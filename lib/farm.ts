@@ -7,7 +7,10 @@ export async function getFarms() {
     .eq("is_active", true)
     .order("name");
 
-  if (error) throw error;
+  if (error) {
+    throw new Error(`getFarms failed: ${error.message}`);
+  }
+
   return data ?? [];
 }
 
@@ -18,14 +21,18 @@ export async function getFarmBySlug(slug: string) {
     .eq("slug", slug)
     .single();
 
-  if (error) throw error;
+  if (error) {
+    throw new Error(`getFarmBySlug failed: ${error.message}`);
+  }
+
   return data;
 }
 
 export async function getCrops(farmId: string) {
   const { data, error } = await supabase
     .from("crops")
-    .select(`
+    .select(
+      `
       id,
       crop_name,
       variety,
@@ -37,19 +44,24 @@ export async function getCrops(farmId: string) {
       actual_yield_kg,
       expected_sale_price_per_kg,
       zone:zones(name)
-    `)
+    `
+    )
     .eq("farm_id", farmId)
     .eq("is_active", true)
     .order("created_at", { ascending: false });
 
-  if (error) throw error;
+  if (error) {
+    throw new Error(`getCrops failed: ${error.message}`);
+  }
+
   return data ?? [];
 }
 
 export async function getTasks(farmId: string) {
   const { data, error } = await supabase
     .from("tasks")
-    .select(`
+    .select(
+      `
       id,
       title,
       description,
@@ -60,11 +72,15 @@ export async function getTasks(farmId: string) {
       proof_required,
       crop:crops(crop_name),
       zone:zones(name)
-    `)
+    `
+    )
     .eq("farm_id", farmId)
     .order("due_date", { ascending: true });
 
-  if (error) throw error;
+  if (error) {
+    throw new Error(`getTasks failed: ${error.message}`);
+  }
+
   return data ?? [];
 }
 
@@ -76,6 +92,9 @@ export async function getActivities(farmId: string) {
     .order("created_at", { ascending: false })
     .limit(8);
 
-  if (error) throw error;
+  if (error) {
+    throw new Error(`getActivities failed: ${error.message}`);
+  }
+
   return data ?? [];
 }
