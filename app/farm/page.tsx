@@ -106,6 +106,8 @@ export default function FarmPage() {
   const [loading, setLoading] = useState(true);
   const [savingCrop, setSavingCrop] = useState(false);
   const [savingTask, setSavingTask] = useState(false);
+  const [savingHarvest, setSavingHarvest] = useState(false);
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string>("");
 
   const [cropForm, setCropForm] = useState({
@@ -128,6 +130,15 @@ export default function FarmPage() {
     priority: "medium",
     due_date: "",
     proof_required: false,
+  });
+
+  const [harvestForm, setHarvestForm] = useState({
+    crop_id: "",
+    zone_id: "",
+    harvest_date: "",
+    quantity_kg: "",
+    quality: "standard",
+    notes: "",
   });
 
   async function loadFarms() {
@@ -193,14 +204,14 @@ export default function FarmPage() {
           zone:zones(name)
         `)
         .eq("farm_id", farmId)
-        .order("due_date", { ascending: true }),
+        .order("due_date", { ascending: true, nullsFirst: false }),
 
       supabase
         .from("activities")
         .select("id, type, title, meta, created_at")
         .eq("farm_id", farmId)
         .order("created_at", { ascending: false })
-        .limit(8),
+        .limit(10),
     ]);
 
     if (zonesRes.error) throw zonesRes.error;
@@ -208,8 +219,11 @@ export default function FarmPage() {
     if (tasksRes.error) throw tasksRes.error;
     if (activitiesRes.error) throw activitiesRes.error;
 
-    setZones((zonesRes.data ?? []) as Zone[]);
-    setCrops((cropsRes.data ?? []) as Crop[]);
+    const zoneRows = (zonesRes.data ?? []) as Zone[];
+    const cropRows = (cropsRes.data ?? []) as Crop[];
+
+    setZones(zoneRows);
+    setCrops(cropRows);
     setTasks((tasksRes.data ?? []) as Task[]);
     setActivities((activitiesRes.data ?? []) as Activity[]);
 
@@ -223,6 +237,27 @@ export default function FarmPage() {
       zone_id: "",
       crop_id: "",
     }));
+
+    setHarvestForm((prev) => ({
+      ...prev,
+      crop_id: "",
+      zone_id: "",
+    }));
+
+    if (cropRows.length === 1 && !harvestForm.crop_id) {
+      setHarvestForm((prev) => ({
+        ...prev,
+        crop_id: cropRows[0].id,
+        zone_id: cropRows[0].zone_id ?? "",
+      }));
+    }
+
+    if (zoneRows.length === 1 && !cropForm.zone_id) {
+      setCropForm((prev) => ({
+        ...prev,
+        zone_id: zoneRows[0].id,
+      }));
+    }
   }
 
   async function refreshAll() {
@@ -267,7 +302,10 @@ export default function FarmPage() {
   const today = new Date().toISOString().slice(0, 10);
 
   const tasksToday = tasks.filter(
-    (task) => task.due_date === today && task.status !== "done"
+    (task) =>
+      task.due_date === today &&
+      task.status !== "done" &&
+      task.status !== "cancelled"
   );
 
   const openTasks = tasks.filter(
@@ -290,10 +328,13 @@ export default function FarmPage() {
       setSavingCrop(true);
       setError("");
 
+      const cropName = cropForm.crop_name.trim();
+      if (!cropName) throw new Error("Crop name is required.");
+
       const { error: insertError } = await supabase.from("crops").insert({
         farm_id: activeFarmId,
         zone_id: cropForm.zone_id || null,
-        crop_name: cropForm.crop_name.trim(),
+        crop_name: cropName,
         variety: cropForm.variety.trim() || null,
         status: cropForm.status,
         planted_on: cropForm.planted_on || null,
@@ -312,10 +353,8 @@ export default function FarmPage() {
       await supabase.from("activities").insert({
         farm_id: activeFarmId,
         type: "crop_created",
-        title: `${cropForm.crop_name.trim()} added`,
-        meta: cropForm.zone_id
-          ? `Zone linked`
-          : "Crop created",
+        title: `${cropName} added`,
+        meta: cropForm.zone_id ? "Crop linked to zone" : "Crop created",
       });
 
       setCropForm({
@@ -345,11 +384,14 @@ export default function FarmPage() {
       setSavingTask(true);
       setError("");
 
+      const title = taskForm.title.trim();
+      if (!title) throw new Error("Task title is required.");
+
       const { error: insertError } = await supabase.from("tasks").insert({
         farm_id: activeFarmId,
         zone_id: taskForm.zone_id || null,
         crop_id: taskForm.crop_id || null,
-        title: taskForm.title.trim(),
+        title,
         description: taskForm.description.trim() || null,
         status: taskForm.status,
         priority: taskForm.priority,
@@ -362,7 +404,7 @@ export default function FarmPage() {
       await supabase.from("activities").insert({
         farm_id: activeFarmId,
         type: "task_created",
-        title: `${taskForm.title.trim()} created`,
+        title: `${title} created`,
         meta: taskForm.due_date ? `Due ${taskForm.due_date}` : "Task added",
       });
 
@@ -382,6 +424,118 @@ export default function FarmPage() {
       setError(err instanceof Error ? err.message : "Failed to create task");
     } finally {
       setSavingTask(false);
+    }
+  }
+
+  async function handleCompleteTask(task: Task) {
+    if (!activeFarmId) return;
+
+    try {
+      setCompletingTaskId(task.id);
+      setError("");
+
+      const { error: updateError } = await supabase
+        .from("tasks")
+        .update({
+          status: "done",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", task.id);
+
+      if (updateError) throw updateError;
+
+      await supabase.from("activities").insert({
+        farm_id: activeFarmId,
+        type: "task_completed",
+        title: `${task.title} completed`,
+        meta: task.crop?.[0]?.crop_name
+          ? `Linked to ${task.crop[0].crop_name}`
+          : "Task marked done",
+      });
+
+      await loadFarmData(activeFarmId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to complete task");
+    } finally {
+      setCompletingTaskId(null);
+    }
+  }
+
+  async function handleLogHarvest(e: React.FormEvent) {
+    e.preventDefault();
+    if (!activeFarmId) return;
+
+    try {
+      setSavingHarvest(true);
+      setError("");
+
+      if (!harvestForm.crop_id) {
+        throw new Error("Choose a crop before logging harvest.");
+      }
+
+      if (!harvestForm.harvest_date) {
+        throw new Error("Harvest date is required.");
+      }
+
+      if (!harvestForm.quantity_kg) {
+        throw new Error("Harvest quantity is required.");
+      }
+
+      const selectedCrop = crops.find((crop) => crop.id === harvestForm.crop_id) ?? null;
+      const harvestQty = Number(harvestForm.quantity_kg);
+
+      const { error: harvestError } = await supabase.from("harvests").insert({
+        farm_id: activeFarmId,
+        crop_id: harvestForm.crop_id,
+        zone_id: harvestForm.zone_id || null,
+        harvest_date: harvestForm.harvest_date,
+        quantity_kg: harvestQty,
+        quality: harvestForm.quality,
+        notes: harvestForm.notes.trim() || null,
+      });
+
+      if (harvestError) throw harvestError;
+
+      const existingActualYield = Number(selectedCrop?.actual_yield_kg ?? 0);
+      const nextActualYield = existingActualYield + harvestQty;
+
+      const cropUpdates: Record<string, unknown> = {
+        actual_yield_kg: nextActualYield,
+      };
+
+      if (selectedCrop?.status !== "harvested") {
+        cropUpdates.status = "harvested";
+        cropUpdates.actual_harvest_date = harvestForm.harvest_date;
+      }
+
+      const { error: cropUpdateError } = await supabase
+        .from("crops")
+        .update(cropUpdates)
+        .eq("id", harvestForm.crop_id);
+
+      if (cropUpdateError) throw cropUpdateError;
+
+      await supabase.from("activities").insert({
+        farm_id: activeFarmId,
+        type: "harvest_logged",
+        title: `${selectedCrop?.crop_name ?? "Harvest"} logged`,
+        meta: `${harvestQty} kg · ${harvestForm.quality}`,
+      });
+
+      setHarvestForm({
+        crop_id: "",
+        zone_id: "",
+        harvest_date: "",
+        quantity_kg: "",
+        quality: "standard",
+        notes: "",
+      });
+
+      await loadFarmData(activeFarmId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to log harvest");
+    } finally {
+      setSavingHarvest(false);
     }
   }
 
@@ -476,145 +630,143 @@ export default function FarmPage() {
               </div>
             </section>
 
-            <section className="mb-6 grid gap-6 lg:grid-cols-2">
+            <section className="mb-6 grid gap-6 xl:grid-cols-3">
               <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                 <div className="mb-5">
                   <h2 className="text-xl font-semibold">Create crop</h2>
                   <p className="mt-1 text-sm text-zinc-500">
-                    Keep this simple. Add the crop cycle and link it to a zone.
+                    Add the crop cycle and link it to a zone.
                   </p>
                 </div>
 
                 <form onSubmit={handleCreateCrop} className="space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-2 block text-sm font-medium">Crop name</label>
-                      <input
-                        type="text"
-                        value={cropForm.crop_name}
-                        onChange={(e) =>
-                          setCropForm((prev) => ({ ...prev, crop_name: e.target.value }))
-                        }
-                        className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                        placeholder="Tomatoes"
-                        required
-                      />
-                    </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Crop name</label>
+                    <input
+                      type="text"
+                      value={cropForm.crop_name}
+                      onChange={(e) =>
+                        setCropForm((prev) => ({ ...prev, crop_name: e.target.value }))
+                      }
+                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                      placeholder="Tomatoes"
+                      required
+                    />
+                  </div>
 
-                    <div>
-                      <label className="mb-2 block text-sm font-medium">Variety</label>
-                      <input
-                        type="text"
-                        value={cropForm.variety}
-                        onChange={(e) =>
-                          setCropForm((prev) => ({ ...prev, variety: e.target.value }))
-                        }
-                        className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                        placeholder="Roma"
-                      />
-                    </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Variety</label>
+                    <input
+                      type="text"
+                      value={cropForm.variety}
+                      onChange={(e) =>
+                        setCropForm((prev) => ({ ...prev, variety: e.target.value }))
+                      }
+                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                      placeholder="Roma"
+                    />
+                  </div>
 
-                    <div>
-                      <label className="mb-2 block text-sm font-medium">Zone</label>
-                      <select
-                        value={cropForm.zone_id}
-                        onChange={(e) =>
-                          setCropForm((prev) => ({ ...prev, zone_id: e.target.value }))
-                        }
-                        className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                      >
-                        <option value="">No zone</option>
-                        {zones.map((zone) => (
-                          <option key={zone.id} value={zone.id}>
-                            {zone.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Zone</label>
+                    <select
+                      value={cropForm.zone_id}
+                      onChange={(e) =>
+                        setCropForm((prev) => ({ ...prev, zone_id: e.target.value }))
+                      }
+                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                    >
+                      <option value="">No zone</option>
+                      {zones.map((zone) => (
+                        <option key={zone.id} value={zone.id}>
+                          {zone.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                    <div>
-                      <label className="mb-2 block text-sm font-medium">Status</label>
-                      <select
-                        value={cropForm.status}
-                        onChange={(e) =>
-                          setCropForm((prev) => ({ ...prev, status: e.target.value }))
-                        }
-                        className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                      >
-                        <option value="planned">planned</option>
-                        <option value="planted">planted</option>
-                        <option value="germinating">germinating</option>
-                        <option value="growing">growing</option>
-                        <option value="harvest_ready">harvest_ready</option>
-                      </select>
-                    </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Status</label>
+                    <select
+                      value={cropForm.status}
+                      onChange={(e) =>
+                        setCropForm((prev) => ({ ...prev, status: e.target.value }))
+                      }
+                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                    >
+                      <option value="planned">planned</option>
+                      <option value="planted">planted</option>
+                      <option value="germinating">germinating</option>
+                      <option value="growing">growing</option>
+                      <option value="harvest_ready">harvest_ready</option>
+                    </select>
+                  </div>
 
-                    <div>
-                      <label className="mb-2 block text-sm font-medium">Planted on</label>
-                      <input
-                        type="date"
-                        value={cropForm.planted_on}
-                        onChange={(e) =>
-                          setCropForm((prev) => ({ ...prev, planted_on: e.target.value }))
-                        }
-                        className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                      />
-                    </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Planted on</label>
+                    <input
+                      type="date"
+                      value={cropForm.planted_on}
+                      onChange={(e) =>
+                        setCropForm((prev) => ({ ...prev, planted_on: e.target.value }))
+                      }
+                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                    />
+                  </div>
 
-                    <div>
-                      <label className="mb-2 block text-sm font-medium">
-                        Expected harvest
-                      </label>
-                      <input
-                        type="date"
-                        value={cropForm.expected_harvest_start}
-                        onChange={(e) =>
-                          setCropForm((prev) => ({
-                            ...prev,
-                            expected_harvest_start: e.target.value,
-                          }))
-                        }
-                        className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                      />
-                    </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">
+                      Expected harvest
+                    </label>
+                    <input
+                      type="date"
+                      value={cropForm.expected_harvest_start}
+                      onChange={(e) =>
+                        setCropForm((prev) => ({
+                          ...prev,
+                          expected_harvest_start: e.target.value,
+                        }))
+                      }
+                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                    />
+                  </div>
 
-                    <div>
-                      <label className="mb-2 block text-sm font-medium">
-                        Estimated yield (kg)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={cropForm.estimated_yield_kg}
-                        onChange={(e) =>
-                          setCropForm((prev) => ({
-                            ...prev,
-                            estimated_yield_kg: e.target.value,
-                          }))
-                        }
-                        className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                        placeholder="900"
-                      />
-                    </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">
+                      Estimated yield (kg)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={cropForm.estimated_yield_kg}
+                      onChange={(e) =>
+                        setCropForm((prev) => ({
+                          ...prev,
+                          estimated_yield_kg: e.target.value,
+                        }))
+                      }
+                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                      placeholder="900"
+                    />
+                  </div>
 
-                    <div>
-                      <label className="mb-2 block text-sm font-medium">
-                        Expected price per kg
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={cropForm.expected_sale_price_per_kg}
-                        onChange={(e) =>
-                          setCropForm((prev) => ({
-                            ...prev,
-                            expected_sale_price_per_kg: e.target.value,
-                          }))
-                        }
-                        className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                        placeholder="3000"
-                      />
-                    </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">
+                      Expected price per kg
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={cropForm.expected_sale_price_per_kg}
+                      onChange={(e) =>
+                        setCropForm((prev) => ({
+                          ...prev,
+                          expected_sale_price_per_kg: e.target.value,
+                        }))
+                      }
+                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                      placeholder="3000"
+                    />
                   </div>
 
                   <button
@@ -665,44 +817,44 @@ export default function FarmPage() {
                     />
                   </div>
 
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Zone</label>
+                    <select
+                      value={taskForm.zone_id}
+                      onChange={(e) =>
+                        setTaskForm((prev) => ({ ...prev, zone_id: e.target.value }))
+                      }
+                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                    >
+                      <option value="">No zone</option>
+                      {zones.map((zone) => (
+                        <option key={zone.id} value={zone.id}>
+                          {zone.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Crop</label>
+                    <select
+                      value={taskForm.crop_id}
+                      onChange={(e) =>
+                        setTaskForm((prev) => ({ ...prev, crop_id: e.target.value }))
+                      }
+                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                    >
+                      <option value="">General task</option>
+                      {crops.map((crop) => (
+                        <option key={crop.id} value={crop.id}>
+                          {crop.crop_name}
+                          {crop.variety ? ` · ${crop.variety}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-2 block text-sm font-medium">Zone</label>
-                      <select
-                        value={taskForm.zone_id}
-                        onChange={(e) =>
-                          setTaskForm((prev) => ({ ...prev, zone_id: e.target.value }))
-                        }
-                        className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                      >
-                        <option value="">No zone</option>
-                        {zones.map((zone) => (
-                          <option key={zone.id} value={zone.id}>
-                            {zone.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium">Crop</label>
-                      <select
-                        value={taskForm.crop_id}
-                        onChange={(e) =>
-                          setTaskForm((prev) => ({ ...prev, crop_id: e.target.value }))
-                        }
-                        className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                      >
-                        <option value="">General task</option>
-                        {crops.map((crop) => (
-                          <option key={crop.id} value={crop.id}>
-                            {crop.crop_name}
-                            {crop.variety ? ` · ${crop.variety}` : ""}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
                     <div>
                       <label className="mb-2 block text-sm font-medium">Status</label>
                       <select
@@ -733,35 +885,33 @@ export default function FarmPage() {
                         <option value="urgent">urgent</option>
                       </select>
                     </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium">Due date</label>
-                      <input
-                        type="date"
-                        value={taskForm.due_date}
-                        onChange={(e) =>
-                          setTaskForm((prev) => ({ ...prev, due_date: e.target.value }))
-                        }
-                        className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                      />
-                    </div>
-
-                    <div className="flex items-end">
-                      <label className="flex items-center gap-3 rounded-2xl border border-zinc-300 px-4 py-3 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={taskForm.proof_required}
-                          onChange={(e) =>
-                            setTaskForm((prev) => ({
-                              ...prev,
-                              proof_required: e.target.checked,
-                            }))
-                          }
-                        />
-                        Photo proof required
-                      </label>
-                    </div>
                   </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Due date</label>
+                    <input
+                      type="date"
+                      value={taskForm.due_date}
+                      onChange={(e) =>
+                        setTaskForm((prev) => ({ ...prev, due_date: e.target.value }))
+                      }
+                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                    />
+                  </div>
+
+                  <label className="flex items-center gap-3 rounded-2xl border border-zinc-300 px-4 py-3 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={taskForm.proof_required}
+                      onChange={(e) =>
+                        setTaskForm((prev) => ({
+                          ...prev,
+                          proof_required: e.target.checked,
+                        }))
+                      }
+                    />
+                    Photo proof required
+                  </label>
 
                   <button
                     type="submit"
@@ -769,6 +919,138 @@ export default function FarmPage() {
                     className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {savingTask ? "Creating task..." : "Create task"}
+                  </button>
+                </form>
+              </div>
+
+              <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <div className="mb-5">
+                  <h2 className="text-xl font-semibold">Log harvest</h2>
+                  <p className="mt-1 text-sm text-zinc-500">
+                    Record actual yield and push the crop into real production data.
+                  </p>
+                </div>
+
+                <form onSubmit={handleLogHarvest} className="space-y-4">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Crop</label>
+                    <select
+                      value={harvestForm.crop_id}
+                      onChange={(e) => {
+                        const selectedCrop =
+                          crops.find((crop) => crop.id === e.target.value) ?? null;
+
+                        setHarvestForm((prev) => ({
+                          ...prev,
+                          crop_id: e.target.value,
+                          zone_id: selectedCrop?.zone_id ?? "",
+                        }));
+                      }}
+                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                      required
+                    >
+                      <option value="">Select crop</option>
+                      {crops.map((crop) => (
+                        <option key={crop.id} value={crop.id}>
+                          {crop.crop_name}
+                          {crop.variety ? ` · ${crop.variety}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Zone</label>
+                    <select
+                      value={harvestForm.zone_id}
+                      onChange={(e) =>
+                        setHarvestForm((prev) => ({ ...prev, zone_id: e.target.value }))
+                      }
+                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                    >
+                      <option value="">No zone</option>
+                      {zones.map((zone) => (
+                        <option key={zone.id} value={zone.id}>
+                          {zone.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Harvest date</label>
+                    <input
+                      type="date"
+                      value={harvestForm.harvest_date}
+                      onChange={(e) =>
+                        setHarvestForm((prev) => ({
+                          ...prev,
+                          harvest_date: e.target.value,
+                        }))
+                      }
+                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Quantity (kg)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={harvestForm.quantity_kg}
+                      onChange={(e) =>
+                        setHarvestForm((prev) => ({
+                          ...prev,
+                          quantity_kg: e.target.value,
+                        }))
+                      }
+                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                      placeholder="120"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Quality</label>
+                    <select
+                      value={harvestForm.quality}
+                      onChange={(e) =>
+                        setHarvestForm((prev) => ({
+                          ...prev,
+                          quality: e.target.value,
+                        }))
+                      }
+                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                    >
+                      <option value="premium">premium</option>
+                      <option value="standard">standard</option>
+                      <option value="lower_grade">lower_grade</option>
+                      <option value="mixed">mixed</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Notes</label>
+                    <textarea
+                      value={harvestForm.notes}
+                      onChange={(e) =>
+                        setHarvestForm((prev) => ({
+                          ...prev,
+                          notes: e.target.value,
+                        }))
+                      }
+                      className="min-h-[100px] w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                      placeholder="Any notes on quality, weather, or batch."
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={savingHarvest || !harvestForm.crop_id}
+                    className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {savingHarvest ? "Logging harvest..." : "Log harvest"}
                   </button>
                 </form>
               </div>
@@ -781,7 +1063,7 @@ export default function FarmPage() {
                     <div>
                       <h2 className="text-xl font-semibold">Today’s tasks</h2>
                       <p className="mt-1 text-sm text-zinc-500">
-                        Keep this tight. This is what matters in the field.
+                        This should feel direct and useful, not like admin clutter.
                       </p>
                     </div>
                     <span className="text-sm text-zinc-500">{tasksToday.length} due</span>
@@ -791,48 +1073,62 @@ export default function FarmPage() {
                     {tasksToday.length === 0 ? (
                       <p className="text-sm text-zinc-500">No tasks due today.</p>
                     ) : (
-                      tasksToday.map((task) => (
-                        <div
-                          key={task.id}
-                          className="rounded-2xl border border-zinc-200 p-4"
-                        >
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span
-                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass(
-                                task.status
-                              )}`}
-                            >
-                              {task.status}
-                            </span>
+                      tasksToday.map((task) => {
+                        const isCompleting = completingTaskId === task.id;
 
-                            <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
-                              {task.priority}
-                            </span>
-
-                            {task.proof_required ? (
-                              <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
-                                photo proof
+                        return (
+                          <div
+                            key={task.id}
+                            className="rounded-2xl border border-zinc-200 p-4"
+                          >
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass(
+                                  task.status
+                                )}`}
+                              >
+                                {task.status}
                               </span>
+
+                              <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
+                                {task.priority}
+                              </span>
+
+                              {task.proof_required ? (
+                                <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
+                                  photo proof
+                                </span>
+                              ) : null}
+                            </div>
+
+                            <h3 className="mt-3 text-base font-semibold">{task.title}</h3>
+
+                            <div className="mt-2 text-sm text-zinc-600">
+                              {task.zone?.[0]?.name ?? "No zone"}
+                              <span className="mx-2">·</span>
+                              {task.crop?.[0]?.crop_name ?? "General task"}
+                              <span className="mx-2">·</span>
+                              {formatDate(task.due_date)}
+                            </div>
+
+                            {task.description ? (
+                              <p className="mt-2 text-sm text-zinc-500">
+                                {task.description}
+                              </p>
                             ) : null}
+
+                            <div className="mt-4">
+                              <button
+                                onClick={() => handleCompleteTask(task)}
+                                disabled={isCompleting}
+                                className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {isCompleting ? "Completing..." : "Mark done"}
+                              </button>
+                            </div>
                           </div>
-
-                          <h3 className="mt-3 text-base font-semibold">{task.title}</h3>
-
-                          <div className="mt-2 text-sm text-zinc-600">
-                            {task.zone?.[0]?.name ?? "No zone"}
-                            <span className="mx-2">·</span>
-                            {task.crop?.[0]?.crop_name ?? "General task"}
-                            <span className="mx-2">·</span>
-                            {formatDate(task.due_date)}
-                          </div>
-
-                          {task.description ? (
-                            <p className="mt-2 text-sm text-zinc-500">
-                              {task.description}
-                            </p>
-                          ) : null}
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -842,18 +1138,19 @@ export default function FarmPage() {
                     <div>
                       <h2 className="text-xl font-semibold">Crop tracker</h2>
                       <p className="mt-1 text-sm text-zinc-500">
-                        What is planted, where it is, and when it should come out.
+                        What is planted, where it is, and how much it is really yielding.
                       </p>
                     </div>
                     <span className="text-sm text-zinc-500">{crops.length} crops</span>
                   </div>
 
                   <div className="mt-5 overflow-hidden rounded-2xl border border-zinc-200">
-                    <div className="grid grid-cols-4 gap-4 border-b border-zinc-200 bg-zinc-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                    <div className="grid grid-cols-5 gap-4 border-b border-zinc-200 bg-zinc-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
                       <div>Crop</div>
                       <div>Zone</div>
                       <div>Status</div>
                       <div>Harvest</div>
+                      <div>Actual yield</div>
                     </div>
 
                     {crops.length === 0 ? (
@@ -864,7 +1161,7 @@ export default function FarmPage() {
                       crops.map((crop) => (
                         <div
                           key={crop.id}
-                          className="grid grid-cols-4 gap-4 border-b border-zinc-100 px-4 py-4 text-sm last:border-b-0"
+                          className="grid grid-cols-5 gap-4 border-b border-zinc-100 px-4 py-4 text-sm last:border-b-0"
                         >
                           <div>
                             <div className="font-semibold">{crop.crop_name}</div>
@@ -884,6 +1181,8 @@ export default function FarmPage() {
                           </div>
 
                           <div>{formatDate(crop.expected_harvest_start)}</div>
+
+                          <div>{crop.actual_yield_kg ?? 0} kg</div>
                         </div>
                       ))
                     )}
@@ -920,10 +1219,10 @@ export default function FarmPage() {
                 <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                   <h2 className="text-xl font-semibold">Next best move</h2>
                   <div className="mt-4 space-y-3 text-sm text-zinc-600">
-                    <p>Add task completion</p>
-                    <p>Add harvest logging</p>
                     <p>Add expense logging</p>
-                    <p>Then add auth and worker-specific screens</p>
+                    <p>Add sales logging</p>
+                    <p>Add worker task view</p>
+                    <p>Then add auth and permissions</p>
                   </div>
                 </div>
               </aside>
