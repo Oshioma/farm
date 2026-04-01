@@ -1,5 +1,6 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
   reactStrictMode: true,
 
   images: {
@@ -9,10 +10,6 @@ const nextConfig = {
         hostname: "**",
       },
     ],
-  },
-
-  experimental: {
-    serverActions: true,
   },
 };
 
