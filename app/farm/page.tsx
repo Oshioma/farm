@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import {
   getFarms,
@@ -28,8 +29,14 @@ export default function FarmPage() {
 
   const [activeFarmId, setActiveFarmId] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string>("");
+
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+    router.push("/login");
+  }
 
   async function loadFarms() {
     const farmRows = await getFarms();
@@ -285,7 +292,7 @@ export default function FarmPage() {
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {farms.map((farm) => {
                 const isActive = farm.id === activeFarmId;
                 return (
@@ -302,6 +309,12 @@ export default function FarmPage() {
                   </button>
                 );
               })}
+              <button
+                onClick={handleSignOut}
+                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+              >
+                Sign out
+              </button>
             </div>
           </div>
         </header>
