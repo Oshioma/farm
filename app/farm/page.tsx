@@ -48,13 +48,59 @@ function badgeClass(status?: string | null) {
 
 type SearchParams = Promise<{ farm?: string }>;
 
+type RelatedZone = { name: string }[];
+type RelatedCrop = { crop_name: string }[];
+
+type Farm = {
+  id: string;
+  name: string;
+  slug: string;
+  location: string | null;
+  size_acres: number | null;
+};
+
+type Crop = {
+  id: string;
+  crop_name: string;
+  variety: string | null;
+  status: string | null;
+  planted_on: string | null;
+  expected_harvest_start: string | null;
+  expected_harvest_end: string | null;
+  estimated_yield_kg: number | null;
+  actual_yield_kg: number | null;
+  expected_sale_price_per_kg: number | null;
+  zone: RelatedZone | null;
+};
+
+type Task = {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string | null;
+  priority: string | null;
+  due_date: string | null;
+  due_time: string | null;
+  proof_required: boolean | null;
+  crop: RelatedCrop | null;
+  zone: RelatedZone | null;
+};
+
+type Activity = {
+  id: string;
+  type: string;
+  title: string;
+  meta: string | null;
+  created_at: string | null;
+};
+
 export default async function FarmPage({
   searchParams,
 }: {
   searchParams?: SearchParams;
 }) {
   const params = await searchParams;
-  const farms = await getFarms();
+  const farms = (await getFarms()) as Farm[];
 
   if (!farms.length) {
     return (
@@ -78,7 +124,7 @@ export default async function FarmPage({
   }
 
   const activeSlug = params?.farm ?? farms[0].slug;
-  const farm = await getFarmBySlug(activeSlug);
+  const farm = (await getFarmBySlug(activeSlug)) as Farm | null;
 
   if (!farm) {
     return (
@@ -97,11 +143,11 @@ export default async function FarmPage({
     );
   }
 
-  const [crops, tasks, activities] = await Promise.all([
+  const [crops, tasks, activities] = (await Promise.all([
     getCrops(farm.id),
     getTasks(farm.id),
     getActivities(farm.id),
-  ]);
+  ])) as [Crop[], Task[], Activity[]];
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -238,9 +284,9 @@ export default async function FarmPage({
                       <h3 className="mt-3 text-base font-semibold">{task.title}</h3>
 
                       <div className="mt-2 text-sm text-zinc-600">
-                        {task.zone?.name ?? "No zone"}
+                        {task.zone?.[0]?.name ?? "No zone"}
                         <span className="mx-2">·</span>
-                        {task.crop?.crop_name ?? "General task"}
+                        {task.crop?.[0]?.crop_name ?? "General task"}
                         <span className="mx-2">·</span>
                         {formatDate(task.due_date)}
                       </div>
@@ -290,7 +336,7 @@ export default async function FarmPage({
                         <div className="text-zinc-500">{crop.variety || "—"}</div>
                       </div>
 
-                      <div>{crop.zone?.name ?? "No zone"}</div>
+                      <div>{crop.zone?.[0]?.name ?? "No zone"}</div>
 
                       <div>
                         <span
