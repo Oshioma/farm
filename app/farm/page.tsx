@@ -9,16 +9,19 @@ import {
   getCrops,
   getTasks,
   getActivities,
+  getExpenses,
 } from "@/lib/farm";
-import type { Farm, Zone, Crop, Task, Activity } from "@/lib/farm";
+import type { Farm, Zone, Crop, Task, Activity, Expense } from "@/lib/farm";
 import { formatDate, formatMoney, badgeClass } from "@/app/farm/utils";
 import { CropForm } from "@/app/farm/components/CropForm";
 import { TaskForm } from "@/app/farm/components/TaskForm";
 import { HarvestForm } from "@/app/farm/components/HarvestForm";
+import { ExpenseForm } from "@/app/farm/components/ExpenseForm";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
 import type { CropFormData } from "@/app/farm/components/CropForm";
 import type { TaskFormData } from "@/app/farm/components/TaskForm";
 import type { HarvestFormData } from "@/app/farm/components/HarvestForm";
+import type { ExpenseFormData } from "@/app/farm/components/ExpenseForm";
 
 export default function FarmPage() {
   const [farms, setFarms] = useState<Farm[]>([]);
@@ -26,6 +29,7 @@ export default function FarmPage() {
   const [crops, setCrops] = useState<Crop[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
 
   const [activeFarmId, setActiveFarmId] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -47,17 +51,19 @@ export default function FarmPage() {
   }
 
   async function loadFarmData(farmId: string) {
-    const [zoneRows, cropRows, taskRows, activityRows] = await Promise.all([
+    const [zoneRows, cropRows, taskRows, activityRows, expenseRows] = await Promise.all([
       getZones(farmId),
       getCrops(farmId),
       getTasks(farmId),
       getActivities(farmId),
+      getExpenses(farmId),
     ]);
 
     setZones(zoneRows);
     setCrops(cropRows);
     setTasks(taskRows);
     setActivities(activityRows);
+    setExpenses(expenseRows);
   }
 
   async function refreshAll() {
@@ -117,6 +123,8 @@ export default function FarmPage() {
   const forecastRevenue = crops.reduce((sum, crop) => {
     return sum + Number(crop.estimated_yield_kg ?? 0) * Number(crop.expected_sale_price_per_kg ?? 0);
   }, 0);
+
+  const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
 
   const defaultZoneId = zones.length === 1 ? zones[0].id : "";
   const defaultCropId = crops.length === 1 ? crops[0].id : "";
@@ -274,6 +282,39 @@ export default function FarmPage() {
     }
   }
 
+  async function handleLogExpense(data: ExpenseFormData): Promise<boolean> {
+    if (!activeFarmId) return false;
+    try {
+      setError("");
+      if (!data.amount || Number(data.amount) <= 0) throw new Error("Amount must be greater than zero.");
+      if (!data.expense_date) throw new Error("Expense date is required.");
+
+      const { error: insertError } = await supabase.from("expenses").insert({
+        farm_id: activeFarmId,
+        zone_id: data.zone_id || null,
+        crop_id: data.crop_id || null,
+        category: data.category,
+        amount: Number(data.amount),
+        description: data.description.trim() || null,
+        expense_date: data.expense_date,
+      });
+      if (insertError) throw insertError;
+
+      await supabase.from("activities").insert({
+        farm_id: activeFarmId,
+        type: "expense_logged",
+        title: `${data.category} expense logged`,
+        meta: `${formatMoney(Number(data.amount))}${data.description.trim() ? ` · ${data.description.trim()}` : ""}`,
+      });
+
+      await loadFarmData(activeFarmId);
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to log expense");
+      return false;
+    }
+  }
+
   return (
     <main className="min-h-screen bg-stone-50 text-zinc-900">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -339,7 +380,7 @@ export default function FarmPage() {
 
         {activeFarm ? (
           <>
-            <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
               <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
                   Tasks today
@@ -367,9 +408,16 @@ export default function FarmPage() {
                 </p>
                 <p className="mt-3 text-3xl font-semibold">{formatMoney(forecastRevenue)}</p>
               </div>
+
+              <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                  Total expenses
+                </p>
+                <p className="mt-3 text-3xl font-semibold">{formatMoney(totalExpenses)}</p>
+              </div>
             </section>
 
-            <section className="mb-6 grid gap-6 xl:grid-cols-3">
+            <section className="mb-6 grid gap-6 xl:grid-cols-4">
               <CropForm
                 zones={zones}
                 defaultZoneId={defaultZoneId}
@@ -387,6 +435,12 @@ export default function FarmPage() {
                 defaultCropId={defaultCropId}
                 defaultZoneId={defaultZoneId}
                 onSubmit={handleLogHarvest}
+              />
+              <ExpenseForm
+                zones={zones}
+                crops={crops}
+                defaultZoneId={defaultZoneId}
+                onSubmit={handleLogExpense}
               />
             </section>
 
@@ -507,6 +561,48 @@ export default function FarmPage() {
                     )}
                   </div>
                 </div>
+
+                <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-xl font-semibold">Expenses</h2>
+                      <p className="mt-1 text-sm text-zinc-500">
+                        Most recent 20 expenses across all categories.
+                      </p>
+                    </div>
+                    <span className="text-sm text-zinc-500">{expenses.length} logged</span>
+                  </div>
+
+                  <div className="mt-5 overflow-hidden rounded-2xl border border-zinc-200">
+                    <div className="grid grid-cols-4 gap-4 border-b border-zinc-200 bg-zinc-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                      <div>Date</div>
+                      <div>Category</div>
+                      <div>Crop</div>
+                      <div>Amount</div>
+                    </div>
+
+                    {expenses.length === 0 ? (
+                      <div className="px-4 py-6 text-sm text-zinc-500">No expenses yet.</div>
+                    ) : (
+                      expenses.map((expense) => (
+                        <div
+                          key={expense.id}
+                          className="grid grid-cols-4 gap-4 border-b border-zinc-100 px-4 py-4 text-sm last:border-b-0"
+                        >
+                          <div>{formatDate(expense.expense_date)}</div>
+                          <div>
+                            <div className="font-medium capitalize">{expense.category}</div>
+                            {expense.description ? (
+                              <div className="text-zinc-500">{expense.description}</div>
+                            ) : null}
+                          </div>
+                          <div>{expense.crop?.[0]?.crop_name ?? "—"}</div>
+                          <div className="font-medium">{formatMoney(expense.amount)}</div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
               </section>
 
               <aside className="space-y-6">
@@ -515,10 +611,8 @@ export default function FarmPage() {
                 <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                   <h2 className="text-xl font-semibold">Next best move</h2>
                   <div className="mt-4 space-y-3 text-sm text-zinc-600">
-                    <p>Add expense logging</p>
                     <p>Add sales logging</p>
                     <p>Add worker task view</p>
-                    <p>Then add auth and permissions</p>
                   </div>
                 </div>
               </aside>
