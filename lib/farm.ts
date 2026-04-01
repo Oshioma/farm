@@ -54,6 +54,19 @@ export type Activity = {
   created_at: string | null;
 };
 
+export type Expense = {
+  id: string;
+  category: string;
+  amount: number;
+  description: string | null;
+  expense_date: string;
+  created_at: string | null;
+  crop_id: string | null;
+  zone_id: string | null;
+  crop: { crop_name: string }[] | null;
+  zone: { name: string }[] | null;
+};
+
 export async function getFarms(): Promise<Farm[]> {
   const { data, error } = await supabase
     .from("farms")
@@ -140,4 +153,29 @@ export async function getActivities(farmId: string): Promise<Activity[]> {
 
   if (error) throw new Error(`getActivities failed: ${error.message}`);
   return (data ?? []) as Activity[];
+}
+
+export async function getExpenses(farmId: string): Promise<Expense[]> {
+  const { data, error } = await supabase
+    .from("expenses")
+    .select(
+      `
+      id,
+      category,
+      amount,
+      description,
+      expense_date,
+      created_at,
+      crop_id,
+      zone_id,
+      crop:crops(crop_name),
+      zone:zones(name)
+    `
+    )
+    .eq("farm_id", farmId)
+    .order("expense_date", { ascending: false })
+    .limit(20);
+
+  if (error) throw new Error(`getExpenses failed: ${error.message}`);
+  return (data ?? []) as Expense[];
 }
