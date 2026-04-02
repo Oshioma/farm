@@ -9,24 +9,34 @@ export type ExpenseFormData = {
   expense_date: string;
   crop_id: string;
   zone_id: string;
+  notes: string;
+  vendor_name: string;
 };
 
 const blank: ExpenseFormData = {
-  category: "labor",
+  category: "other",
   amount: "",
   expense_date: "",
   crop_id: "",
   zone_id: "",
+  notes: "",
+  vendor_name: "",
 };
 
 const CATEGORIES = [
-  "labor",
   "seeds",
   "fertilizer",
+  "compost",
   "pesticide",
-  "equipment",
-  "water",
+  "labour",
   "transport",
+  "fuel",
+  "equipment",
+  "irrigation",
+  "packaging",
+  "maintenance",
+  "rent",
+  "utilities",
   "other",
 ];
 
@@ -35,67 +45,63 @@ type Props = {
   crops: Crop[];
   defaultZoneId: string;
   onSubmit: (data: ExpenseFormData) => Promise<boolean>;
+  initial?: ExpenseFormData;
+  submitLabel?: string;
 };
 
-export function ExpenseForm({ zones, crops, defaultZoneId, onSubmit }: Props) {
-  const [form, setForm] = useState<ExpenseFormData>(blank);
+export function ExpenseForm({ zones, crops, defaultZoneId, onSubmit, initial, submitLabel }: Props) {
+  const [form, setForm] = useState<ExpenseFormData>(initial ?? blank);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (defaultZoneId) {
+    if (initial) {
+      setForm(initial);
+    } else if (defaultZoneId) {
       setForm((prev) => (prev.zone_id ? prev : { ...prev, zone_id: defaultZoneId }));
     }
-  }, [defaultZoneId]);
+  }, [initial, defaultZoneId]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     const ok = await onSubmit(form);
     setSaving(false);
-    if (ok) setForm({ ...blank, zone_id: defaultZoneId });
+    if (ok && !initial) setForm({ ...blank, zone_id: defaultZoneId });
   }
 
   return (
-    <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-      <div className="mb-5">
-        <h2 className="text-xl font-semibold">Log expense</h2>
-        <p className="mt-1 text-sm text-zinc-500">
-          Record what was spent and link it to a crop or zone.
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="mb-2 block text-sm font-medium">Category</label>
-            <select
-              value={form.category}
-              onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
-              className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium">Amount (TZS)</label>
-            <input
-              type="number"
-              step="1"
-              min="0"
-              value={form.amount}
-              onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
-              className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-              placeholder="15000"
-              required
-            />
-          </div>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-2 block text-sm font-medium">Category</label>
+          <select
+            value={form.category}
+            onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
+            className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
         </div>
 
+        <div>
+          <label className="mb-2 block text-sm font-medium">Amount (TZS)</label>
+          <input
+            type="number"
+            step="1"
+            min="0"
+            value={form.amount}
+            onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
+            className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+            placeholder="Leave blank if unknown"
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="mb-2 block text-sm font-medium">Date</label>
           <input
@@ -107,6 +113,30 @@ export function ExpenseForm({ zones, crops, defaultZoneId, onSubmit }: Props) {
           />
         </div>
 
+        <div>
+          <label className="mb-2 block text-sm font-medium">Paid by</label>
+          <input
+            type="text"
+            value={form.vendor_name}
+            onChange={(e) => setForm((prev) => ({ ...prev, vendor_name: e.target.value }))}
+            className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+            placeholder="e.g. Eh"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="mb-2 block text-sm font-medium">Notes</label>
+        <input
+          type="text"
+          value={form.notes}
+          onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+          className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+          placeholder="What was purchased?"
+        />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="mb-2 block text-sm font-medium">Crop</label>
           <select
@@ -139,15 +169,15 @@ export function ExpenseForm({ zones, crops, defaultZoneId, onSubmit }: Props) {
             ))}
           </select>
         </div>
+      </div>
 
-        <button
-          type="submit"
-          disabled={saving || !form.amount}
-          className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {saving ? "Logging expense..." : "Log expense"}
-        </button>
-      </form>
-    </div>
+      <button
+        type="submit"
+        disabled={saving}
+        className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {saving ? "Saving..." : (submitLabel ?? "Log expense")}
+      </button>
+    </form>
   );
 }

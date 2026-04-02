@@ -57,8 +57,9 @@ export type Activity = {
 export type Expense = {
   id: string;
   category: string;
-  amount: number;
-  description: string | null;
+  amount: number | null;
+  notes: string | null;
+  vendor_name: string | null;
   expense_date: string;
   created_at: string | null;
   crop_id: string | null;
@@ -175,6 +176,8 @@ export async function getExpenses(farmId: string): Promise<Expense[]> {
       id,
       category,
       amount,
+      notes,
+      vendor_name,
       expense_date,
       created_at,
       crop_id,

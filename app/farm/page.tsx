@@ -63,6 +63,11 @@ export default function FarmPage() {
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
   const [error, setError] = useState<string>("");
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+  const [editingExpenseForm, setEditingExpenseForm] = useState<ExpenseFormData | null>(null);
+  const [savingExpenseId, setSavingExpenseId] = useState<string | null>(null);
+  const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
+  const [confirmDeleteExpenseId, setConfirmDeleteExpenseId] = useState<string | null>(null);
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -408,7 +413,6 @@ export default function FarmPage() {
     if (!activeFarmId) return false;
     try {
       setError("");
-      if (!data.amount || Number(data.amount) <= 0) throw new Error("Amount must be greater than zero.");
       if (!data.expense_date) throw new Error("Expense date is required.");
 
       const { error: insertError } = await supabase.from("expenses").insert({
@@ -416,8 +420,10 @@ export default function FarmPage() {
         zone_id: data.zone_id || null,
         crop_id: data.crop_id || null,
         category: data.category,
-        amount: Number(data.amount),
+        amount: data.amount ? Number(data.amount) : null,
         expense_date: data.expense_date,
+        notes: data.notes || null,
+        vendor_name: data.vendor_name || null,
       });
       if (insertError) throw insertError;
 
@@ -425,7 +431,7 @@ export default function FarmPage() {
         farm_id: activeFarmId,
         type: "expense_logged",
         title: `${data.category} expense logged`,
-        meta: formatMoney(Number(data.amount)),
+        meta: data.amount ? formatMoney(Number(data.amount)) : "amount TBC",
       });
 
       await loadFarmData(activeFarmId);
@@ -433,6 +439,47 @@ export default function FarmPage() {
     } catch (err) {
       setError(errMsg(err, "Failed to log expense"));
       return false;
+    }
+  }
+
+  async function handleUpdateExpense(id: string, data: ExpenseFormData): Promise<boolean> {
+    try {
+      setError("");
+      setSavingExpenseId(id);
+      const { error: updateError } = await supabase.from("expenses").update({
+        category: data.category,
+        amount: data.amount ? Number(data.amount) : null,
+        expense_date: data.expense_date,
+        notes: data.notes || null,
+        vendor_name: data.vendor_name || null,
+        zone_id: data.zone_id || null,
+        crop_id: data.crop_id || null,
+      }).eq("id", id);
+      if (updateError) throw updateError;
+      await loadFarmData(activeFarmId);
+      setEditingExpenseId(null);
+      setEditingExpenseForm(null);
+      return true;
+    } catch (err) {
+      setError(errMsg(err, "Failed to update expense"));
+      return false;
+    } finally {
+      setSavingExpenseId(null);
+    }
+  }
+
+  async function handleDeleteExpense(id: string) {
+    try {
+      setError("");
+      setDeletingExpenseId(id);
+      const { error: deleteError } = await supabase.from("expenses").delete().eq("id", id);
+      if (deleteError) throw deleteError;
+      await loadFarmData(activeFarmId);
+      setConfirmDeleteExpenseId(null);
+    } catch (err) {
+      setError(errMsg(err, "Failed to delete expense"));
+    } finally {
+      setDeletingExpenseId(null);
     }
   }
 
@@ -1245,25 +1292,88 @@ export default function FarmPage() {
                   <span className="text-sm text-zinc-500">{expenses.length} logged</span>
                 </div>
 
-                <div className="mt-5 overflow-hidden rounded-2xl border border-zinc-200">
-                  <div className="grid grid-cols-4 gap-4 border-b border-zinc-200 bg-zinc-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                    <div>Date</div>
-                    <div>Category</div>
-                    <div>Crop</div>
-                    <div>Amount</div>
-                  </div>
+                <div className="mt-5 space-y-2">
                   {expenses.length === 0 ? (
-                    <div className="px-4 py-6 text-sm text-zinc-500">No expenses yet.</div>
+                    <div className="rounded-2xl border border-zinc-200 px-4 py-6 text-sm text-zinc-500">No expenses yet.</div>
                   ) : (
                     expenses.map((expense) => (
-                      <div
-                        key={expense.id}
-                        className="grid grid-cols-4 gap-4 border-b border-zinc-100 px-4 py-4 text-sm last:border-b-0"
-                      >
-                        <div>{formatDate(expense.expense_date)}</div>
-                        <div className="font-medium capitalize">{expense.category}</div>
-                        <div>{expense.crop?.[0]?.crop_name ?? "—"}</div>
-                        <div className="font-medium">{formatMoney(expense.amount)}</div>
+                      <div key={expense.id} className="rounded-2xl border border-zinc-200 bg-white">
+                        {editingExpenseId === expense.id && editingExpenseForm ? (
+                          <div className="p-4">
+                            <ExpenseForm
+                              zones={zones}
+                              crops={crops}
+                              defaultZoneId={defaultZoneId}
+                              initial={editingExpenseForm}
+                              submitLabel="Save changes"
+                              onSubmit={async (data) => handleUpdateExpense(expense.id, data)}
+                            />
+                            <button
+                              onClick={() => { setEditingExpenseId(null); setEditingExpenseForm(null); }}
+                              className="mt-2 text-sm text-zinc-500 hover:text-zinc-800"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-start justify-between gap-3 px-4 py-4">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium capitalize text-zinc-700">{expense.category}</span>
+                                <span className="text-xs text-zinc-400">{formatDate(expense.expense_date)}</span>
+                                {expense.vendor_name && <span className="text-xs text-zinc-400">· {expense.vendor_name}</span>}
+                              </div>
+                              {expense.notes && <p className="mt-1 text-sm text-zinc-700">{expense.notes}</p>}
+                              <p className="mt-1 text-sm font-semibold">{expense.amount != null ? formatMoney(expense.amount) : <span className="text-zinc-400 font-normal">Amount TBC</span>}</p>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                              {confirmDeleteExpenseId === expense.id ? (
+                                <>
+                                  <span className="text-xs text-red-600">Sure?</span>
+                                  <button
+                                    onClick={() => handleDeleteExpense(expense.id)}
+                                    disabled={deletingExpenseId === expense.id}
+                                    className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60"
+                                  >
+                                    {deletingExpenseId === expense.id ? "Deleting…" : "Yes, delete"}
+                                  </button>
+                                  <button
+                                    onClick={() => setConfirmDeleteExpenseId(null)}
+                                    className="rounded-xl border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      setEditingExpenseId(expense.id);
+                                      setEditingExpenseForm({
+                                        category: expense.category,
+                                        amount: expense.amount != null ? String(expense.amount) : "",
+                                        expense_date: expense.expense_date,
+                                        notes: expense.notes ?? "",
+                                        vendor_name: expense.vendor_name ?? "",
+                                        crop_id: expense.crop_id ?? "",
+                                        zone_id: expense.zone_id ?? "",
+                                      });
+                                    }}
+                                    className="rounded-xl border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => setConfirmDeleteExpenseId(expense.id)}
+                                    className="rounded-xl border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                                  >
+                                    Delete
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))
                   )}
