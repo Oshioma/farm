@@ -62,13 +62,14 @@ function JoinInner() {
       return;
     }
 
-    // Find all farms the inviter belongs to
+    // Find all farms the inviter created
     const { data: inviterFarms } = await supabase
-      .from("farm_members")
-      .select("farm_id")
-      .eq("profile_id", invite.created_by);
+      .from("farms")
+      .select("id")
+      .eq("created_by", invite.created_by)
+      .eq("is_active", true);
 
-    const farmIds = (inviterFarms ?? []).map((f: { farm_id: string }) => f.farm_id);
+    const farmIds = (inviterFarms ?? []).map((f: { id: string }) => f.id);
     if (farmIds.length === 0) farmIds.push(invite.farm_id); // fallback
 
     // Get existing memberships for this user
