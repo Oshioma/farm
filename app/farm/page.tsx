@@ -13,8 +13,9 @@ import {
   getExpenses,
   getAssets,
   getPests,
+  getSales,
 } from "@/lib/farm";
-import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest } from "@/lib/farm";
+import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale } from "@/lib/farm";
 import { formatDate, formatMoney, badgeClass } from "@/app/farm/utils";
 import { CropForm } from "@/app/farm/components/CropForm";
 import { TaskForm } from "@/app/farm/components/TaskForm";
@@ -22,6 +23,7 @@ import { HarvestForm } from "@/app/farm/components/HarvestForm";
 import { ExpenseForm } from "@/app/farm/components/ExpenseForm";
 import { AssetForm } from "@/app/farm/components/AssetForm";
 import { PestForm } from "@/app/farm/components/PestForm";
+import { SaleForm } from "@/app/farm/components/SaleForm";
 import { ZoneForm } from "@/app/farm/components/ZoneForm";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
 import type { CropFormData } from "@/app/farm/components/CropForm";
@@ -30,6 +32,7 @@ import type { HarvestFormData } from "@/app/farm/components/HarvestForm";
 import type { ExpenseFormData } from "@/app/farm/components/ExpenseForm";
 import type { AssetFormData } from "@/app/farm/components/AssetForm";
 import type { PestFormData } from "@/app/farm/components/PestForm";
+import type { SaleFormData } from "@/app/farm/components/SaleForm";
 import type { ZoneFormData } from "@/app/farm/components/ZoneForm";
 
 function errMsg(err: unknown, fallback: string): string {
@@ -48,9 +51,12 @@ export default function FarmPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [pests, setPests] = useState<Pest[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
 
   const [activeFarmId, setActiveFarmId] = useState<string>("");
-  const [activeForm, setActiveForm] = useState<"crop" | "task" | "harvest" | "expense" | "asset" | "pest" | "zone" | null>(null);
+  const [activeForm, setActiveForm] = useState<"crop" | "task" | "harvest" | "expense" | "asset" | "pest" | "sale" | "zone" | null>(null);
+  const [showExpenses, setShowExpenses] = useState(false);
+  const [showAssets, setShowAssets] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editingFarm, setEditingFarm] = useState(false);
   const [farmEditForm, setFarmEditForm] = useState({ name: "", location: "", size_acres: "" });
@@ -120,7 +126,7 @@ export default function FarmPage() {
   }
 
   async function loadFarmData(farmId: string) {
-    const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows, pestRows] = await Promise.all([
+    const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows, pestRows, saleRows] = await Promise.all([
       getZones(farmId),
       getCrops(farmId),
       getTasks(farmId),
@@ -128,6 +134,7 @@ export default function FarmPage() {
       getExpenses(farmId),
       getAssets(farmId),
       getPests(farmId),
+      getSales(farmId),
     ]);
 
     setZones(zoneRows);
@@ -137,6 +144,7 @@ export default function FarmPage() {
     setExpenses(expenseRows);
     setAssets(assetRows);
     setPests(pestRows);
+    setSales(saleRows);
   }
 
   async function refreshAll() {
@@ -202,6 +210,7 @@ export default function FarmPage() {
   }, 0);
 
   const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  const totalSales = sales.reduce((sum, s) => sum + Number(s.total_amount ?? 0), 0);
 
   const defaultZoneId = zones.length === 1 ? zones[0].id : "";
   const defaultCropId = crops.length === 1 ? crops[0].id : "";
@@ -552,6 +561,39 @@ export default function FarmPage() {
     }
   }
 
+  async function handleLogSale(data: SaleFormData): Promise<boolean> {
+    if (!activeFarmId) return false;
+    try {
+      setError("");
+      if (!data.sale_date) throw new Error("Sale date is required.");
+
+      const { error: insertError } = await supabase.from("sales").insert({
+        farm_id: activeFarmId,
+        crop_id: data.crop_id || null,
+        buyer_name: data.buyer_name.trim() || null,
+        quantity_kg: data.quantity_kg ? Number(data.quantity_kg) : null,
+        price_per_kg: data.price_per_kg ? Number(data.price_per_kg) : null,
+        total_amount: data.total_amount ? Number(data.total_amount) : null,
+        sale_date: data.sale_date,
+        notes: data.notes.trim() || null,
+      });
+      if (insertError) throw insertError;
+
+      await supabase.from("activities").insert({
+        farm_id: activeFarmId,
+        type: "sale_logged",
+        title: `Sale logged${data.buyer_name ? ` to ${data.buyer_name.trim()}` : ""}`,
+        meta: data.total_amount ? formatMoney(Number(data.total_amount)) : "amount TBC",
+      });
+
+      await loadFarmData(activeFarmId);
+      return true;
+    } catch (err) {
+      setError(errMsg(err, "Failed to log sale"));
+      return false;
+    }
+  }
+
   async function handleCreateZone(data: ZoneFormData): Promise<boolean> {
     if (!activeFarmId) return false;
     try {
@@ -773,7 +815,21 @@ export default function FarmPage() {
                     All todo and in-progress tasks, due soonest first.
                   </p>
                 </div>
-                <span className="text-sm text-zinc-500">{openTasks.length} open</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-zinc-500">{openTasks.length} open</span>
+                  <button
+                    onClick={() => setActiveForm(activeForm === "task" ? null : "task")}
+                    className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+                  >
+                    {activeForm === "task" ? "Cancel" : "+ New task"}
+                  </button>
+                  <Link
+                    href="/farm/tasks"
+                    className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+                  >
+                    Worker view
+                  </Link>
+                </div>
               </div>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -1022,6 +1078,7 @@ export default function FarmPage() {
                   { key: "expense", label: "Log expense" },
                   { key: "asset", label: "Log asset" },
                   { key: "pest", label: "Log pest" },
+                  { key: "sale", label: "Log sale" },
                 ] as const
               ).map(({ key, label }) => (
                 <button
@@ -1113,6 +1170,18 @@ export default function FarmPage() {
                   defaultZoneId={defaultZoneId}
                   onSubmit={async (data) => {
                     const ok = await handleLogPest(data);
+                    if (ok) setActiveForm(null);
+                    return ok;
+                  }}
+                />
+              </div>
+            )}
+            {activeForm === "sale" && (
+              <div className="mb-6 max-w-sm">
+                <SaleForm
+                  crops={crops}
+                  onSubmit={async (data) => {
+                    const ok = await handleLogSale(data);
                     if (ok) setActiveForm(null);
                     return ok;
                   }}
@@ -1236,16 +1305,38 @@ export default function FarmPage() {
                 </div>
 
                 <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-                  <div className="flex items-center justify-between gap-4">
+                  <button
+                    onClick={() => setShowAssets((v) => !v)}
+                    className="flex w-full items-center justify-between gap-4 text-left"
+                  >
                     <div>
                       <h2 className="text-xl font-semibold">Assets</h2>
-                      <p className="mt-1 text-sm text-zinc-500">
-                        Equipment, vehicles, tools, and infrastructure.
-                      </p>
+                      <p className="mt-1 text-sm text-zinc-500">{assets.length} logged</p>
                     </div>
-                    <span className="text-sm text-zinc-500">{assets.length} logged</span>
-                  </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setActiveForm(activeForm === "asset" ? null : "asset"); }}
+                        className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+                      >
+                        {activeForm === "asset" ? "Cancel" : "+ Log asset"}
+                      </button>
+                      <span className="text-sm text-zinc-500">{showAssets ? "Hide" : "Show"}</span>
+                    </div>
+                  </button>
 
+                  {activeForm === "asset" && (
+                    <div className="mt-5 max-w-sm">
+                      <AssetForm
+                        onSubmit={async (data) => {
+                          const ok = await handleLogAsset(data);
+                          if (ok) setActiveForm(null);
+                          return ok;
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {showAssets ? (
                   <div className="mt-5 overflow-hidden rounded-2xl border border-zinc-200">
                     <div className="grid grid-cols-5 gap-4 border-b border-zinc-200 bg-zinc-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
                       <div>Name</div>
@@ -1277,6 +1368,7 @@ export default function FarmPage() {
                       ))
                     )}
                   </div>
+                  ) : null}
                 </div>
 
                 <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
@@ -1336,24 +1428,17 @@ export default function FarmPage() {
               <aside className="space-y-6">
                 <ActivityFeed activities={activities} />
 
-                <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-                  <h2 className="text-xl font-semibold">Next best move</h2>
-                  <div className="mt-4 space-y-3 text-sm text-zinc-600">
-                    <p>Add sales logging</p>
-                    <p>Add worker task view</p>
-                  </div>
-                </div>
               </aside>
             </div>
 
             <section className="mt-6 space-y-6">
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
-                    Expected income
+                    Total sales
                   </p>
-                  <p className="mt-3 text-3xl font-semibold">{formatMoney(forecastRevenue)}</p>
-                  <p className="mt-1 text-xs text-zinc-400">Based on estimated yield × price per kg</p>
+                  <p className="mt-3 text-3xl font-semibold">{formatMoney(totalSales)}</p>
+                  <p className="mt-1 text-xs text-zinc-400">Actual revenue from logged sales</p>
                 </div>
                 <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
@@ -1361,20 +1446,115 @@ export default function FarmPage() {
                   </p>
                   <p className="mt-3 text-3xl font-semibold">{formatMoney(totalExpenses)}</p>
                   <p className="mt-1 text-xs text-zinc-400">
-                    Net: {formatMoney(forecastRevenue - totalExpenses)}
+                    Net: {formatMoney(totalSales - totalExpenses)}
                   </p>
+                </div>
+                <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                    Expected income
+                  </p>
+                  <p className="mt-3 text-3xl font-semibold">{formatMoney(forecastRevenue)}</p>
+                  <p className="mt-1 text-xs text-zinc-400">Based on estimated yield × price per kg</p>
                 </div>
               </div>
 
               <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <h2 className="text-xl font-semibold">Expenses</h2>
-                    <p className="mt-1 text-sm text-zinc-500">Most recent 20 expenses.</p>
+                    <h2 className="text-xl font-semibold">Sales</h2>
+                    <p className="mt-1 text-sm text-zinc-500">Most recent 20 sales.</p>
                   </div>
-                  <span className="text-sm text-zinc-500">{expenses.length} logged</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-zinc-500">{sales.length} logged</span>
+                    <button
+                      onClick={() => setActiveForm(activeForm === "sale" ? null : "sale")}
+                      className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+                    >
+                      {activeForm === "sale" ? "Cancel" : "+ Log sale"}
+                    </button>
+                  </div>
                 </div>
 
+                {activeForm === "sale" && (
+                  <div className="mt-5 max-w-sm">
+                    <SaleForm
+                      crops={crops}
+                      onSubmit={async (data) => {
+                        const ok = await handleLogSale(data);
+                        if (ok) setActiveForm(null);
+                        return ok;
+                      }}
+                    />
+                  </div>
+                )}
+
+                <div className="mt-5 space-y-2">
+                  {sales.length === 0 ? (
+                    <div className="rounded-2xl border border-zinc-200 px-4 py-6 text-sm text-zinc-500">No sales yet.</div>
+                  ) : (
+                    sales.map((sale) => (
+                      <div key={sale.id} className="rounded-2xl border border-zinc-200 bg-white">
+                        <div className="flex items-start justify-between gap-3 px-4 py-4">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {sale.crop?.[0]?.crop_name && (
+                                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">{sale.crop[0].crop_name}</span>
+                              )}
+                              <span className="text-xs text-zinc-400">{formatDate(sale.sale_date)}</span>
+                              {sale.buyer_name && <span className="text-xs text-zinc-400">· {sale.buyer_name}</span>}
+                            </div>
+                            {sale.quantity_kg != null && (
+                              <p className="mt-1 text-sm text-zinc-600">
+                                {sale.quantity_kg} kg
+                                {sale.price_per_kg != null ? ` @ ${formatMoney(sale.price_per_kg)}/kg` : ""}
+                              </p>
+                            )}
+                            {sale.notes && <p className="mt-1 text-sm text-zinc-500">{sale.notes}</p>}
+                            <p className="mt-1 text-sm font-semibold">{sale.total_amount != null ? formatMoney(sale.total_amount) : <span className="text-zinc-400 font-normal">Amount TBC</span>}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <button
+                  onClick={() => setShowExpenses((v) => !v)}
+                  className="flex w-full items-center justify-between gap-4 text-left"
+                >
+                  <div>
+                    <h2 className="text-xl font-semibold">Expenses</h2>
+                    <p className="mt-1 text-sm text-zinc-500">{expenses.length} logged</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setActiveForm(activeForm === "expense" ? null : "expense"); }}
+                      className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+                    >
+                      {activeForm === "expense" ? "Cancel" : "+ Log expense"}
+                    </button>
+                    <span className="text-sm text-zinc-500">{showExpenses ? "Hide" : "Show"}</span>
+                  </div>
+                </button>
+
+                {activeForm === "expense" && (
+                  <div className="mt-5 max-w-sm">
+                    <ExpenseForm
+                      zones={zones}
+                      crops={crops}
+                      defaultZoneId={defaultZoneId}
+                      onSubmit={async (data) => {
+                        const ok = await handleLogExpense(data);
+                        if (ok) setActiveForm(null);
+                        return ok;
+                      }}
+                    />
+                  </div>
+                )}
+
+                {showExpenses ? (
                 <div className="mt-5 space-y-2">
                   {expenses.length === 0 ? (
                     <div className="rounded-2xl border border-zinc-200 px-4 py-6 text-sm text-zinc-500">No expenses yet.</div>
@@ -1461,6 +1641,7 @@ export default function FarmPage() {
                     ))
                   )}
                 </div>
+                ) : null}
               </div>
             </section>
           </>
