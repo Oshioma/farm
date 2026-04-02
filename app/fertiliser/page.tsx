@@ -22,6 +22,7 @@ const blank = {
   fertiliser: "",
   ready_to_use: "",
   bin_colour: "",
+  plants: "",
   notes: "",
 };
 
@@ -35,6 +36,9 @@ export default function FertiliserPage() {
   const [form, setForm] = useState(blank);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState(blank);
+  const [savingEditId, setSavingEditId] = useState<string | null>(null);
   const router = useRouter();
 
   async function loadEntries(farmId: string) {
@@ -80,6 +84,7 @@ export default function FertiliserPage() {
         fertiliser: form.fertiliser.trim(),
         ready_to_use: form.ready_to_use || null,
         bin_colour: form.bin_colour || null,
+        plants: form.plants.trim() || null,
         notes: form.notes.trim() || null,
       });
       if (err) throw err;
@@ -93,12 +98,49 @@ export default function FertiliserPage() {
     }
   }
 
+  async function handleSaveEdit(id: string) {
+    setSavingEditId(id);
+    setError("");
+    try {
+      const { error: err } = await supabase
+        .from("fertilisations")
+        .update({
+          date: editForm.date || null,
+          fertiliser: editForm.fertiliser.trim() || null,
+          ready_to_use: editForm.ready_to_use || null,
+          bin_colour: editForm.bin_colour || null,
+          plants: editForm.plants.trim() || null,
+          notes: editForm.notes.trim() || null,
+        })
+        .eq("id", id);
+      if (err) throw err;
+      setEditingId(null);
+      await loadEntries(activeFarmId);
+    } catch (err) {
+      setError(errMsg(err, "Failed to update"));
+    } finally {
+      setSavingEditId(null);
+    }
+  }
+
   async function handleDelete(id: string) {
     setDeletingId(id);
     const { error: err } = await supabase.from("fertilisations").delete().eq("id", id);
     if (err) setError(errMsg(err, "Failed to delete"));
     else setEntries((prev) => prev.filter((e) => e.id !== id));
     setDeletingId(null);
+  }
+
+  function startEdit(entry: FertilisationEntry) {
+    setEditingId(entry.id);
+    setEditForm({
+      date: entry.date ?? "",
+      fertiliser: entry.fertiliser ?? "",
+      ready_to_use: entry.ready_to_use ?? "",
+      bin_colour: entry.bin_colour ?? "",
+      plants: entry.plants ?? "",
+      notes: entry.notes ?? "",
+    });
   }
 
   function fmt(d: string | null) {
@@ -111,7 +153,7 @@ export default function FertiliserPage() {
 
   return (
     <main className="min-h-screen bg-stone-50 text-zinc-900">
-      <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
 
         <header className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -136,10 +178,7 @@ export default function FertiliserPage() {
                   {f.name}
                 </button>
               ))}
-              <Link
-                href="/farm"
-                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-              >
+              <Link href="/farm" className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
                 ← Farm
               </Link>
               <button
@@ -156,14 +195,12 @@ export default function FertiliserPage() {
           <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
         )}
 
-        {/* Add entry toggle */}
+        {/* Add entry */}
         <div className="mb-6">
           <button
             onClick={() => setShowForm((v) => !v)}
             className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
-              showForm
-                ? "bg-zinc-900 text-white"
-                : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
+              showForm ? "bg-zinc-900 text-white" : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
             }`}
           >
             <FlaskConical size={15} />
@@ -171,85 +208,60 @@ export default function FertiliserPage() {
           </button>
 
           {showForm && (
-            <div className="mt-4 max-w-md rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold">New fertiliser batch</h2>
+            <div className="mt-4 max-w-lg rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold">New fertiliser entry</h2>
               <form onSubmit={handleSubmit} className="mt-4 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="mb-2 block text-sm font-medium">Date added</label>
-                    <input
-                      type="date"
-                      value={form.date}
+                    <input type="date" value={form.date}
                       onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
-                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                      required
-                    />
+                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900" required />
                   </div>
                   <div>
                     <label className="mb-2 block text-sm font-medium">Ready to use</label>
-                    <input
-                      type="date"
-                      value={form.ready_to_use}
+                    <input type="date" value={form.ready_to_use}
                       onChange={(e) => setForm((p) => ({ ...p, ready_to_use: e.target.value }))}
-                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                    />
+                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900" />
                   </div>
                 </div>
-
                 <div>
                   <label className="mb-2 block text-sm font-medium">Fertiliser type</label>
-                  <input
-                    type="text"
-                    value={form.fertiliser}
+                  <input type="text" value={form.fertiliser}
                     onChange={(e) => setForm((p) => ({ ...p, fertiliser: e.target.value }))}
                     className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                    placeholder="Seaweed (+egg shells, +banana peel…)"
-                    required
-                  />
+                    placeholder="Bokashi, Seaweed…" required />
                 </div>
-
                 <div>
-                  <label className="mb-2 block text-sm font-medium">
-                    Bin colour <span className="font-normal text-zinc-400">(optional)</span>
-                  </label>
-                  <select
-                    value={form.bin_colour}
+                  <label className="mb-2 block text-sm font-medium">Bin colour <span className="font-normal text-zinc-400">(optional)</span></label>
+                  <select value={form.bin_colour}
                     onChange={(e) => setForm((p) => ({ ...p, bin_colour: e.target.value }))}
-                    className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                  >
+                    className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900">
                     <option value="">—</option>
-                    {BIN_COLOURS.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
+                    {BIN_COLOURS.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
-
                 <div>
-                  <label className="mb-2 block text-sm font-medium">
-                    Notes <span className="font-normal text-zinc-400">(optional)</span>
-                  </label>
-                  <textarea
-                    value={form.notes}
+                  <label className="mb-2 block text-sm font-medium">Plants <span className="font-normal text-zinc-400">(optional)</span></label>
+                  <input type="text" value={form.plants}
+                    onChange={(e) => setForm((p) => ({ ...p, plants: e.target.value }))}
+                    className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                    placeholder="Garden, seedlings, trees…" />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium">Notes <span className="font-normal text-zinc-400">(optional)</span></label>
+                  <textarea value={form.notes}
                     onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
                     className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                    rows={2}
-                    placeholder="Any extra details…"
-                  />
+                    rows={2} placeholder="Any extra details…" />
                 </div>
-
                 <div className="flex gap-3">
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
-                  >
+                  <button type="submit" disabled={saving}
+                    className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60">
                     {saving ? "Saving…" : "Save entry"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowForm(false); setForm(blank); }}
-                    className="rounded-2xl border border-zinc-200 px-5 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
-                  >
+                  <button type="button" onClick={() => { setShowForm(false); setForm(blank); }}
+                    className="rounded-2xl border border-zinc-200 px-5 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100">
                     Cancel
                   </button>
                 </div>
@@ -267,49 +279,99 @@ export default function FertiliserPage() {
             <p className="text-sm text-zinc-500">No entries yet. Add one above.</p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
+          <div className="overflow-x-auto rounded-3xl border border-zinc-200 bg-white shadow-sm">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-zinc-100 text-left text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500">
-                  <th className="px-5 py-4">Date added</th>
+                  <th className="px-5 py-4">Date</th>
                   <th className="px-5 py-4">Fertiliser type</th>
                   <th className="px-5 py-4">Ready to use</th>
                   <th className="px-5 py-4">Bin colour</th>
+                  <th className="px-5 py-4">Plants</th>
                   <th className="px-5 py-4">Notes</th>
                   <th className="px-5 py-4"></th>
                 </tr>
               </thead>
               <tbody>
                 {entries.map((entry, i) => (
-                  <tr
-                    key={entry.id}
-                    className={`border-b border-zinc-100 last:border-0 ${i % 2 === 0 ? "" : "bg-zinc-50/50"}`}
-                  >
-                    <td className="px-5 py-4 font-medium tabular-nums">{fmt(entry.date)}</td>
-                    <td className="px-5 py-4 text-zinc-700">{entry.fertiliser ?? "—"}</td>
-                    <td className="px-5 py-4 tabular-nums text-zinc-600">{fmt(entry.ready_to_use)}</td>
-                    <td className="px-5 py-4">
-                      {entry.bin_colour ? (
-                        <span className="inline-flex items-center gap-1.5">
-                          <span
-                            className="inline-block h-3 w-3 rounded-full border border-zinc-200"
-                            style={{ backgroundColor: entry.bin_colour.toLowerCase() }}
-                          />
-                          {entry.bin_colour}
-                        </span>
-                      ) : "—"}
-                    </td>
-                    <td className="px-5 py-4 text-zinc-500">{entry.notes ?? "—"}</td>
-                    <td className="px-5 py-4">
-                      <button
-                        onClick={() => handleDelete(entry.id)}
-                        disabled={deletingId === entry.id}
-                        className="rounded-xl border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
+                  editingId === entry.id ? (
+                    <tr key={entry.id} className="border-b border-zinc-100 bg-amber-50/40">
+                      <td className="px-3 py-2">
+                        <input type="date" value={editForm.date}
+                          onChange={(e) => setEditForm((p) => ({ ...p, date: e.target.value }))}
+                          className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input type="text" value={editForm.fertiliser}
+                          onChange={(e) => setEditForm((p) => ({ ...p, fertiliser: e.target.value }))}
+                          className="w-full min-w-[140px] rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input type="date" value={editForm.ready_to_use}
+                          onChange={(e) => setEditForm((p) => ({ ...p, ready_to_use: e.target.value }))}
+                          className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <select value={editForm.bin_colour}
+                          onChange={(e) => setEditForm((p) => ({ ...p, bin_colour: e.target.value }))}
+                          className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900">
+                          <option value="">—</option>
+                          {BIN_COLOURS.map((c) => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-3 py-2">
+                        <input type="text" value={editForm.plants}
+                          onChange={(e) => setEditForm((p) => ({ ...p, plants: e.target.value }))}
+                          className="w-full min-w-[160px] rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input type="text" value={editForm.notes}
+                          onChange={(e) => setEditForm((p) => ({ ...p, notes: e.target.value }))}
+                          className="w-full min-w-[120px] rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex gap-2">
+                          <button onClick={() => handleSaveEdit(entry.id)} disabled={savingEditId === entry.id}
+                            className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-60">
+                            {savingEditId === entry.id ? "…" : "Save"}
+                          </button>
+                          <button onClick={() => setEditingId(null)}
+                            className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100">
+                            Cancel
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr key={entry.id} className={`border-b border-zinc-100 last:border-0 ${i % 2 === 0 ? "" : "bg-zinc-50/50"}`}>
+                      <td className="px-5 py-4 font-medium tabular-nums">{fmt(entry.date)}</td>
+                      <td className="px-5 py-4 text-zinc-700">{entry.fertiliser ?? "—"}</td>
+                      <td className="px-5 py-4 tabular-nums text-zinc-600">{fmt(entry.ready_to_use)}</td>
+                      <td className="px-5 py-4">
+                        {entry.bin_colour ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="inline-block h-3 w-3 rounded-full border border-zinc-200"
+                              style={{ backgroundColor: entry.bin_colour.toLowerCase() }} />
+                            {entry.bin_colour}
+                          </span>
+                        ) : "—"}
+                      </td>
+                      <td className="px-5 py-4 text-zinc-600">{entry.plants ?? "—"}</td>
+                      <td className="px-5 py-4 text-zinc-500">{entry.notes ?? "—"}</td>
+                      <td className="px-5 py-4">
+                        <div className="flex gap-2">
+                          <button onClick={() => startEdit(entry)}
+                            className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100">
+                            Edit
+                          </button>
+                          <button onClick={() => handleDelete(entry.id)} disabled={deletingId === entry.id}
+                            className="rounded-xl border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
                 ))}
               </tbody>
             </table>
