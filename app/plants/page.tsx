@@ -363,9 +363,6 @@ export default function PlantsPage() {
                       )}
                     </button>
                   )}
-                  {plant.zone?.[0]?.name ? (
-                    <p className="mt-1 text-xs text-zinc-400">{plant.zone[0].name}</p>
-                  ) : null}
                 </div>
               </div>
             ))}
