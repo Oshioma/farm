@@ -221,3 +221,43 @@ export async function getPlants(farmId: string): Promise<Plant[]> {
   if (error) throw new Error(`getPlants failed: ${error.message}`);
   return (data ?? []) as Plant[];
 }
+
+export type Pest = {
+  id: string;
+  pest_name: string;
+  severity: string;
+  description: string | null;
+  action_taken: string | null;
+  logged_date: string;
+  created_at: string | null;
+  crop_id: string | null;
+  zone_id: string | null;
+  crop: { crop_name: string }[] | null;
+  zone: { name: string }[] | null;
+};
+
+export async function getPests(farmId: string): Promise<Pest[]> {
+  const { data, error } = await supabase
+    .from("pest_logs")
+    .select(
+      `
+      id,
+      pest_name,
+      severity,
+      description,
+      action_taken,
+      logged_date,
+      created_at,
+      crop_id,
+      zone_id,
+      crop:crops(crop_name),
+      zone:zones(name)
+    `
+    )
+    .eq("farm_id", farmId)
+    .order("logged_date", { ascending: false })
+    .limit(30);
+
+  if (error) throw new Error(`getPests failed: ${error.message}`);
+  return (data ?? []) as Pest[];
+}
