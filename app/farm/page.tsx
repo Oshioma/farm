@@ -39,6 +39,7 @@ export default function FarmPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
 
   const [activeFarmId, setActiveFarmId] = useState<string>("");
+  const [activeForm, setActiveForm] = useState<"crop" | "task" | "harvest" | "expense" | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingFarm, setEditingFarm] = useState(false);
   const [farmEditForm, setFarmEditForm] = useState({ name: "", location: "", size_acres: "" });
@@ -585,32 +586,85 @@ export default function FarmPage() {
               </div>
             </section>
 
-            <section className="mb-6 grid gap-6 xl:grid-cols-4">
-              <CropForm
-                zones={zones}
-                defaultZoneId={defaultZoneId}
-                onSubmit={handleCreateCrop}
-              />
-              <TaskForm
-                zones={zones}
-                crops={crops}
-                defaultZoneId={defaultZoneId}
-                onSubmit={handleCreateTask}
-              />
-              <HarvestForm
-                zones={zones}
-                crops={crops}
-                defaultCropId={defaultCropId}
-                defaultZoneId={defaultZoneId}
-                onSubmit={handleLogHarvest}
-              />
-              <ExpenseForm
-                zones={zones}
-                crops={crops}
-                defaultZoneId={defaultZoneId}
-                onSubmit={handleLogExpense}
-              />
-            </section>
+            <div className="mb-6 flex flex-wrap gap-3">
+              {(
+                [
+                  { key: "crop", label: "New crop" },
+                  { key: "task", label: "New task" },
+                  { key: "harvest", label: "Log harvest" },
+                  { key: "expense", label: "Log expense" },
+                ] as const
+              ).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveForm(activeForm === key ? null : key)}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                    activeForm === key
+                      ? "bg-zinc-900 text-white"
+                      : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {activeForm === "crop" && (
+              <div className="mb-6 max-w-sm">
+                <CropForm
+                  zones={zones}
+                  defaultZoneId={defaultZoneId}
+                  onSubmit={async (data) => {
+                    const ok = await handleCreateCrop(data);
+                    if (ok) setActiveForm(null);
+                    return ok;
+                  }}
+                />
+              </div>
+            )}
+            {activeForm === "task" && (
+              <div className="mb-6 max-w-sm">
+                <TaskForm
+                  zones={zones}
+                  crops={crops}
+                  defaultZoneId={defaultZoneId}
+                  onSubmit={async (data) => {
+                    const ok = await handleCreateTask(data);
+                    if (ok) setActiveForm(null);
+                    return ok;
+                  }}
+                />
+              </div>
+            )}
+            {activeForm === "harvest" && (
+              <div className="mb-6 max-w-sm">
+                <HarvestForm
+                  zones={zones}
+                  crops={crops}
+                  defaultCropId={defaultCropId}
+                  defaultZoneId={defaultZoneId}
+                  onSubmit={async (data) => {
+                    const ok = await handleLogHarvest(data);
+                    if (ok) setActiveForm(null);
+                    return ok;
+                  }}
+                />
+              </div>
+            )}
+            {activeForm === "expense" && (
+              <div className="mb-6 max-w-sm">
+                <ExpenseForm
+                  zones={zones}
+                  crops={crops}
+                  defaultZoneId={defaultZoneId}
+                  onSubmit={async (data) => {
+                    const ok = await handleLogExpense(data);
+                    if (ok) setActiveForm(null);
+                    return ok;
+                  }}
+                />
+              </div>
+            )}
 
             <div className="grid gap-6 lg:grid-cols-[1.25fr,0.75fr]">
               <section className="space-y-6">
