@@ -201,3 +201,23 @@ export async function getAssets(farmId: string): Promise<Asset[]> {
   if (error) throw new Error(`getAssets failed: ${error.message}`);
   return (data ?? []) as Asset[];
 }
+
+export type Plant = {
+  id: string;
+  farm_id: string;
+  name: string | null;
+  image_url: string | null;
+  notes: string | null;
+  created_at: string | null;
+};
+
+export async function getPlants(farmId: string): Promise<Plant[]> {
+  const { data, error } = await supabase
+    .from("plants")
+    .select("id, farm_id, name, image_url, notes, created_at")
+    .eq("farm_id", farmId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(`getPlants failed: ${error.message}`);
+  return (data ?? []) as Plant[];
+}
