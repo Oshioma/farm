@@ -9,10 +9,9 @@ import type { Farm } from "@/lib/farm";
 
 type Member = {
   id: string;
-  user_id: string;
-  role: string;
+  profile_id: string;
+  role_on_farm: string;
   created_at: string;
-  email?: string;
 };
 
 type Invite = {
@@ -44,7 +43,7 @@ export default function InvitePage() {
 
   async function loadData(farmId: string) {
     const [{ data: memberRows }, { data: inviteRows }] = await Promise.all([
-      supabase.from("farm_members").select("id, user_id, role, created_at").eq("farm_id", farmId),
+      supabase.from("farm_members").select("id, profile_id, role_on_farm, created_at").eq("farm_id", farmId),
       supabase.from("farm_invites")
         .select("id, token, invited_email, created_at, expires_at, used_by")
         .eq("farm_id", farmId)
@@ -93,6 +92,7 @@ export default function InvitePage() {
         token,
         created_by: user?.id ?? null,
         expires_at: expires,
+        used_by: null,
       });
       if (err) throw err;
       const origin = window.location.origin;
@@ -240,12 +240,12 @@ export default function InvitePage() {
                 {members.map((m) => (
                   <div key={m.id} className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-100 px-4 py-3">
                     <div>
-                      <p className="text-sm font-medium font-mono text-zinc-500">{m.user_id}</p>
+                      <p className="text-sm font-mono text-zinc-500">{m.profile_id}</p>
                       <span className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-                        m.role === "owner" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600"
-                      }`}>{m.role}</span>
+                        m.role_on_farm === "owner" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600"
+                      }`}>{m.role_on_farm}</span>
                     </div>
-                    {m.role !== "owner" && (
+                    {m.role_on_farm !== "owner" && (
                       <button
                         onClick={() => removeMember(m.id)}
                         disabled={removingId === m.id}

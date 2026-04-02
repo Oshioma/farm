@@ -69,14 +69,14 @@ function JoinInner() {
       .from("farm_members")
       .select("id")
       .eq("farm_id", invite.farm_id)
-      .eq("user_id", user.id)
+      .eq("profile_id", user.id)
       .single();
 
     if (!existing) {
       const { error: memberError } = await supabase.from("farm_members").insert({
         farm_id: invite.farm_id,
-        user_id: user.id,
-        role: "member",
+        profile_id: user.id,
+        role_on_farm: "member",
       });
       if (memberError) {
         setStatus("error");

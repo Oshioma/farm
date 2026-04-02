@@ -87,7 +87,7 @@ export async function getFarms(): Promise<Farm[]> {
   const { data: members, error: membersError } = await supabase
     .from("farm_members")
     .select("farm_id")
-    .eq("user_id", user.id);
+    .eq("profile_id", user.id);
 
   if (membersError) throw new Error(`getFarms failed: ${membersError.message}`);
   if (!members?.length) return [];
