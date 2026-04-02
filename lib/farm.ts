@@ -208,6 +208,29 @@ export async function getExpenses(farmId: string): Promise<Expense[]> {
   return (data ?? []) as Expense[];
 }
 
+export type CompanionEntry = {
+  id: string;
+  farm_id: string;
+  vegetable_type: string;
+  variety: string | null;
+  num_seeds: string | null;
+  date: string | null;
+  companion: string | null;
+  notes: string | null;
+  created_at: string | null;
+};
+
+export async function getCompanionPlanting(farmId: string): Promise<CompanionEntry[]> {
+  const { data, error } = await supabase
+    .from("companion_planting")
+    .select("id, farm_id, vegetable_type, variety, num_seeds, date, companion, notes, created_at")
+    .eq("farm_id", farmId)
+    .order("date", { ascending: true });
+
+  if (error) throw new Error(`getCompanionPlanting failed: ${error.message}`);
+  return (data ?? []) as CompanionEntry[];
+}
+
 export type PlantingPlanEntry = {
   id: string;
   species_name: string;
