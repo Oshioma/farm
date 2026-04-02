@@ -20,7 +20,12 @@ function SignUpInner() {
     setLoading(true);
     setError("");
 
-    const { error: authError, data } = await supabase.auth.signUp({ email, password });
+    const emailRedirectTo = `${window.location.origin}${redirectTo}`;
+    const { error: authError, data } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo },
+    });
 
     if (authError) {
       setError(authError.message);
@@ -45,7 +50,7 @@ function SignUpInner() {
           </p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">Check your email</h1>
           <p className="mt-3 text-sm text-zinc-600">
-            We sent a confirmation link to <strong>{email}</strong>. Click it to activate your account, then sign in.
+            We sent a confirmation link to <strong>{email}</strong>. Click it — it will bring you straight back to accept the invite.
           </p>
           <Link
             href={`/login?redirectTo=${encodeURIComponent(redirectTo)}`}
