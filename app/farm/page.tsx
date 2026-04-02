@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import {
@@ -10,18 +11,21 @@ import {
   getTasks,
   getActivities,
   getExpenses,
+  getAssets,
 } from "@/lib/farm";
-import type { Farm, Zone, Crop, Task, Activity, Expense } from "@/lib/farm";
+import type { Farm, Zone, Crop, Task, Activity, Expense, Asset } from "@/lib/farm";
 import { formatDate, formatMoney, badgeClass } from "@/app/farm/utils";
 import { CropForm } from "@/app/farm/components/CropForm";
 import { TaskForm } from "@/app/farm/components/TaskForm";
 import { HarvestForm } from "@/app/farm/components/HarvestForm";
 import { ExpenseForm } from "@/app/farm/components/ExpenseForm";
+import { AssetForm } from "@/app/farm/components/AssetForm";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
 import type { CropFormData } from "@/app/farm/components/CropForm";
 import type { TaskFormData } from "@/app/farm/components/TaskForm";
 import type { HarvestFormData } from "@/app/farm/components/HarvestForm";
 import type { ExpenseFormData } from "@/app/farm/components/ExpenseForm";
+import type { AssetFormData } from "@/app/farm/components/AssetForm";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -37,9 +41,10 @@ export default function FarmPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
 
   const [activeFarmId, setActiveFarmId] = useState<string>("");
-  const [activeForm, setActiveForm] = useState<"crop" | "task" | "harvest" | "expense" | null>(null);
+  const [activeForm, setActiveForm] = useState<"crop" | "task" | "harvest" | "expense" | "asset" | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingFarm, setEditingFarm] = useState(false);
   const [farmEditForm, setFarmEditForm] = useState({ name: "", location: "", size_acres: "" });
@@ -99,12 +104,13 @@ export default function FarmPage() {
   }
 
   async function loadFarmData(farmId: string) {
-    const [zoneRows, cropRows, taskRows, activityRows, expenseRows] = await Promise.all([
+    const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows] = await Promise.all([
       getZones(farmId),
       getCrops(farmId),
       getTasks(farmId),
       getActivities(farmId),
       getExpenses(farmId),
+      getAssets(farmId),
     ]);
 
     setZones(zoneRows);
@@ -112,6 +118,7 @@ export default function FarmPage() {
     setTasks(taskRows);
     setActivities(activityRows);
     setExpenses(expenseRows);
+    setAssets(assetRows);
   }
 
   async function refreshAll() {
@@ -362,6 +369,41 @@ export default function FarmPage() {
     }
   }
 
+  async function handleLogAsset(data: AssetFormData): Promise<boolean> {
+    if (!activeFarmId) return false;
+    try {
+      setError("");
+      if (!data.name.trim()) throw new Error("Asset name is required.");
+
+      const { error: insertError } = await supabase.from("assets").insert({
+        farm_id: activeFarmId,
+        name: data.name.trim(),
+        category: data.category,
+        purchase_date: data.purchase_date || null,
+        purchase_price: data.purchase_price ? Number(data.purchase_price) : null,
+        paid_by: data.paid_by.trim() || null,
+        condition: data.condition,
+        notes: data.notes.trim() || null,
+      });
+      if (insertError) throw insertError;
+
+      await supabase.from("activities").insert({
+        farm_id: activeFarmId,
+        type: "asset_logged",
+        title: `${data.name.trim()} logged`,
+        meta: [data.category, data.paid_by.trim() ? `paid by ${data.paid_by.trim()}` : null]
+          .filter(Boolean)
+          .join(" · "),
+      });
+
+      await loadFarmData(activeFarmId);
+      return true;
+    } catch (err) {
+      setError(errMsg(err, "Failed to log asset"));
+      return false;
+    }
+  }
+
   return (
     <main className="min-h-screen bg-stone-50 text-zinc-900">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -450,6 +492,12 @@ export default function FarmPage() {
                   </button>
                 );
               })}
+              <Link
+                href="/plants"
+                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+              >
+                Plants
+              </Link>
               <button
                 onClick={handleSignOut}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
@@ -593,6 +641,7 @@ export default function FarmPage() {
                   { key: "task", label: "New task" },
                   { key: "harvest", label: "Log harvest" },
                   { key: "expense", label: "Log expense" },
+                  { key: "asset", label: "Log asset" },
                 ] as const
               ).map(({ key, label }) => (
                 <button
@@ -659,6 +708,17 @@ export default function FarmPage() {
                   defaultZoneId={defaultZoneId}
                   onSubmit={async (data) => {
                     const ok = await handleLogExpense(data);
+                    if (ok) setActiveForm(null);
+                    return ok;
+                  }}
+                />
+              </div>
+            )}
+            {activeForm === "asset" && (
+              <div className="mb-6 max-w-sm">
+                <AssetForm
+                  onSubmit={async (data) => {
+                    const ok = await handleLogAsset(data);
                     if (ok) setActiveForm(null);
                     return ok;
                   }}
@@ -752,6 +812,50 @@ export default function FarmPage() {
                           </div>
                           <div>{expense.crop?.[0]?.crop_name ?? "—"}</div>
                           <div className="font-medium">{formatMoney(expense.amount)}</div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-xl font-semibold">Assets</h2>
+                      <p className="mt-1 text-sm text-zinc-500">
+                        Equipment, vehicles, tools, and infrastructure.
+                      </p>
+                    </div>
+                    <span className="text-sm text-zinc-500">{assets.length} logged</span>
+                  </div>
+
+                  <div className="mt-5 overflow-hidden rounded-2xl border border-zinc-200">
+                    <div className="grid grid-cols-5 gap-4 border-b border-zinc-200 bg-zinc-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                      <div>Name</div>
+                      <div>Category</div>
+                      <div>Paid by</div>
+                      <div>Price</div>
+                      <div>Condition</div>
+                    </div>
+
+                    {assets.length === 0 ? (
+                      <div className="px-4 py-6 text-sm text-zinc-500">No assets logged yet.</div>
+                    ) : (
+                      assets.map((asset) => (
+                        <div
+                          key={asset.id}
+                          className="grid grid-cols-5 gap-4 border-b border-zinc-100 px-4 py-4 text-sm last:border-b-0"
+                        >
+                          <div>
+                            <div className="font-medium">{asset.name}</div>
+                            {asset.notes ? (
+                              <div className="text-zinc-500">{asset.notes}</div>
+                            ) : null}
+                          </div>
+                          <div className="capitalize">{asset.category}</div>
+                          <div>{asset.paid_by ?? "—"}</div>
+                          <div>{asset.purchase_price ? formatMoney(asset.purchase_price) : "—"}</div>
+                          <div className="capitalize">{asset.condition ?? "—"}</div>
                         </div>
                       ))
                     )}
