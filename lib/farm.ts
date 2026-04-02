@@ -309,6 +309,29 @@ export async function getSoilImprovements(farmId: string): Promise<SoilImproveme
   return (data ?? []) as SoilImprovement[];
 }
 
+export type CompostEntry = {
+  id: string;
+  farm_id: string;
+  compost_type: string | null;
+  date: string | null;
+  ready_to_use_date: string | null;
+  materials_used: string | null;
+  place: string | null;
+  notes: string | null;
+  created_at: string | null;
+};
+
+export async function getCompost(farmId: string): Promise<CompostEntry[]> {
+  const { data, error } = await supabase
+    .from("compost")
+    .select("id, farm_id, compost_type, date, ready_to_use_date, materials_used, place, notes, created_at")
+    .eq("farm_id", farmId)
+    .order("date", { ascending: true });
+
+  if (error) throw new Error(`getCompost failed: ${error.message}`);
+  return (data ?? []) as CompostEntry[];
+}
+
 export type SeedCollectionEntry = {
   id: string;
   farm_id: string;
