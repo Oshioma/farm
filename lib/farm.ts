@@ -65,7 +65,21 @@ export type Expense = {
   zone_id: string | null;
   crop: { crop_name: string }[] | null;
   zone: { name: string }[] | null;
-};export async function getFarms(): Promise<Farm[]> {
+};
+
+export type Asset = {
+  id: string;
+  name: string;
+  category: string;
+  purchase_date: string | null;
+  purchase_price: number | null;
+  paid_by: string | null;
+  condition: string | null;
+  notes: string | null;
+  created_at: string | null;
+};
+
+export async function getFarms(): Promise<Farm[]> {
   const { data, error } = await supabase
     .from("farms")
     .select("id, name, slug, location, size_acres")
@@ -175,4 +189,15 @@ export async function getExpenses(farmId: string): Promise<Expense[]> {
 
   if (error) throw new Error(`getExpenses failed: ${error.message}`);
   return (data ?? []) as Expense[];
+}
+
+export async function getAssets(farmId: string): Promise<Asset[]> {
+  const { data, error } = await supabase
+    .from("assets")
+    .select("id, name, category, purchase_date, purchase_price, paid_by, condition, notes, created_at")
+    .eq("farm_id", farmId)
+    .order("purchase_date", { ascending: false });
+
+  if (error) throw new Error(`getAssets failed: ${error.message}`);
+  return (data ?? []) as Asset[];
 }
