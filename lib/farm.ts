@@ -215,6 +215,7 @@ export async function getPlantingPlan(farmId: string): Promise<PlantingPlanEntry
   return (data ?? []) as PlantingPlanEntry[];
 }
 
+export async function getAssets(farmId: string): Promise<Asset[]> {
   const { data, error } = await supabase
     .from("assets")
     .select("id, name, category, purchase_date, purchase_price, paid_by, condition, notes, created_at")
