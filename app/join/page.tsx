@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -11,7 +11,7 @@ type InviteInfo = {
   farm_name: string;
 };
 
-export default function JoinPage() {
+function JoinInner() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
   const router = useRouter();
@@ -150,5 +150,17 @@ export default function JoinPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function JoinPage() {
+  return (
+    <Suspense fallback={
+      <main className="flex min-h-screen items-center justify-center bg-stone-50">
+        <p className="text-sm text-zinc-500">Loading…</p>
+      </main>
+    }>
+      <JoinInner />
+    </Suspense>
   );
 }
