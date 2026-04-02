@@ -39,7 +39,7 @@ export default function SignUpPage() {
       <main className="flex min-h-screen items-center justify-center bg-stone-50 px-4">
         <div className="w-full max-w-sm rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-            Inguka Farm Manager
+            Shamba Farm Manager
           </p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">Check your email</h1>
           <p className="mt-3 text-sm text-zinc-600">
@@ -61,7 +61,7 @@ export default function SignUpPage() {
       <div className="w-full max-w-sm">
         <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-            Inguka Farm Manager
+            Shamba Farm Manager
           </p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">Create account</h1>
 

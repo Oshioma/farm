@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Farm Manager",
-  description: "Inguka farm task manager and crop tracker",
+  description: "Shamba farm task manager and crop tracker",
 };
 
 export default function RootLayout({
