@@ -1,33 +1,59 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-export default function LoginPage() {
-  const [email, setEmail] = useState("");
+export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [ready, setReady] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setReady(true);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (password !== confirm) {
+      setError("Passwords do not match.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
     setLoading(true);
     setError("");
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { error: updateError } = await supabase.auth.updateUser({ password });
 
-    if (authError) {
-      setError(authError.message);
+    if (updateError) {
+      setError(updateError.message);
       setLoading(false);
     } else {
       router.push("/farm");
     }
+  }
+
+  if (!ready) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-stone-50 px-4">
+        <div className="w-full max-w-sm">
+          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-center text-sm text-zinc-500">
+            Waiting for reset link verification…
+          </div>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -37,7 +63,7 @@ export default function LoginPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
             Shamba Farm Manager
           </p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight">Sign in</h1>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight">New password</h1>
 
           {error ? (
             <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -47,25 +73,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
-              <label className="mb-2 block text-sm font-medium">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                placeholder="you@example.com"
-                required
-                autoComplete="email"
-              />
-            </div>
-
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <label className="text-sm font-medium">Password</label>
-                <Link href="/forgot-password" className="text-xs text-zinc-500 hover:underline">
-                  Forgot password?
-                </Link>
-              </div>
+              <label className="mb-2 block text-sm font-medium">New password</label>
               <input
                 type="password"
                 value={password}
@@ -73,7 +81,20 @@ export default function LoginPage() {
                 className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
                 placeholder="••••••••"
                 required
-                autoComplete="current-password"
+                autoComplete="new-password"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium">Confirm password</label>
+              <input
+                type="password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                placeholder="••••••••"
+                required
+                autoComplete="new-password"
               />
             </div>
 
@@ -82,16 +103,9 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? "Signing in..." : "Sign in"}
+              {loading ? "Updating..." : "Update password"}
             </button>
           </form>
-
-          <p className="mt-5 text-center text-sm text-zinc-500">
-            No account?{" "}
-            <Link href="/signup" className="font-medium text-zinc-900 hover:underline">
-              Create one
-            </Link>
-          </p>
         </div>
       </div>
     </main>
