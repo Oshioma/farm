@@ -9,7 +9,6 @@ export type ExpenseFormData = {
   expense_date: string;
   crop_id: string;
   zone_id: string;
-  description: string;
 };
 
 const blank: ExpenseFormData = {
@@ -18,7 +17,6 @@ const blank: ExpenseFormData = {
   expense_date: "",
   crop_id: "",
   zone_id: "",
-  description: "",
 };
 
 const CATEGORIES = [
@@ -140,17 +138,6 @@ export function ExpenseForm({ zones, crops, defaultZoneId, onSubmit }: Props) {
               </option>
             ))}
           </select>
-        </div>
-
-        <div>
-          <label className="mb-2 block text-sm font-medium">Description</label>
-          <input
-            type="text"
-            value={form.description}
-            onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-            className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            placeholder="Day workers for planting"
-          />
         </div>
 
         <button

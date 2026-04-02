@@ -23,6 +23,13 @@ import type { TaskFormData } from "@/app/farm/components/TaskForm";
 import type { HarvestFormData } from "@/app/farm/components/HarvestForm";
 import type { ExpenseFormData } from "@/app/farm/components/ExpenseForm";
 
+function errMsg(err: unknown, fallback: string): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "object" && err !== null && "message" in err)
+    return String((err as { message: unknown }).message);
+  return fallback;
+}
+
 export default function FarmPage() {
   const [farms, setFarms] = useState<Farm[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
@@ -76,7 +83,7 @@ export default function FarmPage() {
       await loadFarms();
       setEditingFarm(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save farm");
+      setError(errMsg(err, "Failed to save farm"));
     } finally {
       setSavingFarm(false);
     }
@@ -112,7 +119,7 @@ export default function FarmPage() {
       setLoading(true);
       await loadFarms();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load farms");
+      setError(errMsg(err, "Failed to load farms"));
     } finally {
       setLoading(false);
     }
@@ -131,7 +138,7 @@ export default function FarmPage() {
         setLoading(true);
         await loadFarmData(activeFarmId);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load farm data");
+        setError(errMsg(err, "Failed to load farm data"));
       } finally {
         setLoading(false);
       }
@@ -202,7 +209,7 @@ export default function FarmPage() {
       await loadFarmData(activeFarmId);
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create crop");
+      setError(errMsg(err, "Failed to create crop"));
       return false;
     }
   }
@@ -237,7 +244,7 @@ export default function FarmPage() {
       await loadFarmData(activeFarmId);
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create task");
+      setError(errMsg(err, "Failed to create task"));
       return false;
     }
   }
@@ -265,7 +272,7 @@ export default function FarmPage() {
 
       await loadFarmData(activeFarmId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to complete task");
+      setError(errMsg(err, "Failed to complete task"));
     } finally {
       setCompletingTaskId(null);
     }
@@ -317,7 +324,7 @@ export default function FarmPage() {
       await loadFarmData(activeFarmId);
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to log harvest");
+      setError(errMsg(err, "Failed to log harvest"));
       return false;
     }
   }
@@ -335,7 +342,6 @@ export default function FarmPage() {
         crop_id: data.crop_id || null,
         category: data.category,
         amount: Number(data.amount),
-        description: data.description.trim() || null,
         expense_date: data.expense_date,
       });
       if (insertError) throw insertError;
@@ -344,13 +350,13 @@ export default function FarmPage() {
         farm_id: activeFarmId,
         type: "expense_logged",
         title: `${data.category} expense logged`,
-        meta: `${formatMoney(Number(data.amount))}${data.description.trim() ? ` · ${data.description.trim()}` : ""}`,
+        meta: formatMoney(Number(data.amount)),
       });
 
       await loadFarmData(activeFarmId);
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to log expense");
+      setError(errMsg(err, "Failed to log expense"));
       return false;
     }
   }

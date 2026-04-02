@@ -65,9 +65,7 @@ export type Expense = {
   zone_id: string | null;
   crop: { crop_name: string }[] | null;
   zone: { name: string }[] | null;
-};
-
-export async function getFarms(): Promise<Farm[]> {
+};export async function getFarms(): Promise<Farm[]> {
   const { data, error } = await supabase
     .from("farms")
     .select("id, name, slug, location, size_acres")
@@ -163,7 +161,6 @@ export async function getExpenses(farmId: string): Promise<Expense[]> {
       id,
       category,
       amount,
-      description,
       expense_date,
       created_at,
       crop_id,
