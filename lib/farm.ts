@@ -235,13 +235,15 @@ export type Plant = {
   name: string | null;
   image_url: string | null;
   notes: string | null;
+  zone_id: string | null;
+  zone: { name: string }[] | null;
   created_at: string | null;
 };
 
 export async function getPlants(farmId: string): Promise<Plant[]> {
   const { data, error } = await supabase
     .from("plants")
-    .select("id, farm_id, name, image_url, notes, created_at")
+    .select("id, farm_id, name, image_url, notes, zone_id, zone:zones(name), created_at")
     .eq("farm_id", farmId)
     .order("created_at", { ascending: false });
 

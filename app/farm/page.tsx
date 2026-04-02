@@ -992,7 +992,6 @@ export default function FarmPage() {
                   { key: "expense", label: "Log expense" },
                   { key: "asset", label: "Log asset" },
                   { key: "pest", label: "Log pest" },
-                  { key: "zone", label: "Add zone" },
                 ] as const
               ).map(({ key, label }) => (
                 <button
@@ -1090,17 +1089,71 @@ export default function FarmPage() {
                 />
               </div>
             )}
-            {activeForm === "zone" && (
-              <div className="mb-6 max-w-sm">
-                <ZoneForm
-                  onSubmit={async (data) => {
-                    const ok = await handleCreateZone(data);
-                    if (ok) setActiveForm(null);
-                    return ok;
-                  }}
-                />
+
+            <section className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-semibold">Zones / Beds</h2>
+                  <p className="mt-1 text-sm text-zinc-500">Planting areas and what is growing in each.</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-zinc-500">{zones.length} zones</span>
+                  <button
+                    onClick={() => setActiveForm(activeForm === "zone" ? null : "zone")}
+                    className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+                  >
+                    {activeForm === "zone" ? "Cancel" : "+ Add zone"}
+                  </button>
+                </div>
               </div>
-            )}
+
+              {activeForm === "zone" && (
+                <div className="mt-5 max-w-sm">
+                  <ZoneForm
+                    onSubmit={async (data) => {
+                      const ok = await handleCreateZone(data);
+                      if (ok) setActiveForm(null);
+                      return ok;
+                    }}
+                  />
+                </div>
+              )}
+
+              {zones.length === 0 ? (
+                <p className="mt-5 text-sm text-zinc-500">No zones yet — add a bed, row, or area above.</p>
+              ) : (
+                <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {zones.map((zone) => {
+                    const zoneCrops = crops.filter((c) => c.zone_id === zone.id);
+                    return (
+                      <div key={zone.id} className="rounded-2xl border border-zinc-200 p-4">
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <p className="font-semibold">{zone.name}</p>
+                            {zone.code && <p className="text-xs text-zinc-400">{zone.code}</p>}
+                          </div>
+                          {zone.size_acres && (
+                            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">{zone.size_acres} ac</span>
+                          )}
+                        </div>
+                        {zoneCrops.length > 0 ? (
+                          <ul className="mt-3 space-y-1">
+                            {zoneCrops.map((c) => (
+                              <li key={c.id} className="flex items-center justify-between text-sm">
+                                <span>{c.crop_name}{c.variety ? ` · ${c.variety}` : ""}</span>
+                                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badgeClass(c.status)}`}>{c.status}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="mt-3 text-xs text-zinc-400">No crops assigned yet.</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
 
             <div className="grid gap-6 lg:grid-cols-[1.25fr,0.75fr]">
               <section className="space-y-6">
