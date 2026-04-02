@@ -266,6 +266,46 @@ export async function getAssets(farmId: string): Promise<Asset[]> {
   return (data ?? []) as Asset[];
 }
 
+export type Sale = {
+  id: string;
+  farm_id: string;
+  crop_id: string | null;
+  buyer_name: string | null;
+  quantity_kg: number | null;
+  price_per_kg: number | null;
+  total_amount: number | null;
+  sale_date: string;
+  notes: string | null;
+  created_at: string | null;
+  crop: { crop_name: string }[] | null;
+};
+
+export async function getSales(farmId: string): Promise<Sale[]> {
+  const { data, error } = await supabase
+    .from("sales")
+    .select(
+      `
+      id,
+      farm_id,
+      crop_id,
+      buyer_name,
+      quantity_kg,
+      price_per_kg,
+      total_amount,
+      sale_date,
+      notes,
+      created_at,
+      crop:crops(crop_name)
+    `
+    )
+    .eq("farm_id", farmId)
+    .order("sale_date", { ascending: false })
+    .limit(20);
+
+  if (error) throw new Error(`getSales failed: ${error.message}`);
+  return (data ?? []) as Sale[];
+}
+
 export type Plant = {
   id: string;
   farm_id: string;
