@@ -700,6 +700,18 @@ export default function FarmPage() {
               >
                 Fertiliser
               </Link>
+              <Link
+                href="/companion"
+                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+              >
+                Companion planting
+              </Link>
+              <Link
+                href="/income-prediction"
+                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+              >
+                Income prediction
+              </Link>
               <button
                 onClick={handleSignOut}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"

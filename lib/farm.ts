@@ -208,6 +208,29 @@ export async function getExpenses(farmId: string): Promise<Expense[]> {
   return (data ?? []) as Expense[];
 }
 
+export type CompanionEntry = {
+  id: string;
+  farm_id: string;
+  vegetable_type: string;
+  variety: string | null;
+  num_seeds: string | null;
+  date: string | null;
+  companion: string | null;
+  notes: string | null;
+  created_at: string | null;
+};
+
+export async function getCompanionPlanting(farmId: string): Promise<CompanionEntry[]> {
+  const { data, error } = await supabase
+    .from("companion_planting")
+    .select("id, farm_id, vegetable_type, variety, num_seeds, date, companion, notes, created_at")
+    .eq("farm_id", farmId)
+    .order("date", { ascending: true });
+
+  if (error) throw new Error(`getCompanionPlanting failed: ${error.message}`);
+  return (data ?? []) as CompanionEntry[];
+}
+
 export type PlantingPlanEntry = {
   id: string;
   species_name: string;
@@ -410,6 +433,31 @@ export async function getFertilisations(farmId: string): Promise<FertilisationEn
 
   if (error) throw new Error(`getFertilisations failed: ${error.message}`);
   return (data ?? []) as FertilisationEntry[];
+}
+
+export type IncomePredictionRow = {
+  id: string;
+  farm_id: string;
+  species: string;
+  sort_order: number;
+  y1_qty: string | null;  y1_income: number | null;
+  y2_qty: string | null;  y2_income: number | null;
+  y3_qty: string | null;  y3_income: number | null;
+  y4_qty: string | null;  y4_income: number | null;
+  y5_qty: string | null;  y5_income: number | null;
+  y6_qty: string | null;  y6_income: number | null;
+  y10_qty: string | null; y10_income: number | null;
+  y15_qty: string | null; y15_income: number | null;
+};
+
+export async function getIncomePrediction(farmId: string): Promise<IncomePredictionRow[]> {
+  const { data, error } = await supabase
+    .from("income_prediction")
+    .select("id, farm_id, species, sort_order, y1_qty, y1_income, y2_qty, y2_income, y3_qty, y3_income, y4_qty, y4_income, y5_qty, y5_income, y6_qty, y6_income, y10_qty, y10_income, y15_qty, y15_income")
+    .eq("farm_id", farmId)
+    .order("sort_order");
+  if (error) throw new Error(`getIncomePrediction failed: ${error.message}`);
+  return (data ?? []) as IncomePredictionRow[];
 }
 
 export type SeedlingEntry = {
