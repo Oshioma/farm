@@ -624,6 +624,12 @@ export default function FarmPage() {
                 Planting plan
               </Link>
               <Link
+                href="/farm/seedlings"
+                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+              >
+                Seedlings
+              </Link>
+              <Link
                 href="/plants"
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
