@@ -361,7 +361,27 @@ export default function SeedlingsPage() {
                 </Field>
               )}
               <Field label="Germination">
-                <input className={inp} value={form.germination} onChange={(e) => setForm((p) => ({ ...p, germination: e.target.value }))} placeholder="%" />
+                <div className="flex gap-3 pt-1">
+                  {[
+                    { value: "green",  bg: "bg-emerald-500", ring: "ring-emerald-500", label: "Good" },
+                    { value: "amber",  bg: "bg-amber-400",   ring: "ring-amber-400",   label: "Partial" },
+                    { value: "red",    bg: "bg-rose-500",    ring: "ring-rose-500",    label: "Failed" },
+                  ].map(({ value, bg, ring, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setForm((p) => ({ ...p, germination: p.germination === value ? "" : value }))}
+                      className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition ${
+                        form.germination === value
+                          ? `border-transparent ${bg} text-white ring-2 ${ring} ring-offset-1`
+                          : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+                      }`}
+                    >
+                      <span className={`h-3 w-3 rounded-full ${bg}`} />
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </Field>
               <Field label="Notes">
                 <textarea className={`${inp} min-h-[80px]`} value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} placeholder="Observations…" />
@@ -467,6 +487,13 @@ function SeedlingTable({
 
   function cell(row: SeedlingEntry, col: Col) {
     if (col === "date") return fmt(row.date);
+    if (col === "germination") {
+      const g = row.germination;
+      if (g === "green") return <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-500" />Good</span>;
+      if (g === "amber") return <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700"><span className="h-2 w-2 rounded-full bg-amber-400" />Partial</span>;
+      if (g === "red")   return <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-medium text-rose-700"><span className="h-2 w-2 rounded-full bg-rose-500" />Failed</span>;
+      return <span className="text-zinc-300">—</span>;
+    }
     const val = row[col];
     return val ?? <span className="text-zinc-300">—</span>;
   }
