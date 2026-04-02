@@ -251,6 +251,26 @@ export async function getPlants(farmId: string): Promise<Plant[]> {
   return (data ?? []) as Plant[];
 }
 
+export type TreeEntry = {
+  id: string;
+  farm_id: string;
+  tree_name: string;
+  number_of_trees: number | null;
+  date_planted: string | null;
+  notes: string | null;
+  created_at: string | null;
+};
+
+export async function getTreeRegistry(farmId: string): Promise<TreeEntry[]> {
+  const { data, error } = await supabase
+    .from("tree_registry")
+    .select("id, farm_id, tree_name, number_of_trees, date_planted, notes, created_at")
+    .eq("farm_id", farmId)
+    .order("date_planted", { ascending: true, nullsFirst: false });
+  if (error) throw new Error(`getTreeRegistry failed: ${error.message}`);
+  return (data ?? []) as TreeEntry[];
+}
+
 export type Pest = {
   id: string;
   pest_name: string;
