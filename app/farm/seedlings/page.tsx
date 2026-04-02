@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { getFarms, getSeedlings, getSoilImprovements, getFertilisations } from "@/lib/farm";
-import type { Farm, SeedlingEntry, SoilImprovement, FertilisationEntry } from "@/lib/farm";
+import { getFarms, getSeedlings, getSoilImprovements, getFertilisations, getSeedCollection } from "@/lib/farm";
+import type { Farm, SeedlingEntry, SoilImprovement, FertilisationEntry, SeedCollectionEntry } from "@/lib/farm";
 
 /* ── Types ────────────────────────────────────────────────── */
 
@@ -71,7 +71,7 @@ export default function SeedlingsPage() {
   const [entries, setEntries] = useState<SeedlingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"nursery" | "field" | "soil" | "fertilisation">("nursery");
+  const [tab, setTab] = useState<"nursery" | "field" | "soil" | "fertilisation" | "seeds">("nursery");
 
   const [modal, setModal] = useState<SeedlingEntry | null | "new">(null);
   const [form, setForm] = useState<FormData>(blank("nursery"));
@@ -80,6 +80,13 @@ export default function SeedlingsPage() {
 
   // Soil improvements
   const [soilEntries, setSoilEntries] = useState<SoilImprovement[]>([]);
+
+  // Seed collection
+  const [seedEntries, setSeedEntries] = useState<SeedCollectionEntry[]>([]);
+  const [seedModal, setSeedModal] = useState<SeedCollectionEntry | null | "new">(null);
+  const [seedForm, setSeedForm] = useState({ plant: "", distance: "", notes: "", notes2: "" });
+  const [seedSaving, setSeedSaving] = useState(false);
+  const [seedDeletingId, setSeedDeletingId] = useState<string | null>(null);
 
   // Fertilisation
   const [fertEntries, setFertEntries] = useState<FertilisationEntry[]>([]);
@@ -108,18 +115,19 @@ export default function SeedlingsPage() {
     if (!activeFarmId) return;
     setLoading(true);
     setError("");
-    Promise.all([getSeedlings(activeFarmId), getSoilImprovements(activeFarmId), getFertilisations(activeFarmId)])
-      .then(([s, soil, fert]) => { setEntries(s); setSoilEntries(soil); setFertEntries(fert); })
+    Promise.all([getSeedlings(activeFarmId), getSoilImprovements(activeFarmId), getFertilisations(activeFarmId), getSeedCollection(activeFarmId)])
+      .then(([s, soil, fert, seeds]) => { setEntries(s); setSoilEntries(soil); setFertEntries(fert); setSeedEntries(seeds); })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load data"))
       .finally(() => setLoading(false));
   }, [activeFarmId]);
 
   async function reload() {
     if (!activeFarmId) return;
-    const [s, soil, fert] = await Promise.all([getSeedlings(activeFarmId), getSoilImprovements(activeFarmId), getFertilisations(activeFarmId)]);
+    const [s, soil, fert, seeds] = await Promise.all([getSeedlings(activeFarmId), getSoilImprovements(activeFarmId), getFertilisations(activeFarmId), getSeedCollection(activeFarmId)]);
     setEntries(s);
     setSoilEntries(soil);
     setFertEntries(fert);
+    setSeedEntries(seeds);
   }
 
   function openAdd() {
@@ -129,6 +137,9 @@ export default function SeedlingsPage() {
     } else if (tab === "fertilisation") {
       setFertForm({ date: "", fertiliser: "", plants: "", notes: "" });
       setFertModal("new");
+    } else if (tab === "seeds") {
+      setSeedForm({ plant: "", distance: "", notes: "", notes2: "" });
+      setSeedModal("new");
     } else {
       setForm(blank(tab));
       setModal("new");
@@ -225,6 +236,47 @@ export default function SeedlingsPage() {
       setError(err instanceof Error ? err.message : "Failed to delete");
     } finally {
       setSoilDeletingId(null);
+    }
+  }
+
+  async function handleSeedSave() {
+    if (!activeFarmId || !seedForm.plant.trim()) return;
+    try {
+      setSeedSaving(true);
+      setError("");
+      const payload = {
+        farm_id: activeFarmId,
+        plant: seedForm.plant.trim(),
+        distance: seedForm.distance.trim() || null,
+        notes: seedForm.notes.trim() || null,
+        notes2: seedForm.notes2.trim() || null,
+      };
+      if (seedModal === "new") {
+        const { error: e } = await supabase.from("seed_collection").insert(payload);
+        if (e) throw e;
+      } else if (seedModal) {
+        const { error: e } = await supabase.from("seed_collection").update(payload).eq("id", (seedModal as SeedCollectionEntry).id);
+        if (e) throw e;
+      }
+      await reload();
+      setSeedModal(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSeedSaving(false);
+    }
+  }
+
+  async function handleSeedDelete(id: string) {
+    try {
+      setSeedDeletingId(id);
+      const { error: e } = await supabase.from("seed_collection").delete().eq("id", id);
+      if (e) throw e;
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete");
+    } finally {
+      setSeedDeletingId(null);
     }
   }
 
@@ -326,6 +378,7 @@ export default function SeedlingsPage() {
               { key: "field",   label: "Field plantings", count: field.length },
               { key: "soil",    label: "Soil improvements", count: soilEntries.length },
               { key: "fertilisation", label: "Fertilisation", count: fertEntries.length },
+              { key: "seeds", label: "Seed collection", count: seedEntries.length },
             ] as const).map(({ key, label, count }) => (
               <button
                 key={key}
@@ -374,12 +427,19 @@ export default function SeedlingsPage() {
             onDelete={handleSoilDelete}
             deletingId={soilDeletingId}
           />
-        ) : (
+        ) : tab === "fertilisation" ? (
           <FertilisationTable
             rows={fertEntries}
             onEdit={(e) => { setFertForm({ date: e.date ?? "", fertiliser: e.fertiliser ?? "", plants: e.plants ?? "", notes: e.notes ?? "" }); setFertModal(e); }}
             onDelete={handleFertDelete}
             deletingId={fertDeletingId}
+          />
+        ) : (
+          <SeedCollectionTable
+            rows={seedEntries}
+            onEdit={(e) => { setSeedForm({ plant: e.plant, distance: e.distance ?? "", notes: e.notes ?? "", notes2: e.notes2 ?? "" }); setSeedModal(e); }}
+            onDelete={handleSeedDelete}
+            deletingId={seedDeletingId}
           />
         )}
       </div>
@@ -508,6 +568,41 @@ export default function SeedlingsPage() {
           </div>
         </div>
       )}
+      {/* Seed collection modal */}
+      {seedModal !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl">
+            <h2 className="mb-5 text-lg font-semibold">
+              {seedModal === "new" ? "Add seed entry" : `Edit — ${(seedModal as SeedCollectionEntry).plant}`}
+            </h2>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Plant *">
+                  <input className={inp} value={seedForm.plant} onChange={(e) => setSeedForm((p) => ({ ...p, plant: e.target.value }))} placeholder="Tomatoes" />
+                </Field>
+                <Field label="Isolation distance">
+                  <input className={inp} value={seedForm.distance} onChange={(e) => setSeedForm((p) => ({ ...p, distance: e.target.value }))} placeholder="500 m - 1 km" />
+                </Field>
+              </div>
+              <Field label="Notes">
+                <textarea className={`${inp} min-h-[70px]`} value={seedForm.notes} onChange={(e) => setSeedForm((p) => ({ ...p, notes: e.target.value }))} placeholder="Wind direction, bagging…" />
+              </Field>
+              <Field label="Additional notes">
+                <textarea className={`${inp} min-h-[70px]`} value={seedForm.notes2} onChange={(e) => setSeedForm((p) => ({ ...p, notes2: e.target.value }))} placeholder="Harvest tips…" />
+              </Field>
+            </div>
+            <div className="mt-5 flex gap-2">
+              <button onClick={handleSeedSave} disabled={seedSaving || !seedForm.plant.trim()} className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60">
+                {seedSaving ? "Saving..." : "Save"}
+              </button>
+              <button onClick={() => setSeedModal(null)} className="rounded-2xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Fertilisation modal */}
       {fertModal !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
@@ -741,6 +836,60 @@ function FertilisationTable({
                 <td className="px-4 py-3 font-medium whitespace-nowrap">{row.fertiliser ?? <span className="text-zinc-300">—</span>}</td>
                 <td className="px-4 py-3 text-zinc-700">{row.plants ?? <span className="text-zinc-300">—</span>}</td>
                 <td className="px-4 py-3 text-zinc-500 max-w-xs">{row.notes ?? <span className="text-zinc-300">—</span>}</td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <div className="flex gap-1">
+                    <button onClick={() => onEdit(row)} className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">Edit</button>
+                    <button onClick={() => onDelete(row.id)} disabled={deletingId === row.id} className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">
+                      {deletingId === row.id ? "…" : "Delete"}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ── Seed collection table ───────────────────────────────── */
+
+function SeedCollectionTable({
+  rows, onEdit, onDelete, deletingId,
+}: {
+  rows: SeedCollectionEntry[];
+  onEdit: (e: SeedCollectionEntry) => void;
+  onDelete: (id: string) => void;
+  deletingId: string | null;
+}) {
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">
+        No seed collection entries yet. Click + Add entry to get started.
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
+          <thead>
+            <tr className="border-b border-zinc-200 bg-zinc-50 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
+              <th className="px-4 py-3 text-left">Plant</th>
+              <th className="px-4 py-3 text-left">Isolation distance</th>
+              <th className="px-4 py-3 text-left">Notes</th>
+              <th className="px-4 py-3 text-left">Additional notes</th>
+              <th className="px-4 py-3" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id} className="border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50 align-top transition-colors">
+                <td className="px-4 py-3 font-medium whitespace-nowrap">{row.plant}</td>
+                <td className="px-4 py-3 text-zinc-700 whitespace-nowrap">{row.distance ?? <span className="text-zinc-300">—</span>}</td>
+                <td className="px-4 py-3 text-zinc-600 max-w-[220px]">{row.notes ?? <span className="text-zinc-300">—</span>}</td>
+                <td className="px-4 py-3 text-zinc-500 max-w-[200px]">{row.notes2 ?? <span className="text-zinc-300">—</span>}</td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <div className="flex gap-1">
                     <button onClick={() => onEdit(row)} className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">Edit</button>

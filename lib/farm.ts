@@ -309,6 +309,27 @@ export async function getSoilImprovements(farmId: string): Promise<SoilImproveme
   return (data ?? []) as SoilImprovement[];
 }
 
+export type SeedCollectionEntry = {
+  id: string;
+  farm_id: string;
+  plant: string;
+  distance: string | null;
+  notes: string | null;
+  notes2: string | null;
+  created_at: string | null;
+};
+
+export async function getSeedCollection(farmId: string): Promise<SeedCollectionEntry[]> {
+  const { data, error } = await supabase
+    .from("seed_collection")
+    .select("id, farm_id, plant, distance, notes, notes2, created_at")
+    .eq("farm_id", farmId)
+    .order("plant");
+
+  if (error) throw new Error(`getSeedCollection failed: ${error.message}`);
+  return (data ?? []) as SeedCollectionEntry[];
+}
+
 export type FertilisationEntry = {
   id: string;
   farm_id: string;
