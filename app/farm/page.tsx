@@ -57,6 +57,11 @@ export default function FarmPage() {
   const [savingFarm, setSavingFarm] = useState(false);
   const router = useRouter();
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editingTaskForm, setEditingTaskForm] = useState<TaskFormData | null>(null);
+  const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
+  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
+  const [showCompleted, setShowCompleted] = useState(false);
   const [error, setError] = useState<string>("");
 
   async function handleSignOut() {
@@ -181,6 +186,10 @@ export default function FarmPage() {
     (task) => task.status === "todo" || task.status === "in_progress"
   );
 
+  const completedTasks = tasks.filter(
+    (task) => task.status === "done" || task.status === "cancelled"
+  );
+
   const readyToHarvest = crops.filter((crop) => crop.status === "harvest_ready");
 
   const forecastRevenue = crops.reduce((sum, crop) => {
@@ -291,6 +300,56 @@ export default function FarmPage() {
       setError(errMsg(err, "Failed to complete task"));
     } finally {
       setCompletingTaskId(null);
+    }
+  }
+
+  async function handleUpdateTask(id: string, data: TaskFormData): Promise<boolean> {
+    if (!activeFarmId) return false;
+    try {
+      setSavingTaskId(id);
+      setError("");
+      const title = data.title.trim();
+      if (!title) throw new Error("Task title is required.");
+
+      const { error: updateError } = await supabase
+        .from("tasks")
+        .update({
+          title,
+          description: data.description.trim() || null,
+          zone_id: data.zone_id || null,
+          crop_id: data.crop_id || null,
+          status: data.status,
+          priority: data.priority,
+          due_date: data.due_date || null,
+          proof_required: data.proof_required,
+        })
+        .eq("id", id);
+      if (updateError) throw updateError;
+
+      await loadFarmData(activeFarmId);
+      setEditingTaskId(null);
+      setEditingTaskForm(null);
+      return true;
+    } catch (err) {
+      setError(errMsg(err, "Failed to update task"));
+      return false;
+    } finally {
+      setSavingTaskId(null);
+    }
+  }
+
+  async function handleDeleteTask(id: string) {
+    if (!activeFarmId) return;
+    try {
+      setDeletingTaskId(id);
+      setError("");
+      const { error: deleteError } = await supabase.from("tasks").delete().eq("id", id);
+      if (deleteError) throw deleteError;
+      await loadFarmData(activeFarmId);
+    } catch (err) {
+      setError(errMsg(err, "Failed to delete task"));
+    } finally {
+      setDeletingTaskId(null);
     }
   }
 
@@ -634,56 +693,235 @@ export default function FarmPage() {
                 ) : (
                   openTasks.map((task) => {
                     const isCompleting = completingTaskId === task.id;
+                    const isDeleting = deletingTaskId === task.id;
+                    const isSaving = savingTaskId === task.id;
+                    const isEditing = editingTaskId === task.id;
                     const isToday = task.due_date === today;
                     return (
                       <div key={task.id} className="rounded-2xl border border-zinc-200 p-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass(task.status)}`}>
-                            {task.status}
-                          </span>
-                          <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
-                            {task.priority}
-                          </span>
-                          {isToday ? (
-                            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
-                              today
-                            </span>
-                          ) : null}
-                          {task.proof_required ? (
-                            <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
-                              photo proof
-                            </span>
-                          ) : null}
-                        </div>
+                        {isEditing && editingTaskForm ? (
+                          <div className="space-y-3">
+                            <input
+                              type="text"
+                              value={editingTaskForm.title}
+                              onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, title: e.target.value } : prev)}
+                              className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                              placeholder="Task title"
+                            />
+                            <textarea
+                              value={editingTaskForm.description}
+                              onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, description: e.target.value } : prev)}
+                              className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                              placeholder="Description"
+                              rows={2}
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <select
+                                value={editingTaskForm.status}
+                                onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, status: e.target.value } : prev)}
+                                className="rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                              >
+                                <option value="todo">todo</option>
+                                <option value="in_progress">in_progress</option>
+                                <option value="done">done</option>
+                              </select>
+                              <select
+                                value={editingTaskForm.priority}
+                                onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, priority: e.target.value } : prev)}
+                                className="rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                              >
+                                <option value="low">low</option>
+                                <option value="medium">medium</option>
+                                <option value="high">high</option>
+                                <option value="urgent">urgent</option>
+                              </select>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <select
+                                value={editingTaskForm.zone_id}
+                                onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, zone_id: e.target.value } : prev)}
+                                className="rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                              >
+                                <option value="">No zone</option>
+                                {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
+                              </select>
+                              <select
+                                value={editingTaskForm.crop_id}
+                                onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, crop_id: e.target.value } : prev)}
+                                className="rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                              >
+                                <option value="">General task</option>
+                                {crops.map((c) => <option key={c.id} value={c.id}>{c.crop_name}{c.variety ? ` · ${c.variety}` : ""}</option>)}
+                              </select>
+                            </div>
+                            <input
+                              type="date"
+                              value={editingTaskForm.due_date}
+                              onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, due_date: e.target.value } : prev)}
+                              className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                            />
+                            <label className="flex items-center gap-2 text-sm">
+                              <input
+                                type="checkbox"
+                                checked={editingTaskForm.proof_required}
+                                onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, proof_required: e.target.checked } : prev)}
+                              />
+                              Photo proof required
+                            </label>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleUpdateTask(task.id, editingTaskForm)}
+                                disabled={isSaving || !editingTaskForm.title.trim()}
+                                className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60"
+                              >
+                                {isSaving ? "Saving..." : "Save"}
+                              </button>
+                              <button
+                                onClick={() => { setEditingTaskId(null); setEditingTaskForm(null); }}
+                                className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass(task.status)}`}>
+                                {task.status}
+                              </span>
+                              <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
+                                {task.priority}
+                              </span>
+                              {isToday ? (
+                                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                                  today
+                                </span>
+                              ) : null}
+                              {task.proof_required ? (
+                                <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
+                                  photo proof
+                                </span>
+                              ) : null}
+                            </div>
 
-                        <h3 className="mt-3 text-base font-semibold">{task.title}</h3>
+                            <h3 className="mt-3 text-base font-semibold">{task.title}</h3>
 
-                        <div className="mt-2 text-sm text-zinc-600">
-                          {task.zone?.[0]?.name ?? "No zone"}
-                          <span className="mx-2">·</span>
-                          {task.crop?.[0]?.crop_name ?? "General task"}
-                          <span className="mx-2">·</span>
-                          {formatDate(task.due_date)}
-                        </div>
+                            <div className="mt-2 text-sm text-zinc-600">
+                              {task.zone?.[0]?.name ?? "No zone"}
+                              <span className="mx-2">·</span>
+                              {task.crop?.[0]?.crop_name ?? "General task"}
+                              <span className="mx-2">·</span>
+                              {formatDate(task.due_date)}
+                            </div>
 
-                        {task.description ? (
-                          <p className="mt-2 text-sm text-zinc-500">{task.description}</p>
-                        ) : null}
+                            {task.description ? (
+                              <p className="mt-2 text-sm text-zinc-500">{task.description}</p>
+                            ) : null}
 
-                        <div className="mt-4">
-                          <button
-                            onClick={() => handleCompleteTask(task)}
-                            disabled={isCompleting}
-                            className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {isCompleting ? "Completing..." : "Mark done"}
-                          </button>
-                        </div>
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              <button
+                                onClick={() => handleCompleteTask(task)}
+                                disabled={isCompleting || isDeleting}
+                                className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {isCompleting ? "Completing..." : "Mark done"}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditingTaskId(task.id);
+                                  setEditingTaskForm({
+                                    title: task.title,
+                                    description: task.description ?? "",
+                                    zone_id: task.zone_id ?? "",
+                                    crop_id: task.crop_id ?? "",
+                                    status: task.status ?? "todo",
+                                    priority: task.priority ?? "medium",
+                                    due_date: task.due_date ?? "",
+                                    proof_required: task.proof_required ?? false,
+                                  });
+                                }}
+                                disabled={isCompleting || isDeleting}
+                                className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-60"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTask(task.id)}
+                                disabled={isCompleting || isDeleting}
+                                className="rounded-2xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
+                              >
+                                {isDeleting ? "Deleting..." : "Delete"}
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     );
                   })
                 )}
               </div>
+            </section>
+
+            <section className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+              <button
+                onClick={() => setShowCompleted((v) => !v)}
+                className="flex w-full items-center justify-between gap-4 text-left"
+              >
+                <div>
+                  <h2 className="text-xl font-semibold">Completed tasks</h2>
+                  <p className="mt-1 text-sm text-zinc-500">{completedTasks.length} done or cancelled</p>
+                </div>
+                <span className="text-sm text-zinc-500">{showCompleted ? "Hide" : "Show"}</span>
+              </button>
+
+              {showCompleted ? (
+                <div className="mt-5 space-y-3">
+                  {completedTasks.length === 0 ? (
+                    <p className="text-sm text-zinc-500">No completed tasks yet.</p>
+                  ) : (
+                    completedTasks.map((task) => {
+                      const isDeleting = deletingTaskId === task.id;
+                      return (
+                        <div key={task.id} className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass(task.status)}`}>
+                              {task.status}
+                            </span>
+                            <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-500">
+                              {task.priority}
+                            </span>
+                          </div>
+
+                          <h3 className="mt-3 text-base font-medium text-zinc-600 line-through">{task.title}</h3>
+
+                          <div className="mt-2 text-sm text-zinc-400">
+                            {task.zone?.[0]?.name ?? "No zone"}
+                            <span className="mx-2">·</span>
+                            {task.crop?.[0]?.crop_name ?? "General task"}
+                            <span className="mx-2">·</span>
+                            {formatDate(task.due_date)}
+                          </div>
+
+                          {task.description ? (
+                            <p className="mt-2 text-sm text-zinc-400">{task.description}</p>
+                          ) : null}
+
+                          <div className="mt-3">
+                            <button
+                              onClick={() => handleDeleteTask(task.id)}
+                              disabled={isDeleting}
+                              className="rounded-2xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
+                            >
+                              {isDeleting ? "Deleting..." : "Delete"}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              ) : null}
             </section>
 
             <div className="mb-6 flex flex-wrap gap-3">
