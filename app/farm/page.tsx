@@ -65,6 +65,15 @@ export default function FarmPage() {
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTaskForm, setEditingTaskForm] = useState<TaskFormData | null>(null);
+  // No-farm state
+  const [noFarmMode, setNoFarmMode] = useState<"idle" | "create" | "join">("idle");
+  const [newFarmName, setNewFarmName] = useState("");
+  const [creatingFarm, setCreatingFarm] = useState(false);
+  const [joinSearch, setJoinSearch] = useState("");
+  const [joinResults, setJoinResults] = useState<{ id: string; name: string }[]>([]);
+  const [joinSearching, setJoinSearching] = useState(false);
+  const [requestingId, setRequestingId] = useState<string | null>(null);
+  const [requestSent, setRequestSent] = useState<string | null>(null);
   const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
@@ -115,6 +124,59 @@ export default function FarmPage() {
     } finally {
       setSavingFarm(false);
     }
+  }
+
+  async function handleCreateFarm(e: React.FormEvent) {
+    e.preventDefault();
+    const name = newFarmName.trim();
+    if (!name) return;
+    setCreatingFarm(true);
+    setError("");
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+      const { data: farm, error: farmErr } = await supabase
+        .from("farms")
+        .insert({ name, slug, is_active: true, created_by: user?.id ?? null })
+        .select("id")
+        .single();
+      if (farmErr) throw farmErr;
+      await supabase.from("farm_members").insert({ farm_id: farm.id, profile_id: user?.id, role_on_farm: "owner" });
+      setNewFarmName("");
+      setNoFarmMode("idle");
+      await loadFarms();
+    } catch (err) {
+      setError(errMsg(err, "Failed to create farm"));
+    } finally {
+      setCreatingFarm(false);
+    }
+  }
+
+  async function handleSearchFarms(e: React.FormEvent) {
+    e.preventDefault();
+    if (!joinSearch.trim()) return;
+    setJoinSearching(true);
+    const { data } = await supabase
+      .from("farms")
+      .select("id, name")
+      .ilike("name", `%${joinSearch.trim()}%`)
+      .eq("is_active", true)
+      .limit(5);
+    setJoinResults((data ?? []) as { id: string; name: string }[]);
+    setJoinSearching(false);
+  }
+
+  async function handleRequestJoin(farmId: string) {
+    setRequestingId(farmId);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error: err } = await supabase.from("join_requests").insert({
+      farm_id: farmId,
+      user_id: user?.id,
+      status: "pending",
+    });
+    if (err) setError(errMsg(err, "Failed to send request"));
+    else setRequestSent(farmId);
+    setRequestingId(null);
   }
 
   async function loadFarms() {
@@ -777,8 +839,93 @@ export default function FarmPage() {
         ) : null}
 
         {!loading && !activeFarm ? (
-          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
-            No farms found. Add the seed SQL in Supabase first.
+          <div className="mx-auto max-w-md space-y-4">
+            <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-center">
+              <p className="text-lg font-semibold">Welcome to Shamba</p>
+              <p className="mt-1 text-sm text-zinc-500">Create a new farm or request to join an existing one.</p>
+              <div className="mt-6 flex flex-col gap-3">
+                <button
+                  onClick={() => setNoFarmMode(noFarmMode === "create" ? "idle" : "create")}
+                  className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white hover:bg-zinc-800"
+                >
+                  Create a farm
+                </button>
+                <button
+                  onClick={() => setNoFarmMode(noFarmMode === "join" ? "idle" : "join")}
+                  className="rounded-2xl border border-zinc-200 px-5 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
+                >
+                  Request to join a farm
+                </button>
+              </div>
+            </div>
+
+            {noFarmMode === "create" && (
+              <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <h2 className="text-base font-semibold">New farm</h2>
+                <form onSubmit={handleCreateFarm} className="mt-4 space-y-4">
+                  <input
+                    type="text"
+                    value={newFarmName}
+                    onChange={(e) => setNewFarmName(e.target.value)}
+                    placeholder="Farm name"
+                    required
+                    className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                  />
+                  <button
+                    type="submit"
+                    disabled={creatingFarm}
+                    className="w-full rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
+                  >
+                    {creatingFarm ? "Creating…" : "Create farm"}
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {noFarmMode === "join" && (
+              <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <h2 className="text-base font-semibold">Request to join</h2>
+                <form onSubmit={handleSearchFarms} className="mt-4 flex gap-2">
+                  <input
+                    type="text"
+                    value={joinSearch}
+                    onChange={(e) => setJoinSearch(e.target.value)}
+                    placeholder="Search farm name…"
+                    className="flex-1 rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                  />
+                  <button
+                    type="submit"
+                    disabled={joinSearching}
+                    className="rounded-2xl bg-zinc-900 px-4 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
+                  >
+                    Search
+                  </button>
+                </form>
+                {joinResults.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    {joinResults.map((f) => (
+                      <div key={f.id} className="flex items-center justify-between rounded-2xl border border-zinc-100 px-4 py-3">
+                        <span className="text-sm font-medium">{f.name}</span>
+                        {requestSent === f.id ? (
+                          <span className="text-xs text-green-600 font-medium">Request sent ✓</span>
+                        ) : (
+                          <button
+                            onClick={() => handleRequestJoin(f.id)}
+                            disabled={requestingId === f.id}
+                            className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
+                          >
+                            {requestingId === f.id ? "Sending…" : "Request to join"}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {joinResults.length === 0 && joinSearch && !joinSearching && (
+                  <p className="mt-4 text-sm text-zinc-500">No farms found. Check the name and try again.</p>
+                )}
+              </div>
+            )}
           </div>
         ) : null}
 
