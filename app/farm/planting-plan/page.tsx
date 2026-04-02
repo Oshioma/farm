@@ -181,89 +181,65 @@ function TreesTable({
 }) {
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
-      {/* Column headers */}
-      <div className="hidden grid-cols-[2fr,2fr,1.5fr,1fr,1.5fr,2fr] gap-4 border-b border-zinc-200 bg-zinc-50 px-5 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500 lg:grid">
-        <div>Species</div>
-        <div>Strata / Height</div>
-        <div>Role</div>
-        <div>Seedlings</div>
-        <div>Target</div>
-        <div>Propagation</div>
-      </div>
-
-      {trees.map((entry) => {
-        const isExpanded = expandedId === entry.id;
-        return (
-          <div key={entry.id} className="border-b border-zinc-100 last:border-b-0">
-            <button
-              onClick={() => setExpandedId(isExpanded ? null : entry.id)}
-              className="w-full px-5 py-4 text-left transition hover:bg-zinc-50"
-            >
-              {/* Mobile layout */}
-              <div className="lg:hidden">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="font-semibold">{entry.species_name}</p>
-                    {entry.strata && (
-                      <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${strataColor(entry.strata)}`}>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[700px] text-sm">
+          <thead>
+            <tr className="border-b border-zinc-200 bg-zinc-50 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
+              <th className="px-4 py-3 text-left">Species</th>
+              <th className="px-4 py-3 text-left">Strata / Height</th>
+              <th className="px-4 py-3 text-left">Role</th>
+              <th className="px-4 py-3 text-right">Seedlings</th>
+              <th className="px-4 py-3 text-right">Target</th>
+              <th className="px-4 py-3 text-left">Propagation</th>
+              <th className="px-4 py-3 text-left">Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {trees.map((entry) => {
+              const isExpanded = expandedId === entry.id;
+              return (
+                <tr
+                  key={entry.id}
+                  onClick={() => entry.notes ? setExpandedId(isExpanded ? null : entry.id) : undefined}
+                  className={`border-b border-zinc-100 last:border-b-0 align-top transition-colors ${entry.notes ? "cursor-pointer hover:bg-zinc-50" : ""} ${isExpanded ? "bg-stone-50" : ""}`}
+                >
+                  <td className="px-4 py-3 font-semibold whitespace-nowrap">{entry.species_name}</td>
+                  <td className="px-4 py-3">
+                    {entry.strata ? (
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap ${strataColor(entry.strata)}`}>
                         {entry.strata}
                       </span>
-                    )}
-                  </div>
-                  <div className="text-right shrink-0">
-                    {entry.seedlings_to_start != null && (
-                      <p className="text-sm font-medium">{entry.seedlings_to_start} seedlings</p>
-                    )}
-                    {entry.target_count && (
-                      <p className="text-xs text-zinc-500">Target: {entry.target_count}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Desktop layout */}
-              <div className="hidden grid-cols-[2fr,2fr,1.5fr,1fr,1.5fr,2fr] gap-4 items-start lg:grid">
-                <p className="font-semibold">{entry.species_name}</p>
-                <div>
-                  {entry.strata ? (
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${strataColor(entry.strata)}`}>
-                      {entry.strata}
-                    </span>
-                  ) : <span className="text-zinc-400">—</span>}
-                </div>
-                <div>
-                  {entry.role ? (
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${roleColor(entry.role)}`}>
-                      {entry.role}
-                    </span>
-                  ) : <span className="text-zinc-400">—</span>}
-                </div>
-                <p className="text-sm">{entry.seedlings_to_start ?? <span className="text-zinc-400">—</span>}</p>
-                <p className="text-sm">{entry.target_count ?? <span className="text-zinc-400">—</span>}</p>
-                <p className="text-sm text-zinc-600">{entry.propagation_method ?? <span className="text-zinc-400">—</span>}</p>
-              </div>
-            </button>
-
-            {/* Expanded notes */}
-            {isExpanded && entry.notes && (
-              <div className="border-t border-zinc-100 bg-stone-50 px-5 py-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400 mb-1">Notes</p>
-                <p className="text-sm text-zinc-700 leading-relaxed">{entry.notes}</p>
-                {entry.role && (
-                  <p className="mt-2 text-xs text-zinc-400">
-                    Role: <span className={`ml-1 rounded-full px-2 py-0.5 font-medium ${roleColor(entry.role)}`}>{entry.role}</span>
-                  </p>
-                )}
-              </div>
-            )}
-            {isExpanded && !entry.notes && (
-              <div className="border-t border-zinc-100 bg-stone-50 px-5 py-3 text-sm text-zinc-400">
-                No additional notes.
-              </div>
-            )}
-          </div>
-        );
-      })}
+                    ) : <span className="text-zinc-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    {entry.role ? (
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap ${roleColor(entry.role)}`}>
+                        {entry.role}
+                      </span>
+                    ) : <span className="text-zinc-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {entry.seedlings_to_start ?? <span className="text-zinc-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">
+                    {entry.target_count ?? <span className="text-zinc-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-600">
+                    {entry.propagation_method ?? <span className="text-zinc-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-500 max-w-xs">
+                    {entry.notes ? (
+                      <span className={isExpanded ? "" : "line-clamp-2"}>
+                        {entry.notes}
+                      </span>
+                    ) : <span className="text-zinc-300">—</span>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
