@@ -191,7 +191,30 @@ export async function getExpenses(farmId: string): Promise<Expense[]> {
   return (data ?? []) as Expense[];
 }
 
-export async function getAssets(farmId: string): Promise<Asset[]> {
+export type PlantingPlanEntry = {
+  id: string;
+  species_name: string;
+  category: string;
+  strata: string | null;
+  role: string | null;
+  seedlings_to_start: number | null;
+  target_count: string | null;
+  propagation_method: string | null;
+  notes: string | null;
+  sort_order: number;
+};
+
+export async function getPlantingPlan(farmId: string): Promise<PlantingPlanEntry[]> {
+  const { data, error } = await supabase
+    .from("planting_plan")
+    .select("id, species_name, category, strata, role, seedlings_to_start, target_count, propagation_method, notes, sort_order")
+    .eq("farm_id", farmId)
+    .order("sort_order");
+
+  if (error) throw new Error(`getPlantingPlan failed: ${error.message}`);
+  return (data ?? []) as PlantingPlanEntry[];
+}
+
   const { data, error } = await supabase
     .from("assets")
     .select("id, name, category, purchase_date, purchase_price, paid_by, condition, notes, created_at")
