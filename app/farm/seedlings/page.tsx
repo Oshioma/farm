@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { getFarms, getSeedlings, getSoilImprovements } from "@/lib/farm";
-import type { Farm, SeedlingEntry, SoilImprovement } from "@/lib/farm";
+import { getFarms, getSeedlings, getSoilImprovements, getFertilisations } from "@/lib/farm";
+import type { Farm, SeedlingEntry, SoilImprovement, FertilisationEntry } from "@/lib/farm";
 
 /* ── Types ────────────────────────────────────────────────── */
 
@@ -71,7 +71,7 @@ export default function SeedlingsPage() {
   const [entries, setEntries] = useState<SeedlingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"nursery" | "field" | "soil">("nursery");
+  const [tab, setTab] = useState<"nursery" | "field" | "soil" | "fertilisation">("nursery");
 
   const [modal, setModal] = useState<SeedlingEntry | null | "new">(null);
   const [form, setForm] = useState<FormData>(blank("nursery"));
@@ -80,6 +80,13 @@ export default function SeedlingsPage() {
 
   // Soil improvements
   const [soilEntries, setSoilEntries] = useState<SoilImprovement[]>([]);
+
+  // Fertilisation
+  const [fertEntries, setFertEntries] = useState<FertilisationEntry[]>([]);
+  const [fertModal, setFertModal] = useState<FertilisationEntry | null | "new">(null);
+  const [fertForm, setFertForm] = useState({ date: "", fertiliser: "", plants: "", notes: "" });
+  const [fertSaving, setFertSaving] = useState(false);
+  const [fertDeletingId, setFertDeletingId] = useState<string | null>(null);
   const [soilModal, setSoilModal] = useState<SoilImprovement | null | "new">(null);
   const [soilForm, setSoilForm] = useState<SoilFormData>(blankSoil());
   const [soilSaving, setSoilSaving] = useState(false);
@@ -101,23 +108,27 @@ export default function SeedlingsPage() {
     if (!activeFarmId) return;
     setLoading(true);
     setError("");
-    Promise.all([getSeedlings(activeFarmId), getSoilImprovements(activeFarmId)])
-      .then(([s, soil]) => { setEntries(s); setSoilEntries(soil); })
+    Promise.all([getSeedlings(activeFarmId), getSoilImprovements(activeFarmId), getFertilisations(activeFarmId)])
+      .then(([s, soil, fert]) => { setEntries(s); setSoilEntries(soil); setFertEntries(fert); })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load data"))
       .finally(() => setLoading(false));
   }, [activeFarmId]);
 
   async function reload() {
     if (!activeFarmId) return;
-    const [s, soil] = await Promise.all([getSeedlings(activeFarmId), getSoilImprovements(activeFarmId)]);
+    const [s, soil, fert] = await Promise.all([getSeedlings(activeFarmId), getSoilImprovements(activeFarmId), getFertilisations(activeFarmId)]);
     setEntries(s);
     setSoilEntries(soil);
+    setFertEntries(fert);
   }
 
   function openAdd() {
     if (tab === "soil") {
       setSoilForm(blankSoil());
       setSoilModal("new");
+    } else if (tab === "fertilisation") {
+      setFertForm({ date: "", fertiliser: "", plants: "", notes: "" });
+      setFertModal("new");
     } else {
       setForm(blank(tab));
       setModal("new");
@@ -217,6 +228,47 @@ export default function SeedlingsPage() {
     }
   }
 
+  async function handleFertSave() {
+    if (!activeFarmId) return;
+    try {
+      setFertSaving(true);
+      setError("");
+      const payload = {
+        farm_id: activeFarmId,
+        date: fertForm.date || null,
+        fertiliser: fertForm.fertiliser.trim() || null,
+        plants: fertForm.plants.trim() || null,
+        notes: fertForm.notes.trim() || null,
+      };
+      if (fertModal === "new") {
+        const { error: e } = await supabase.from("fertilisations").insert(payload);
+        if (e) throw e;
+      } else if (fertModal) {
+        const { error: e } = await supabase.from("fertilisations").update(payload).eq("id", (fertModal as FertilisationEntry).id);
+        if (e) throw e;
+      }
+      await reload();
+      setFertModal(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setFertSaving(false);
+    }
+  }
+
+  async function handleFertDelete(id: string) {
+    try {
+      setFertDeletingId(id);
+      const { error: e } = await supabase.from("fertilisations").delete().eq("id", id);
+      if (e) throw e;
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete");
+    } finally {
+      setFertDeletingId(null);
+    }
+  }
+
   const nursery = entries.filter((e) => e.type === "nursery");
   const field = entries.filter((e) => e.type === "field");
   const activeFarm = farms.find((f) => f.id === activeFarmId);
@@ -273,6 +325,7 @@ export default function SeedlingsPage() {
               { key: "nursery", label: "Nursery starts", count: nursery.length },
               { key: "field",   label: "Field plantings", count: field.length },
               { key: "soil",    label: "Soil improvements", count: soilEntries.length },
+              { key: "fertilisation", label: "Fertilisation", count: fertEntries.length },
             ] as const).map(({ key, label, count }) => (
               <button
                 key={key}
@@ -314,12 +367,19 @@ export default function SeedlingsPage() {
             onDelete={handleDelete}
             deletingId={deletingId}
           />
-        ) : (
+        ) : tab === "soil" ? (
           <SoilTable
             rows={soilEntries}
             onEdit={(e) => { setSoilForm(soilToForm(e)); setSoilModal(e); }}
             onDelete={handleSoilDelete}
             deletingId={soilDeletingId}
+          />
+        ) : (
+          <FertilisationTable
+            rows={fertEntries}
+            onEdit={(e) => { setFertForm({ date: e.date ?? "", fertiliser: e.fertiliser ?? "", plants: e.plants ?? "", notes: e.notes ?? "" }); setFertModal(e); }}
+            onDelete={handleFertDelete}
+            deletingId={fertDeletingId}
           />
         )}
       </div>
@@ -442,6 +502,40 @@ export default function SeedlingsPage() {
                 onClick={() => setSoilModal(null)}
                 className="rounded-2xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Fertilisation modal */}
+      {fertModal !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl">
+            <h2 className="mb-5 text-lg font-semibold">
+              {fertModal === "new" ? "Add fertilisation" : `Edit — ${(fertModal as FertilisationEntry).fertiliser ?? "entry"}`}
+            </h2>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Date">
+                  <input type="date" className={inp} value={fertForm.date} onChange={(e) => setFertForm((p) => ({ ...p, date: e.target.value }))} />
+                </Field>
+                <Field label="Fertiliser">
+                  <input className={inp} value={fertForm.fertiliser} onChange={(e) => setFertForm((p) => ({ ...p, fertiliser: e.target.value }))} placeholder="Bokashi" />
+                </Field>
+              </div>
+              <Field label="Plants / Areas">
+                <input className={inp} value={fertForm.plants} onChange={(e) => setFertForm((p) => ({ ...p, plants: e.target.value }))} placeholder="Garden beds, trees…" />
+              </Field>
+              <Field label="Notes">
+                <textarea className={`${inp} min-h-[80px]`} value={fertForm.notes} onChange={(e) => setFertForm((p) => ({ ...p, notes: e.target.value }))} placeholder="Observations…" />
+              </Field>
+            </div>
+            <div className="mt-5 flex gap-2">
+              <button onClick={handleFertSave} disabled={fertSaving} className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60">
+                {fertSaving ? "Saving..." : "Save"}
+              </button>
+              <button onClick={() => setFertModal(null)} className="rounded-2xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
                 Cancel
               </button>
             </div>
@@ -597,6 +691,60 @@ function SoilTable({
                       disabled={deletingId === row.id}
                       className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
                     >
+                      {deletingId === row.id ? "…" : "Delete"}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ── Fertilisation table ─────────────────────────────────── */
+
+function FertilisationTable({
+  rows, onEdit, onDelete, deletingId,
+}: {
+  rows: FertilisationEntry[];
+  onEdit: (e: FertilisationEntry) => void;
+  onDelete: (id: string) => void;
+  deletingId: string | null;
+}) {
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">
+        No fertilisation logged yet. Click + Add entry to get started.
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[600px] text-sm">
+          <thead>
+            <tr className="border-b border-zinc-200 bg-zinc-50 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
+              <th className="px-4 py-3 text-left">Date</th>
+              <th className="px-4 py-3 text-left">Fertiliser</th>
+              <th className="px-4 py-3 text-left">Plants / Areas</th>
+              <th className="px-4 py-3 text-left">Notes</th>
+              <th className="px-4 py-3" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id} className="border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50 align-top transition-colors">
+                <td className="px-4 py-3 whitespace-nowrap text-zinc-700">{fmt(row.date)}</td>
+                <td className="px-4 py-3 font-medium whitespace-nowrap">{row.fertiliser ?? <span className="text-zinc-300">—</span>}</td>
+                <td className="px-4 py-3 text-zinc-700">{row.plants ?? <span className="text-zinc-300">—</span>}</td>
+                <td className="px-4 py-3 text-zinc-500 max-w-xs">{row.notes ?? <span className="text-zinc-300">—</span>}</td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <div className="flex gap-1">
+                    <button onClick={() => onEdit(row)} className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">Edit</button>
+                    <button onClick={() => onDelete(row.id)} disabled={deletingId === row.id} className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">
                       {deletingId === row.id ? "…" : "Delete"}
                     </button>
                   </div>
