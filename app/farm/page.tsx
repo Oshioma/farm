@@ -39,6 +39,7 @@ export default function FarmPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
 
   const [activeFarmId, setActiveFarmId] = useState<string>("");
+  const [activeForm, setActiveForm] = useState<"crop" | "task" | "harvest" | "expense" | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingFarm, setEditingFarm] = useState(false);
   const [farmEditForm, setFarmEditForm] = useState({ name: "", location: "", size_acres: "" });
@@ -368,7 +369,7 @@ export default function FarmPage() {
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                Inguka Farm Manager
+                Shamba Farm Manager
               </p>
               {editingFarm ? (
                 <div className="mt-2 space-y-2">
@@ -516,103 +517,157 @@ export default function FarmPage() {
               </div>
             </section>
 
-            <section className="mb-6 grid gap-6 xl:grid-cols-4">
-              <CropForm
-                zones={zones}
-                defaultZoneId={defaultZoneId}
-                onSubmit={handleCreateCrop}
-              />
-              <TaskForm
-                zones={zones}
-                crops={crops}
-                defaultZoneId={defaultZoneId}
-                onSubmit={handleCreateTask}
-              />
-              <HarvestForm
-                zones={zones}
-                crops={crops}
-                defaultCropId={defaultCropId}
-                defaultZoneId={defaultZoneId}
-                onSubmit={handleLogHarvest}
-              />
-              <ExpenseForm
-                zones={zones}
-                crops={crops}
-                defaultZoneId={defaultZoneId}
-                onSubmit={handleLogExpense}
-              />
+            <section className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-semibold">Open tasks</h2>
+                  <p className="mt-1 text-sm text-zinc-500">
+                    All todo and in-progress tasks, due soonest first.
+                  </p>
+                </div>
+                <span className="text-sm text-zinc-500">{openTasks.length} open</span>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {openTasks.length === 0 ? (
+                  <p className="text-sm text-zinc-500">No open tasks.</p>
+                ) : (
+                  openTasks.map((task) => {
+                    const isCompleting = completingTaskId === task.id;
+                    const isToday = task.due_date === today;
+                    return (
+                      <div key={task.id} className="rounded-2xl border border-zinc-200 p-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass(task.status)}`}>
+                            {task.status}
+                          </span>
+                          <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
+                            {task.priority}
+                          </span>
+                          {isToday ? (
+                            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                              today
+                            </span>
+                          ) : null}
+                          {task.proof_required ? (
+                            <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
+                              photo proof
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <h3 className="mt-3 text-base font-semibold">{task.title}</h3>
+
+                        <div className="mt-2 text-sm text-zinc-600">
+                          {task.zone?.[0]?.name ?? "No zone"}
+                          <span className="mx-2">·</span>
+                          {task.crop?.[0]?.crop_name ?? "General task"}
+                          <span className="mx-2">·</span>
+                          {formatDate(task.due_date)}
+                        </div>
+
+                        {task.description ? (
+                          <p className="mt-2 text-sm text-zinc-500">{task.description}</p>
+                        ) : null}
+
+                        <div className="mt-4">
+                          <button
+                            onClick={() => handleCompleteTask(task)}
+                            disabled={isCompleting}
+                            className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {isCompleting ? "Completing..." : "Mark done"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </section>
+
+            <div className="mb-6 flex flex-wrap gap-3">
+              {(
+                [
+                  { key: "crop", label: "New crop" },
+                  { key: "task", label: "New task" },
+                  { key: "harvest", label: "Log harvest" },
+                  { key: "expense", label: "Log expense" },
+                ] as const
+              ).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveForm(activeForm === key ? null : key)}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                    activeForm === key
+                      ? "bg-zinc-900 text-white"
+                      : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {activeForm === "crop" && (
+              <div className="mb-6 max-w-sm">
+                <CropForm
+                  zones={zones}
+                  defaultZoneId={defaultZoneId}
+                  onSubmit={async (data) => {
+                    const ok = await handleCreateCrop(data);
+                    if (ok) setActiveForm(null);
+                    return ok;
+                  }}
+                />
+              </div>
+            )}
+            {activeForm === "task" && (
+              <div className="mb-6 max-w-sm">
+                <TaskForm
+                  zones={zones}
+                  crops={crops}
+                  defaultZoneId={defaultZoneId}
+                  onSubmit={async (data) => {
+                    const ok = await handleCreateTask(data);
+                    if (ok) setActiveForm(null);
+                    return ok;
+                  }}
+                />
+              </div>
+            )}
+            {activeForm === "harvest" && (
+              <div className="mb-6 max-w-sm">
+                <HarvestForm
+                  zones={zones}
+                  crops={crops}
+                  defaultCropId={defaultCropId}
+                  defaultZoneId={defaultZoneId}
+                  onSubmit={async (data) => {
+                    const ok = await handleLogHarvest(data);
+                    if (ok) setActiveForm(null);
+                    return ok;
+                  }}
+                />
+              </div>
+            )}
+            {activeForm === "expense" && (
+              <div className="mb-6 max-w-sm">
+                <ExpenseForm
+                  zones={zones}
+                  crops={crops}
+                  defaultZoneId={defaultZoneId}
+                  onSubmit={async (data) => {
+                    const ok = await handleLogExpense(data);
+                    if (ok) setActiveForm(null);
+                    return ok;
+                  }}
+                />
+              </div>
+            )}
 
             <div className="grid gap-6 lg:grid-cols-[1.25fr,0.75fr]">
               <section className="space-y-6">
-                <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <h2 className="text-xl font-semibold">Today's tasks</h2>
-                      <p className="mt-1 text-sm text-zinc-500">
-                        This should feel direct and useful, not like admin clutter.
-                      </p>
-                    </div>
-                    <span className="text-sm text-zinc-500">{tasksToday.length} due</span>
-                  </div>
-
-                  <div className="mt-5 space-y-3">
-                    {tasksToday.length === 0 ? (
-                      <p className="text-sm text-zinc-500">No tasks due today.</p>
-                    ) : (
-                      tasksToday.map((task) => {
-                        const isCompleting = completingTaskId === task.id;
-                        return (
-                          <div
-                            key={task.id}
-                            className="rounded-2xl border border-zinc-200 p-4"
-                          >
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span
-                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass(task.status)}`}
-                              >
-                                {task.status}
-                              </span>
-                              <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
-                                {task.priority}
-                              </span>
-                              {task.proof_required ? (
-                                <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
-                                  photo proof
-                                </span>
-                              ) : null}
-                            </div>
-
-                            <h3 className="mt-3 text-base font-semibold">{task.title}</h3>
-
-                            <div className="mt-2 text-sm text-zinc-600">
-                              {task.zone?.[0]?.name ?? "No zone"}
-                              <span className="mx-2">·</span>
-                              {task.crop?.[0]?.crop_name ?? "General task"}
-                              <span className="mx-2">·</span>
-                              {formatDate(task.due_date)}
-                            </div>
-
-                            {task.description ? (
-                              <p className="mt-2 text-sm text-zinc-500">{task.description}</p>
-                            ) : null}
-
-                            <div className="mt-4">
-                              <button
-                                onClick={() => handleCompleteTask(task)}
-                                disabled={isCompleting}
-                                className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {isCompleting ? "Completing..." : "Mark done"}
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-
                 <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                   <div className="flex items-center justify-between gap-4">
                     <div>

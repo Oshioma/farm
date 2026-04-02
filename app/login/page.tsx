@@ -35,7 +35,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-            Inguka Farm Manager
+            Shamba Farm Manager
           </p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">Sign in</h1>
 
