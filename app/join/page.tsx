@@ -7,8 +7,8 @@ import { supabase } from "@/lib/supabase";
 
 type InviteInfo = {
   id: string;
+  created_by: string | null;
   farm_id: string;
-  farm_name: string;
 };
 
 function JoinInner() {
@@ -35,7 +35,7 @@ function JoinInner() {
       // Validate token
       const { data: inv, error } = await supabase
         .from("farm_invites")
-        .select("id, farm_id, farms(name)")
+        .select("id, farm_id, created_by")
         .eq("token", token)
         .is("used_by", null)
         .gte("expires_at", new Date().toISOString())
@@ -47,9 +47,7 @@ function JoinInner() {
         return;
       }
 
-      const farmsData = inv.farms as unknown as { name: string } | null;
-      const farmName = farmsData?.name ?? "a farm";
-      setInvite({ id: inv.id, farm_id: inv.farm_id, farm_name: farmName });
+      setInvite({ id: inv.id, farm_id: inv.farm_id, created_by: inv.created_by });
       setStatus("ready");
     })();
   }, [token]);
@@ -64,20 +62,28 @@ function JoinInner() {
       return;
     }
 
-    // Check if already a member
-    const { data: existing } = await supabase
+    // Find all farms the inviter belongs to
+    const { data: inviterFarms } = await supabase
       .from("farm_members")
-      .select("id")
-      .eq("farm_id", invite.farm_id)
-      .eq("profile_id", user.id)
-      .single();
+      .select("farm_id")
+      .eq("profile_id", invite.created_by);
 
-    if (!existing) {
-      const { error: memberError } = await supabase.from("farm_members").insert({
-        farm_id: invite.farm_id,
-        profile_id: user.id,
-        role_on_farm: "member",
-      });
+    const farmIds = (inviterFarms ?? []).map((f: { farm_id: string }) => f.farm_id);
+    if (farmIds.length === 0) farmIds.push(invite.farm_id); // fallback
+
+    // Get existing memberships for this user
+    const { data: existingRows } = await supabase
+      .from("farm_members")
+      .select("farm_id")
+      .eq("profile_id", user.id);
+    const alreadyIn = new Set((existingRows ?? []).map((r: { farm_id: string }) => r.farm_id));
+
+    const toInsert = farmIds
+      .filter((fid: string) => !alreadyIn.has(fid))
+      .map((fid: string) => ({ farm_id: fid, profile_id: user.id, role_on_farm: "member" }));
+
+    if (toInsert.length > 0) {
+      const { error: memberError } = await supabase.from("farm_members").insert(toInsert);
       if (memberError) {
         setStatus("error");
         setMessage("Failed to join the farm. Please try again.");
@@ -108,7 +114,7 @@ function JoinInner() {
             <>
               <h1 className="mt-4 text-2xl font-semibold tracking-tight">You're invited</h1>
               <p className="mt-2 text-sm text-zinc-500">
-                Join <span className="font-semibold text-zinc-900">{invite.farm_name}</span> on Shamba Farm Manager.
+                You've been invited to join Shamba Farm Manager.
               </p>
               {!loggedIn && (
                 <p className="mt-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
@@ -119,7 +125,7 @@ function JoinInner() {
                 onClick={acceptInvite}
                 className="mt-6 w-full rounded-2xl bg-zinc-900 py-3 text-sm font-medium text-white hover:bg-zinc-800"
               >
-                {loggedIn ? `Join ${invite.farm_name}` : "Log in to accept invite"}
+                {loggedIn ? "Accept invite" : "Log in to accept invite"}
               </button>
             </>
           )}

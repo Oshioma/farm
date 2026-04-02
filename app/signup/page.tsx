@@ -1,17 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-export default function SignUpPage() {
+function SignUpInner() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirectTo") ?? "/farm";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -28,7 +30,7 @@ export default function SignUpPage() {
 
     // If email confirmation is disabled in Supabase, the session is set immediately
     if (data.session) {
-      router.push("/farm");
+      router.push(redirectTo);
     } else {
       setDone(true);
     }
@@ -46,7 +48,7 @@ export default function SignUpPage() {
             We sent a confirmation link to <strong>{email}</strong>. Click it to activate your account, then sign in.
           </p>
           <Link
-            href="/login"
+            href={`/login?redirectTo=${encodeURIComponent(redirectTo)}`}
             className="mt-6 inline-block rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800"
           >
             Back to sign in
@@ -110,12 +112,27 @@ export default function SignUpPage() {
 
           <p className="mt-5 text-center text-sm text-zinc-500">
             Already have an account?{" "}
-            <Link href="/login" className="font-medium text-zinc-900 hover:underline">
+            <Link
+              href={`/login?redirectTo=${encodeURIComponent(redirectTo)}`}
+              className="font-medium text-zinc-900 hover:underline"
+            >
               Sign in
             </Link>
           </p>
         </div>
       </div>
     </main>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={
+      <main className="flex min-h-screen items-center justify-center bg-stone-50">
+        <p className="text-sm text-zinc-500">Loading…</p>
+      </main>
+    }>
+      <SignUpInner />
+    </Suspense>
   );
 }

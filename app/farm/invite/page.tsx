@@ -141,19 +141,6 @@ export default function InvitePage() {
               {activeFarm && <p className="mt-1 text-sm text-zinc-500">{activeFarm.name}</p>}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {farms.map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => setActiveFarmId(f.id)}
-                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                    activeFarmId === f.id
-                      ? "bg-zinc-900 text-white"
-                      : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
-                  }`}
-                >
-                  {f.name}
-                </button>
-              ))}
               <Link
                 href="/farm"
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
@@ -177,7 +164,7 @@ export default function InvitePage() {
             <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
               <h2 className="text-xl font-semibold">Invite someone</h2>
               <p className="mt-1 text-sm text-zinc-500">
-                Generate a one-use link and share it. The link expires in 7 days.
+                Generate a one-use link. When accepted, the person gets access to all your farms. Expires in 7 days.
               </p>
               <button
                 onClick={generateLink}
