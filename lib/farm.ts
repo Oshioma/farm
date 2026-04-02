@@ -309,6 +309,7 @@ export async function getSoilImprovements(farmId: string): Promise<SoilImproveme
   return (data ?? []) as SoilImprovement[];
 }
 
+export type SeedlingEntry = {
   id: string;
   farm_id: string;
   type: string;
