@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ImagePlus, Leaf } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { getFarms, getPlants } from "@/lib/farm";
-import type { Farm, Plant } from "@/lib/farm";
+import { getFarms, getPlants, getZones } from "@/lib/farm";
+import type { Farm, Plant, Zone } from "@/lib/farm";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -18,6 +18,7 @@ function errMsg(err: unknown, fallback: string): string {
 export default function PlantsPage() {
   const [farms, setFarms] = useState<Farm[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
+  const [zones, setZones] = useState<Zone[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -26,6 +27,7 @@ export default function PlantsPage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
   const [plantName, setPlantName] = useState("");
+  const [zoneId, setZoneId] = useState("");
   const [uploading, setUploading] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -44,6 +46,11 @@ export default function PlantsPage() {
   async function loadPlants(farmId: string) {
     const rows = await getPlants(farmId);
     setPlants(rows);
+  }
+
+  async function loadZones(farmId: string) {
+    const rows = await getZones(farmId);
+    setZones(rows);
   }
 
   useEffect(() => {
@@ -65,7 +72,7 @@ export default function PlantsPage() {
     const run = async () => {
       try {
         setLoading(true);
-        await loadPlants(activeFarmId);
+        await Promise.all([loadPlants(activeFarmId), loadZones(activeFarmId)]);
       } catch (err) {
         setError(errMsg(err, "Failed to load plants"));
       } finally {
@@ -110,12 +117,14 @@ export default function PlantsPage() {
         farm_id: activeFarmId,
         name: plantName.trim() || null,
         image_url: imageUrl,
+        zone_id: zoneId || null,
       });
       if (insertError) throw insertError;
 
       setFile(null);
       setPreview("");
       setPlantName("");
+      setZoneId("");
       setShowUpload(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
       await loadPlants(activeFarmId);
@@ -267,6 +276,24 @@ export default function PlantsPage() {
                   />
                 </div>
 
+                {zones.length > 0 ? (
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">
+                      Zone <span className="font-normal text-zinc-400">(optional)</span>
+                    </label>
+                    <select
+                      value={zoneId}
+                      onChange={(e) => setZoneId(e.target.value)}
+                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                    >
+                      <option value="">No zone</option>
+                      {zones.map((z) => (
+                        <option key={z.id} value={z.id}>{z.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+
                 <button
                   type="submit"
                   disabled={uploading || (!file && !plantName.trim())}
@@ -336,6 +363,9 @@ export default function PlantsPage() {
                       )}
                     </button>
                   )}
+                  {plant.zone?.[0]?.name ? (
+                    <p className="mt-1 text-xs text-zinc-400">{plant.zone[0].name}</p>
+                  ) : null}
                 </div>
               </div>
             ))}
