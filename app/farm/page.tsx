@@ -33,6 +33,9 @@ export default function FarmPage() {
 
   const [activeFarmId, setActiveFarmId] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [editingFarm, setEditingFarm] = useState(false);
+  const [farmEditForm, setFarmEditForm] = useState({ name: "", location: "", size_acres: "" });
+  const [savingFarm, setSavingFarm] = useState(false);
   const router = useRouter();
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string>("");
@@ -40,6 +43,43 @@ export default function FarmPage() {
   async function handleSignOut() {
     await supabase.auth.signOut();
     router.push("/login");
+  }
+
+  function startEditFarm() {
+    if (!activeFarm) return;
+    setFarmEditForm({
+      name: activeFarm.name,
+      location: activeFarm.location ?? "",
+      size_acres: activeFarm.size_acres?.toString() ?? "",
+    });
+    setEditingFarm(true);
+  }
+
+  async function handleSaveFarm() {
+    if (!activeFarmId) return;
+    try {
+      setSavingFarm(true);
+      setError("");
+      const name = farmEditForm.name.trim();
+      if (!name) throw new Error("Farm name is required.");
+
+      const { error: updateError } = await supabase
+        .from("farms")
+        .update({
+          name,
+          location: farmEditForm.location.trim() || null,
+          size_acres: farmEditForm.size_acres ? Number(farmEditForm.size_acres) : null,
+        })
+        .eq("id", activeFarmId);
+      if (updateError) throw updateError;
+
+      await loadFarms();
+      setEditingFarm(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save farm");
+    } finally {
+      setSavingFarm(false);
+    }
   }
 
   async function loadFarms() {
@@ -324,13 +364,66 @@ export default function FarmPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
                 Inguka Farm Manager
               </p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-                {activeFarm?.name ?? "Farm Manager"}
-              </h1>
-              <p className="mt-3 text-sm text-zinc-600 sm:text-base">
-                {activeFarm?.location || "No location set"}
-                {activeFarm?.size_acres ? ` · ${activeFarm.size_acres} acres` : ""}
-              </p>
+              {editingFarm ? (
+                <div className="mt-2 space-y-2">
+                  <input
+                    type="text"
+                    value={farmEditForm.name}
+                    onChange={(e) => setFarmEditForm((prev) => ({ ...prev, name: e.target.value }))}
+                    className="w-full rounded-2xl border border-zinc-300 px-4 py-2 text-2xl font-semibold outline-none focus:border-zinc-900"
+                    placeholder="Farm name"
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={farmEditForm.location}
+                      onChange={(e) => setFarmEditForm((prev) => ({ ...prev, location: e.target.value }))}
+                      className="flex-1 rounded-2xl border border-zinc-300 px-4 py-2 text-sm outline-none focus:border-zinc-900"
+                      placeholder="Location"
+                    />
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={farmEditForm.size_acres}
+                      onChange={(e) => setFarmEditForm((prev) => ({ ...prev, size_acres: e.target.value }))}
+                      className="w-32 rounded-2xl border border-zinc-300 px-4 py-2 text-sm outline-none focus:border-zinc-900"
+                      placeholder="Acres"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSaveFarm}
+                      disabled={savingFarm || !farmEditForm.name.trim()}
+                      className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60"
+                    >
+                      {savingFarm ? "Saving..." : "Save"}
+                    </button>
+                    <button
+                      onClick={() => setEditingFarm(false)}
+                      className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
+                    {activeFarm?.name ?? "Farm Manager"}
+                  </h1>
+                  <p className="mt-3 text-sm text-zinc-600 sm:text-base">
+                    {activeFarm?.location || "No location set"}
+                    {activeFarm?.size_acres ? ` · ${activeFarm.size_acres} acres` : ""}
+                  </p>
+                  <button
+                    onClick={startEditFarm}
+                    className="mt-3 rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100"
+                  >
+                    Edit
+                  </button>
+                </>
+              )}
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
