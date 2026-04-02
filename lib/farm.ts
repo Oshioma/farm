@@ -81,9 +81,23 @@ export type Asset = {
 };
 
 export async function getFarms(): Promise<Farm[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: members, error: membersError } = await supabase
+    .from("farm_members")
+    .select("farm_id")
+    .eq("user_id", user.id);
+
+  if (membersError) throw new Error(`getFarms failed: ${membersError.message}`);
+  if (!members?.length) return [];
+
+  const farmIds = members.map((m: { farm_id: string }) => m.farm_id);
+
   const { data, error } = await supabase
     .from("farms")
     .select("id, name, slug, location, size_acres")
+    .in("id", farmIds)
     .eq("is_active", true)
     .order("name");
 

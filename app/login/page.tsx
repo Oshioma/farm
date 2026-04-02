@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
@@ -11,6 +11,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirectTo") ?? "/farm";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -26,7 +28,7 @@ export default function LoginPage() {
       setError(authError.message);
       setLoading(false);
     } else {
-      router.push("/farm");
+      router.push(redirectTo);
     }
   }
 
