@@ -22,6 +22,7 @@ import { HarvestForm } from "@/app/farm/components/HarvestForm";
 import { ExpenseForm } from "@/app/farm/components/ExpenseForm";
 import { AssetForm } from "@/app/farm/components/AssetForm";
 import { PestForm } from "@/app/farm/components/PestForm";
+import { ZoneForm } from "@/app/farm/components/ZoneForm";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
 import type { CropFormData } from "@/app/farm/components/CropForm";
 import type { TaskFormData } from "@/app/farm/components/TaskForm";
@@ -29,6 +30,7 @@ import type { HarvestFormData } from "@/app/farm/components/HarvestForm";
 import type { ExpenseFormData } from "@/app/farm/components/ExpenseForm";
 import type { AssetFormData } from "@/app/farm/components/AssetForm";
 import type { PestFormData } from "@/app/farm/components/PestForm";
+import type { ZoneFormData } from "@/app/farm/components/ZoneForm";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -48,7 +50,7 @@ export default function FarmPage() {
   const [pests, setPests] = useState<Pest[]>([]);
 
   const [activeFarmId, setActiveFarmId] = useState<string>("");
-  const [activeForm, setActiveForm] = useState<"crop" | "task" | "harvest" | "expense" | "asset" | "pest" | null>(null);
+  const [activeForm, setActiveForm] = useState<"crop" | "task" | "harvest" | "expense" | "asset" | "pest" | "zone" | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingFarm, setEditingFarm] = useState(false);
   const [farmEditForm, setFarmEditForm] = useState({ name: "", location: "", size_acres: "" });
@@ -444,6 +446,30 @@ export default function FarmPage() {
     }
   }
 
+  async function handleCreateZone(data: ZoneFormData): Promise<boolean> {
+    if (!activeFarmId) return false;
+    try {
+      setError("");
+      const name = data.name.trim();
+      if (!name) throw new Error("Zone name is required.");
+
+      const { error: insertError } = await supabase.from("zones").insert({
+        farm_id: activeFarmId,
+        name,
+        code: data.code.trim() || null,
+        size_acres: data.size_acres ? Number(data.size_acres) : null,
+        is_active: true,
+      });
+      if (insertError) throw insertError;
+
+      await loadFarmData(activeFarmId);
+      return true;
+    } catch (err) {
+      setError(errMsg(err, "Failed to add zone"));
+      return false;
+    }
+  }
+
   return (
     <main className="min-h-screen bg-stone-50 text-zinc-900">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -568,7 +594,7 @@ export default function FarmPage() {
 
         {activeFarm ? (
           <>
-            <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <section className="mb-6 grid gap-4 sm:grid-cols-3">
               <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
                   Tasks today
@@ -588,20 +614,6 @@ export default function FarmPage() {
                   Ready to harvest
                 </p>
                 <p className="mt-3 text-3xl font-semibold">{readyToHarvest.length}</p>
-              </div>
-
-              <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
-                  Forecast revenue
-                </p>
-                <p className="mt-3 text-3xl font-semibold">{formatMoney(forecastRevenue)}</p>
-              </div>
-
-              <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
-                  Total expenses
-                </p>
-                <p className="mt-3 text-3xl font-semibold">{formatMoney(totalExpenses)}</p>
               </div>
             </section>
 
@@ -683,6 +695,7 @@ export default function FarmPage() {
                   { key: "expense", label: "Log expense" },
                   { key: "asset", label: "Log asset" },
                   { key: "pest", label: "Log pest" },
+                  { key: "zone", label: "Add zone" },
                 ] as const
               ).map(({ key, label }) => (
                 <button
@@ -780,6 +793,17 @@ export default function FarmPage() {
                 />
               </div>
             )}
+            {activeForm === "zone" && (
+              <div className="mb-6 max-w-sm">
+                <ZoneForm
+                  onSubmit={async (data) => {
+                    const ok = await handleCreateZone(data);
+                    if (ok) setActiveForm(null);
+                    return ok;
+                  }}
+                />
+              </div>
+            )}
 
             <div className="grid gap-6 lg:grid-cols-[1.25fr,0.75fr]">
               <section className="space-y-6">
@@ -825,48 +849,6 @@ export default function FarmPage() {
                           </div>
                           <div>{formatDate(crop.expected_harvest_start)}</div>
                           <div>{crop.actual_yield_kg ?? 0} kg</div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <h2 className="text-xl font-semibold">Expenses</h2>
-                      <p className="mt-1 text-sm text-zinc-500">
-                        Most recent 20 expenses across all categories.
-                      </p>
-                    </div>
-                    <span className="text-sm text-zinc-500">{expenses.length} logged</span>
-                  </div>
-
-                  <div className="mt-5 overflow-hidden rounded-2xl border border-zinc-200">
-                    <div className="grid grid-cols-4 gap-4 border-b border-zinc-200 bg-zinc-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                      <div>Date</div>
-                      <div>Category</div>
-                      <div>Crop</div>
-                      <div>Amount</div>
-                    </div>
-
-                    {expenses.length === 0 ? (
-                      <div className="px-4 py-6 text-sm text-zinc-500">No expenses yet.</div>
-                    ) : (
-                      expenses.map((expense) => (
-                        <div
-                          key={expense.id}
-                          className="grid grid-cols-4 gap-4 border-b border-zinc-100 px-4 py-4 text-sm last:border-b-0"
-                        >
-                          <div>{formatDate(expense.expense_date)}</div>
-                          <div>
-                            <div className="font-medium capitalize">{expense.category}</div>
-                            {expense.description ? (
-                              <div className="text-zinc-500">{expense.description}</div>
-                            ) : null}
-                          </div>
-                          <div>{expense.crop?.[0]?.crop_name ?? "—"}</div>
-                          <div className="font-medium">{formatMoney(expense.amount)}</div>
                         </div>
                       ))
                     )}
@@ -983,6 +965,61 @@ export default function FarmPage() {
                 </div>
               </aside>
             </div>
+
+            <section className="mt-6 space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                    Expected income
+                  </p>
+                  <p className="mt-3 text-3xl font-semibold">{formatMoney(forecastRevenue)}</p>
+                  <p className="mt-1 text-xs text-zinc-400">Based on estimated yield × price per kg</p>
+                </div>
+                <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                    Total expenses
+                  </p>
+                  <p className="mt-3 text-3xl font-semibold">{formatMoney(totalExpenses)}</p>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Net: {formatMoney(forecastRevenue - totalExpenses)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-semibold">Expenses</h2>
+                    <p className="mt-1 text-sm text-zinc-500">Most recent 20 expenses.</p>
+                  </div>
+                  <span className="text-sm text-zinc-500">{expenses.length} logged</span>
+                </div>
+
+                <div className="mt-5 overflow-hidden rounded-2xl border border-zinc-200">
+                  <div className="grid grid-cols-4 gap-4 border-b border-zinc-200 bg-zinc-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                    <div>Date</div>
+                    <div>Category</div>
+                    <div>Crop</div>
+                    <div>Amount</div>
+                  </div>
+                  {expenses.length === 0 ? (
+                    <div className="px-4 py-6 text-sm text-zinc-500">No expenses yet.</div>
+                  ) : (
+                    expenses.map((expense) => (
+                      <div
+                        key={expense.id}
+                        className="grid grid-cols-4 gap-4 border-b border-zinc-100 px-4 py-4 text-sm last:border-b-0"
+                      >
+                        <div>{formatDate(expense.expense_date)}</div>
+                        <div className="font-medium capitalize">{expense.category}</div>
+                        <div>{expense.crop?.[0]?.crop_name ?? "—"}</div>
+                        <div className="font-medium">{formatMoney(expense.amount)}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </section>
           </>
         ) : null}
       </div>
