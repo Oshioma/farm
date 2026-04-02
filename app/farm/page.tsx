@@ -687,7 +687,7 @@ export default function FarmPage() {
                 <span className="text-sm text-zinc-500">{openTasks.length} open</span>
               </div>
 
-              <div className="mt-5 space-y-3">
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {openTasks.length === 0 ? (
                   <p className="text-sm text-zinc-500">No open tasks.</p>
                 ) : (
@@ -876,7 +876,7 @@ export default function FarmPage() {
               </button>
 
               {showCompleted ? (
-                <div className="mt-5 space-y-3">
+                <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {completedTasks.length === 0 ? (
                     <p className="text-sm text-zinc-500">No completed tasks yet.</p>
                   ) : (
