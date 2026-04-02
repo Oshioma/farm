@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { getFarms, getSeedlings } from "@/lib/farm";
-import type { Farm, SeedlingEntry } from "@/lib/farm";
+import { getFarms, getSeedlings, getSoilImprovements } from "@/lib/farm";
+import type { Farm, SeedlingEntry, SoilImprovement } from "@/lib/farm";
 
 /* ── Types ────────────────────────────────────────────────── */
 
@@ -50,6 +50,19 @@ function fmt(date: string | null) {
   return `${d}/${m}/${y}`;
 }
 
+type SoilFormData = {
+  date: string;
+  bed: string;
+  method: string;
+  notes: string;
+};
+
+const blankSoil = (): SoilFormData => ({ date: "", bed: "", method: "", notes: "" });
+
+function soilToForm(e: SoilImprovement): SoilFormData {
+  return { date: e.date ?? "", bed: e.bed ?? "", method: e.method ?? "", notes: e.notes ?? "" };
+}
+
 /* ── Page ─────────────────────────────────────────────────── */
 
 export default function SeedlingsPage() {
@@ -58,12 +71,19 @@ export default function SeedlingsPage() {
   const [entries, setEntries] = useState<SeedlingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"nursery" | "field">("nursery");
+  const [tab, setTab] = useState<"nursery" | "field" | "soil">("nursery");
 
   const [modal, setModal] = useState<SeedlingEntry | null | "new">(null);
   const [form, setForm] = useState<FormData>(blank("nursery"));
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Soil improvements
+  const [soilEntries, setSoilEntries] = useState<SoilImprovement[]>([]);
+  const [soilModal, setSoilModal] = useState<SoilImprovement | null | "new">(null);
+  const [soilForm, setSoilForm] = useState<SoilFormData>(blankSoil());
+  const [soilSaving, setSoilSaving] = useState(false);
+  const [soilDeletingId, setSoilDeletingId] = useState<string | null>(null);
 
   const router = useRouter();
 
@@ -81,20 +101,27 @@ export default function SeedlingsPage() {
     if (!activeFarmId) return;
     setLoading(true);
     setError("");
-    getSeedlings(activeFarmId)
-      .then(setEntries)
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load seedlings"))
+    Promise.all([getSeedlings(activeFarmId), getSoilImprovements(activeFarmId)])
+      .then(([s, soil]) => { setEntries(s); setSoilEntries(soil); })
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load data"))
       .finally(() => setLoading(false));
   }, [activeFarmId]);
 
   async function reload() {
     if (!activeFarmId) return;
-    setEntries(await getSeedlings(activeFarmId));
+    const [s, soil] = await Promise.all([getSeedlings(activeFarmId), getSoilImprovements(activeFarmId)]);
+    setEntries(s);
+    setSoilEntries(soil);
   }
 
   function openAdd() {
-    setForm(blank(tab));
-    setModal("new");
+    if (tab === "soil") {
+      setSoilForm(blankSoil());
+      setSoilModal("new");
+    } else {
+      setForm(blank(tab));
+      setModal("new");
+    }
   }
 
   function openEdit(entry: SeedlingEntry) {
@@ -149,6 +176,47 @@ export default function SeedlingsPage() {
     }
   }
 
+  async function handleSoilSave() {
+    if (!activeFarmId) return;
+    try {
+      setSoilSaving(true);
+      setError("");
+      const payload = {
+        farm_id: activeFarmId,
+        date: soilForm.date || null,
+        bed: soilForm.bed.trim() || null,
+        method: soilForm.method.trim() || null,
+        notes: soilForm.notes.trim() || null,
+      };
+      if (soilModal === "new") {
+        const { error: e } = await supabase.from("soil_improvements").insert(payload);
+        if (e) throw e;
+      } else if (soilModal) {
+        const { error: e } = await supabase.from("soil_improvements").update(payload).eq("id", (soilModal as SoilImprovement).id);
+        if (e) throw e;
+      }
+      await reload();
+      setSoilModal(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSoilSaving(false);
+    }
+  }
+
+  async function handleSoilDelete(id: string) {
+    try {
+      setSoilDeletingId(id);
+      const { error: e } = await supabase.from("soil_improvements").delete().eq("id", id);
+      if (e) throw e;
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete");
+    } finally {
+      setSoilDeletingId(null);
+    }
+  }
+
   const nursery = entries.filter((e) => e.type === "nursery");
   const field = entries.filter((e) => e.type === "field");
   const activeFarm = farms.find((f) => f.id === activeFarmId);
@@ -163,7 +231,7 @@ export default function SeedlingsPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
                 Shamba Farm Manager
               </p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight">Seedlings log</h1>
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight">Field log</h1>
               {activeFarm && <p className="mt-1 text-sm text-zinc-500">{activeFarm.name}</p>}
             </div>
             <div className="flex flex-wrap gap-2">
@@ -200,19 +268,21 @@ export default function SeedlingsPage() {
         )}
 
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex gap-2">
-            {(["nursery", "field"] as const).map((t) => (
+          <div className="flex flex-wrap gap-2">
+            {([
+              { key: "nursery", label: "Nursery starts", count: nursery.length },
+              { key: "field",   label: "Field plantings", count: field.length },
+              { key: "soil",    label: "Soil improvements", count: soilEntries.length },
+            ] as const).map(({ key, label, count }) => (
               <button
-                key={t}
-                onClick={() => setTab(t)}
+                key={key}
+                onClick={() => setTab(key)}
                 className={`rounded-full px-5 py-2 text-sm font-medium transition ${
-                  tab === t ? "bg-zinc-900 text-white" : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
+                  tab === key ? "bg-zinc-900 text-white" : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
                 }`}
               >
-                {t === "nursery" ? "Nursery starts" : "Field plantings"}
-                <span className="ml-2 text-xs opacity-60">
-                  {t === "nursery" ? nursery.length : field.length}
-                </span>
+                {label}
+                <span className="ml-2 text-xs opacity-60">{count}</span>
               </button>
             ))}
           </div>
@@ -235,7 +305,7 @@ export default function SeedlingsPage() {
             onDelete={handleDelete}
             deletingId={deletingId}
           />
-        ) : (
+        ) : tab === "field" ? (
           <SeedlingTable
             rows={field}
             columns={["date", "row_location", "plant", "quantity", "germination", "notes"]}
@@ -243,6 +313,13 @@ export default function SeedlingsPage() {
             onEdit={openEdit}
             onDelete={handleDelete}
             deletingId={deletingId}
+          />
+        ) : (
+          <SoilTable
+            rows={soilEntries}
+            onEdit={(e) => { setSoilForm(soilToForm(e)); setSoilModal(e); }}
+            onDelete={handleSoilDelete}
+            deletingId={soilDeletingId}
           />
         )}
       </div>
@@ -301,6 +378,48 @@ export default function SeedlingsPage() {
               </button>
               <button
                 onClick={() => setModal(null)}
+                className="rounded-2xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Soil improvements modal */}
+      {soilModal !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl">
+            <h2 className="mb-5 text-lg font-semibold">
+              {soilModal === "new" ? "Add soil improvement" : `Edit — ${(soilModal as SoilImprovement).method ?? "entry"}`}
+            </h2>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Date">
+                  <input type="date" className={inp} value={soilForm.date} onChange={(e) => setSoilForm((p) => ({ ...p, date: e.target.value }))} />
+                </Field>
+                <Field label="Bed / Location">
+                  <input className={inp} value={soilForm.bed} onChange={(e) => setSoilForm((p) => ({ ...p, bed: e.target.value }))} placeholder="A2.1" />
+                </Field>
+              </div>
+              <Field label="Method">
+                <input className={inp} value={soilForm.method} onChange={(e) => setSoilForm((p) => ({ ...p, method: e.target.value }))} placeholder="Bokashi + hugelculture" />
+              </Field>
+              <Field label="Notes">
+                <textarea className={`${inp} min-h-[80px]`} value={soilForm.notes} onChange={(e) => setSoilForm((p) => ({ ...p, notes: e.target.value }))} placeholder="2 bins, about 15m…" />
+              </Field>
+            </div>
+            <div className="mt-5 flex gap-2">
+              <button
+                onClick={handleSoilSave}
+                disabled={soilSaving}
+                className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60"
+              >
+                {soilSaving ? "Saving..." : "Save"}
+              </button>
+              <button
+                onClick={() => setSoilModal(null)}
                 className="rounded-2xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
                 Cancel
@@ -375,6 +494,69 @@ function SeedlingTable({
                     {cell(row, col)}
                   </td>
                 ))}
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => onEdit(row)}
+                      className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => onDelete(row.id)}
+                      disabled={deletingId === row.id}
+                      className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                    >
+                      {deletingId === row.id ? "…" : "Delete"}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ── Soil improvements table ─────────────────────────────── */
+
+function SoilTable({
+  rows, onEdit, onDelete, deletingId,
+}: {
+  rows: SoilImprovement[];
+  onEdit: (e: SoilImprovement) => void;
+  onDelete: (id: string) => void;
+  deletingId: string | null;
+}) {
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">
+        No soil improvements logged yet. Click + Add entry to get started.
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[600px] text-sm">
+          <thead>
+            <tr className="border-b border-zinc-200 bg-zinc-50 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
+              <th className="px-4 py-3 text-left">Date</th>
+              <th className="px-4 py-3 text-left">Bed</th>
+              <th className="px-4 py-3 text-left">Method</th>
+              <th className="px-4 py-3 text-left">Notes</th>
+              <th className="px-4 py-3" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id} className="border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50 align-top transition-colors">
+                <td className="px-4 py-3 whitespace-nowrap text-zinc-700">{fmt(row.date)}</td>
+                <td className="px-4 py-3 font-medium whitespace-nowrap">{row.bed ?? <span className="text-zinc-300">—</span>}</td>
+                <td className="px-4 py-3 text-zinc-700">{row.method ?? <span className="text-zinc-300">—</span>}</td>
+                <td className="px-4 py-3 text-zinc-500 max-w-xs">{row.notes ?? <span className="text-zinc-300">—</span>}</td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <div className="flex gap-1">
                     <button
