@@ -13,19 +13,14 @@ export default function ResetPasswordPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Check if we already have a session (code was exchanged via /auth/callback)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setReady(true);
-      }
-    });
-
-    // Also listen for PASSWORD_RECOVERY event (handles hash-based recovery links)
+    // Listen for auth state changes — covers both PKCE and implicit flows
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setReady(true);
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || event === "INITIAL_SESSION" || event === "SIGNED_IN") {
+        if (session) {
+          setReady(true);
+        }
       }
     });
     return () => subscription.unsubscribe();
