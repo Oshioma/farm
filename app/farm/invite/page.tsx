@@ -9,6 +9,7 @@ import type { Farm } from "@/lib/farm";
 type Member = {
   id: string;
   profile_id: string;
+  user_email: string | null;
   role_on_farm: string;
   created_at: string;
 };
@@ -16,6 +17,7 @@ type Member = {
 type JoinRequest = {
   id: string;
   user_id: string;
+  user_email: string | null;
   status: string;
   created_at: string;
 };
@@ -37,9 +39,9 @@ export default function InvitePage() {
 
   async function loadData(farmId: string) {
     const [{ data: memberRows }, { data: requestRows }] = await Promise.all([
-      supabase.from("farm_members").select("id, profile_id, role_on_farm, created_at").eq("farm_id", farmId),
+      supabase.from("farm_members").select("id, profile_id, user_email, role_on_farm, created_at").eq("farm_id", farmId),
       supabase.from("join_requests")
-        .select("id, user_id, status, created_at")
+        .select("id, user_id, user_email, status, created_at")
         .eq("farm_id", farmId)
         .eq("status", "pending")
         .order("created_at", { ascending: true }),
@@ -86,6 +88,7 @@ export default function InvitePage() {
         const { error: insertErr } = await supabase.from("farm_members").insert({
           farm_id: activeFarmId,
           profile_id: req.user_id,
+          user_email: req.user_email,
           role_on_farm: "worker",
         });
         if (insertErr) throw insertErr;
@@ -200,7 +203,7 @@ export default function InvitePage() {
                   {joinRequests.map((req) => (
                     <div key={req.id} className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-white px-4 py-3">
                       <div>
-                        <p className="text-sm font-mono text-zinc-600">{req.user_id}</p>
+                        <p className="text-sm text-zinc-600">{req.user_email ?? req.user_id}</p>
                         <p className="text-xs text-zinc-400">{fmtDate(req.created_at)}</p>
                       </div>
                       <div className="flex gap-2">
@@ -233,7 +236,7 @@ export default function InvitePage() {
                 {members.map((m) => (
                   <div key={m.id} className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-100 px-4 py-3">
                     <div>
-                      <p className="text-sm font-mono text-zinc-500">{m.profile_id}</p>
+                      <p className="text-sm text-zinc-500">{m.user_email ?? m.profile_id}</p>
                       <span className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
                         m.role_on_farm === "owner" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600"
                       }`}>{m.role_on_farm}</span>

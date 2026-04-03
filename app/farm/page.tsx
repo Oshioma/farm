@@ -141,7 +141,7 @@ export default function FarmPage() {
         .select("id")
         .single();
       if (farmErr) throw farmErr;
-      await supabase.from("farm_members").insert({ farm_id: farm.id, profile_id: user?.id, role_on_farm: "owner" });
+      await supabase.from("farm_members").insert({ farm_id: farm.id, profile_id: user?.id, user_email: user?.email, role_on_farm: "owner" });
       setNewFarmName("");
       setNoFarmMode("idle");
       await loadFarms();
@@ -172,6 +172,7 @@ export default function FarmPage() {
     const { error: err } = await supabase.from("join_requests").insert({
       farm_id: farmId,
       user_id: user?.id,
+      user_email: user?.email,
       status: "pending",
     });
     if (err) setError(errMsg(err, "Failed to send request"));
