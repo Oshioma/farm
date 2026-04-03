@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server";
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/farm";
+  const next = searchParams.get("next") ?? "/reset-password";
 
   if (code) {
     const response = NextResponse.redirect(new URL(next, request.url));
