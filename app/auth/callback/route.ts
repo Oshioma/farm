@@ -7,6 +7,14 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/reset-password";
 
+  // Forward Supabase error params to the reset-password page
+  const errorDescription = searchParams.get("error_description");
+  if (errorDescription) {
+    const dest = new URL("/reset-password", request.url);
+    dest.searchParams.set("error_description", errorDescription);
+    return NextResponse.redirect(dest);
+  }
+
   if (code) {
     const response = NextResponse.redirect(new URL(next, request.url));
 
