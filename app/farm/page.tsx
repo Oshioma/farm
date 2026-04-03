@@ -913,6 +913,12 @@ export default function FarmPage() {
                 Fertiliser
               </Link>
               <Link
+                href="/farm/compost"
+                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+              >
+                Compost
+              </Link>
+              <Link
                 href="/companion"
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
