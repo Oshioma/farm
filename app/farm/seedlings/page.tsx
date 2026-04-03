@@ -16,6 +16,10 @@ type FormData = {
   variety: string;
   quantity: string;
   germination: string;
+  germination_date: string;
+  healthy_seedlings: string;
+  successional_sowing: string;
+  yields: string;
   row_location: string;
   notes: string;
 };
@@ -27,6 +31,10 @@ const blank = (type: string): FormData => ({
   variety: "",
   quantity: "",
   germination: "",
+  germination_date: "",
+  healthy_seedlings: "",
+  successional_sowing: "",
+  yields: "",
   row_location: "",
   notes: "",
 });
@@ -39,6 +47,10 @@ function entryToForm(e: SeedlingEntry): FormData {
     variety: e.variety ?? "",
     quantity: e.quantity ?? "",
     germination: e.germination ?? "",
+    germination_date: e.germination_date ?? "",
+    healthy_seedlings: e.healthy_seedlings ?? "",
+    successional_sowing: e.successional_sowing ?? "",
+    yields: e.yields ?? "",
     row_location: e.row_location ?? "",
     notes: e.notes ?? "",
   };
@@ -128,6 +140,10 @@ export default function SeedlingsPage() {
         variety: form.variety.trim() || null,
         quantity: form.quantity.trim() || null,
         germination: form.germination.trim() || null,
+        germination_date: form.germination_date || null,
+        healthy_seedlings: form.healthy_seedlings.trim() || null,
+        successional_sowing: form.successional_sowing.trim() || null,
+        yields: form.yields.trim() || null,
         row_location: form.row_location.trim() || null,
         notes: form.notes.trim() || null,
       };
@@ -285,8 +301,8 @@ export default function SeedlingsPage() {
         ) : tab === "nursery" ? (
           <SeedlingTable
             rows={nursery}
-            columns={["date", "plant", "variety", "quantity", "germination", "notes"]}
-            headers={["Date", "Plant", "Variety", "Qty", "Germination", "Notes"]}
+            columns={["date", "plant", "variety", "quantity", "successional_sowing", "germination_date", "germination", "healthy_seedlings", "notes", "yields"]}
+            headers={["Date", "Plant", "Variety", "Seeds", "Successional", "Germ. date", "Status", "Healthy", "Notes", "Yields"]}
             onEdit={openEdit}
             onDelete={handleDelete}
             deletingId={deletingId}
@@ -294,8 +310,8 @@ export default function SeedlingsPage() {
         ) : tab === "field" ? (
           <SeedlingTable
             rows={field}
-            columns={["date", "row_location", "plant", "quantity", "germination", "notes"]}
-            headers={["Date", "Row", "Plant", "Qty", "Germination", "Notes"]}
+            columns={["date", "row_location", "plant", "quantity", "germination_date", "germination", "healthy_seedlings", "notes"]}
+            headers={["Date", "Row", "Plant", "Qty", "Germ. date", "Status", "Healthy", "Notes"]}
             onEdit={openEdit}
             onDelete={handleDelete}
             deletingId={deletingId}
@@ -341,12 +357,25 @@ export default function SeedlingsPage() {
                   <input className={inp} value={form.quantity} onChange={(e) => setForm((p) => ({ ...p, quantity: e.target.value }))} placeholder="64 or ~20" />
                 </Field>
               </div>
-              {form.type === "field" && (
-                <Field label="Row / Location">
-                  <input className={inp} value={form.row_location} onChange={(e) => setForm((p) => ({ ...p, row_location: e.target.value }))} placeholder="A1, South border…" />
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Successional sowing">
+                  <input className={inp} value={form.successional_sowing} onChange={(e) => setForm((p) => ({ ...p, successional_sowing: e.target.value }))} placeholder="After seed collection, monthly…" />
                 </Field>
-              )}
-              <Field label="Germination">
+                <Field label="Germination date">
+                  <input type="date" className={inp} value={form.germination_date} onChange={(e) => setForm((p) => ({ ...p, germination_date: e.target.value }))} />
+                </Field>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Healthy seedlings">
+                  <input className={inp} value={form.healthy_seedlings} onChange={(e) => setForm((p) => ({ ...p, healthy_seedlings: e.target.value }))} placeholder="8, All, None…" />
+                </Field>
+                {form.type === "field" && (
+                  <Field label="Row / Location">
+                    <input className={inp} value={form.row_location} onChange={(e) => setForm((p) => ({ ...p, row_location: e.target.value }))} placeholder="A1, South border…" />
+                  </Field>
+                )}
+              </div>
+              <Field label="Germination status">
                 <div className="flex gap-3 pt-1">
                   {[
                     { value: "green",  bg: "bg-emerald-500", ring: "ring-emerald-500", label: "Good" },
@@ -371,6 +400,9 @@ export default function SeedlingsPage() {
               </Field>
               <Field label="Notes">
                 <textarea className={`${inp} min-h-[80px]`} value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} placeholder="Observations…" />
+              </Field>
+              <Field label="Yields">
+                <textarea className={`${inp} min-h-[60px]`} value={form.yields} onChange={(e) => setForm((p) => ({ ...p, yields: e.target.value }))} placeholder="Harvest results…" />
               </Field>
             </div>
 
@@ -444,7 +476,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-type Col = "date" | "plant" | "variety" | "quantity" | "germination" | "row_location" | "notes";
+type Col = "date" | "plant" | "variety" | "quantity" | "germination" | "germination_date" | "healthy_seedlings" | "successional_sowing" | "yields" | "row_location" | "notes";
 
 function SeedlingTable({
   rows, columns, headers, onEdit, onDelete, deletingId,
@@ -466,6 +498,7 @@ function SeedlingTable({
 
   function cell(row: SeedlingEntry, col: Col) {
     if (col === "date") return fmt(row.date);
+    if (col === "germination_date") return fmt(row.germination_date);
     if (col === "germination") {
       const g = row.germination;
       if (g === "green") return <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-500" />Good</span>;
@@ -473,7 +506,8 @@ function SeedlingTable({
       if (g === "red")   return <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-medium text-rose-700"><span className="h-2 w-2 rounded-full bg-rose-500" />Failed</span>;
       return <span className="text-zinc-300">—</span>;
     }
-    const val = row[col];
+    const val = row[col as keyof SeedlingEntry];
+    if (typeof val === "string") return val;
     return val ?? <span className="text-zinc-300">—</span>;
   }
 

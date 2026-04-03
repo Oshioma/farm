@@ -512,6 +512,10 @@ export type SeedlingEntry = {
   variety: string | null;
   quantity: string | null;
   germination: string | null;
+  germination_date: string | null;
+  healthy_seedlings: string | null;
+  successional_sowing: string | null;
+  yields: string | null;
   row_location: string | null;
   notes: string | null;
   created_at: string | null;
@@ -520,7 +524,7 @@ export type SeedlingEntry = {
 export async function getSeedlings(farmId: string): Promise<SeedlingEntry[]> {
   const { data, error } = await supabase
     .from("seedlings")
-    .select("id, farm_id, type, date, plant, variety, quantity, germination, row_location, notes, created_at")
+    .select("id, farm_id, type, date, plant, variety, quantity, germination, germination_date, healthy_seedlings, successional_sowing, yields, row_location, notes, created_at")
     .eq("farm_id", farmId)
     .order("date", { ascending: true });
 
