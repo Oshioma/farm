@@ -168,12 +168,14 @@ export function FarmMap({ zones, crops, onSelectBed }: Props) {
 
   return (
     <div>
-      <div className="overflow-auto rounded-2xl border border-zinc-200 bg-white">
-        <svg
-          viewBox="0 0 740 730"
-          className="w-full"
-          style={{ minWidth: 500, maxHeight: 600 }}
-        >
+      <div className="flex gap-4">
+        {/* Map */}
+        <div className="flex-1 overflow-auto rounded-2xl border border-zinc-200 bg-white">
+          <svg
+            viewBox="0 0 740 730"
+            className="w-full"
+            style={{ minWidth: 400 }}
+          >
           {/* Background */}
           <rect width="740" height="730" fill="#fafaf9" />
 
@@ -289,71 +291,83 @@ export function FarmMap({ zones, crops, onSelectBed }: Props) {
             x
           </text>
         </svg>
-      </div>
+        </div>
 
-      {/* Legend */}
-      <div className="mt-3 flex flex-wrap gap-3 text-xs text-zinc-500">
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded border border-zinc-300 bg-zinc-100" /> Unmapped
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded border border-zinc-300 bg-sky-100" /> Planned
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded border border-zinc-300 bg-yellow-200" /> Planted
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded border border-zinc-300 bg-lime-200" /> Growing
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded border border-zinc-300 bg-green-200" /> Harvest ready
-        </span>
-      </div>
-
-      {/* Selected bed info */}
-      {selectedBed && (
-        <div className="mt-3 rounded-2xl border border-zinc-200 bg-white p-4 text-sm">
-          <div className="font-medium">Bed {selectedBed}</div>
-          {selected ? (
-            <>
-              <div className="text-zinc-500">
-                Zone: {selected.name}
-                {selected.size_acres ? ` · ${selected.size_acres} acres` : ""}
-              </div>
-              {selectedCrops.length > 0 ? (
-                <div className="mt-2 space-y-1">
-                  {selectedCrops.map((c) => (
-                    <div key={c.id} className="flex items-center gap-2">
-                      <span
-                        className={`inline-block h-2 w-2 rounded-full ${
-                          c.status === "harvest_ready"
-                            ? "bg-green-500"
-                            : c.status === "growing"
-                            ? "bg-lime-500"
-                            : c.status === "planted" || c.status === "germinating"
-                            ? "bg-yellow-500"
-                            : "bg-sky-400"
-                        }`}
-                      />
-                      <span>
-                        {c.crop_name}
-                        {c.variety ? ` · ${c.variety}` : ""}
-                      </span>
-                      <span className="text-zinc-400">{c.status}</span>
+        {/* Side panel — bed info */}
+        <div className="w-56 shrink-0 space-y-3">
+          {selectedBed ? (
+            <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-sm">
+              <div className="text-lg font-semibold">Bed {selectedBed}</div>
+              {selected ? (
+                <>
+                  <div className="mt-1 text-zinc-500">
+                    Zone: {selected.name}
+                    {selected.size_acres ? ` · ${selected.size_acres} ac` : ""}
+                  </div>
+                  {selectedCrops.length > 0 ? (
+                    <div className="mt-3 space-y-2">
+                      {selectedCrops.map((c) => (
+                        <div key={c.id} className="rounded-xl border border-zinc-100 p-2.5">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`inline-block h-2.5 w-2.5 rounded-full ${
+                                c.status === "harvest_ready"
+                                  ? "bg-green-500"
+                                  : c.status === "growing"
+                                  ? "bg-lime-500"
+                                  : c.status === "planted" || c.status === "germinating"
+                                  ? "bg-yellow-500"
+                                  : "bg-sky-400"
+                              }`}
+                            />
+                            <span className="font-medium">
+                              {c.crop_name}
+                              {c.variety ? ` · ${c.variety}` : ""}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-xs text-zinc-400 capitalize">{c.status}</div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  ) : (
+                    <div className="mt-3 text-xs text-zinc-400">No crops in this zone</div>
+                  )}
+                </>
               ) : (
-                <div className="mt-1 text-zinc-400">No crops in this zone</div>
+                <div className="mt-2 text-xs text-zinc-400">
+                  Not mapped to a zone. Create a zone with code &quot;{selectedBed}&quot; to link it.
+                </div>
               )}
-            </>
+            </div>
           ) : (
-            <div className="text-zinc-400">
-              Not mapped to a zone yet. Create a zone with code &quot;{selectedBed}&quot; to link it.
+            <div className="rounded-2xl border border-dashed border-zinc-200 p-4 text-center text-xs text-zinc-400">
+              Click a bed on the map to see what&apos;s growing
             </div>
           )}
+
+          {/* Legend */}
+          <div className="rounded-2xl border border-zinc-200 bg-white p-3">
+            <div className="mb-2 text-xs font-semibold text-zinc-500">Legend</div>
+            <div className="space-y-1.5 text-xs text-zinc-500">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-zinc-100" /> Unmapped
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-sky-100" /> Planned
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-yellow-200" /> Planted
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-lime-200" /> Growing
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-green-200" /> Harvest ready
+              </span>
+            </div>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
