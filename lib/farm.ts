@@ -531,3 +531,25 @@ export async function getSeedlings(farmId: string): Promise<SeedlingEntry[]> {
   if (error) throw new Error(`getSeedlings failed: ${error.message}`);
   return (data ?? []) as SeedlingEntry[];
 }
+
+export type WorkHoursEntry = {
+  id: string;
+  farm_id: string;
+  date: string;
+  worker_name: string;
+  hours: number;
+  role: string;
+  notes: string | null;
+  created_at: string | null;
+};
+
+export async function getWorkHours(farmId: string): Promise<WorkHoursEntry[]> {
+  const { data, error } = await supabase
+    .from("work_hours")
+    .select("id, farm_id, date, worker_name, hours, role, notes, created_at")
+    .eq("farm_id", farmId)
+    .order("date", { ascending: false });
+
+  if (error) throw new Error(`getWorkHours failed: ${error.message}`);
+  return (data ?? []) as WorkHoursEntry[];
+}
