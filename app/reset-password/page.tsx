@@ -10,20 +10,17 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
+  const [checking, setChecking] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    // Listen for auth state changes — covers both PKCE and implicit flows
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY" || event === "INITIAL_SESSION" || event === "SIGNED_IN") {
-        if (session) {
-          setReady(true);
-        }
+    // Use getUser() — an actual API call that reads session from cookies
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setReady(true);
       }
+      setChecking(false);
     });
-    return () => subscription.unsubscribe();
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -49,12 +46,32 @@ export default function ResetPasswordPage() {
     }
   }
 
-  if (!ready) {
+  if (checking) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-stone-50 px-4">
         <div className="w-full max-w-sm">
           <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-center text-sm text-zinc-500">
-            Waiting for reset link verification…
+            Verifying reset link…
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!ready) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-stone-50 px-4">
+        <div className="w-full max-w-sm">
+          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-center">
+            <p className="text-sm text-zinc-700">
+              This reset link is invalid or has expired.
+            </p>
+            <a
+              href="/forgot-password"
+              className="mt-4 inline-block text-sm font-medium text-zinc-900 hover:underline"
+            >
+              Request a new reset link
+            </a>
           </div>
         </div>
       </main>
