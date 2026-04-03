@@ -75,30 +75,28 @@ export default function InvitePage() {
     setProcessingId(req.id);
     setError("");
     try {
-      // Add to ALL farms (same as invite link behaviour)
-      const { data: ownerFarms } = await supabase
-        .from("farm_members")
-        .select("farm_id")
-        .in("profile_id", members.filter((m) => m.role_on_farm === "owner").map((m) => m.profile_id));
-
-      const farmIds = [...new Set((ownerFarms ?? []).map((f: { farm_id: string }) => f.farm_id))];
-      if (farmIds.length === 0) farmIds.push(activeFarmId);
-
+      // Check if user is already a member of this farm
       const { data: existing } = await supabase
         .from("farm_members")
         .select("farm_id")
-        .eq("profile_id", req.user_id);
-      const alreadyIn = new Set((existing ?? []).map((r: { farm_id: string }) => r.farm_id));
+        .eq("profile_id", req.user_id)
+        .eq("farm_id", activeFarmId);
 
-      const toInsert = farmIds
-        .filter((fid) => !alreadyIn.has(fid))
-        .map((fid) => ({ farm_id: fid, profile_id: req.user_id, role_on_farm: "member" }));
-
-      if (toInsert.length > 0) {
-        const { error: err } = await supabase.from("farm_members").insert(toInsert);
-        if (err) throw err;
+      if (!existing || existing.length === 0) {
+        const { error: insertErr } = await supabase.from("farm_members").insert({
+          farm_id: activeFarmId,
+          profile_id: req.user_id,
+          role_on_farm: "member",
+        });
+        if (insertErr) throw insertErr;
       }
-      await supabase.from("join_requests").update({ status: "accepted" }).eq("id", req.id);
+
+      const { error: updateErr } = await supabase
+        .from("join_requests")
+        .update({ status: "accepted" })
+        .eq("id", req.id);
+      if (updateErr) throw updateErr;
+
       await loadData(activeFarmId);
     } catch (err) {
       setError(errMsg(err, "Failed to accept request"));
@@ -109,16 +107,30 @@ export default function InvitePage() {
 
   async function handleReject(id: string) {
     setProcessingId(id);
-    await supabase.from("join_requests").update({ status: "rejected" }).eq("id", id);
-    setJoinRequests((prev) => prev.filter((r) => r.id !== id));
-    setProcessingId(null);
+    setError("");
+    try {
+      const { error: err } = await supabase.from("join_requests").update({ status: "rejected" }).eq("id", id);
+      if (err) throw err;
+      setJoinRequests((prev) => prev.filter((r) => r.id !== id));
+    } catch (err) {
+      setError(errMsg(err, "Failed to reject request"));
+    } finally {
+      setProcessingId(null);
+    }
   }
 
   async function removeMember(id: string) {
     setRemovingId(id);
-    await supabase.from("farm_members").delete().eq("id", id);
-    await loadData(activeFarmId);
-    setRemovingId(null);
+    setError("");
+    try {
+      const { error: err } = await supabase.from("farm_members").delete().eq("id", id);
+      if (err) throw err;
+      await loadData(activeFarmId);
+    } catch (err) {
+      setError(errMsg(err, "Failed to remove member"));
+    } finally {
+      setRemovingId(null);
+    }
   }
 
   function fmtDate(d: string) {
