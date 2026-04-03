@@ -25,6 +25,7 @@ import { AssetForm } from "@/app/farm/components/AssetForm";
 import { PestForm } from "@/app/farm/components/PestForm";
 import { SaleForm } from "@/app/farm/components/SaleForm";
 import { ZoneForm } from "@/app/farm/components/ZoneForm";
+import { FarmMap } from "@/app/farm/components/FarmMap";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
 import type { CropFormData } from "@/app/farm/components/CropForm";
 import type { TaskFormData } from "@/app/farm/components/TaskForm";
@@ -86,6 +87,7 @@ export default function FarmPage() {
   const [editingPestId, setEditingPestId] = useState<string | null>(null);
   const [deletingPestId, setDeletingPestId] = useState<string | null>(null);
   const [confirmDeletePestId, setConfirmDeletePestId] = useState<string | null>(null);
+  const [zonesView, setZonesView] = useState<"map" | "list">("map");
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -1449,6 +1451,20 @@ export default function FarmPage() {
                   <p className="mt-1 text-sm text-zinc-500">Planting areas and what is growing in each.</p>
                 </div>
                 <div className="flex items-center gap-3">
+                  <div className="flex rounded-full border border-zinc-200 p-0.5">
+                    <button
+                      onClick={() => setZonesView("map")}
+                      className={`rounded-full px-3 py-1 text-xs font-medium transition ${zonesView === "map" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-700"}`}
+                    >
+                      Map
+                    </button>
+                    <button
+                      onClick={() => setZonesView("list")}
+                      className={`rounded-full px-3 py-1 text-xs font-medium transition ${zonesView === "list" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-700"}`}
+                    >
+                      List
+                    </button>
+                  </div>
                   <span className="text-sm text-zinc-500">{zones.length} zones</span>
                   <button
                     onClick={() => setActiveForm(activeForm === "zone" ? null : "zone")}
@@ -1471,7 +1487,14 @@ export default function FarmPage() {
                 </div>
               )}
 
-              {zones.length === 0 ? (
+              {zonesView === "map" ? (
+                <div className="mt-5">
+                  <FarmMap zones={zones} crops={crops} />
+                  <p className="mt-2 text-xs text-zinc-400">
+                    Click a bed to see details. To link a bed, create a zone with a matching code (e.g. R1, CL2).
+                  </p>
+                </div>
+              ) : zones.length === 0 ? (
                 <p className="mt-5 text-sm text-zinc-500">No zones yet — add a bed, row, or area above.</p>
               ) : (
                 <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
