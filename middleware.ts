@@ -3,6 +3,27 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  const { pathname, searchParams } = new URL(request.url);
+
+  // Redirect /reset-password?code=... to /auth/callback for server-side code exchange
+  const code = searchParams.get("code");
+  if (pathname === "/reset-password" && code) {
+    const callbackUrl = new URL("/auth/callback", request.url);
+    callbackUrl.searchParams.set("code", code);
+    callbackUrl.searchParams.set("next", "/reset-password");
+    return NextResponse.redirect(callbackUrl);
+  }
+
+  // Protected routes — check auth
+  const protectedPaths = ["/farm", "/plants"];
+  const isProtected = protectedPaths.some(
+    (p) => pathname === p || pathname.startsWith(p + "/")
+  );
+
+  if (!isProtected) {
+    return NextResponse.next();
+  }
+
   const response = NextResponse.next();
 
   const supabase = createServerClient(
@@ -34,5 +55,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/farm/:path*", "/plants/:path*"],
+  matcher: ["/farm/:path*", "/plants/:path*", "/reset-password"],
 };

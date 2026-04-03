@@ -23,30 +23,14 @@ function ResetPasswordInner() {
       return;
     }
 
-    // If Supabase sent a code param, exchange it for a session
-    const code = searchParams.get("code");
-    if (code) {
-      supabase.auth.exchangeCodeForSession(code).then(({ error: codeError }) => {
-        if (codeError) {
-          setError(codeError.message);
-        } else {
-          setReady(true);
-        }
-        setChecking(false);
-        // Clean the code from the URL
-        router.replace("/reset-password");
-      });
-      return;
-    }
-
-    // No code param — check if we already have a session
+    // Session was established server-side via /auth/callback — verify it
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         setReady(true);
       }
       setChecking(false);
     });
-  }, [searchParams, router]);
+  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
