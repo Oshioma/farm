@@ -21,6 +21,7 @@ type SystemDoc = {
   title: string;
   url: string;
   description: string | null;
+  category: string | null;
   created_at: string | null;
 };
 
@@ -51,12 +52,14 @@ export default function SystemsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [tab, setTab] = useState<"crop_guide" | "sop">("crop_guide");
+
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ title: "", url: "", description: "" });
+  const [form, setForm] = useState({ title: "", url: "", description: "", category: "crop_guide" });
   const [saving, setSaving] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ title: "", url: "", description: "" });
+  const [editForm, setEditForm] = useState({ title: "", url: "", description: "", category: "crop_guide" });
   const [savingEditId, setSavingEditId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -67,7 +70,7 @@ export default function SystemsPage() {
   async function loadDocs(farmId: string) {
     const { data, error: e } = await supabase
       .from("system_docs")
-      .select("id, farm_id, title, url, description, created_at")
+      .select("id, farm_id, title, url, description, category, created_at")
       .eq("farm_id", farmId)
       .order("title");
     if (e) throw new Error(e.message);
@@ -111,9 +114,10 @@ export default function SystemsPage() {
         title: form.title.trim(),
         url: form.url.trim(),
         description: form.description.trim() || null,
+        category: form.category,
       });
       if (err) throw err;
-      setForm({ title: "", url: "", description: "" });
+      setForm({ title: "", url: "", description: "", category: tab });
       setShowForm(false);
       await loadDocs(activeFarmId);
     } catch (err) {
@@ -131,6 +135,7 @@ export default function SystemsPage() {
         title: editForm.title.trim(),
         url: editForm.url.trim(),
         description: editForm.description.trim() || null,
+        category: editForm.category,
       }).eq("id", id);
       if (err) throw err;
       setEditingId(null);
@@ -157,10 +162,11 @@ export default function SystemsPage() {
 
   function startEdit(doc: SystemDoc) {
     setEditingId(doc.id);
-    setEditForm({ title: doc.title, url: doc.url, description: doc.description ?? "" });
+    setEditForm({ title: doc.title, url: doc.url, description: doc.description ?? "", category: doc.category ?? "crop_guide" });
   }
 
   const activeFarm = farms.find((f) => f.id === activeFarmId);
+  const filteredDocs = docs.filter((d) => (d.category ?? "crop_guide") === tab);
   const inp = "w-full rounded-2xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-900";
 
   return (
@@ -203,17 +209,34 @@ export default function SystemsPage() {
           <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
         )}
 
-        {/* Add button */}
-        <div className="mb-6">
+        {/* Tabs + Add button */}
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex rounded-full border border-zinc-200 p-0.5">
+            <button
+              onClick={() => { setTab("crop_guide"); setForm((p) => ({ ...p, category: "crop_guide" })); }}
+              className={`rounded-full px-5 py-2 text-sm font-medium transition ${tab === "crop_guide" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-700"}`}
+            >
+              Crop guides
+            </button>
+            <button
+              onClick={() => { setTab("sop"); setForm((p) => ({ ...p, category: "sop" })); }}
+              className={`rounded-full px-5 py-2 text-sm font-medium transition ${tab === "sop" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-700"}`}
+            >
+              SOPs
+            </button>
+          </div>
           <button
-            onClick={() => setShowForm(!showForm)}
+            onClick={() => { setShowForm(!showForm); setForm((p) => ({ ...p, category: tab })); }}
             className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
               showForm ? "bg-zinc-900 text-white" : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
             }`}
           >
             <Plus size={15} />
-            Add document
+            Add {tab === "crop_guide" ? "crop guide" : "SOP"}
           </button>
+        </div>
+
+        <div className="mb-6">
 
           {showForm && (
             <form onSubmit={handleAdd} className="mt-4 max-w-lg rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm space-y-4">
@@ -237,6 +260,13 @@ export default function SystemsPage() {
                   placeholder="https://docs.google.com/document/d/..."
                   required
                 />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium">Category</label>
+                <select className={inp} value={form.category} onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}>
+                  <option value="crop_guide">Crop guide</option>
+                  <option value="sop">SOP</option>
+                </select>
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium">
@@ -263,14 +293,14 @@ export default function SystemsPage() {
         {/* Documents list */}
         {loading ? (
           <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">Loading...</div>
-        ) : docs.length === 0 ? (
+        ) : filteredDocs.length === 0 ? (
           <div className="rounded-3xl border border-zinc-200 bg-white p-10 text-center shadow-sm">
             <FileText className="mx-auto mb-3 text-zinc-300" size={32} />
-            <p className="text-sm text-zinc-500">No documents yet. Add your Google Docs, sheets, and drive files above.</p>
+            <p className="text-sm text-zinc-500">No {tab === "crop_guide" ? "crop guides" : "SOPs"} yet. Add one above.</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {docs.map((doc) => {
+            {filteredDocs.map((doc) => {
               const isExpanded = expandedId === doc.id;
               const isEditing = editingId === doc.id;
               const previewUrl = getPreviewUrl(doc.url);
@@ -280,6 +310,10 @@ export default function SystemsPage() {
                   <div key={doc.id} className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm space-y-3">
                     <input className={inp} value={editForm.title} onChange={(e) => setEditForm((p) => ({ ...p, title: e.target.value }))} placeholder="Title" />
                     <input type="url" className={inp} value={editForm.url} onChange={(e) => setEditForm((p) => ({ ...p, url: e.target.value }))} placeholder="URL" />
+                    <select className={inp} value={editForm.category} onChange={(e) => setEditForm((p) => ({ ...p, category: e.target.value }))}>
+                      <option value="crop_guide">Crop guide</option>
+                      <option value="sop">SOP</option>
+                    </select>
                     <textarea className={`${inp} min-h-[60px]`} value={editForm.description} onChange={(e) => setEditForm((p) => ({ ...p, description: e.target.value }))} placeholder="Description" />
                     <div className="flex gap-2">
                       <button onClick={() => handleSaveEdit(doc.id)} disabled={savingEditId === doc.id} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60">
