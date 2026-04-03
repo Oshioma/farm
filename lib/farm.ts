@@ -390,6 +390,28 @@ export async function getPests(farmId: string): Promise<Pest[]> {
   return (data ?? []) as Pest[];
 }
 
+export type SoilTestEntry = {
+  id: string;
+  farm_id: string;
+  date: string | null;
+  location: string | null;
+  action: string | null;
+  result: string | null;
+  notes: string | null;
+  created_at: string | null;
+};
+
+export async function getSoilTests(farmId: string): Promise<SoilTestEntry[]> {
+  const { data, error } = await supabase
+    .from("soil_tests")
+    .select("id, farm_id, date, location, action, result, notes, created_at")
+    .eq("farm_id", farmId)
+    .order("date", { ascending: false });
+
+  if (error) throw new Error(`getSoilTests failed: ${error.message}`);
+  return (data ?? []) as SoilTestEntry[];
+}
+
 export type SoilImprovement = {
   id: string;
   farm_id: string;
