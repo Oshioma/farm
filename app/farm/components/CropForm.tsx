@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Zone } from "@/lib/farm";
 
 export type CropFormData = {
@@ -12,6 +12,7 @@ export type CropFormData = {
   expected_harvest_start: string;
   estimated_yield_kg: string;
   expected_sale_price_per_kg: string;
+  image_file: File | null;
 };
 
 const blank: CropFormData = {
@@ -23,6 +24,7 @@ const blank: CropFormData = {
   expected_harvest_start: "",
   estimated_yield_kg: "",
   expected_sale_price_per_kg: "",
+  image_file: null,
 };
 
 type Props = {
@@ -34,6 +36,8 @@ type Props = {
 export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
   const [form, setForm] = useState<CropFormData>(blank);
   const [saving, setSaving] = useState(false);
+  const [preview, setPreview] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (defaultZoneId) {
@@ -41,12 +45,24 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
     }
   }, [defaultZoneId]);
 
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null;
+    setForm((prev) => ({ ...prev, image_file: f }));
+    if (preview && preview.startsWith("blob:")) URL.revokeObjectURL(preview);
+    setPreview(f ? URL.createObjectURL(f) : "");
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     const ok = await onSubmit(form);
     setSaving(false);
-    if (ok) setForm({ ...blank, zone_id: defaultZoneId });
+    if (ok) {
+      if (preview && preview.startsWith("blob:")) URL.revokeObjectURL(preview);
+      setPreview("");
+      setForm({ ...blank, zone_id: defaultZoneId });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   }
 
   return (
@@ -81,6 +97,27 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
             placeholder="Roma"
           />
         </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium">
+            Photo <span className="font-normal text-zinc-400">(optional)</span>
+          </label>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="w-full text-sm text-zinc-600 file:mr-3 file:rounded-full file:border-0 file:bg-zinc-100 file:px-4 file:py-2 file:text-sm file:font-medium hover:file:bg-zinc-200"
+          />
+        </div>
+
+        {preview ? (
+          <img
+            src={preview}
+            alt="Preview"
+            className="h-48 w-full rounded-2xl object-cover"
+          />
+        ) : null}
 
         <div>
           <label className="mb-2 block text-sm font-medium">Zone</label>

@@ -288,6 +288,17 @@ export default function FarmPage() {
       const cropName = data.crop_name.trim();
       if (!cropName) throw new Error("Crop name is required.");
 
+      // Upload image if provided
+      let imageUrl: string | null = null;
+      if (data.image_file) {
+        const ext = data.image_file.name.split(".").pop() ?? "jpg";
+        const path = `${activeFarmId}/${Date.now()}.${ext}`;
+        const { error: uploadError } = await supabase.storage.from("plant-images").upload(path, data.image_file);
+        if (uploadError) throw uploadError;
+        const { data: urlData } = supabase.storage.from("plant-images").getPublicUrl(path);
+        imageUrl = urlData.publicUrl;
+      }
+
       const { error: insertError } = await supabase.from("crops").insert({
         farm_id: activeFarmId,
         zone_id: data.zone_id || null,
@@ -303,6 +314,20 @@ export default function FarmPage() {
         is_active: true,
       });
       if (insertError) throw insertError;
+
+      // Sync image to plants gallery
+      if (imageUrl) {
+        const plantName = data.variety.trim()
+          ? `${cropName} · ${data.variety.trim()}`
+          : cropName;
+
+        await supabase.from("plants").insert({
+          farm_id: activeFarmId,
+          name: plantName,
+          image_url: imageUrl,
+          zone_id: data.zone_id || null,
+        });
+      }
 
       await supabase.from("activities").insert({
         farm_id: activeFarmId,
