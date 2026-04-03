@@ -22,6 +22,7 @@ type SystemDoc = {
   url: string;
   description: string | null;
   category: string | null;
+  subcategory: string | null;
   created_at: string | null;
 };
 
@@ -53,13 +54,14 @@ export default function SystemsPage() {
   const [error, setError] = useState("");
 
   const [tab, setTab] = useState<"crop_guide" | "sop">("crop_guide");
+  const [sopFilter, setSopFilter] = useState<"all" | "system" | "crop_system">("all");
 
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ title: "", url: "", description: "", category: "crop_guide" });
+  const [form, setForm] = useState({ title: "", url: "", description: "", category: "crop_guide", subcategory: "" });
   const [saving, setSaving] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ title: "", url: "", description: "", category: "crop_guide" });
+  const [editForm, setEditForm] = useState({ title: "", url: "", description: "", category: "crop_guide", subcategory: "" });
   const [savingEditId, setSavingEditId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -70,7 +72,7 @@ export default function SystemsPage() {
   async function loadDocs(farmId: string) {
     const { data, error: e } = await supabase
       .from("system_docs")
-      .select("id, farm_id, title, url, description, category, created_at")
+      .select("id, farm_id, title, url, description, category, subcategory, created_at")
       .eq("farm_id", farmId)
       .order("title");
     if (e) throw new Error(e.message);
@@ -115,9 +117,10 @@ export default function SystemsPage() {
         url: form.url.trim(),
         description: form.description.trim() || null,
         category: form.category,
+        subcategory: form.subcategory || null,
       });
       if (err) throw err;
-      setForm({ title: "", url: "", description: "", category: tab });
+      setForm({ title: "", url: "", description: "", category: tab, subcategory: "" });
       setShowForm(false);
       await loadDocs(activeFarmId);
     } catch (err) {
@@ -136,6 +139,7 @@ export default function SystemsPage() {
         url: editForm.url.trim(),
         description: editForm.description.trim() || null,
         category: editForm.category,
+        subcategory: editForm.subcategory || null,
       }).eq("id", id);
       if (err) throw err;
       setEditingId(null);
@@ -162,11 +166,15 @@ export default function SystemsPage() {
 
   function startEdit(doc: SystemDoc) {
     setEditingId(doc.id);
-    setEditForm({ title: doc.title, url: doc.url, description: doc.description ?? "", category: doc.category ?? "crop_guide" });
+    setEditForm({ title: doc.title, url: doc.url, description: doc.description ?? "", category: doc.category ?? "crop_guide", subcategory: doc.subcategory ?? "" });
   }
 
   const activeFarm = farms.find((f) => f.id === activeFarmId);
-  const filteredDocs = docs.filter((d) => (d.category ?? "crop_guide") === tab);
+  const filteredDocs = docs.filter((d) => {
+    if ((d.category ?? "crop_guide") !== tab) return false;
+    if (tab === "sop" && sopFilter !== "all") return d.subcategory === sopFilter;
+    return true;
+  });
   const inp = "w-full rounded-2xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-900";
 
   return (
@@ -236,6 +244,24 @@ export default function SystemsPage() {
           </button>
         </div>
 
+        {tab === "sop" && (
+          <div className="mb-6 flex flex-wrap gap-2">
+            {([["all", "All"], ["system", "System"], ["crop_system", "Crop system"]] as const).map(([value, label]) => (
+              <button
+                key={value}
+                onClick={() => setSopFilter(value)}
+                className={`rounded-full px-4 py-2 text-xs font-medium transition ${
+                  sopFilter === value
+                    ? "bg-zinc-700 text-white"
+                    : "border border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-100"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="mb-6">
 
           {showForm && (
@@ -268,6 +294,16 @@ export default function SystemsPage() {
                   <option value="sop">SOP</option>
                 </select>
               </div>
+              {form.category === "sop" && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium">SOP type</label>
+                  <select className={inp} value={form.subcategory} onChange={(e) => setForm((p) => ({ ...p, subcategory: e.target.value }))}>
+                    <option value="">None</option>
+                    <option value="system">System</option>
+                    <option value="crop_system">Crop system</option>
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="mb-2 block text-sm font-medium">
                   Description <span className="font-normal text-zinc-400">(optional)</span>
@@ -314,6 +350,13 @@ export default function SystemsPage() {
                       <option value="crop_guide">Crop guide</option>
                       <option value="sop">SOP</option>
                     </select>
+                    {editForm.category === "sop" && (
+                      <select className={inp} value={editForm.subcategory} onChange={(e) => setEditForm((p) => ({ ...p, subcategory: e.target.value }))}>
+                        <option value="">No SOP type</option>
+                        <option value="system">System</option>
+                        <option value="crop_system">Crop system</option>
+                      </select>
+                    )}
                     <textarea className={`${inp} min-h-[60px]`} value={editForm.description} onChange={(e) => setEditForm((p) => ({ ...p, description: e.target.value }))} placeholder="Description" />
                     <div className="flex gap-2">
                       <button onClick={() => handleSaveEdit(doc.id)} disabled={savingEditId === doc.id} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60">
@@ -334,7 +377,14 @@ export default function SystemsPage() {
                     >
                       <FileText size={20} className="shrink-0 text-zinc-400" />
                       <div className="min-w-0">
-                        <h3 className="font-semibold truncate">{doc.title}</h3>
+                        <h3 className="font-semibold truncate">
+                          {doc.title}
+                          {doc.subcategory && (
+                            <span className="ml-2 inline-block rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                              {doc.subcategory === "crop_system" ? "Crop system" : "System"}
+                            </span>
+                          )}
+                        </h3>
                         {doc.description && <p className="mt-0.5 text-sm text-zinc-500 truncate">{doc.description}</p>}
                       </div>
                       {isExpanded ? <ChevronUp size={16} className="shrink-0 text-zinc-400" /> : <ChevronDown size={16} className="shrink-0 text-zinc-400" />}
