@@ -925,6 +925,12 @@ export default function FarmPage() {
                 Work hours
               </Link>
               <Link
+                href="/farm/systems"
+                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+              >
+                Systems
+              </Link>
+              <Link
                 href="/companion"
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
