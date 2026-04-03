@@ -596,9 +596,9 @@ export default function FarmPage() {
   async function uploadPestImage(file: File): Promise<string> {
     const ext = file.name.split(".").pop() ?? "jpg";
     const path = `${activeFarmId}/${Date.now()}.${ext}`;
-    const { error: uploadError } = await supabase.storage.from("pest-images").upload(path, file);
+    const { error: uploadError } = await supabase.storage.from("plant-images").upload(path, file);
     if (uploadError) throw uploadError;
-    const { data: urlData } = supabase.storage.from("pest-images").getPublicUrl(path);
+    const { data: urlData } = supabase.storage.from("plant-images").getPublicUrl(path);
     return urlData.publicUrl;
   }
 
@@ -626,6 +626,24 @@ export default function FarmPage() {
         zone_id: data.zone_id || null,
       });
       if (insertError) throw insertError;
+
+      // Also add the image to the plants gallery so users can see pest states
+      if (imageUrl) {
+        const cropName = data.crop_id
+          ? crops.find((c) => c.id === data.crop_id)?.crop_name ?? null
+          : null;
+        const plantName = cropName
+          ? `${cropName} — ${data.pest_name.trim()} (pest)`
+          : `${data.pest_name.trim()} (pest photo)`;
+
+        await supabase.from("plants").insert({
+          farm_id: activeFarmId,
+          name: plantName,
+          image_url: imageUrl,
+          notes: [data.description.trim(), data.action_taken.trim()].filter(Boolean).join(" | ") || null,
+          zone_id: data.zone_id || null,
+        });
+      }
 
       await supabase.from("activities").insert({
         farm_id: activeFarmId,
