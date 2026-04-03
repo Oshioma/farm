@@ -98,8 +98,9 @@ export default function InvitePage() {
       if (updateErr) throw updateErr;
 
       await loadData(activeFarmId);
-    } catch (err) {
-      setError(errMsg(err, "Failed to accept request"));
+    } catch (err: unknown) {
+      const msg = err && typeof err === "object" && "message" in err ? (err as { message: string }).message : String(err);
+      setError("Failed to accept request: " + msg);
     } finally {
       setProcessingId(null);
     }
