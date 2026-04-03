@@ -86,7 +86,7 @@ export default function InvitePage() {
         const { error: insertErr } = await supabase.from("farm_members").insert({
           farm_id: activeFarmId,
           profile_id: req.user_id,
-          role_on_farm: "member",
+          role_on_farm: "worker",
         });
         if (insertErr) throw insertErr;
       }

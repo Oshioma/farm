@@ -80,7 +80,7 @@ function JoinInner() {
 
     const toInsert = farmIds
       .filter((fid: string) => !alreadyIn.has(fid))
-      .map((fid: string) => ({ farm_id: fid, profile_id: user.id, role_on_farm: "member" }));
+      .map((fid: string) => ({ farm_id: fid, profile_id: user.id, role_on_farm: "worker" }));
 
     if (toInsert.length > 0) {
       const { error: memberError } = await supabase.from("farm_members").insert(toInsert);
