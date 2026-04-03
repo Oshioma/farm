@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Zone, Crop } from "@/lib/farm";
 
 export type PestFormData = {
@@ -11,6 +11,8 @@ export type PestFormData = {
   logged_date: string;
   crop_id: string;
   zone_id: string;
+  image_url: string;
+  image_file: File | null;
 };
 
 const blank: PestFormData = {
@@ -21,6 +23,8 @@ const blank: PestFormData = {
   logged_date: "",
   crop_id: "",
   zone_id: "",
+  image_url: "",
+  image_file: null,
 };
 
 type Props = {
@@ -28,30 +32,72 @@ type Props = {
   crops: Crop[];
   defaultZoneId: string;
   onSubmit: (data: PestFormData) => Promise<boolean>;
+  initialData?: PestFormData;
+  submitLabel?: string;
 };
 
-export function PestForm({ zones, crops, defaultZoneId, onSubmit }: Props) {
-  const [form, setForm] = useState<PestFormData>(blank);
+export function PestForm({
+  zones,
+  crops,
+  defaultZoneId,
+  onSubmit,
+  initialData,
+  submitLabel = "Log pest issue",
+}: Props) {
+  const [form, setForm] = useState<PestFormData>(initialData ?? blank);
   const [saving, setSaving] = useState(false);
+  const [preview, setPreview] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (defaultZoneId) {
+    if (initialData) {
+      setForm(initialData);
+      // If editing an existing record with an image_url, show it as the preview
+      if (initialData.image_url) {
+        setPreview(initialData.image_url);
+      }
+    }
+  }, [initialData]);
+
+  useEffect(() => {
+    if (!initialData && defaultZoneId) {
       setForm((prev) => (prev.zone_id ? prev : { ...prev, zone_id: defaultZoneId }));
     }
-  }, [defaultZoneId]);
+  }, [defaultZoneId, initialData]);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null;
+    setForm((prev) => ({ ...prev, image_file: f }));
+    if (f) {
+      // Revoke previous blob URL to avoid memory leaks
+      if (preview && preview.startsWith("blob:")) {
+        URL.revokeObjectURL(preview);
+      }
+      setPreview(URL.createObjectURL(f));
+    } else {
+      setPreview(initialData?.image_url ?? "");
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     const ok = await onSubmit(form);
     setSaving(false);
-    if (ok) setForm({ ...blank, zone_id: defaultZoneId });
+    if (ok) {
+      if (preview && preview.startsWith("blob:")) {
+        URL.revokeObjectURL(preview);
+      }
+      setPreview("");
+      setForm({ ...blank, zone_id: defaultZoneId });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   }
 
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
       <div className="mb-5">
-        <h2 className="text-xl font-semibold">Log pest issue</h2>
+        <h2 className="text-xl font-semibold">{submitLabel}</h2>
         <p className="mt-1 text-sm text-zinc-500">
           Record what you saw, where, and what you did about it.
         </p>
@@ -131,6 +177,27 @@ export function PestForm({ zones, crops, defaultZoneId, onSubmit }: Props) {
         </div>
 
         <div>
+          <label className="mb-2 block text-sm font-medium">
+            Photo <span className="font-normal text-zinc-400">(optional)</span>
+          </label>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="w-full text-sm text-zinc-600 file:mr-3 file:rounded-full file:border-0 file:bg-zinc-100 file:px-4 file:py-2 file:text-sm file:font-medium hover:file:bg-zinc-200"
+          />
+        </div>
+
+        {preview ? (
+          <img
+            src={preview}
+            alt="Preview"
+            className="h-48 w-full rounded-2xl object-cover"
+          />
+        ) : null}
+
+        <div>
           <label className="mb-2 block text-sm font-medium">What you saw</label>
           <textarea
             value={form.description}
@@ -155,7 +222,7 @@ export function PestForm({ zones, crops, defaultZoneId, onSubmit }: Props) {
           disabled={saving || !form.pest_name.trim()}
           className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {saving ? "Logging…" : "Log pest issue"}
+          {saving ? "Saving…" : submitLabel}
         </button>
       </form>
     </div>

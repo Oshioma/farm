@@ -83,6 +83,9 @@ export default function FarmPage() {
   const [savingExpenseId, setSavingExpenseId] = useState<string | null>(null);
   const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
   const [confirmDeleteExpenseId, setConfirmDeleteExpenseId] = useState<string | null>(null);
+  const [editingPestId, setEditingPestId] = useState<string | null>(null);
+  const [deletingPestId, setDeletingPestId] = useState<string | null>(null);
+  const [confirmDeletePestId, setConfirmDeletePestId] = useState<string | null>(null);
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -590,6 +593,15 @@ export default function FarmPage() {
     }
   }
 
+  async function uploadPestImage(file: File): Promise<string> {
+    const ext = file.name.split(".").pop() ?? "jpg";
+    const path = `${activeFarmId}/${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabase.storage.from("pest-images").upload(path, file);
+    if (uploadError) throw uploadError;
+    const { data: urlData } = supabase.storage.from("pest-images").getPublicUrl(path);
+    return urlData.publicUrl;
+  }
+
   async function handleLogPest(data: PestFormData): Promise<boolean> {
     if (!activeFarmId) return false;
     try {
@@ -597,12 +609,18 @@ export default function FarmPage() {
       if (!data.pest_name.trim()) throw new Error("Pest name is required.");
       if (!data.logged_date) throw new Error("Date spotted is required.");
 
+      let imageUrl: string | null = data.image_url || null;
+      if (data.image_file) {
+        imageUrl = await uploadPestImage(data.image_file);
+      }
+
       const { error: insertError } = await supabase.from("pest_logs").insert({
         farm_id: activeFarmId,
         pest_name: data.pest_name.trim(),
         severity: data.severity,
         description: data.description.trim() || null,
         action_taken: data.action_taken.trim() || null,
+        image_url: imageUrl,
         logged_date: data.logged_date,
         crop_id: data.crop_id || null,
         zone_id: data.zone_id || null,
@@ -621,6 +639,50 @@ export default function FarmPage() {
     } catch (err) {
       setError(errMsg(err, "Failed to log pest issue"));
       return false;
+    }
+  }
+
+  async function handleUpdatePest(pestId: string, data: PestFormData): Promise<boolean> {
+    try {
+      setError("");
+      let imageUrl: string | null = data.image_url || null;
+      if (data.image_file) {
+        imageUrl = await uploadPestImage(data.image_file);
+      }
+
+      const { error: updateError } = await supabase.from("pest_logs").update({
+        pest_name: data.pest_name.trim(),
+        severity: data.severity,
+        description: data.description.trim() || null,
+        action_taken: data.action_taken.trim() || null,
+        image_url: imageUrl,
+        logged_date: data.logged_date,
+        crop_id: data.crop_id || null,
+        zone_id: data.zone_id || null,
+      }).eq("id", pestId);
+      if (updateError) throw updateError;
+
+      setEditingPestId(null);
+      await loadFarmData(activeFarmId);
+      return true;
+    } catch (err) {
+      setError(errMsg(err, "Failed to update pest log"));
+      return false;
+    }
+  }
+
+  async function handleDeletePest(pestId: string) {
+    try {
+      setError("");
+      setDeletingPestId(pestId);
+      const { error: deleteError } = await supabase.from("pest_logs").delete().eq("id", pestId);
+      if (deleteError) throw deleteError;
+      await loadFarmData(activeFarmId);
+    } catch (err) {
+      setError(errMsg(err, "Failed to delete pest log"));
+    } finally {
+      setDeletingPestId(null);
+      setConfirmDeletePestId(null);
     }
   }
 
@@ -932,6 +994,126 @@ export default function FarmPage() {
 
         {activeFarm ? (
           <>
+            <div className="mb-6 flex flex-wrap gap-2">
+              {(
+                [
+                  { key: "crop", label: "+ Crop" },
+                  { key: "zone", label: "+ Zone" },
+                  { key: "task", label: "+ Task" },
+                  { key: "harvest", label: "+ Harvest" },
+                  { key: "pest", label: "+ Pest" },
+                  { key: "sale", label: "+ Sale" },
+                  { key: "expense", label: "+ Expense" },
+                  { key: "asset", label: "+ Asset" },
+                ] as const
+              ).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveForm(activeForm === key ? null : key)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                    activeForm === key
+                      ? "bg-zinc-900 text-white"
+                      : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {activeForm && ["crop", "task", "harvest", "expense", "asset", "pest", "sale", "zone"].includes(activeForm) ? (
+              <div className="mb-6 max-w-sm">
+                {activeForm === "crop" && (
+                  <CropForm
+                    zones={zones}
+                    defaultZoneId={defaultZoneId}
+                    onSubmit={async (data) => {
+                      const ok = await handleCreateCrop(data);
+                      if (ok) setActiveForm(null);
+                      return ok;
+                    }}
+                  />
+                )}
+                {activeForm === "task" && (
+                  <TaskForm
+                    zones={zones}
+                    crops={crops}
+                    defaultZoneId={defaultZoneId}
+                    onSubmit={async (data) => {
+                      const ok = await handleCreateTask(data);
+                      if (ok) setActiveForm(null);
+                      return ok;
+                    }}
+                  />
+                )}
+                {activeForm === "harvest" && (
+                  <HarvestForm
+                    zones={zones}
+                    crops={crops}
+                    defaultCropId={defaultCropId}
+                    defaultZoneId={defaultZoneId}
+                    onSubmit={async (data) => {
+                      const ok = await handleLogHarvest(data);
+                      if (ok) setActiveForm(null);
+                      return ok;
+                    }}
+                  />
+                )}
+                {activeForm === "expense" && (
+                  <ExpenseForm
+                    zones={zones}
+                    crops={crops}
+                    defaultZoneId={defaultZoneId}
+                    onSubmit={async (data) => {
+                      const ok = await handleLogExpense(data);
+                      if (ok) setActiveForm(null);
+                      return ok;
+                    }}
+                  />
+                )}
+                {activeForm === "asset" && (
+                  <AssetForm
+                    onSubmit={async (data) => {
+                      const ok = await handleLogAsset(data);
+                      if (ok) setActiveForm(null);
+                      return ok;
+                    }}
+                  />
+                )}
+                {activeForm === "pest" && (
+                  <PestForm
+                    zones={zones}
+                    crops={crops}
+                    defaultZoneId={defaultZoneId}
+                    onSubmit={async (data) => {
+                      const ok = await handleLogPest(data);
+                      if (ok) setActiveForm(null);
+                      return ok;
+                    }}
+                  />
+                )}
+                {activeForm === "sale" && (
+                  <SaleForm
+                    crops={crops}
+                    onSubmit={async (data) => {
+                      const ok = await handleLogSale(data);
+                      if (ok) setActiveForm(null);
+                      return ok;
+                    }}
+                  />
+                )}
+                {activeForm === "zone" && (
+                  <ZoneForm
+                    onSubmit={async (data) => {
+                      const ok = await handleCreateZone(data);
+                      if (ok) setActiveForm(null);
+                      return ok;
+                    }}
+                  />
+                )}
+              </div>
+            ) : null}
+
             <section className="mb-6 grid gap-4 sm:grid-cols-3">
               <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
@@ -1217,126 +1399,6 @@ export default function FarmPage() {
               ) : null}
             </section>
 
-            <div className="mb-6 flex flex-wrap gap-3">
-              {(
-                [
-                  { key: "crop", label: "New crop" },
-                  { key: "task", label: "New task" },
-                  { key: "harvest", label: "Log harvest" },
-                  { key: "expense", label: "Log expense" },
-                  { key: "asset", label: "Log asset" },
-                  { key: "pest", label: "Log pest" },
-                  { key: "sale", label: "Log sale" },
-                ] as const
-              ).map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setActiveForm(activeForm === key ? null : key)}
-                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                    activeForm === key
-                      ? "bg-zinc-900 text-white"
-                      : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {activeForm === "crop" && (
-              <div className="mb-6 max-w-sm">
-                <CropForm
-                  zones={zones}
-                  defaultZoneId={defaultZoneId}
-                  onSubmit={async (data) => {
-                    const ok = await handleCreateCrop(data);
-                    if (ok) setActiveForm(null);
-                    return ok;
-                  }}
-                />
-              </div>
-            )}
-            {activeForm === "task" && (
-              <div className="mb-6 max-w-sm">
-                <TaskForm
-                  zones={zones}
-                  crops={crops}
-                  defaultZoneId={defaultZoneId}
-                  onSubmit={async (data) => {
-                    const ok = await handleCreateTask(data);
-                    if (ok) setActiveForm(null);
-                    return ok;
-                  }}
-                />
-              </div>
-            )}
-            {activeForm === "harvest" && (
-              <div className="mb-6 max-w-sm">
-                <HarvestForm
-                  zones={zones}
-                  crops={crops}
-                  defaultCropId={defaultCropId}
-                  defaultZoneId={defaultZoneId}
-                  onSubmit={async (data) => {
-                    const ok = await handleLogHarvest(data);
-                    if (ok) setActiveForm(null);
-                    return ok;
-                  }}
-                />
-              </div>
-            )}
-            {activeForm === "expense" && (
-              <div className="mb-6 max-w-sm">
-                <ExpenseForm
-                  zones={zones}
-                  crops={crops}
-                  defaultZoneId={defaultZoneId}
-                  onSubmit={async (data) => {
-                    const ok = await handleLogExpense(data);
-                    if (ok) setActiveForm(null);
-                    return ok;
-                  }}
-                />
-              </div>
-            )}
-            {activeForm === "asset" && (
-              <div className="mb-6 max-w-sm">
-                <AssetForm
-                  onSubmit={async (data) => {
-                    const ok = await handleLogAsset(data);
-                    if (ok) setActiveForm(null);
-                    return ok;
-                  }}
-                />
-              </div>
-            )}
-            {activeForm === "pest" && (
-              <div className="mb-6 max-w-sm">
-                <PestForm
-                  zones={zones}
-                  crops={crops}
-                  defaultZoneId={defaultZoneId}
-                  onSubmit={async (data) => {
-                    const ok = await handleLogPest(data);
-                    if (ok) setActiveForm(null);
-                    return ok;
-                  }}
-                />
-              </div>
-            )}
-            {activeForm === "sale" && (
-              <div className="mb-6 max-w-sm">
-                <SaleForm
-                  crops={crops}
-                  onSubmit={async (data) => {
-                    const ok = await handleLogSale(data);
-                    if (ok) setActiveForm(null);
-                    return ok;
-                  }}
-                />
-              </div>
-            )}
-
             <section className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between gap-4">
                 <div>
@@ -1530,46 +1592,101 @@ export default function FarmPage() {
                     <span className="text-sm text-zinc-500">{pests.length} logged</span>
                   </div>
 
-                  <div className="mt-5 overflow-hidden rounded-2xl border border-zinc-200">
-                    <div className="grid grid-cols-4 gap-4 border-b border-zinc-200 bg-zinc-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                      <div>Date</div>
-                      <div>Pest</div>
-                      <div>Crop / zone</div>
-                      <div>Action taken</div>
-                    </div>
+                  {pests.length === 0 ? (
+                    <div className="mt-5 rounded-2xl border border-zinc-200 px-4 py-6 text-sm text-zinc-500">No pest issues logged yet.</div>
+                  ) : (
+                    <div className="mt-5 space-y-3">
+                      {pests.map((pest) => {
+                        const isEditing = editingPestId === pest.id;
+                        const isDeleting = deletingPestId === pest.id;
 
-                    {pests.length === 0 ? (
-                      <div className="px-4 py-6 text-sm text-zinc-500">No pest issues logged yet.</div>
-                    ) : (
-                      pests.map((pest) => (
-                        <div
-                          key={pest.id}
-                          className="grid grid-cols-4 gap-4 border-b border-zinc-100 px-4 py-4 text-sm last:border-b-0"
-                        >
-                          <div>{formatDate(pest.logged_date)}</div>
-                          <div>
-                            <div className="font-medium">{pest.pest_name}</div>
-                            <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${
-                              pest.severity === "high"
-                                ? "bg-rose-100 text-rose-700"
-                                : pest.severity === "medium"
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-emerald-100 text-emerald-700"
-                            }`}>
-                              {pest.severity}
-                            </span>
-                          </div>
-                          <div>
-                            <div>{pest.crop?.[0]?.crop_name ?? "—"}</div>
-                            {pest.zone?.[0]?.name ? (
-                              <div className="text-zinc-500">{pest.zone[0].name}</div>
+                        if (isEditing) {
+                          return (
+                            <div key={pest.id} className="rounded-2xl border border-zinc-200 p-4">
+                              <PestForm
+                                zones={zones}
+                                crops={crops}
+                                defaultZoneId=""
+                                submitLabel="Save changes"
+                                initialData={{
+                                  pest_name: pest.pest_name,
+                                  severity: pest.severity,
+                                  description: pest.description ?? "",
+                                  action_taken: pest.action_taken ?? "",
+                                  logged_date: pest.logged_date,
+                                  crop_id: pest.crop_id ?? "",
+                                  zone_id: pest.zone_id ?? "",
+                                  image_url: pest.image_url ?? "",
+                                  image_file: null,
+                                }}
+                                onSubmit={(data) => handleUpdatePest(pest.id, data)}
+                              />
+                              <button
+                                onClick={() => setEditingPestId(null)}
+                                className="mt-2 rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div key={pest.id} className="rounded-2xl border border-zinc-100 p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">{pest.pest_name}</span>
+                                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                    pest.severity === "high"
+                                      ? "bg-rose-100 text-rose-700"
+                                      : pest.severity === "medium"
+                                      ? "bg-amber-100 text-amber-700"
+                                      : "bg-emerald-100 text-emerald-700"
+                                  }`}>
+                                    {pest.severity}
+                                  </span>
+                                  <span className="text-xs text-zinc-400">{formatDate(pest.logged_date)}</span>
+                                </div>
+                                <div className="mt-1 text-sm text-zinc-500">
+                                  {pest.crop?.[0]?.crop_name ?? ""}{pest.crop?.[0]?.crop_name && pest.zone?.[0]?.name ? " · " : ""}{pest.zone?.[0]?.name ?? ""}
+                                </div>
+                                {pest.description ? <p className="mt-1 text-sm text-zinc-600">{pest.description}</p> : null}
+                                {pest.action_taken ? <p className="mt-1 text-sm text-zinc-500">Action: {pest.action_taken}</p> : null}
+                              </div>
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => setEditingPestId(pest.id)}
+                                  className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                                >
+                                  Edit
+                                </button>
+                                {confirmDeletePestId === pest.id ? (
+                                  <button
+                                    onClick={() => handleDeletePest(pest.id)}
+                                    disabled={isDeleting}
+                                    className="rounded-xl bg-rose-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-rose-700 disabled:opacity-60"
+                                  >
+                                    {isDeleting ? "…" : "Confirm"}
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => setConfirmDeletePestId(pest.id)}
+                                    className="rounded-xl border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                                  >
+                                    Delete
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            {pest.image_url ? (
+                              <img src={pest.image_url} alt={pest.pest_name} className="mt-3 h-40 w-full rounded-xl object-cover" />
                             ) : null}
                           </div>
-                          <div className="text-zinc-600">{pest.action_taken ?? "—"}</div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </section>
 

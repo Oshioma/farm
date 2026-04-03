@@ -312,6 +312,7 @@ export type Plant = {
   name: string | null;
   image_url: string | null;
   notes: string | null;
+  medicinal_properties: string | null;
   zone_id: string | null;
   created_at: string | null;
 };
@@ -319,7 +320,7 @@ export type Plant = {
 export async function getPlants(farmId: string): Promise<Plant[]> {
   const { data, error } = await supabase
     .from("plants")
-    .select("id, farm_id, name, image_url, notes, zone_id, created_at")
+    .select("id, farm_id, name, image_url, notes, medicinal_properties, zone_id, created_at")
     .eq("farm_id", farmId)
     .order("created_at", { ascending: false });
 
@@ -353,6 +354,7 @@ export type Pest = {
   severity: string;
   description: string | null;
   action_taken: string | null;
+  image_url: string | null;
   logged_date: string;
   created_at: string | null;
   crop_id: string | null;
@@ -371,6 +373,7 @@ export async function getPests(farmId: string): Promise<Pest[]> {
       severity,
       description,
       action_taken,
+      image_url,
       logged_date,
       created_at,
       crop_id,
