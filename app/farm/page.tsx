@@ -15,8 +15,9 @@ import {
   getPests,
   getSales,
   getFertilisations,
+  getCompost,
 } from "@/lib/farm";
-import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, FertilisationEntry } from "@/lib/farm";
+import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, FertilisationEntry, CompostEntry } from "@/lib/farm";
 import { formatDate, formatMoney, badgeClass } from "@/app/farm/utils";
 import { CropForm } from "@/app/farm/components/CropForm";
 import { TaskForm } from "@/app/farm/components/TaskForm";
@@ -55,6 +56,7 @@ export default function FarmPage() {
   const [pests, setPests] = useState<Pest[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [fertilisations, setFertilisations] = useState<FertilisationEntry[]>([]);
+  const [compostEntries, setCompostEntries] = useState<CompostEntry[]>([]);
 
   const [activeFarmId, setActiveFarmId] = useState<string>("");
   const [activeForm, setActiveForm] = useState<"crop" | "task" | "harvest" | "expense" | "asset" | "pest" | "sale" | "zone" | null>(null);
@@ -196,7 +198,7 @@ export default function FarmPage() {
   }
 
   async function loadFarmData(farmId: string) {
-    const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows, pestRows, saleRows, fertilisationRows] = await Promise.all([
+    const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows, pestRows, saleRows, fertilisationRows, compostRows] = await Promise.all([
       getZones(farmId),
       getCrops(farmId),
       getTasks(farmId),
@@ -206,6 +208,7 @@ export default function FarmPage() {
       getPests(farmId),
       getSales(farmId),
       getFertilisations(farmId),
+      getCompost(farmId),
     ]);
 
     setZones(zoneRows);
@@ -217,6 +220,7 @@ export default function FarmPage() {
     setPests(pestRows);
     setSales(saleRows);
     setFertilisations(fertilisationRows);
+    setCompostEntries(compostRows);
   }
 
   async function refreshAll() {
@@ -1523,7 +1527,7 @@ export default function FarmPage() {
 
               {zonesView === "map" ? (
                 <div className="mt-5">
-                  <FarmMap zones={zones} crops={crops} fertilisations={fertilisations} />
+                  <FarmMap zones={zones} crops={crops} fertilisations={fertilisations} compostEntries={compostEntries} />
                   <p className="mt-2 text-xs text-zinc-400">
                     Click a bed to see details. To link a bed, create a zone with a matching code (e.g. R1, CL2).
                   </p>

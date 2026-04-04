@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { getFarms, getCompost } from "@/lib/farm";
-import type { Farm, CompostEntry } from "@/lib/farm";
+import { getFarms, getCompost, getZones } from "@/lib/farm";
+import type { Farm, CompostEntry, Zone } from "@/lib/farm";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -14,7 +14,7 @@ function errMsg(err: unknown, fallback: string): string {
   return fallback;
 }
 
-const blankForm = { compost_type: "", date: "", ready_to_use_date: "", materials_used: "", place: "", notes: "" };
+const blankForm = { compost_type: "", date: "", ready_to_use_date: "", materials_used: "", place: "", zone_id: "", notes: "" };
 
 function fmt(d: string | null) {
   if (!d) return "—";
@@ -24,6 +24,7 @@ function fmt(d: string | null) {
 
 export default function CompostPage() {
   const [farms, setFarms] = useState<Farm[]>([]);
+  const [zones, setZones] = useState<Zone[]>([]);
   const [entries, setEntries] = useState<CompostEntry[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -35,8 +36,9 @@ export default function CompostPage() {
   const router = useRouter();
 
   async function loadEntries(farmId: string) {
-    const rows = await getCompost(farmId);
+    const [rows, zoneRows] = await Promise.all([getCompost(farmId), getZones(farmId)]);
     setEntries(rows);
+    setZones(zoneRows);
   }
 
   useEffect(() => {
@@ -77,6 +79,7 @@ export default function CompostPage() {
         ready_to_use_date: form.ready_to_use_date || null,
         materials_used: form.materials_used.trim() || null,
         place: form.place.trim() || null,
+        zone_id: form.zone_id || null,
         notes: form.notes.trim() || null,
       };
       if (modal === "new") {
@@ -115,6 +118,7 @@ export default function CompostPage() {
       ready_to_use_date: entry.ready_to_use_date ?? "",
       materials_used: entry.materials_used ?? "",
       place: entry.place ?? "",
+      zone_id: entry.zone_id ?? "",
       notes: entry.notes ?? "",
     });
     setModal(entry);
@@ -198,6 +202,7 @@ export default function CompostPage() {
                     <th className="px-4 py-3 text-left">Ready to use</th>
                     <th className="px-4 py-3 text-left">Materials</th>
                     <th className="px-4 py-3 text-left">Place</th>
+                    <th className="px-4 py-3 text-left">Zone / Bed</th>
                     <th className="px-4 py-3 text-left">Notes</th>
                     <th className="px-4 py-3" />
                   </tr>
@@ -210,6 +215,7 @@ export default function CompostPage() {
                       <td className="px-4 py-3 whitespace-nowrap text-zinc-700">{fmt(row.ready_to_use_date)}</td>
                       <td className="px-4 py-3 text-zinc-600">{row.materials_used ?? <span className="text-zinc-300">—</span>}</td>
                       <td className="px-4 py-3 text-zinc-600 whitespace-nowrap">{row.place ?? <span className="text-zinc-300">—</span>}</td>
+                      <td className="px-4 py-3 text-zinc-600 whitespace-nowrap">{row.zone?.[0]?.name ?? <span className="text-zinc-300">—</span>}</td>
                       <td className="px-4 py-3 text-zinc-500 max-w-[180px]">{row.notes ?? <span className="text-zinc-300">—</span>}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex gap-1">
@@ -259,6 +265,13 @@ export default function CompostPage() {
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-zinc-600">Materials used</label>
                 <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.materials_used} onChange={(e) => setForm((p) => ({ ...p, materials_used: e.target.value }))} placeholder="Manure + food scraps" />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Zone / Bed <span className="font-normal text-zinc-400">(optional)</span></label>
+                <select className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.zone_id} onChange={(e) => setForm((p) => ({ ...p, zone_id: e.target.value }))}>
+                  <option value="">—</option>
+                  {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
+                </select>
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-zinc-600">Notes</label>

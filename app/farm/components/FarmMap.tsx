@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Zone, Crop, FertilisationEntry } from "@/lib/farm";
+import type { Zone, Crop, FertilisationEntry, CompostEntry } from "@/lib/farm";
 
 type BedDef = {
   id: string;
@@ -124,10 +124,11 @@ type Props = {
   zones: Zone[];
   crops: Crop[];
   fertilisations?: FertilisationEntry[];
+  compostEntries?: CompostEntry[];
   onSelectBed?: (bedId: string) => void;
 };
 
-export function FarmMap({ zones, crops, fertilisations = [], onSelectBed }: Props) {
+export function FarmMap({ zones, crops, fertilisations = [], compostEntries = [], onSelectBed }: Props) {
   const [hoveredBed, setHoveredBed] = useState<string | null>(null);
   const [selectedBed, setSelectedBed] = useState<string | null>(null);
 
@@ -147,6 +148,12 @@ export function FarmMap({ zones, crops, fertilisations = [], onSelectBed }: Prop
   function getFertilisationsForZone(zoneId: string): FertilisationEntry[] {
     return fertilisations
       .filter((f) => f.zone_id === zoneId)
+      .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  }
+
+  function getCompostForZone(zoneId: string): CompostEntry[] {
+    return compostEntries
+      .filter((c) => c.zone_id === zoneId)
       .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   }
 
@@ -179,6 +186,7 @@ export function FarmMap({ zones, crops, fertilisations = [], onSelectBed }: Prop
   const selected = selectedBed ? getZoneForBed(selectedBed) : null;
   const selectedCrops = selected ? getCropsForZone(selected.id) : [];
   const selectedFertilisations = selected ? getFertilisationsForZone(selected.id) : [];
+  const selectedCompost = selected ? getCompostForZone(selected.id) : [];
 
   return (
     <div>
@@ -357,6 +365,23 @@ export function FarmMap({ zones, crops, fertilisations = [], onSelectBed }: Prop
                               <span className="text-[10px] text-amber-600">{fmtDate(f.date)}</span>
                             </div>
                             {f.notes && <div className="mt-0.5 text-[10px] text-amber-600/70">{f.notes}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedCompost.length > 0 && (
+                    <div className="mt-4">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Compost</div>
+                      <div className="mt-1.5 space-y-1.5">
+                        {selectedCompost.map((c) => (
+                          <div key={c.id} className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-2">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-xs font-medium text-emerald-800">{c.compost_type ?? "Compost"}</span>
+                              <span className="text-[10px] text-emerald-600">{fmtDate(c.date)}</span>
+                            </div>
+                            {c.materials_used && <div className="mt-0.5 text-[10px] text-emerald-600/70">{c.materials_used}</div>}
+                            {c.notes && <div className="mt-0.5 text-[10px] text-emerald-600/70">{c.notes}</div>}
                           </div>
                         ))}
                       </div>

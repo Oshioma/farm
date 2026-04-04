@@ -441,6 +441,8 @@ export type CompostEntry = {
   ready_to_use_date: string | null;
   materials_used: string | null;
   place: string | null;
+  zone_id: string | null;
+  zone: { name: string }[] | null;
   notes: string | null;
   created_at: string | null;
 };
@@ -448,7 +450,7 @@ export type CompostEntry = {
 export async function getCompost(farmId: string): Promise<CompostEntry[]> {
   const { data, error } = await supabase
     .from("compost")
-    .select("id, farm_id, compost_type, date, ready_to_use_date, materials_used, place, notes, created_at")
+    .select("id, farm_id, compost_type, date, ready_to_use_date, materials_used, place, zone_id, zone:zones(name), notes, created_at")
     .eq("farm_id", farmId)
     .order("date", { ascending: true });
 
