@@ -1837,14 +1837,14 @@ export default function FarmPage() {
                   {pests.length === 0 ? (
                     <div className="mt-5 rounded-2xl border border-zinc-200 px-4 py-6 text-sm text-zinc-500">No pest issues logged yet.</div>
                   ) : (
-                    <div className="mt-5 space-y-3">
+                    <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                       {pests.map((pest) => {
                         const isEditing = editingPestId === pest.id;
                         const isDeleting = deletingPestId === pest.id;
 
                         if (isEditing) {
                           return (
-                            <div key={pest.id} className="rounded-2xl border border-zinc-200 p-4">
+                            <div key={pest.id} className="col-span-full rounded-2xl border border-zinc-200 p-4">
                               <PestForm
                                 zones={zones}
                                 crops={crops}
@@ -1874,32 +1874,41 @@ export default function FarmPage() {
                         }
 
                         return (
-                          <div key={pest.id} className="rounded-2xl border border-zinc-100 p-4">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium">{pest.pest_name}</span>
-                                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                                    pest.severity === "high"
-                                      ? "bg-rose-100 text-rose-700"
-                                      : pest.severity === "medium"
-                                      ? "bg-amber-100 text-amber-700"
-                                      : "bg-emerald-100 text-emerald-700"
-                                  }`}>
-                                    {pest.severity}
-                                  </span>
-                                  <span className="text-xs text-zinc-400">{formatDate(pest.logged_date)}</span>
-                                </div>
-                                <div className="mt-1 text-sm text-zinc-500">
-                                  {pest.crop?.[0]?.crop_name ?? ""}{pest.crop?.[0]?.crop_name && pest.zone?.[0]?.name ? " · " : ""}{pest.zone?.[0]?.name ?? ""}
-                                </div>
-                                {pest.description ? <p className="mt-1 text-sm text-zinc-600">{pest.description}</p> : null}
-                                {pest.action_taken ? <p className="mt-1 text-sm text-zinc-500">Action: {pest.action_taken}</p> : null}
+                          <div key={pest.id} className="group relative overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
+                            {/* Image / placeholder */}
+                            {pest.image_url ? (
+                              <img src={pest.image_url} alt={pest.pest_name} className="aspect-square w-full object-cover" />
+                            ) : (
+                              <div className="flex aspect-square w-full items-center justify-center bg-zinc-100">
+                                <span className="text-2xl text-zinc-300">🐛</span>
                               </div>
-                              <div className="flex gap-1">
+                            )}
+
+                            {/* Info */}
+                            <div className="p-3">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-sm">{pest.pest_name}</span>
+                                <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                                  pest.severity === "high"
+                                    ? "bg-rose-100 text-rose-700"
+                                    : pest.severity === "medium"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-emerald-100 text-emerald-700"
+                                }`}>
+                                  {pest.severity}
+                                </span>
+                              </div>
+                              <div className="mt-1 text-xs text-zinc-400">
+                                {formatDate(pest.logged_date)}
+                                {(pest.crop?.[0]?.crop_name || pest.zone?.[0]?.name) && " · "}
+                                {pest.crop?.[0]?.crop_name ?? ""}{pest.crop?.[0]?.crop_name && pest.zone?.[0]?.name ? " · " : ""}{pest.zone?.[0]?.name ?? ""}
+                              </div>
+                              {pest.description && <p className="mt-1 text-xs text-zinc-500 line-clamp-2">{pest.description}</p>}
+                              {pest.action_taken && <p className="mt-1 text-xs text-zinc-400 line-clamp-2">Action: {pest.action_taken}</p>}
+                              <div className="mt-2 flex gap-1">
                                 <button
                                   onClick={() => setEditingPestId(pest.id)}
-                                  className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                                  className="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] font-medium text-zinc-600 hover:bg-zinc-50"
                                 >
                                   Edit
                                 </button>
@@ -1907,23 +1916,20 @@ export default function FarmPage() {
                                   <button
                                     onClick={() => handleDeletePest(pest.id)}
                                     disabled={isDeleting}
-                                    className="rounded-xl bg-rose-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-rose-700 disabled:opacity-60"
+                                    className="rounded-lg bg-rose-600 px-2 py-1 text-[10px] font-medium text-white hover:bg-rose-700 disabled:opacity-60"
                                   >
                                     {isDeleting ? "…" : "Confirm"}
                                   </button>
                                 ) : (
                                   <button
                                     onClick={() => setConfirmDeletePestId(pest.id)}
-                                    className="rounded-xl border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                                    className="rounded-lg border border-rose-200 px-2 py-1 text-[10px] font-medium text-rose-600 hover:bg-rose-50"
                                   >
                                     Delete
                                   </button>
                                 )}
                               </div>
                             </div>
-                            {pest.image_url ? (
-                              <img src={pest.image_url} alt={pest.pest_name} className="mt-3 h-40 w-full rounded-xl object-cover" />
-                            ) : null}
                           </div>
                         );
                       })}
