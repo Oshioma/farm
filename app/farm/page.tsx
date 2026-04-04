@@ -389,9 +389,11 @@ export default function FarmPage() {
         estimated_yield_kg: editingCropForm.estimated_yield_kg ? Number(editingCropForm.estimated_yield_kg) : null,
         expected_sale_price_per_kg: editingCropForm.expected_sale_price_per_kg ? Number(editingCropForm.expected_sale_price_per_kg) : null,
       };
-      const { error: err, count } = await supabase.from("crops").update(payload, { count: "exact" }).eq("id", id);
-      if (err) throw err;
-      if (count === 0) throw new Error("Update failed — check RLS policies on the crops table allow updates for your user.");
+      console.log("Crop update payload:", JSON.stringify(payload), "id:", id);
+      const res = await supabase.from("crops").update(payload, { count: "exact" }).eq("id", id).select();
+      console.log("Crop update response:", JSON.stringify(res));
+      if (res.error) throw res.error;
+      if (!res.data || res.data.length === 0) throw new Error("Update returned no rows — RLS may be blocking updates. Check UPDATE policy on crops table.");
       setEditingCropId(null);
       await loadFarmData(activeFarmId);
     } catch (err) {
