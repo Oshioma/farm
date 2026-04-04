@@ -562,6 +562,7 @@ export default function FarmPage() {
       const zoneIds = editingCropForm.zone_ids.filter(Boolean);
       const primaryZoneId = zoneIds[0] || null;
       const extraZoneIds = zoneIds.length > 1 ? JSON.stringify(zoneIds.slice(1)) : null;
+
       const payload = {
         crop_name: editingCropForm.crop_name.trim(),
         variety: editingCropForm.variety.trim() || null,
@@ -581,7 +582,6 @@ export default function FarmPage() {
       console.log("Crop update response:", JSON.stringify(res));
       if (res.error) throw res.error;
       if (!res.data || res.data.length === 0) throw new Error("Update returned no rows — RLS may be blocking updates.");
-
       setEditingCropId(null);
       setCropImagePreview("");
       await loadFarmData(activeFarmId);
