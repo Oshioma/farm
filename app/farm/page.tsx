@@ -929,14 +929,14 @@ export default function FarmPage() {
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
               {farms.map((farm) => {
                 const isActive = farm.id === activeFarmId;
                 return (
                   <button
                     key={farm.id}
                     onClick={() => setActiveFarmId(farm.id)}
-                    className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                    className={`rounded-full px-5 py-2.5 text-sm font-medium transition ${
                       isActive
                         ? "bg-zinc-900 text-white"
                         : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
@@ -947,82 +947,10 @@ export default function FarmPage() {
                 );
               })}
               <Link
-                href="/farm/trees"
-                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-              >
-                Trees
-              </Link>
-              <Link
                 href="/farm/invite"
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
                 Invite
-              </Link>
-              <Link
-                href="/farm/planting-plan"
-                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-              >
-                Planting plan
-              </Link>
-              <Link
-                href="/farm/seedlings"
-                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-              >
-                Seedlings
-              </Link>
-              <Link
-                href="/plants"
-                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-              >
-                Plants
-              </Link>
-              <Link
-                href="/fertiliser"
-                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-              >
-                Fertiliser
-              </Link>
-              <Link
-                href="/farm/soil-tests"
-                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-              >
-                Soil tests
-              </Link>
-              <Link
-                href="/farm/soil-improvements"
-                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-              >
-                Soil improvements
-              </Link>
-              <Link
-                href="/farm/compost"
-                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-              >
-                Compost
-              </Link>
-              <Link
-                href="/farm/work-hours"
-                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-              >
-                Work hours
-              </Link>
-              <Link
-                href="/farm/systems"
-                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-              >
-                Systems
-              </Link>
-              <Link
-                href="/companion"
-                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-              >
-                Companion planting
-              </Link>
-              <Link
-                href="/income-prediction"
-                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-              >
-                Income prediction
               </Link>
               <button
                 onClick={handleSignOut}
@@ -1033,6 +961,34 @@ export default function FarmPage() {
             </div>
           </div>
         </header>
+
+        {/* Navigation bar */}
+        <nav className="mb-6 overflow-x-auto rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
+          <div className="flex items-center gap-2 text-sm whitespace-nowrap">
+            {[
+              { href: "/farm/trees", label: "Trees" },
+              { href: "/farm/planting-plan", label: "Planting plan" },
+              { href: "/farm/seedlings", label: "Seedlings" },
+              { href: "/plants", label: "Plants" },
+              { href: "/fertiliser", label: "Fertiliser" },
+              { href: "/farm/compost", label: "Compost" },
+              { href: "/farm/soil-tests", label: "Soil tests" },
+              { href: "/farm/soil-improvements", label: "Soil improvements" },
+              { href: "/farm/work-hours", label: "Work hours" },
+              { href: "/farm/systems", label: "Systems" },
+              { href: "/companion", label: "Companion planting" },
+              { href: "/income-prediction", label: "Income prediction" },
+            ].map(({ href, label }) => (
+              <Link
+                key={href}
+                href={href}
+                className="rounded-full border border-zinc-100 px-3 py-1.5 font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900"
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+        </nav>
 
         {error ? (
           <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
