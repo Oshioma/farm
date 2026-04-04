@@ -390,10 +390,10 @@ export default function FarmPage() {
         expected_sale_price_per_kg: editingCropForm.expected_sale_price_per_kg ? Number(editingCropForm.expected_sale_price_per_kg) : null,
       };
       console.log("Crop update payload:", JSON.stringify(payload), "id:", id);
-      const res = await supabase.from("crops").update(payload, { count: "exact" }).eq("id", id).select();
+      const res = await supabase.from("crops").update(payload).eq("id", id).select();
       console.log("Crop update response:", JSON.stringify(res));
       if (res.error) throw res.error;
-      if (!res.data || res.data.length === 0) throw new Error("Update returned no rows — RLS may be blocking updates. Check UPDATE policy on crops table.");
+      if (!res.data || res.data.length === 0) throw new Error("Update returned no rows — RLS may be blocking updates.");
       setEditingCropId(null);
       await loadFarmData(activeFarmId);
     } catch (err) {
@@ -1725,7 +1725,7 @@ export default function FarmPage() {
                                     <div className="font-semibold">{crop.crop_name}</div>
                                     <div className="text-zinc-500">{crop.variety || "\u2014"}</div>
                                   </td>
-                                  <td className="px-4 py-4">{crop.zone?.[0]?.name ?? "No zone"}</td>
+                                  <td className="px-4 py-4">{crop.zone?.[0]?.name || (crop.zone_id ? zones.find((z) => z.id === crop.zone_id)?.name ?? "Unknown zone" : "No zone")}</td>
                                   <td className="px-4 py-4">
                                     <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass(crop.status)}`}>
                                       {crop.status}
