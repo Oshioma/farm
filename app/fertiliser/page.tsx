@@ -363,7 +363,7 @@ export default function FertiliserPage() {
                           </span>
                         ) : "—"}
                       </td>
-                      <td className="px-5 py-4 text-zinc-600">{entry.zone?.[0]?.name ?? "—"}</td>
+                      <td className="px-5 py-4 text-zinc-600">{entry.zone?.[0]?.name || (entry.zone_id ? zones.find((z) => z.id === entry.zone_id)?.name ?? "Unknown zone" : "—")}</td>
                       <td className="px-5 py-4 text-zinc-500">{entry.notes ?? "—"}</td>
                       <td className="px-5 py-4">
                         <div className="flex gap-2">

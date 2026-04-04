@@ -215,7 +215,7 @@ export default function CompostPage() {
                       <td className="px-4 py-3 whitespace-nowrap text-zinc-700">{fmt(row.ready_to_use_date)}</td>
                       <td className="px-4 py-3 text-zinc-600">{row.materials_used ?? <span className="text-zinc-300">—</span>}</td>
                       <td className="px-4 py-3 text-zinc-600 whitespace-nowrap">{row.place ?? <span className="text-zinc-300">—</span>}</td>
-                      <td className="px-4 py-3 text-zinc-600 whitespace-nowrap">{row.zone?.[0]?.name ?? <span className="text-zinc-300">—</span>}</td>
+                      <td className="px-4 py-3 text-zinc-600 whitespace-nowrap">{row.zone?.[0]?.name || (row.zone_id ? zones.find((z) => z.id === row.zone_id)?.name ?? "Unknown zone" : <span className="text-zinc-300">—</span>)}</td>
                       <td className="px-4 py-3 text-zinc-500 max-w-[180px]">{row.notes ?? <span className="text-zinc-300">—</span>}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex gap-1">
