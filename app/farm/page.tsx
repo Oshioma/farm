@@ -70,6 +70,13 @@ export default function FarmPage() {
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTaskForm, setEditingTaskForm] = useState<TaskFormData | null>(null);
+  const [editingCropId, setEditingCropId] = useState<string | null>(null);
+  const [editingCropForm, setEditingCropForm] = useState({
+    crop_name: "", variety: "", zone_id: "", status: "", planted_on: "",
+    expected_harvest_start: "", estimated_yield_kg: "", expected_sale_price_per_kg: "",
+  });
+  const [savingCropId, setSavingCropId] = useState<string | null>(null);
+  const [deletingCropId, setDeletingCropId] = useState<string | null>(null);
   // No-farm state
   const [noFarmMode, setNoFarmMode] = useState<"idle" | "create" | "join">("idle");
   const [newFarmName, setNewFarmName] = useState("");
@@ -351,6 +358,57 @@ export default function FarmPage() {
     } catch (err) {
       setError(errMsg(err, "Failed to create crop"));
       return false;
+    }
+  }
+
+  function startEditCrop(crop: Crop) {
+    setEditingCropId(crop.id);
+    setEditingCropForm({
+      crop_name: crop.crop_name,
+      variety: crop.variety ?? "",
+      zone_id: crop.zone_id ?? "",
+      status: crop.status ?? "planned",
+      planted_on: crop.planted_on ?? "",
+      expected_harvest_start: crop.expected_harvest_start ?? "",
+      estimated_yield_kg: crop.estimated_yield_kg != null ? String(crop.estimated_yield_kg) : "",
+      expected_sale_price_per_kg: crop.expected_sale_price_per_kg != null ? String(crop.expected_sale_price_per_kg) : "",
+    });
+  }
+
+  async function handleSaveCrop(id: string) {
+    try {
+      setSavingCropId(id);
+      setError("");
+      const { error: err } = await supabase.from("crops").update({
+        crop_name: editingCropForm.crop_name.trim(),
+        variety: editingCropForm.variety.trim() || null,
+        zone_id: editingCropForm.zone_id || null,
+        status: editingCropForm.status || null,
+        planted_on: editingCropForm.planted_on || null,
+        expected_harvest_start: editingCropForm.expected_harvest_start || null,
+        estimated_yield_kg: editingCropForm.estimated_yield_kg ? Number(editingCropForm.estimated_yield_kg) : null,
+        expected_sale_price_per_kg: editingCropForm.expected_sale_price_per_kg ? Number(editingCropForm.expected_sale_price_per_kg) : null,
+      }).eq("id", id);
+      if (err) throw err;
+      setEditingCropId(null);
+      await loadFarmData(activeFarmId);
+    } catch (err) {
+      setError(errMsg(err, "Failed to update crop"));
+    } finally {
+      setSavingCropId(null);
+    }
+  }
+
+  async function handleDeleteCrop(id: string) {
+    try {
+      setDeletingCropId(id);
+      const { error: err } = await supabase.from("crops").update({ is_active: false }).eq("id", id);
+      if (err) throw err;
+      setCrops((prev) => prev.filter((c) => c.id !== id));
+    } catch (err) {
+      setError(errMsg(err, "Failed to delete crop"));
+    } finally {
+      setDeletingCropId(null);
     }
   }
 
@@ -1582,39 +1640,115 @@ export default function FarmPage() {
                   </div>
 
                   <div className="mt-5 overflow-hidden rounded-2xl border border-zinc-200">
-                    <div className="grid grid-cols-5 gap-4 border-b border-zinc-200 bg-zinc-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                      <div>Crop</div>
-                      <div>Zone</div>
-                      <div>Status</div>
-                      <div>Harvest</div>
-                      <div>Actual yield</div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-zinc-200 bg-zinc-50 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                            <th className="px-4 py-3 text-left">Crop</th>
+                            <th className="px-4 py-3 text-left">Zone</th>
+                            <th className="px-4 py-3 text-left">Status</th>
+                            <th className="px-4 py-3 text-left">Planted</th>
+                            <th className="px-4 py-3 text-left">Harvest</th>
+                            <th className="px-4 py-3 text-left">Yield</th>
+                            <th className="px-4 py-3" />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {crops.length === 0 ? (
+                            <tr><td colSpan={7} className="px-4 py-6 text-zinc-500">No crops yet.</td></tr>
+                          ) : (
+                            crops.map((crop) =>
+                              editingCropId === crop.id ? (
+                                <tr key={crop.id} className="border-b border-zinc-100 bg-amber-50/40">
+                                  <td className="px-3 py-2">
+                                    <input type="text" value={editingCropForm.crop_name}
+                                      onChange={(e) => setEditingCropForm((p) => ({ ...p, crop_name: e.target.value }))}
+                                      className="w-full min-w-[100px] rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
+                                    <input type="text" value={editingCropForm.variety} placeholder="Variety"
+                                      onChange={(e) => setEditingCropForm((p) => ({ ...p, variety: e.target.value }))}
+                                      className="mt-1 w-full min-w-[100px] rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <select value={editingCropForm.zone_id}
+                                      onChange={(e) => setEditingCropForm((p) => ({ ...p, zone_id: e.target.value }))}
+                                      className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900">
+                                      <option value="">No zone</option>
+                                      {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
+                                    </select>
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <select value={editingCropForm.status}
+                                      onChange={(e) => setEditingCropForm((p) => ({ ...p, status: e.target.value }))}
+                                      className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900">
+                                      <option value="planned">planned</option>
+                                      <option value="planted">planted</option>
+                                      <option value="germinating">germinating</option>
+                                      <option value="growing">growing</option>
+                                      <option value="harvest_ready">harvest_ready</option>
+                                    </select>
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <input type="date" value={editingCropForm.planted_on}
+                                      onChange={(e) => setEditingCropForm((p) => ({ ...p, planted_on: e.target.value }))}
+                                      className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <input type="date" value={editingCropForm.expected_harvest_start}
+                                      onChange={(e) => setEditingCropForm((p) => ({ ...p, expected_harvest_start: e.target.value }))}
+                                      className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <input type="number" step="0.01" value={editingCropForm.estimated_yield_kg} placeholder="kg"
+                                      onChange={(e) => setEditingCropForm((p) => ({ ...p, estimated_yield_kg: e.target.value }))}
+                                      className="w-full min-w-[70px] rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <div className="flex gap-1">
+                                      <button onClick={() => handleSaveCrop(crop.id)} disabled={savingCropId === crop.id}
+                                        className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-60">
+                                        {savingCropId === crop.id ? "\u2026" : "Save"}
+                                      </button>
+                                      <button onClick={() => setEditingCropId(null)}
+                                        className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100">
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ) : (
+                                <tr key={crop.id} className="border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50 transition-colors">
+                                  <td className="px-4 py-4">
+                                    <div className="font-semibold">{crop.crop_name}</div>
+                                    <div className="text-zinc-500">{crop.variety || "\u2014"}</div>
+                                  </td>
+                                  <td className="px-4 py-4">{crop.zone?.[0]?.name ?? "No zone"}</td>
+                                  <td className="px-4 py-4">
+                                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass(crop.status)}`}>
+                                      {crop.status}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-4">{formatDate(crop.planted_on)}</td>
+                                  <td className="px-4 py-4">{formatDate(crop.expected_harvest_start)}</td>
+                                  <td className="px-4 py-4">{crop.actual_yield_kg ?? 0} kg</td>
+                                  <td className="px-4 py-4">
+                                    <div className="flex gap-1">
+                                      <button onClick={() => startEditCrop(crop)}
+                                        className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">
+                                        Edit
+                                      </button>
+                                      <button onClick={() => handleDeleteCrop(crop.id)} disabled={deletingCropId === crop.id}
+                                        className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">
+                                        {deletingCropId === crop.id ? "\u2026" : "Del"}
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )
+                            )
+                          )}
+                        </tbody>
+                      </table>
                     </div>
-
-                    {crops.length === 0 ? (
-                      <div className="px-4 py-6 text-sm text-zinc-500">No crops yet.</div>
-                    ) : (
-                      crops.map((crop) => (
-                        <div
-                          key={crop.id}
-                          className="grid grid-cols-5 gap-4 border-b border-zinc-100 px-4 py-4 text-sm last:border-b-0"
-                        >
-                          <div>
-                            <div className="font-semibold">{crop.crop_name}</div>
-                            <div className="text-zinc-500">{crop.variety || "—"}</div>
-                          </div>
-                          <div>{crop.zone?.[0]?.name ?? "No zone"}</div>
-                          <div>
-                            <span
-                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass(crop.status)}`}
-                            >
-                              {crop.status}
-                            </span>
-                          </div>
-                          <div>{formatDate(crop.expected_harvest_start)}</div>
-                          <div>{crop.actual_yield_kg ?? 0} kg</div>
-                        </div>
-                      ))
-                    )}
                   </div>
                 </div>
 
