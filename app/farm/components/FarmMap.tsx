@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Zone, Crop } from "@/lib/farm";
+import type { Zone, Crop, FertilisationEntry } from "@/lib/farm";
 
 type BedDef = {
   id: string;
@@ -123,10 +123,11 @@ const landmarks: LandmarkDef[] = [
 type Props = {
   zones: Zone[];
   crops: Crop[];
+  fertilisations?: FertilisationEntry[];
   onSelectBed?: (bedId: string) => void;
 };
 
-export function FarmMap({ zones, crops, onSelectBed }: Props) {
+export function FarmMap({ zones, crops, fertilisations = [], onSelectBed }: Props) {
   const [hoveredBed, setHoveredBed] = useState<string | null>(null);
   const [selectedBed, setSelectedBed] = useState<string | null>(null);
 
@@ -141,6 +142,18 @@ export function FarmMap({ zones, crops, onSelectBed }: Props) {
 
   function getCropsForZone(zoneId: string): Crop[] {
     return crops.filter((c) => c.zone_id === zoneId);
+  }
+
+  function getFertilisationsForZone(zoneId: string): FertilisationEntry[] {
+    return fertilisations
+      .filter((f) => f.zone_id === zoneId)
+      .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  }
+
+  function fmtDate(d: string | null) {
+    if (!d) return "";
+    const [y, m, day] = d.split("-");
+    return `${day}/${m}/${y}`;
   }
 
   function bedColor(bedId: string): string {
@@ -165,6 +178,7 @@ export function FarmMap({ zones, crops, onSelectBed }: Props) {
 
   const selected = selectedBed ? getZoneForBed(selectedBed) : null;
   const selectedCrops = selected ? getCropsForZone(selected.id) : [];
+  const selectedFertilisations = selected ? getFertilisationsForZone(selected.id) : [];
 
   return (
     <div>
@@ -331,6 +345,22 @@ export function FarmMap({ zones, crops, onSelectBed }: Props) {
                     </div>
                   ) : (
                     <div className="mt-3 text-xs text-zinc-400">No crops in this zone</div>
+                  )}
+                  {selectedFertilisations.length > 0 && (
+                    <div className="mt-4">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Fertiliser</div>
+                      <div className="mt-1.5 space-y-1.5">
+                        {selectedFertilisations.map((f) => (
+                          <div key={f.id} className="rounded-xl border border-amber-100 bg-amber-50/50 p-2">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-xs font-medium text-amber-800">{f.fertiliser}</span>
+                              <span className="text-[10px] text-amber-600">{fmtDate(f.date)}</span>
+                            </div>
+                            {f.notes && <div className="mt-0.5 text-[10px] text-amber-600/70">{f.notes}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </>
               ) : (
