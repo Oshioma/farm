@@ -221,10 +221,15 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
 
   // Try to match beds to zones by code
   function getZoneForBed(bedId: string): Zone | undefined {
+    const id = bedId.toUpperCase();
     return zones.find(
-      (z) =>
-        z.code?.toUpperCase() === bedId.toUpperCase() ||
-        z.name.toUpperCase() === bedId.toUpperCase()
+      (z) => {
+        const code = z.code?.toUpperCase() ?? "";
+        const name = z.name.toUpperCase();
+        return code === id || name === id ||
+          code.replace(/^ROW\s*/i, "") === id ||
+          name.replace(/^ROW\s*/i, "") === id;
+      }
     );
   }
 
