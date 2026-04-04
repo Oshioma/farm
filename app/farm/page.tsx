@@ -379,7 +379,7 @@ export default function FarmPage() {
     try {
       setSavingCropId(id);
       setError("");
-      const { error: err } = await supabase.from("crops").update({
+      const payload = {
         crop_name: editingCropForm.crop_name.trim(),
         variety: editingCropForm.variety.trim() || null,
         zone_id: editingCropForm.zone_id || null,
@@ -388,8 +388,10 @@ export default function FarmPage() {
         expected_harvest_start: editingCropForm.expected_harvest_start || null,
         estimated_yield_kg: editingCropForm.estimated_yield_kg ? Number(editingCropForm.estimated_yield_kg) : null,
         expected_sale_price_per_kg: editingCropForm.expected_sale_price_per_kg ? Number(editingCropForm.expected_sale_price_per_kg) : null,
-      }).eq("id", id);
+      };
+      const { error: err, count } = await supabase.from("crops").update(payload, { count: "exact" }).eq("id", id);
       if (err) throw err;
+      if (count === 0) throw new Error("Update failed — check RLS policies on the crops table allow updates for your user.");
       setEditingCropId(null);
       await loadFarmData(activeFarmId);
     } catch (err) {
