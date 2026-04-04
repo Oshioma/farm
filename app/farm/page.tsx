@@ -16,8 +16,9 @@ import {
   getSales,
   getFertilisations,
   getCompost,
+  getPlants,
 } from "@/lib/farm";
-import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, FertilisationEntry, CompostEntry } from "@/lib/farm";
+import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, FertilisationEntry, CompostEntry, Plant } from "@/lib/farm";
 import { formatDate, formatMoney, badgeClass } from "@/app/farm/utils";
 import { CropForm } from "@/app/farm/components/CropForm";
 import { TaskForm } from "@/app/farm/components/TaskForm";
@@ -57,6 +58,7 @@ export default function FarmPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [fertilisations, setFertilisations] = useState<FertilisationEntry[]>([]);
   const [compostEntries, setCompostEntries] = useState<CompostEntry[]>([]);
+  const [plants, setPlants] = useState<Plant[]>([]);
 
   const [activeFarmId, setActiveFarmId] = useState<string>("");
   const [activeForm, setActiveForm] = useState<"crop" | "task" | "harvest" | "expense" | "asset" | "pest" | "sale" | "zone" | null>(null);
@@ -205,7 +207,7 @@ export default function FarmPage() {
   }
 
   async function loadFarmData(farmId: string) {
-    const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows, pestRows, saleRows, fertilisationRows, compostRows] = await Promise.all([
+    const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows, pestRows, saleRows, fertilisationRows, compostRows, plantRows] = await Promise.all([
       getZones(farmId),
       getCrops(farmId),
       getTasks(farmId),
@@ -216,6 +218,7 @@ export default function FarmPage() {
       getSales(farmId),
       getFertilisations(farmId),
       getCompost(farmId),
+      getPlants(farmId),
     ]);
 
     setZones(zoneRows);
@@ -228,6 +231,7 @@ export default function FarmPage() {
     setSales(saleRows);
     setFertilisations(fertilisationRows);
     setCompostEntries(compostRows);
+    setPlants(plantRows);
   }
 
   async function refreshAll() {
@@ -1889,6 +1893,42 @@ export default function FarmPage() {
                           </div>
                         );
                       })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-xl font-semibold">New plants added</h2>
+                      <p className="mt-1 text-sm text-zinc-500">
+                        Recently added to the plants gallery.
+                      </p>
+                    </div>
+                    <Link href="/plants" className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100">
+                      View all
+                    </Link>
+                  </div>
+
+                  {plants.length === 0 ? (
+                    <div className="mt-5 rounded-2xl border border-zinc-200 px-4 py-6 text-sm text-zinc-500">No plants added yet.</div>
+                  ) : (
+                    <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                      {plants.slice(0, 8).map((plant) => (
+                        <Link key={plant.id} href="/plants" className="group overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm transition hover:shadow-md">
+                          {plant.image_url ? (
+                            <img src={plant.image_url} alt={plant.name ?? "Plant"} className="aspect-square w-full object-cover" />
+                          ) : (
+                            <div className="flex aspect-square w-full items-center justify-center bg-zinc-100">
+                              <span className="text-2xl text-zinc-300">🌱</span>
+                            </div>
+                          )}
+                          <div className="p-3">
+                            <div className="text-sm font-medium truncate">{plant.name ?? "Unnamed"}</div>
+                            {plant.notes && <p className="mt-0.5 text-xs text-zinc-400 line-clamp-1">{plant.notes}</p>}
+                          </div>
+                        </Link>
+                      ))}
                     </div>
                   )}
                 </div>
