@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FlaskConical } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { getFarms, getFertilisations } from "@/lib/farm";
-import type { Farm, FertilisationEntry } from "@/lib/farm";
+import { getFarms, getFertilisations, getZones } from "@/lib/farm";
+import type { Farm, FertilisationEntry, Zone } from "@/lib/farm";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -22,12 +22,13 @@ const blank = {
   fertiliser: "",
   ready_to_use: "",
   bin_colour: "",
-  plants: "",
+  zone_id: "",
   notes: "",
 };
 
 export default function FertiliserPage() {
   const [farms, setFarms] = useState<Farm[]>([]);
+  const [zones, setZones] = useState<Zone[]>([]);
   const [entries, setEntries] = useState<FertilisationEntry[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -42,8 +43,9 @@ export default function FertiliserPage() {
   const router = useRouter();
 
   async function loadEntries(farmId: string) {
-    const rows = await getFertilisations(farmId);
+    const [rows, zoneRows] = await Promise.all([getFertilisations(farmId), getZones(farmId)]);
     setEntries(rows);
+    setZones(zoneRows);
   }
 
   useEffect(() => {
@@ -84,7 +86,7 @@ export default function FertiliserPage() {
         fertiliser: form.fertiliser.trim(),
         ready_to_use: form.ready_to_use || null,
         bin_colour: form.bin_colour || null,
-        plants: form.plants.trim() || null,
+        zone_id: form.zone_id || null,
         notes: form.notes.trim() || null,
       });
       if (err) throw err;
@@ -109,7 +111,7 @@ export default function FertiliserPage() {
           fertiliser: editForm.fertiliser.trim() || null,
           ready_to_use: editForm.ready_to_use || null,
           bin_colour: editForm.bin_colour || null,
-          plants: editForm.plants.trim() || null,
+          zone_id: editForm.zone_id || null,
           notes: editForm.notes.trim() || null,
         })
         .eq("id", id);
@@ -138,7 +140,7 @@ export default function FertiliserPage() {
       fertiliser: entry.fertiliser ?? "",
       ready_to_use: entry.ready_to_use ?? "",
       bin_colour: entry.bin_colour ?? "",
-      plants: entry.plants ?? "",
+      zone_id: entry.zone_id ?? "",
       notes: entry.notes ?? "",
     });
   }
@@ -242,11 +244,13 @@ export default function FertiliserPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Plants <span className="font-normal text-zinc-400">(optional)</span></label>
-                  <input type="text" value={form.plants}
-                    onChange={(e) => setForm((p) => ({ ...p, plants: e.target.value }))}
-                    className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                    placeholder="Garden, seedlings, trees…" />
+                  <label className="mb-2 block text-sm font-medium">Zone / Bed <span className="font-normal text-zinc-400">(optional)</span></label>
+                  <select value={form.zone_id}
+                    onChange={(e) => setForm((p) => ({ ...p, zone_id: e.target.value }))}
+                    className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900">
+                    <option value="">—</option>
+                    {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium">Notes <span className="font-normal text-zinc-400">(optional)</span></label>
@@ -287,7 +291,7 @@ export default function FertiliserPage() {
                   <th className="px-5 py-4">Fertiliser type</th>
                   <th className="px-5 py-4">Ready to use</th>
                   <th className="px-5 py-4">Bin colour</th>
-                  <th className="px-5 py-4">Plants</th>
+                  <th className="px-5 py-4">Zone / Bed</th>
                   <th className="px-5 py-4">Notes</th>
                   <th className="px-5 py-4"></th>
                 </tr>
@@ -320,9 +324,12 @@ export default function FertiliserPage() {
                         </select>
                       </td>
                       <td className="px-3 py-2">
-                        <input type="text" value={editForm.plants}
-                          onChange={(e) => setEditForm((p) => ({ ...p, plants: e.target.value }))}
-                          className="w-full min-w-[160px] rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
+                        <select value={editForm.zone_id}
+                          onChange={(e) => setEditForm((p) => ({ ...p, zone_id: e.target.value }))}
+                          className="w-full min-w-[140px] rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900">
+                          <option value="">—</option>
+                          {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
+                        </select>
                       </td>
                       <td className="px-3 py-2">
                         <input type="text" value={editForm.notes}
@@ -356,7 +363,7 @@ export default function FertiliserPage() {
                           </span>
                         ) : "—"}
                       </td>
-                      <td className="px-5 py-4 text-zinc-600">{entry.plants ?? "—"}</td>
+                      <td className="px-5 py-4 text-zinc-600">{entry.zone?.[0]?.name ?? "—"}</td>
                       <td className="px-5 py-4 text-zinc-500">{entry.notes ?? "—"}</td>
                       <td className="px-5 py-4">
                         <div className="flex gap-2">
