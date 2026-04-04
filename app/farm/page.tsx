@@ -1590,8 +1590,7 @@ export default function FarmPage() {
               )}
             </section>
 
-            <div className="grid gap-6 lg:grid-cols-[1.25fr,0.75fr]">
-              <section className="space-y-6">
+            <div className="space-y-6">
                 <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                   <div className="flex items-center justify-between gap-4">
                     <div>
@@ -1932,12 +1931,7 @@ export default function FarmPage() {
                     </div>
                   )}
                 </div>
-              </section>
-
-              <aside className="space-y-6">
-                <ActivityFeed activities={activities} />
-
-              </aside>
+              <ActivityFeed activities={activities} />
             </div>
 
             <section className="mt-6 space-y-6">
