@@ -963,8 +963,8 @@ export default function FarmPage() {
         </header>
 
         {/* Navigation bar */}
-        <nav className="mb-6 overflow-x-auto rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
-          <div className="flex items-center gap-2 text-sm whitespace-nowrap">
+        <nav className="mb-6 rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
+          <div className="flex flex-wrap items-center gap-1.5 text-sm">
             {[
               { href: "/farm/trees", label: "Trees" },
               { href: "/farm/planting-plan", label: "Planting plan" },
