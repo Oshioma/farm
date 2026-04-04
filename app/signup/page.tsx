@@ -13,7 +13,7 @@ function SignUpInner() {
   const [done, setDone] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirectTo") ?? "/farm";
+  const redirectTo = searchParams.get("redirectTo") ?? "/farm?mode=join";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
