@@ -994,57 +994,12 @@ export default function FarmPage() {
                     {activeFarm?.location || "No location set"}
                     {activeFarm?.size_acres ? ` · ${activeFarm.size_acres} acres` : ""}
                   </p>
-                  <div className="mt-3 flex items-center gap-2">
-                    <button
-                      onClick={startEditFarm}
-                      className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100"
-                    >
-                      Edit
-                    </button>
-                    {userRoleOnFarm === "owner" && deleteFarmStep === 0 && (
-                      <button
-                        onClick={() => setDeleteFarmStep(1)}
-                        className="rounded-full border border-red-200 px-3 py-1 text-xs font-medium text-red-500 transition hover:bg-red-50"
-                      >
-                        Delete farm
-                      </button>
-                    )}
-                    {userRoleOnFarm === "owner" && deleteFarmStep === 1 && (
-                      <span className="flex items-center gap-2">
-                        <span className="text-xs text-red-600 font-medium">Are you sure?</span>
-                        <button
-                          onClick={() => setDeleteFarmStep(2)}
-                          className="rounded-full bg-red-100 border border-red-300 px-3 py-1 text-xs font-medium text-red-700 transition hover:bg-red-200"
-                        >
-                          Yes, delete
-                        </button>
-                        <button
-                          onClick={() => setDeleteFarmStep(0)}
-                          className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100"
-                        >
-                          Cancel
-                        </button>
-                      </span>
-                    )}
-                    {userRoleOnFarm === "owner" && deleteFarmStep === 2 && (
-                      <span className="flex items-center gap-2">
-                        <span className="text-xs text-red-700 font-semibold">This cannot be undone. Confirm?</span>
-                        <button
-                          onClick={handleDeleteFarm}
-                          disabled={deletingFarm}
-                          className="rounded-full bg-red-600 px-3 py-1 text-xs font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
-                        >
-                          {deletingFarm ? "Deleting…" : "Permanently delete"}
-                        </button>
-                        <button
-                          onClick={() => setDeleteFarmStep(0)}
-                          className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100"
-                        >
-                          Cancel
-                        </button>
-                      </span>
-                    )}
-                  </div>
+                  <button
+                    onClick={startEditFarm}
+                    className="mt-3 rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100"
+                  >
+                    Edit
+                  </button>
                 </>
               )}
             </div>
@@ -2427,6 +2382,55 @@ export default function FarmPage() {
             </section>
           </>
         ) : null}
+
+        {activeFarm && userRoleOnFarm === "owner" && (
+          <div className="mt-12 border-t border-zinc-200 pt-8">
+            <h3 className="text-sm font-semibold text-zinc-500">Danger zone</h3>
+            {deleteFarmStep === 0 && (
+              <button
+                onClick={() => setDeleteFarmStep(1)}
+                className="mt-3 rounded-2xl border border-red-200 px-5 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
+              >
+                Delete farm
+              </button>
+            )}
+            {deleteFarmStep === 1 && (
+              <div className="mt-3 flex items-center gap-3">
+                <span className="text-sm text-red-600 font-medium">Are you sure you want to delete &ldquo;{activeFarm.name}&rdquo;?</span>
+                <button
+                  onClick={() => setDeleteFarmStep(2)}
+                  className="rounded-2xl bg-red-100 border border-red-300 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-200"
+                >
+                  Yes, delete
+                </button>
+                <button
+                  onClick={() => setDeleteFarmStep(0)}
+                  className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-500 transition hover:bg-zinc-100"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+            {deleteFarmStep === 2 && (
+              <div className="mt-3 flex items-center gap-3">
+                <span className="text-sm text-red-700 font-semibold">This cannot be undone. All farm data will be lost.</span>
+                <button
+                  onClick={handleDeleteFarm}
+                  disabled={deletingFarm}
+                  className="rounded-2xl bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
+                >
+                  {deletingFarm ? "Deleting…" : "Permanently delete"}
+                </button>
+                <button
+                  onClick={() => setDeleteFarmStep(0)}
+                  className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-500 transition hover:bg-zinc-100"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </main>
   );
