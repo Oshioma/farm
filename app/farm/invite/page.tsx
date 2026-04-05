@@ -127,8 +127,13 @@ export default function InvitePage() {
     setRemovingId(id);
     setError("");
     try {
-      const { error: err } = await supabase.from("farm_members").delete().eq("id", id);
-      if (err) throw err;
+      const res = await fetch("/api/members/remove", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId: id, farmId: activeFarmId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to remove member");
       await loadData(activeFarmId);
     } catch (err) {
       setError(errMsg(err, "Failed to remove member"));
@@ -236,10 +241,13 @@ export default function InvitePage() {
                 {members.map((m) => (
                   <div key={m.id} className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-100 px-4 py-3">
                     <div>
-                      <p className="text-sm text-zinc-500">{m.user_email ?? m.profile_id}</p>
-                      <span className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-                        m.role_on_farm === "owner" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600"
-                      }`}>{m.role_on_farm}</span>
+                      <p className="text-sm font-medium text-zinc-900">{m.user_email ?? "No email"}</p>
+                      <div className="mt-0.5 flex items-center gap-2">
+                        <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+                          m.role_on_farm === "owner" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600"
+                        }`}>{m.role_on_farm}</span>
+                        {!m.user_email && <span className="text-xs text-zinc-400">ID: {m.profile_id.slice(0, 8)}…</span>}
+                      </div>
                     </div>
                     {m.role_on_farm !== "owner" && (
                       <button
