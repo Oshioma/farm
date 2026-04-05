@@ -44,18 +44,22 @@ export async function GET(req: NextRequest) {
   // Look up emails from auth for all members to ensure we have current emails
   const emailMap: Record<string, string> = {};
 
-  await Promise.all(
-    (members ?? []).map(async (m) => {
-      try {
-        const { data } = await supabaseAdmin.auth.admin.getUserById(m.profile_id);
-        if (data?.user?.email) {
-          emailMap[m.profile_id] = data.user.email;
+  try {
+    await Promise.all(
+      (members ?? []).map(async (m) => {
+        try {
+          const { data } = await supabaseAdmin.auth.admin.getUserById(m.profile_id);
+          if (data?.user?.email) {
+            emailMap[m.profile_id] = data.user.email;
+          }
+        } catch {
+          // skip if individual user lookup fails
         }
-      } catch {
-        // skip if user lookup fails
-      }
-    })
-  );
+      })
+    );
+  } catch {
+    // continue without auth emails if the lookup fails entirely
+  }
 
   // Merge emails into member records
   const enriched = (members ?? []).map((m) => ({

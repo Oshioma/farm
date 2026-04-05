@@ -42,7 +42,11 @@ export default function InvitePage() {
 
   async function loadData(farmId: string) {
     const [membersRes, { data: requestRows }] = await Promise.all([
-      fetch(`/api/members/list?farmId=${farmId}`).then((r) => r.json()),
+      fetch(`/api/members/list?farmId=${farmId}`).then(async (r) => {
+        if (!r.ok) throw new Error(`Failed to load members (${r.status})`);
+        const text = await r.text();
+        return text ? JSON.parse(text) : { members: [] };
+      }),
       supabase.from("join_requests")
         .select("id, user_id, user_email, status, created_at")
         .eq("farm_id", farmId)
