@@ -38,15 +38,15 @@ export default function InvitePage() {
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   async function loadData(farmId: string) {
-    const [{ data: memberRows }, { data: requestRows }] = await Promise.all([
-      supabase.from("farm_members").select("id, profile_id, user_email, role_on_farm, created_at").eq("farm_id", farmId),
+    const [membersRes, { data: requestRows }] = await Promise.all([
+      fetch(`/api/members/list?farmId=${farmId}`).then((r) => r.json()),
       supabase.from("join_requests")
         .select("id, user_id, user_email, status, created_at")
         .eq("farm_id", farmId)
         .eq("status", "pending")
         .order("created_at", { ascending: true }),
     ]);
-    setMembers((memberRows ?? []) as Member[]);
+    setMembers((membersRes.members ?? []) as Member[]);
     setJoinRequests((requestRows ?? []) as JoinRequest[]);
   }
 
