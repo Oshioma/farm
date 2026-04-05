@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
   // Verify the caller is authenticated
   let supabaseResponse = NextResponse.next({ request: req });
