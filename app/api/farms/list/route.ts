@@ -5,11 +5,11 @@ export async function GET() {
   const { data, error } = await supabaseAdmin
     .from("farms")
     .select("id, name")
-    .eq("is_active", true)
     .order("name");
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Failed to list farms:", error.message);
+    return NextResponse.json([], { status: 200 });
   }
 
   return NextResponse.json(data ?? []);
