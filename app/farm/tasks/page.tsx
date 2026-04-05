@@ -96,8 +96,8 @@ export default function WorkerTasksPage() {
         farm_id: activeFarmId,
         type: "task_completed",
         title: `${task.title} completed`,
-        meta: task.crop?.[0]?.crop_name
-          ? `Linked to ${task.crop[0].crop_name}`
+        meta: task.crop?.[0]?.name
+          ? `Linked to ${task.crop[0].name}`
           : "Task marked done",
       });
 
@@ -250,7 +250,7 @@ export default function WorkerTasksPage() {
                       <div className="mt-2 text-sm text-zinc-600">
                         {task.zone?.[0]?.name ?? "No zone"}
                         <span className="mx-2">·</span>
-                        {task.crop?.[0]?.crop_name ?? "General task"}
+                        {task.crop?.[0]?.name ?? "General task"}
                         <span className="mx-2">·</span>
                         {formatDate(task.due_date)}
                       </div>
@@ -304,7 +304,7 @@ export default function WorkerTasksPage() {
                       <div className="mt-1 text-sm text-zinc-400">
                         {task.zone?.[0]?.name ?? "No zone"}
                         <span className="mx-2">·</span>
-                        {task.crop?.[0]?.crop_name ?? "General task"}
+                        {task.crop?.[0]?.name ?? "General task"}
                         <span className="mx-2">·</span>
                         {formatDate(task.due_date)}
                       </div>

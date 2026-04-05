@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import type { Zone } from "@/lib/farm";
 
 export type CropFormData = {
-  crop_name: string;
+  name: string;
   variety: string;
   zone_id: string;
   status: string;
@@ -13,11 +13,12 @@ export type CropFormData = {
   estimated_yield_kg: string;
   expected_sale_price_per_kg: string;
   notes: string;
+  medicinal_properties: string;
   image_file: File | null;
 };
 
 const blank: CropFormData = {
-  crop_name: "",
+  name: "",
   variety: "",
   zone_id: "",
   status: "planned",
@@ -26,6 +27,7 @@ const blank: CropFormData = {
   estimated_yield_kg: "",
   expected_sale_price_per_kg: "",
   notes: "",
+  medicinal_properties: "",
   image_file: null,
 };
 
@@ -81,8 +83,8 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
           <label className="mb-2 block text-sm font-medium">Crop name</label>
           <input
             type="text"
-            value={form.crop_name}
-            onChange={(e) => setForm((prev) => ({ ...prev, crop_name: e.target.value }))}
+            value={form.name}
+            onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
             className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
             placeholder="Tomatoes"
             required
@@ -212,13 +214,25 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
             value={form.notes}
             onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
             className="min-h-[80px] w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            placeholder="Growing conditions, observations, medicinal properties…"
+            placeholder="Growing conditions, observations…"
+          />
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium">
+            Medicinal properties <span className="font-normal text-zinc-400">(optional)</span>
+          </label>
+          <textarea
+            value={form.medicinal_properties}
+            onChange={(e) => setForm((prev) => ({ ...prev, medicinal_properties: e.target.value }))}
+            className="min-h-[60px] w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+            placeholder="Traditional or known medicinal uses…"
           />
         </div>
 
         <button
           type="submit"
-          disabled={saving || !form.crop_name.trim()}
+          disabled={saving || !form.name.trim()}
           className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving ? "Creating crop..." : "Create crop"}

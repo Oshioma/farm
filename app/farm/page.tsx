@@ -74,9 +74,9 @@ export default function FarmPage() {
   const [editingTaskForm, setEditingTaskForm] = useState<TaskFormData | null>(null);
   const [editingCropId, setEditingCropId] = useState<string | null>(null);
   const [editingCropForm, setEditingCropForm] = useState({
-    crop_name: "", variety: "", zone_id: "", status: "", planted_on: "",
+    name: "", variety: "", zone_id: "", status: "", planted_on: "",
     expected_harvest_start: "", estimated_yield_kg: "", expected_sale_price_per_kg: "",
-    notes: "",
+    notes: "", medicinal_properties: "",
   });
   const [savingCropId, setSavingCropId] = useState<string | null>(null);
   const [deletingCropId, setDeletingCropId] = useState<string | null>(null);
@@ -314,7 +314,7 @@ export default function FarmPage() {
     if (!activeFarmId) return false;
     try {
       setError("");
-      const cropName = data.crop_name.trim();
+      const cropName = data.name.trim();
       if (!cropName) throw new Error("Crop name is required.");
 
       // Upload image if provided
@@ -328,10 +328,11 @@ export default function FarmPage() {
         imageUrl = urlData.publicUrl;
       }
 
-      const { error: insertError } = await supabase.from("crops").insert({
+      const { error: insertError } = await supabase.from("plants").insert({
         farm_id: activeFarmId,
         zone_id: data.zone_id || null,
-        crop_name: cropName,
+        name: cropName,
+        image_url: imageUrl,
         variety: data.variety.trim() || null,
         status: data.status,
         planted_on: data.planted_on || null,
@@ -341,24 +342,11 @@ export default function FarmPage() {
           ? Number(data.expected_sale_price_per_kg)
           : null,
         notes: data.notes.trim() || null,
+        medicinal_properties: data.medicinal_properties.trim() || null,
+        is_crop: true,
         is_active: true,
       });
       if (insertError) throw insertError;
-
-      // Sync image to plants gallery
-      if (imageUrl) {
-        const plantName = data.variety.trim()
-          ? `${cropName} · ${data.variety.trim()}`
-          : cropName;
-
-        await supabase.from("plants").insert({
-          farm_id: activeFarmId,
-          name: plantName,
-          image_url: imageUrl,
-          notes: data.notes.trim() || null,
-          zone_id: data.zone_id || null,
-        });
-      }
 
       await supabase.from("activities").insert({
         farm_id: activeFarmId,
@@ -378,7 +366,7 @@ export default function FarmPage() {
   function startEditCrop(crop: Crop) {
     setEditingCropId(crop.id);
     setEditingCropForm({
-      crop_name: crop.crop_name,
+      name: crop.name ?? "",
       variety: crop.variety ?? "",
       zone_id: crop.zone_id ?? "",
       status: crop.status ?? "planned",
@@ -387,6 +375,7 @@ export default function FarmPage() {
       estimated_yield_kg: crop.estimated_yield_kg != null ? String(crop.estimated_yield_kg) : "",
       expected_sale_price_per_kg: crop.expected_sale_price_per_kg != null ? String(crop.expected_sale_price_per_kg) : "",
       notes: crop.notes ?? "",
+      medicinal_properties: crop.medicinal_properties ?? "",
     });
   }
 
@@ -395,7 +384,7 @@ export default function FarmPage() {
       setSavingCropId(id);
       setError("");
       const payload = {
-        crop_name: editingCropForm.crop_name.trim(),
+        name: editingCropForm.name.trim(),
         variety: editingCropForm.variety.trim() || null,
         zone_id: editingCropForm.zone_id || null,
         status: editingCropForm.status || null,
@@ -404,10 +393,10 @@ export default function FarmPage() {
         estimated_yield_kg: editingCropForm.estimated_yield_kg ? Number(editingCropForm.estimated_yield_kg) : null,
         expected_sale_price_per_kg: editingCropForm.expected_sale_price_per_kg ? Number(editingCropForm.expected_sale_price_per_kg) : null,
         notes: editingCropForm.notes.trim() || null,
+        medicinal_properties: editingCropForm.medicinal_properties.trim() || null,
       };
-      console.log("Crop update payload:", JSON.stringify(payload), "id:", id);
-      const res = await supabase.from("crops").update(payload).eq("id", id).select();
-      console.log("Crop update response:", JSON.stringify(res));
+      const res = await supabase.from("plants").update(payload).eq("id", id).select();
+
       if (res.error) throw res.error;
       if (!res.data || res.data.length === 0) throw new Error("Update returned no rows — RLS may be blocking updates.");
       setEditingCropId(null);
@@ -433,7 +422,7 @@ export default function FarmPage() {
     try {
       setSavingCropNote(true);
       setError("");
-      const { error: err } = await supabase.from("crops").update({ notes: cropNoteText.trim() || null }).eq("id", id);
+      const { error: err } = await supabase.from("plants").update({ notes: cropNoteText.trim() || null }).eq("id", id);
       if (err) throw err;
       setCrops((prev) => prev.map((c) => c.id === id ? { ...c, notes: cropNoteText.trim() || null } : c));
     } catch (err) {
@@ -446,7 +435,7 @@ export default function FarmPage() {
   async function handleDeleteCrop(id: string) {
     try {
       setDeletingCropId(id);
-      const { error: err } = await supabase.from("crops").update({ is_active: false }).eq("id", id);
+      const { error: err } = await supabase.from("plants").update({ is_active: false }).eq("id", id);
       if (err) throw err;
       setCrops((prev) => prev.filter((c) => c.id !== id));
     } catch (err) {
@@ -507,8 +496,8 @@ export default function FarmPage() {
         farm_id: activeFarmId,
         type: "task_completed",
         title: `${task.title} completed`,
-        meta: task.crop?.[0]?.crop_name
-          ? `Linked to ${task.crop[0].crop_name}`
+        meta: task.crop?.[0]?.name
+          ? `Linked to ${task.crop[0].name}`
           : "Task marked done",
       });
 
@@ -601,7 +590,7 @@ export default function FarmPage() {
       }
 
       const { error: cropUpdateError } = await supabase
-        .from("crops")
+        .from("plants")
         .update(cropUpdates)
         .eq("id", data.crop_id);
       if (cropUpdateError) throw cropUpdateError;
@@ -609,7 +598,7 @@ export default function FarmPage() {
       await supabase.from("activities").insert({
         farm_id: activeFarmId,
         type: "harvest_logged",
-        title: `${selectedCrop?.crop_name ?? "Harvest"} logged`,
+        title: `${selectedCrop?.name ?? "Harvest"} logged`,
         meta: `${harvestQty} kg · ${data.quality}`,
       });
 
@@ -767,7 +756,7 @@ export default function FarmPage() {
       // Also add the image to the plants gallery so users can see pest states
       if (imageUrl) {
         const cropName = data.crop_id
-          ? crops.find((c) => c.id === data.crop_id)?.crop_name ?? null
+          ? crops.find((c) => c.id === data.crop_id)?.name ?? null
           : null;
         const plantName = cropName
           ? `${cropName} — ${data.pest_name.trim()} (pest)`
@@ -1383,7 +1372,7 @@ export default function FarmPage() {
                                 className="rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                               >
                                 <option value="">General task</option>
-                                {crops.map((c) => <option key={c.id} value={c.id}>{c.crop_name}{c.variety ? ` · ${c.variety}` : ""}</option>)}
+                                {crops.map((c) => <option key={c.id} value={c.id}>{c.name}{c.variety ? ` · ${c.variety}` : ""}</option>)}
                               </select>
                             </div>
                             <input
@@ -1442,7 +1431,7 @@ export default function FarmPage() {
                             <div className="mt-2 text-sm text-zinc-600">
                               {task.zone?.[0]?.name ?? "No zone"}
                               <span className="mx-2">·</span>
-                              {task.crop?.[0]?.crop_name ?? "General task"}
+                              {task.crop?.[0]?.name ?? "General task"}
                               <span className="mx-2">·</span>
                               {formatDate(task.due_date)}
                             </div>
@@ -1530,7 +1519,7 @@ export default function FarmPage() {
                           <div className="mt-2 text-sm text-zinc-400">
                             {task.zone?.[0]?.name ?? "No zone"}
                             <span className="mx-2">·</span>
-                            {task.crop?.[0]?.crop_name ?? "General task"}
+                            {task.crop?.[0]?.name ?? "General task"}
                             <span className="mx-2">·</span>
                             {formatDate(task.due_date)}
                           </div>
@@ -1627,7 +1616,7 @@ export default function FarmPage() {
                           <ul className="mt-3 space-y-1">
                             {zoneCrops.map((c) => (
                               <li key={c.id} className="flex items-center justify-between text-sm">
-                                <span>{c.crop_name}{c.variety ? ` · ${c.variety}` : ""}</span>
+                                <span>{c.name}{c.variety ? ` · ${c.variety}` : ""}</span>
                                 <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badgeClass(c.status)}`}>{c.status}</span>
                               </li>
                             ))}
@@ -1676,8 +1665,8 @@ export default function FarmPage() {
                               editingCropId === crop.id ? (
                                 <tr key={crop.id} className="border-b border-zinc-100 bg-amber-50/40">
                                   <td className="px-3 py-2">
-                                    <input type="text" value={editingCropForm.crop_name}
-                                      onChange={(e) => setEditingCropForm((p) => ({ ...p, crop_name: e.target.value }))}
+                                    <input type="text" value={editingCropForm.name}
+                                      onChange={(e) => setEditingCropForm((p) => ({ ...p, name: e.target.value }))}
                                       className="w-full min-w-[100px] rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
                                     <input type="text" value={editingCropForm.variety} placeholder="Variety"
                                       onChange={(e) => setEditingCropForm((p) => ({ ...p, variety: e.target.value }))}
@@ -1747,7 +1736,7 @@ export default function FarmPage() {
                                     <div className="flex items-center gap-2">
                                       <span className={`inline-block transition-transform text-zinc-400 ${expandedCropId === crop.id ? "rotate-90" : ""}`}>&#9654;</span>
                                       <div>
-                                        <div className="font-semibold">{crop.crop_name}</div>
+                                        <div className="font-semibold">{crop.name}</div>
                                         <div className="text-zinc-500">{crop.variety || "\u2014"}</div>
                                       </div>
                                     </div>
@@ -1959,8 +1948,8 @@ export default function FarmPage() {
                               </div>
                               <div className="mt-1 text-xs text-zinc-400">
                                 {formatDate(pest.logged_date)}
-                                {(pest.crop?.[0]?.crop_name || pest.zone?.[0]?.name) && " · "}
-                                {pest.crop?.[0]?.crop_name ?? ""}{pest.crop?.[0]?.crop_name && pest.zone?.[0]?.name ? " · " : ""}{pest.zone?.[0]?.name ?? ""}
+                                {(pest.crop?.[0]?.name || pest.zone?.[0]?.name) && " · "}
+                                {pest.crop?.[0]?.name ?? ""}{pest.crop?.[0]?.name && pest.zone?.[0]?.name ? " · " : ""}{pest.zone?.[0]?.name ?? ""}
                               </div>
                               {pest.description && <p className="mt-1 text-xs text-zinc-500 line-clamp-2">{pest.description}</p>}
                               {pest.action_taken && <p className="mt-1 text-xs text-zinc-400 line-clamp-2">Action: {pest.action_taken}</p>}
@@ -2100,8 +2089,8 @@ export default function FarmPage() {
                         <div className="flex items-start justify-between gap-3 px-4 py-4">
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              {sale.crop?.[0]?.crop_name && (
-                                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">{sale.crop[0].crop_name}</span>
+                              {sale.crop?.[0]?.name && (
+                                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">{sale.crop[0].name}</span>
                               )}
                               <span className="text-xs text-zinc-400">{formatDate(sale.sale_date)}</span>
                               {sale.buyer_name && <span className="text-xs text-zinc-400">· {sale.buyer_name}</span>}

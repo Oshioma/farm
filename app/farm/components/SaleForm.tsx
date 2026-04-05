@@ -73,7 +73,7 @@ export function SaleForm({ crops, onSubmit, initial, submitLabel }: Props) {
             <option value="">Not linked to a crop</option>
             {crops.map((crop) => (
               <option key={crop.id} value={crop.id}>
-                {crop.crop_name}
+                {crop.name}
                 {crop.variety ? ` · ${crop.variety}` : ""}
               </option>
             ))}

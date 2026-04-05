@@ -147,7 +147,7 @@ export function ExpenseForm({ zones, crops, defaultZoneId, onSubmit, initial, su
             <option value="">Not linked to a crop</option>
             {crops.map((crop) => (
               <option key={crop.id} value={crop.id}>
-                {crop.crop_name}
+                {crop.name}
                 {crop.variety ? ` · ${crop.variety}` : ""}
               </option>
             ))}

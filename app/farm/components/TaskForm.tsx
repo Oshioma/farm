@@ -108,7 +108,7 @@ export function TaskForm({ zones, crops, defaultZoneId, onSubmit }: Props) {
             <option value="">General task</option>
             {crops.map((crop) => (
               <option key={crop.id} value={crop.id}>
-                {crop.crop_name}
+                {crop.name}
                 {crop.variety ? ` · ${crop.variety}` : ""}
               </option>
             ))}
