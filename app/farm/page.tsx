@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -76,9 +76,13 @@ export default function FarmPage() {
   const [editingCropForm, setEditingCropForm] = useState({
     crop_name: "", variety: "", zone_id: "", status: "", planted_on: "",
     expected_harvest_start: "", estimated_yield_kg: "", expected_sale_price_per_kg: "",
+    notes: "",
   });
   const [savingCropId, setSavingCropId] = useState<string | null>(null);
   const [deletingCropId, setDeletingCropId] = useState<string | null>(null);
+  const [expandedCropId, setExpandedCropId] = useState<string | null>(null);
+  const [cropNoteText, setCropNoteText] = useState("");
+  const [savingCropNote, setSavingCropNote] = useState(false);
   // No-farm state
   const [noFarmMode, setNoFarmMode] = useState<"idle" | "create" | "join">("idle");
   const [newFarmName, setNewFarmName] = useState("");
@@ -336,6 +340,7 @@ export default function FarmPage() {
         expected_sale_price_per_kg: data.expected_sale_price_per_kg
           ? Number(data.expected_sale_price_per_kg)
           : null,
+        notes: data.notes.trim() || null,
         is_active: true,
       });
       if (insertError) throw insertError;
@@ -350,6 +355,7 @@ export default function FarmPage() {
           farm_id: activeFarmId,
           name: plantName,
           image_url: imageUrl,
+          notes: data.notes.trim() || null,
           zone_id: data.zone_id || null,
         });
       }
@@ -380,6 +386,7 @@ export default function FarmPage() {
       expected_harvest_start: crop.expected_harvest_start ?? "",
       estimated_yield_kg: crop.estimated_yield_kg != null ? String(crop.estimated_yield_kg) : "",
       expected_sale_price_per_kg: crop.expected_sale_price_per_kg != null ? String(crop.expected_sale_price_per_kg) : "",
+      notes: crop.notes ?? "",
     });
   }
 
@@ -396,6 +403,7 @@ export default function FarmPage() {
         expected_harvest_start: editingCropForm.expected_harvest_start || null,
         estimated_yield_kg: editingCropForm.estimated_yield_kg ? Number(editingCropForm.estimated_yield_kg) : null,
         expected_sale_price_per_kg: editingCropForm.expected_sale_price_per_kg ? Number(editingCropForm.expected_sale_price_per_kg) : null,
+        notes: editingCropForm.notes.trim() || null,
       };
       console.log("Crop update payload:", JSON.stringify(payload), "id:", id);
       const res = await supabase.from("crops").update(payload).eq("id", id).select();
@@ -408,6 +416,30 @@ export default function FarmPage() {
       setError(errMsg(err, "Failed to update crop"));
     } finally {
       setSavingCropId(null);
+    }
+  }
+
+  function toggleExpandCrop(crop: Crop) {
+    if (expandedCropId === crop.id) {
+      setExpandedCropId(null);
+      setCropNoteText("");
+    } else {
+      setExpandedCropId(crop.id);
+      setCropNoteText(crop.notes ?? "");
+    }
+  }
+
+  async function handleSaveCropNote(id: string) {
+    try {
+      setSavingCropNote(true);
+      setError("");
+      const { error: err } = await supabase.from("crops").update({ notes: cropNoteText.trim() || null }).eq("id", id);
+      if (err) throw err;
+      setCrops((prev) => prev.map((c) => c.id === id ? { ...c, notes: cropNoteText.trim() || null } : c));
+    } catch (err) {
+      setError(errMsg(err, "Failed to save note"));
+    } finally {
+      setSavingCropNote(false);
     }
   }
 
@@ -1685,24 +1717,43 @@ export default function FarmPage() {
                                       onChange={(e) => setEditingCropForm((p) => ({ ...p, estimated_yield_kg: e.target.value }))}
                                       className="w-full min-w-[70px] rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
                                   </td>
-                                  <td className="px-3 py-2">
-                                    <div className="flex gap-1">
-                                      <button onClick={() => handleSaveCrop(crop.id)} disabled={savingCropId === crop.id}
-                                        className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-60">
-                                        {savingCropId === crop.id ? "\u2026" : "Save"}
-                                      </button>
-                                      <button onClick={() => setEditingCropId(null)}
-                                        className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100">
-                                        Cancel
-                                      </button>
+                                  <td className="px-3 py-2" colSpan={2}>
+                                    <div className="space-y-2">
+                                      <label className="block text-xs font-medium text-zinc-500">Notes</label>
+                                      <textarea
+                                        value={editingCropForm.notes}
+                                        onChange={(e) => setEditingCropForm((p) => ({ ...p, notes: e.target.value }))}
+                                        className="min-h-[60px] w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                                        placeholder="Growing conditions, observations, medicinal properties…"
+                                      />
+                                      <div className="flex gap-1">
+                                        <button onClick={() => handleSaveCrop(crop.id)} disabled={savingCropId === crop.id}
+                                          className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-60">
+                                          {savingCropId === crop.id ? "\u2026" : "Save"}
+                                        </button>
+                                        <button onClick={() => setEditingCropId(null)}
+                                          className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100">
+                                          Cancel
+                                        </button>
+                                      </div>
                                     </div>
                                   </td>
                                 </tr>
                               ) : (
-                                <tr key={crop.id} className="border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50 transition-colors">
+                                <React.Fragment key={crop.id}>
+                                <tr className={`border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50 transition-colors cursor-pointer ${expandedCropId === crop.id ? "bg-zinc-50" : ""}`}
+                                    onClick={() => toggleExpandCrop(crop)}>
                                   <td className="px-4 py-4">
-                                    <div className="font-semibold">{crop.crop_name}</div>
-                                    <div className="text-zinc-500">{crop.variety || "\u2014"}</div>
+                                    <div className="flex items-center gap-2">
+                                      <span className={`inline-block transition-transform text-zinc-400 ${expandedCropId === crop.id ? "rotate-90" : ""}`}>&#9654;</span>
+                                      <div>
+                                        <div className="font-semibold">{crop.crop_name}</div>
+                                        <div className="text-zinc-500">{crop.variety || "\u2014"}</div>
+                                      </div>
+                                    </div>
+                                    {crop.notes && expandedCropId !== crop.id && (
+                                      <div className="mt-1 ml-5 text-xs text-zinc-400 truncate max-w-[180px]">📝 Has notes</div>
+                                    )}
                                   </td>
                                   <td className="px-4 py-4">{crop.zone?.[0]?.name || (crop.zone_id ? zones.find((z) => z.id === crop.zone_id)?.name ?? "Unknown zone" : "No zone")}</td>
                                   <td className="px-4 py-4">
@@ -1714,7 +1765,7 @@ export default function FarmPage() {
                                   <td className="px-4 py-4">{formatDate(crop.expected_harvest_start)}</td>
                                   <td className="px-4 py-4">{crop.actual_yield_kg ?? 0} kg</td>
                                   <td className="px-4 py-4">
-                                    <div className="flex gap-1">
+                                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                                       <button onClick={() => startEditCrop(crop)}
                                         className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">
                                         Edit
@@ -1726,6 +1777,35 @@ export default function FarmPage() {
                                     </div>
                                   </td>
                                 </tr>
+                                {expandedCropId === crop.id && (
+                                  <tr className="border-b border-zinc-100 bg-zinc-50/60">
+                                    <td colSpan={7} className="px-4 py-4">
+                                      <div className="ml-5 space-y-3">
+                                        <label className="block text-sm font-medium text-zinc-700">Notes</label>
+                                        <textarea
+                                          value={cropNoteText}
+                                          onChange={(e) => setCropNoteText(e.target.value)}
+                                          className="min-h-[100px] w-full max-w-lg rounded-2xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-900"
+                                          placeholder="Add notes — growing conditions, observations, medicinal properties…"
+                                        />
+                                        <div className="flex gap-2">
+                                          <button
+                                            onClick={() => handleSaveCropNote(crop.id)}
+                                            disabled={savingCropNote}
+                                            className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-60">
+                                            {savingCropNote ? "Saving…" : "Save note"}
+                                          </button>
+                                          <button
+                                            onClick={() => { setExpandedCropId(null); setCropNoteText(""); }}
+                                            className="rounded-xl border border-zinc-200 px-4 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-100">
+                                            Close
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                                </React.Fragment>
                               )
                             )
                           )}
