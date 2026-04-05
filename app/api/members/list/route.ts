@@ -1,5 +1,4 @@
 import { createServerClient } from "@supabase/ssr";
-import { supabaseAdmin } from "@/lib/supabase-admin";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -34,8 +33,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Fetch members for this farm using admin client
-    const { data: members, error } = await supabaseAdmin
+    // Fetch members for this farm
+    const { data: members, error } = await supabase
       .from("farm_members")
       .select("id, profile_id, user_email, role_on_farm, created_at")
       .eq("farm_id", farmId);
@@ -44,24 +43,31 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Look up emails from auth for all members to ensure we have current emails
+    // Try to enrich emails from Supabase Auth admin API (requires service role key)
     const emailMap: Record<string, string> = {};
-
     try {
-      await Promise.all(
-        (members ?? []).map(async (m) => {
-          try {
-            const { data } = await supabaseAdmin.auth.admin.getUserById(m.profile_id);
-            if (data?.user?.email) {
-              emailMap[m.profile_id] = data.user.email;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (serviceRoleKey) {
+        const { createClient } = await import("@supabase/supabase-js");
+        const admin = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          serviceRoleKey
+        );
+        await Promise.all(
+          (members ?? []).map(async (m) => {
+            try {
+              const { data } = await admin.auth.admin.getUserById(m.profile_id);
+              if (data?.user?.email) {
+                emailMap[m.profile_id] = data.user.email;
+              }
+            } catch {
+              // skip individual lookup failures
             }
-          } catch {
-            // skip if individual user lookup fails
-          }
-        })
-      );
+          })
+        );
+      }
     } catch {
-      // continue without auth emails if the lookup fails entirely
+      // continue without enriched emails
     }
 
     // Merge emails into member records
