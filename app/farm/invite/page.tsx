@@ -36,6 +36,9 @@ export default function InvitePage() {
   const [error, setError] = useState("");
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviting, setInviting] = useState(false);
+  const [inviteSuccess, setInviteSuccess] = useState("");
 
   async function loadData(farmId: string) {
     const [membersRes, { data: requestRows }] = await Promise.all([
@@ -123,6 +126,29 @@ export default function InvitePage() {
     }
   }
 
+  async function handleInvite(e: React.FormEvent) {
+    e.preventDefault();
+    if (!inviteEmail.trim() || !activeFarmId) return;
+    setInviting(true);
+    setError("");
+    setInviteSuccess("");
+    try {
+      const res = await fetch("/api/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: inviteEmail.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send invite");
+      setInviteSuccess(`Invite sent to ${inviteEmail.trim()}`);
+      setInviteEmail("");
+    } catch (err) {
+      setError(errMsg(err, "Failed to send invite"));
+    } finally {
+      setInviting(false);
+    }
+  }
+
   async function removeMember(id: string) {
     setRemovingId(id);
     setError("");
@@ -193,6 +219,32 @@ export default function InvitePage() {
           <div className="rounded-3xl border border-zinc-200 bg-white p-10 text-center text-sm text-zinc-500">Loading…</div>
         ) : (
           <div className="space-y-6">
+
+            {/* Invite new user */}
+            <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-semibold">Invite a new user</h2>
+              <p className="mt-1 text-sm text-zinc-500">Send an email invite so they can create an account and join the farm.</p>
+              {inviteSuccess && (
+                <div className="mt-3 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{inviteSuccess}</div>
+              )}
+              <form onSubmit={handleInvite} className="mt-4 flex gap-2">
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="new-member@example.com"
+                  required
+                  className="flex-1 rounded-2xl border border-zinc-300 px-4 py-2.5 text-sm outline-none focus:border-zinc-900"
+                />
+                <button
+                  type="submit"
+                  disabled={inviting}
+                  className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
+                >
+                  {inviting ? "Sending..." : "Send invite"}
+                </button>
+              </form>
+            </div>
 
             {/* Join requests */}
             {joinRequests.length > 0 && (

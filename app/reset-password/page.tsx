@@ -11,6 +11,7 @@ function ResetPasswordInner() {
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [userEmail, setUserEmail] = useState("");
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -27,6 +28,7 @@ function ResetPasswordInner() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         setReady(true);
+        setUserEmail(user.email ?? "");
       }
       setChecking(false);
     });
@@ -101,6 +103,11 @@ function ResetPasswordInner() {
             Shamba Farm Manager
           </p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">New password</h1>
+          {userEmail && (
+            <p className="mt-2 text-sm text-zinc-500">
+              Setting password for <strong>{userEmail}</strong>
+            </p>
+          )}
 
           {error ? (
             <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
