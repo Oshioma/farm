@@ -12,6 +12,7 @@ export type CropFormData = {
   expected_harvest_start: string;
   estimated_yield_kg: string;
   expected_sale_price_per_kg: string;
+  notes: string;
   image_file: File | null;
 };
 
@@ -24,6 +25,7 @@ const blank: CropFormData = {
   expected_harvest_start: "",
   estimated_yield_kg: "",
   expected_sale_price_per_kg: "",
+  notes: "",
   image_file: null,
 };
 
@@ -199,6 +201,18 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
             }
             className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
             placeholder="3000"
+          />
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium">
+            Notes <span className="font-normal text-zinc-400">(optional)</span>
+          </label>
+          <textarea
+            value={form.notes}
+            onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+            className="min-h-[80px] w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+            placeholder="Growing conditions, observations, medicinal properties…"
           />
         </div>
 

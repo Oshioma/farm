@@ -27,6 +27,7 @@ export type Crop = {
   estimated_yield_kg: number | null;
   actual_yield_kg: number | null;
   expected_sale_price_per_kg: number | null;
+  notes: string | null;
   zone_id: string | null;
   zone: { name: string }[] | null;
 };
@@ -132,6 +133,7 @@ export async function getCrops(farmId: string): Promise<Crop[]> {
       estimated_yield_kg,
       actual_yield_kg,
       expected_sale_price_per_kg,
+      notes,
       zone_id,
       zone:zones(name)
     `
