@@ -38,6 +38,7 @@ export default function PlantsPage() {
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [convertingToCrop, setConvertingToCrop] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -196,6 +197,44 @@ export default function PlantsPage() {
     } finally {
       setDeletingId(null);
       setConfirmDeleteId(null);
+    }
+  }
+
+  async function handleConvertToCrop(plant: Plant) {
+    if (!activeFarmId) return;
+    try {
+      setConvertingToCrop(true);
+      setError("");
+
+      // Build notes: combine notes + medicinal properties
+      const notesParts: string[] = [];
+      if (plant.notes) notesParts.push(plant.notes);
+      if (plant.medicinal_properties) notesParts.push(`Medicinal: ${plant.medicinal_properties}`);
+      const combinedNotes = notesParts.join("\n\n") || null;
+
+      const { error: insertError } = await supabase.from("crops").insert({
+        farm_id: activeFarmId,
+        crop_name: plant.name || "Unnamed plant",
+        zone_id: plant.zone_id || null,
+        notes: combinedNotes,
+        status: "planned",
+        is_active: true,
+      });
+      if (insertError) throw insertError;
+
+      await supabase.from("activities").insert({
+        farm_id: activeFarmId,
+        type: "crop_created",
+        title: `${plant.name || "Unnamed plant"} converted from plant`,
+        meta: "Plant promoted to crop",
+      });
+
+      setEditPlant(null);
+      alert(`"${plant.name || "Unnamed plant"}" has been added as a crop. View it on the Farm page.`);
+    } catch (err) {
+      setError(errMsg(err, "Failed to convert plant to crop"));
+    } finally {
+      setConvertingToCrop(false);
     }
   }
 
@@ -519,6 +558,14 @@ export default function PlantsPage() {
                     Cancel
                   </button>
                 </div>
+
+                <button
+                  onClick={() => handleConvertToCrop(editPlant)}
+                  disabled={convertingToCrop}
+                  className="w-full rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60"
+                >
+                  {convertingToCrop ? "Converting…" : "Convert to crop"}
+                </button>
               </div>
             </div>
           </div>
