@@ -30,6 +30,7 @@ export type Crop = {
   notes: string | null;
   zone_id: string | null;
   zone: { name: string }[] | null;
+  zone_ids?: string[];
 };
 
 export type Task = {
@@ -118,6 +119,28 @@ export async function getZones(farmId: string): Promise<Zone[]> {
   return (data ?? []) as Zone[];
 }
 
+export async function getCropZones(cropIds: string[]): Promise<Record<string, string[]>> {
+  if (!cropIds.length) return {};
+  const { data, error } = await supabase
+    .from("crop_zones")
+    .select("crop_id, zone_id")
+    .in("crop_id", cropIds);
+
+  if (error) {
+    // Table may not exist yet — fall back gracefully
+    console.warn("crop_zones query failed (table may not exist yet):", error.message);
+    return {};
+  }
+
+  const map: Record<string, string[]> = {};
+  for (const row of data ?? []) {
+    const r = row as { crop_id: string; zone_id: string };
+    if (!map[r.crop_id]) map[r.crop_id] = [];
+    map[r.crop_id].push(r.zone_id);
+  }
+  return map;
+}
+
 export async function getCrops(farmId: string): Promise<Crop[]> {
   const { data, error } = await supabase
     .from("crops")
@@ -143,7 +166,24 @@ export async function getCrops(farmId: string): Promise<Crop[]> {
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`getCrops failed: ${error.message}`);
-  return (data ?? []) as Crop[];
+
+  const crops = (data ?? []) as Crop[];
+
+  // Fetch multi-zone assignments from crop_zones junction table
+  const cropIds = crops.map((c) => c.id);
+  const zoneMap = await getCropZones(cropIds);
+
+  for (const crop of crops) {
+    if (zoneMap[crop.id]?.length) {
+      crop.zone_ids = zoneMap[crop.id];
+    } else if (crop.zone_id) {
+      crop.zone_ids = [crop.zone_id];
+    } else {
+      crop.zone_ids = [];
+    }
+  }
+
+  return crops;
 }
 
 export async function getTasks(farmId: string): Promise<Task[]> {

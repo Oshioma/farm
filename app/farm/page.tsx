@@ -29,6 +29,7 @@ import { PestForm } from "@/app/farm/components/PestForm";
 import { SaleForm } from "@/app/farm/components/SaleForm";
 import { ZoneForm } from "@/app/farm/components/ZoneForm";
 import { FarmMap } from "@/app/farm/components/FarmMap";
+import { Plus, X } from "lucide-react";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
 import type { CropFormData } from "@/app/farm/components/CropForm";
 import type { TaskFormData } from "@/app/farm/components/TaskForm";
@@ -74,7 +75,7 @@ export default function FarmPage() {
   const [editingTaskForm, setEditingTaskForm] = useState<TaskFormData | null>(null);
   const [editingCropId, setEditingCropId] = useState<string | null>(null);
   const [editingCropForm, setEditingCropForm] = useState({
-    crop_name: "", variety: "", zone_id: "", status: "", planted_on: "",
+    crop_name: "", variety: "", zone_ids: [] as string[], status: "", planted_on: "",
     expected_harvest_start: "", estimated_yield_kg: "", expected_sale_price_per_kg: "",
     notes: "",
   });
@@ -352,6 +353,9 @@ export default function FarmPage() {
       const cropName = data.crop_name.trim();
       if (!cropName) throw new Error("Crop name is required.");
 
+      const zoneIds = data.zone_ids.filter(Boolean);
+      const primaryZoneId = zoneIds[0] || null;
+
       // Upload image if provided
       let imageUrl: string | null = null;
       if (data.image_file) {
@@ -363,9 +367,9 @@ export default function FarmPage() {
         imageUrl = urlData.publicUrl;
       }
 
-      const { error: insertError } = await supabase.from("crops").insert({
+      const { data: inserted, error: insertError } = await supabase.from("crops").insert({
         farm_id: activeFarmId,
-        zone_id: data.zone_id || null,
+        zone_id: primaryZoneId,
         crop_name: cropName,
         variety: data.variety.trim() || null,
         status: data.status,
@@ -377,8 +381,15 @@ export default function FarmPage() {
           : null,
         notes: data.notes.trim() || null,
         is_active: true,
-      });
+      }).select("id");
       if (insertError) throw insertError;
+
+      // Insert multi-zone assignments into crop_zones junction table
+      const cropId = inserted?.[0]?.id;
+      if (cropId && zoneIds.length > 0) {
+        const rows = zoneIds.map((zid) => ({ crop_id: cropId, zone_id: zid }));
+        await supabase.from("crop_zones").insert(rows);
+      }
 
       // Sync image to plants gallery
       if (imageUrl) {
@@ -391,15 +402,20 @@ export default function FarmPage() {
           name: plantName,
           image_url: imageUrl,
           notes: data.notes.trim() || null,
-          zone_id: data.zone_id || null,
+          zone_id: primaryZoneId,
         });
       }
 
+      const zoneCount = zoneIds.length;
       await supabase.from("activities").insert({
         farm_id: activeFarmId,
         type: "crop_created",
         title: `${cropName} added`,
-        meta: data.zone_id ? "Crop linked to zone" : "Crop created",
+        meta: zoneCount > 1
+          ? `Crop linked to ${zoneCount} zones`
+          : zoneCount === 1
+            ? "Crop linked to zone"
+            : "Crop created",
       });
 
       await loadFarmData(activeFarmId);
@@ -412,10 +428,11 @@ export default function FarmPage() {
 
   function startEditCrop(crop: Crop) {
     setEditingCropId(crop.id);
+    const zoneIds = crop.zone_ids?.length ? crop.zone_ids : crop.zone_id ? [crop.zone_id] : [];
     setEditingCropForm({
       crop_name: crop.crop_name,
       variety: crop.variety ?? "",
-      zone_id: crop.zone_id ?? "",
+      zone_ids: zoneIds,
       status: crop.status ?? "planned",
       planted_on: crop.planted_on ?? "",
       expected_harvest_start: crop.expected_harvest_start ?? "",
@@ -429,10 +446,12 @@ export default function FarmPage() {
     try {
       setSavingCropId(id);
       setError("");
+      const zoneIds = editingCropForm.zone_ids.filter(Boolean);
+      const primaryZoneId = zoneIds[0] || null;
       const payload = {
         crop_name: editingCropForm.crop_name.trim(),
         variety: editingCropForm.variety.trim() || null,
-        zone_id: editingCropForm.zone_id || null,
+        zone_id: primaryZoneId,
         status: editingCropForm.status || null,
         planted_on: editingCropForm.planted_on || null,
         expected_harvest_start: editingCropForm.expected_harvest_start || null,
@@ -445,6 +464,14 @@ export default function FarmPage() {
       console.log("Crop update response:", JSON.stringify(res));
       if (res.error) throw res.error;
       if (!res.data || res.data.length === 0) throw new Error("Update returned no rows — RLS may be blocking updates.");
+
+      // Sync crop_zones junction table
+      await supabase.from("crop_zones").delete().eq("crop_id", id);
+      if (zoneIds.length > 0) {
+        const rows = zoneIds.map((zid) => ({ crop_id: id, zone_id: zid }));
+        await supabase.from("crop_zones").insert(rows);
+      }
+
       setEditingCropId(null);
       await loadFarmData(activeFarmId);
     } catch (err) {
@@ -1746,7 +1773,7 @@ export default function FarmPage() {
               ) : (
                 <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {zones.map((zone) => {
-                    const zoneCrops = crops.filter((c) => c.zone_id === zone.id);
+                    const zoneCrops = crops.filter((c) => c.zone_ids?.includes(zone.id) || c.zone_id === zone.id);
                     return (
                       <div key={zone.id} className="rounded-2xl border border-zinc-200 p-4">
                         <div className="flex items-center justify-between gap-2">
@@ -1819,12 +1846,46 @@ export default function FarmPage() {
                                       className="mt-1 w-full min-w-[100px] rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
                                   </td>
                                   <td className="px-3 py-2">
-                                    <select value={editingCropForm.zone_id}
-                                      onChange={(e) => setEditingCropForm((p) => ({ ...p, zone_id: e.target.value }))}
-                                      className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900">
-                                      <option value="">No zone</option>
-                                      {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
-                                    </select>
+                                    <div className="space-y-1">
+                                      {editingCropForm.zone_ids.length === 0 ? (
+                                        <select value=""
+                                          onChange={(e) => { if (e.target.value) setEditingCropForm((p) => ({ ...p, zone_ids: [e.target.value] })); }}
+                                          className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900">
+                                          <option value="">No zone</option>
+                                          {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
+                                        </select>
+                                      ) : (
+                                        editingCropForm.zone_ids.map((zid, idx) => (
+                                          <div key={idx} className="flex items-center gap-1">
+                                            <select value={zid}
+                                              onChange={(e) => setEditingCropForm((p) => {
+                                                const next = [...p.zone_ids];
+                                                next[idx] = e.target.value;
+                                                return { ...p, zone_ids: next };
+                                              })}
+                                              className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900">
+                                              <option value="">Select zone</option>
+                                              {zones.map((z) => (
+                                                <option key={z.id} value={z.id}
+                                                  disabled={editingCropForm.zone_ids.includes(z.id) && z.id !== zid}>
+                                                  {z.name}
+                                                </option>
+                                              ))}
+                                            </select>
+                                            <button type="button" onClick={() => setEditingCropForm((p) => ({ ...p, zone_ids: p.zone_ids.filter((_, i) => i !== idx) }))}
+                                              className="flex-shrink-0 rounded-lg border border-zinc-200 p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+                                              <X size={14} />
+                                            </button>
+                                          </div>
+                                        ))
+                                      )}
+                                      {editingCropForm.zone_ids.length < zones.length && (
+                                        <button type="button" onClick={() => setEditingCropForm((p) => ({ ...p, zone_ids: [...p.zone_ids, ""] }))}
+                                          className="flex items-center gap-1 rounded-lg border border-dashed border-zinc-300 px-2 py-1 text-xs text-zinc-500 hover:border-zinc-400 hover:text-zinc-700">
+                                          <Plus size={12} /> Add zone
+                                        </button>
+                                      )}
+                                    </div>
                                   </td>
                                   <td className="px-3 py-2">
                                     <select value={editingCropForm.status}
@@ -1890,7 +1951,11 @@ export default function FarmPage() {
                                       <div className="mt-1 ml-5 text-xs text-zinc-400 truncate max-w-[180px]">📝 Has notes</div>
                                     )}
                                   </td>
-                                  <td className="px-4 py-4">{crop.zone?.[0]?.name || (crop.zone_id ? zones.find((z) => z.id === crop.zone_id)?.name ?? "Unknown zone" : "No zone")}</td>
+                                  <td className="px-4 py-4">{
+                                    crop.zone_ids?.length
+                                      ? crop.zone_ids.map((zid) => zones.find((z) => z.id === zid)?.name).filter(Boolean).join(", ") || "Unknown zone"
+                                      : crop.zone?.[0]?.name || (crop.zone_id ? zones.find((z) => z.id === crop.zone_id)?.name ?? "Unknown zone" : "No zone")
+                                  }</td>
                                   <td className="px-4 py-4">
                                     <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass(crop.status)}`}>
                                       {crop.status}
