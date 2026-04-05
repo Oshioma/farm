@@ -38,6 +38,7 @@ export default function PlantsPage() {
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [promotingToCrop, setPromotingToCrop] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -196,6 +197,47 @@ export default function PlantsPage() {
     } finally {
       setDeletingId(null);
       setConfirmDeleteId(null);
+    }
+  }
+
+  async function handlePromoteToCrop(plant: Plant) {
+    try {
+      setPromotingToCrop(true);
+      setError("");
+
+      const { error: updateError } = await supabase
+        .from("plants")
+        .update({ is_crop: true, status: "planned" })
+        .eq("id", plant.id);
+      if (updateError) throw updateError;
+
+      setPlants((prev) => prev.map((p) => p.id === plant.id ? { ...p, is_crop: true, status: "planned" } : p));
+      setEditPlant(null);
+      alert(`"${plant.name || "Unnamed plant"}" is now tracked as a crop on the Farm page.`);
+    } catch (err) {
+      setError(errMsg(err, "Failed to promote plant to crop"));
+    } finally {
+      setPromotingToCrop(false);
+    }
+  }
+
+  async function handleDemoteFromCrop(plant: Plant) {
+    try {
+      setPromotingToCrop(true);
+      setError("");
+
+      const { error: updateError } = await supabase
+        .from("plants")
+        .update({ is_crop: false })
+        .eq("id", plant.id);
+      if (updateError) throw updateError;
+
+      setPlants((prev) => prev.map((p) => p.id === plant.id ? { ...p, is_crop: false } : p));
+      setEditPlant(null);
+    } catch (err) {
+      setError(errMsg(err, "Failed to update plant"));
+    } finally {
+      setPromotingToCrop(false);
     }
   }
 
@@ -434,6 +476,9 @@ export default function PlantsPage() {
                     {plant.medicinal_properties ? (
                       <p className="mt-0.5 text-xs text-emerald-600 line-clamp-1">Medicinal: {plant.medicinal_properties}</p>
                     ) : null}
+                    {plant.is_crop ? (
+                      <span className="mt-1 inline-block rounded-full bg-lime-100 px-2 py-0.5 text-[10px] font-semibold text-lime-700">Crop</span>
+                    ) : null}
                   </button>
                 </div>
               </div>
@@ -519,6 +564,24 @@ export default function PlantsPage() {
                     Cancel
                   </button>
                 </div>
+
+                {editPlant.is_crop ? (
+                  <button
+                    onClick={() => handleDemoteFromCrop(editPlant)}
+                    disabled={promotingToCrop}
+                    className="w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-5 py-3 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-60"
+                  >
+                    {promotingToCrop ? "Updating…" : "Remove from crop tracker"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handlePromoteToCrop(editPlant)}
+                    disabled={promotingToCrop}
+                    className="w-full rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60"
+                  >
+                    {promotingToCrop ? "Promoting…" : "Track as crop"}
+                  </button>
+                )}
               </div>
             </div>
           </div>

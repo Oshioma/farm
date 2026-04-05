@@ -16,9 +16,18 @@ export type Zone = {
   size_acres: number | null;
 };
 
-export type Crop = {
+export type Plant = {
   id: string;
-  crop_name: string;
+  farm_id: string;
+  name: string | null;
+  image_url: string | null;
+  notes: string | null;
+  medicinal_properties: string | null;
+  zone_id: string | null;
+  zone: { name: string }[] | null;
+  created_at: string | null;
+  // Crop fields (populated when is_crop = true)
+  is_crop: boolean;
   variety: string | null;
   status: string | null;
   planted_on: string | null;
@@ -27,10 +36,9 @@ export type Crop = {
   estimated_yield_kg: number | null;
   actual_yield_kg: number | null;
   expected_sale_price_per_kg: number | null;
-  notes: string | null;
-  zone_id: string | null;
-  zone: { name: string }[] | null;
 };
+
+export type Crop = Plant;
 
 export type Task = {
   id: string;
@@ -43,7 +51,7 @@ export type Task = {
   proof_required: boolean | null;
   zone_id: string | null;
   crop_id: string | null;
-  crop: { crop_name: string }[] | null;
+  crop: { name: string }[] | null;
   zone: { name: string }[] | null;
 };
 
@@ -65,7 +73,7 @@ export type Expense = {
   created_at: string | null;
   crop_id: string | null;
   zone_id: string | null;
-  crop: { crop_name: string }[] | null;
+  crop: { name: string }[] | null;
   zone: { name: string }[] | null;
 };
 
@@ -120,11 +128,15 @@ export async function getZones(farmId: string): Promise<Zone[]> {
 
 export async function getCrops(farmId: string): Promise<Crop[]> {
   const { data, error } = await supabase
-    .from("crops")
+    .from("plants")
     .select(
       `
       id,
-      crop_name,
+      farm_id,
+      name,
+      image_url,
+      notes,
+      medicinal_properties,
       variety,
       status,
       planted_on,
@@ -133,12 +145,14 @@ export async function getCrops(farmId: string): Promise<Crop[]> {
       estimated_yield_kg,
       actual_yield_kg,
       expected_sale_price_per_kg,
-      notes,
       zone_id,
-      zone:zones(name)
+      zone:zones(name),
+      is_crop,
+      created_at
     `
     )
     .eq("farm_id", farmId)
+    .eq("is_crop", true)
     .eq("is_active", true)
     .order("created_at", { ascending: false });
 
@@ -161,7 +175,7 @@ export async function getTasks(farmId: string): Promise<Task[]> {
       proof_required,
       zone_id,
       crop_id,
-      crop:crops(crop_name),
+      crop:plants(name),
       zone:zones(name)
     `
     )
@@ -198,7 +212,7 @@ export async function getExpenses(farmId: string): Promise<Expense[]> {
       created_at,
       crop_id,
       zone_id,
-      crop:crops(crop_name),
+      crop:plants(name),
       zone:zones(name)
     `
     )
@@ -279,7 +293,7 @@ export type Sale = {
   sale_date: string;
   notes: string | null;
   created_at: string | null;
-  crop: { crop_name: string }[] | null;
+  crop: { name: string }[] | null;
 };
 
 export async function getSales(farmId: string): Promise<Sale[]> {
@@ -297,7 +311,7 @@ export async function getSales(farmId: string): Promise<Sale[]> {
       sale_date,
       notes,
       created_at,
-      crop:crops(crop_name)
+      crop:plants(name)
     `
     )
     .eq("farm_id", farmId)
@@ -308,22 +322,12 @@ export async function getSales(farmId: string): Promise<Sale[]> {
   return (data ?? []) as Sale[];
 }
 
-export type Plant = {
-  id: string;
-  farm_id: string;
-  name: string | null;
-  image_url: string | null;
-  notes: string | null;
-  medicinal_properties: string | null;
-  zone_id: string | null;
-  created_at: string | null;
-};
-
 export async function getPlants(farmId: string): Promise<Plant[]> {
   const { data, error } = await supabase
     .from("plants")
-    .select("id, farm_id, name, image_url, notes, medicinal_properties, zone_id, created_at")
+    .select("id, farm_id, name, image_url, notes, medicinal_properties, zone_id, zone:zones(name), created_at, is_crop, variety, status, planted_on, expected_harvest_start, expected_harvest_end, estimated_yield_kg, actual_yield_kg, expected_sale_price_per_kg")
     .eq("farm_id", farmId)
+    .eq("is_active", true)
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`getPlants failed: ${error.message}`);
@@ -361,7 +365,7 @@ export type Pest = {
   created_at: string | null;
   crop_id: string | null;
   zone_id: string | null;
-  crop: { crop_name: string }[] | null;
+  crop: { name: string }[] | null;
   zone: { name: string }[] | null;
 };
 
@@ -380,7 +384,7 @@ export async function getPests(farmId: string): Promise<Pest[]> {
       created_at,
       crop_id,
       zone_id,
-      crop:crops(crop_name),
+      crop:plants(name),
       zone:zones(name)
     `
     )

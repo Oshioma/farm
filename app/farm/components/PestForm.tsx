@@ -153,7 +153,7 @@ export function PestForm({
               <option value="">No specific crop</option>
               {crops.map((crop) => (
                 <option key={crop.id} value={crop.id}>
-                  {crop.crop_name}{crop.variety ? ` · ${crop.variety}` : ""}
+                  {crop.name}{crop.variety ? ` · ${crop.variety}` : ""}
                 </option>
               ))}
             </select>

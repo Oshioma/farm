@@ -79,7 +79,7 @@ export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubm
             <option value="">Select crop</option>
             {crops.map((crop) => (
               <option key={crop.id} value={crop.id}>
-                {crop.crop_name}
+                {crop.name}
                 {crop.variety ? ` · ${crop.variety}` : ""}
               </option>
             ))}

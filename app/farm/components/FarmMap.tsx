@@ -438,7 +438,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                               }`}
                             />
                             <span className="font-medium">
-                              {c.crop_name}
+                              {c.name}
                               {c.variety ? ` · ${c.variety}` : ""}
                             </span>
                           </div>
