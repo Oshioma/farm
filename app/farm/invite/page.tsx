@@ -36,6 +36,8 @@ export default function InvitePage() {
   const [error, setError] = useState("");
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviting, setInviting] = useState(false);
   const [inviteSuccess, setInviteSuccess] = useState("");
@@ -174,6 +176,26 @@ export default function InvitePage() {
     }
   }
 
+  async function deleteUser(profileId: string) {
+    setDeletingId(profileId);
+    setConfirmDeleteId(null);
+    setError("");
+    try {
+      const res = await fetch("/api/members/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId, farmId: activeFarmId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete user");
+      await loadData(activeFarmId);
+    } catch (err) {
+      setError(errMsg(err, "Failed to delete user"));
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   function fmtDate(d: string) {
     return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
   }
@@ -308,13 +330,39 @@ export default function InvitePage() {
                       </div>
                     </div>
                     {m.role_on_farm !== "owner" && (
-                      <button
-                        onClick={() => removeMember(m.id)}
-                        disabled={removingId === m.id}
-                        className="rounded-xl border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
-                      >
-                        Remove
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => removeMember(m.id)}
+                          disabled={removingId === m.id}
+                          className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-60"
+                        >
+                          Remove
+                        </button>
+                        {confirmDeleteId === m.profile_id ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => deleteUser(m.profile_id)}
+                              disabled={deletingId === m.profile_id}
+                              className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60"
+                            >
+                              {deletingId === m.profile_id ? "Deleting..." : "Confirm"}
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteId(null)}
+                              className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmDeleteId(m.profile_id)}
+                            className="rounded-xl border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                          >
+                            Delete user
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 ))}
