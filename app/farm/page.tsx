@@ -175,12 +175,13 @@ export default function FarmPage() {
 
   async function loadAllFarms() {
     setLoadingAllFarms(true);
-    const { data } = await supabase
-      .from("farms")
-      .select("id, name")
-      .eq("is_active", true)
-      .order("name");
-    setAllFarms((data ?? []) as { id: string; name: string }[]);
+    try {
+      const res = await fetch("/api/farms/list");
+      const data = await res.json();
+      setAllFarms(Array.isArray(data) ? data : []);
+    } catch {
+      setAllFarms([]);
+    }
     setLoadingAllFarms(false);
   }
 
