@@ -41,32 +41,26 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Look up emails from auth for members missing user_email
-  const profileIds = (members ?? [])
-    .filter((m) => !m.user_email)
-    .map((m) => m.profile_id);
-
+  // Look up emails from auth for all members to ensure we have current emails
   const emailMap: Record<string, string> = {};
 
-  if (profileIds.length > 0) {
-    // Fetch users from Supabase Auth admin API
-    const { data: authData } = await supabaseAdmin.auth.admin.listUsers({
-      perPage: 1000,
-    });
-
-    if (authData?.users) {
-      for (const u of authData.users) {
-        if (profileIds.includes(u.id) && u.email) {
-          emailMap[u.id] = u.email;
+  await Promise.all(
+    (members ?? []).map(async (m) => {
+      try {
+        const { data } = await supabaseAdmin.auth.admin.getUserById(m.profile_id);
+        if (data?.user?.email) {
+          emailMap[m.profile_id] = data.user.email;
         }
+      } catch {
+        // skip if user lookup fails
       }
-    }
-  }
+    })
+  );
 
   // Merge emails into member records
   const enriched = (members ?? []).map((m) => ({
     ...m,
-    user_email: m.user_email || emailMap[m.profile_id] || null,
+    user_email: emailMap[m.profile_id] || m.user_email || null,
   }));
 
   return NextResponse.json({ members: enriched });
