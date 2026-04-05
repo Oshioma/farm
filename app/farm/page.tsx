@@ -103,6 +103,7 @@ export default function FarmPage() {
   const [deletingPestId, setDeletingPestId] = useState<string | null>(null);
   const [confirmDeletePestId, setConfirmDeletePestId] = useState<string | null>(null);
   const [zonesView, setZonesView] = useState<"map" | "list">("map");
+  const [userEmail, setUserEmail] = useState("");
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -246,6 +247,9 @@ export default function FarmPage() {
   }
 
   useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email) setUserEmail(user.email);
+    });
     refreshAll();
   }, []);
 
@@ -955,6 +959,9 @@ export default function FarmPage() {
               >
                 Invite
               </Link>
+              {userEmail && (
+                <span className="text-sm text-zinc-500">{userEmail}</span>
+              )}
               <button
                 onClick={handleSignOut}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
