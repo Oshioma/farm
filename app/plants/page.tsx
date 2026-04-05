@@ -244,7 +244,6 @@ export default function PlantsPage() {
     try {
       setPromotingToCrop(true);
       setError("");
-
       const notesParts: string[] = [];
       if (plant.notes) notesParts.push(plant.notes);
       if (plant.medicinal_properties) notesParts.push(`Medicinal: ${plant.medicinal_properties}`);
