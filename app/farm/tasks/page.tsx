@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { getFarms, getZones, getCrops, getTasks } from "@/lib/farm";
-import type { Farm, Zone, Crop, Task } from "@/lib/farm";
+import { getFarms, getZones, getCrops, getTasks, getMembers } from "@/lib/farm";
+import type { Farm, Zone, Crop, Task, Member } from "@/lib/farm";
 import { formatDate, badgeClass } from "@/app/farm/utils";
 
 function errMsg(err: unknown, fallback: string): string {
@@ -19,6 +19,7 @@ export default function WorkerTasksPage() {
   const [zones, setZones] = useState<Zone[]>([]);
   const [crops, setCrops] = useState<Crop[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -45,14 +46,16 @@ export default function WorkerTasksPage() {
       try {
         setLoading(true);
         setError("");
-        const [zoneRows, cropRows, taskRows] = await Promise.all([
+        const [zoneRows, cropRows, taskRows, memberRows] = await Promise.all([
           getZones(activeFarmId),
           getCrops(activeFarmId),
           getTasks(activeFarmId),
+          getMembers(activeFarmId),
         ]);
         setZones(zoneRows);
         setCrops(cropRows);
         setTasks(taskRows);
+        setMembers(memberRows);
       } catch (err) {
         setError(errMsg(err, "Failed to load tasks"));
       } finally {
@@ -65,6 +68,14 @@ export default function WorkerTasksPage() {
     () => farms.find((f) => f.id === activeFarmId) ?? null,
     [farms, activeFarmId]
   );
+
+  const memberEmailMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const m of members) {
+      map[m.profile_id] = m.user_email ?? m.profile_id.slice(0, 8);
+    }
+    return map;
+  }, [members]);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -241,6 +252,11 @@ export default function WorkerTasksPage() {
                         {task.proof_required && (
                           <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
                             photo proof
+                          </span>
+                        )}
+                        {task.assigned_to && (
+                          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                            {memberEmailMap[task.assigned_to] ?? task.assigned_to.slice(0, 8)}
                           </span>
                         )}
                       </div>

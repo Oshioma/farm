@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Zone, Crop } from "@/lib/farm";
+import type { Zone, Crop, Member } from "@/lib/farm";
 
 export type TaskFormData = {
   title: string;
@@ -12,6 +12,7 @@ export type TaskFormData = {
   priority: string;
   due_date: string;
   proof_required: boolean;
+  assigned_to: string;
 };
 
 const blank: TaskFormData = {
@@ -23,16 +24,18 @@ const blank: TaskFormData = {
   priority: "medium",
   due_date: "",
   proof_required: false,
+  assigned_to: "",
 };
 
 type Props = {
   zones: Zone[];
   crops: Crop[];
+  members: Member[];
   defaultZoneId: string;
   onSubmit: (data: TaskFormData) => Promise<boolean>;
 };
 
-export function TaskForm({ zones, crops, defaultZoneId, onSubmit }: Props) {
+export function TaskForm({ zones, crops, members, defaultZoneId, onSubmit }: Props) {
   const [form, setForm] = useState<TaskFormData>(blank);
   const [saving, setSaving] = useState(false);
 
@@ -110,6 +113,22 @@ export function TaskForm({ zones, crops, defaultZoneId, onSubmit }: Props) {
               <option key={crop.id} value={crop.id}>
                 {crop.crop_name}
                 {crop.variety ? ` · ${crop.variety}` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium">Assign to</label>
+          <select
+            value={form.assigned_to}
+            onChange={(e) => setForm((prev) => ({ ...prev, assigned_to: e.target.value }))}
+            className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+          >
+            <option value="">Unassigned</option>
+            {members.map((member) => (
+              <option key={member.profile_id} value={member.profile_id}>
+                {member.user_email ?? member.profile_id.slice(0, 8)}
               </option>
             ))}
           </select>

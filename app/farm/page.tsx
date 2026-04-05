@@ -17,8 +17,9 @@ import {
   getFertilisations,
   getCompost,
   getPlants,
+  getMembers,
 } from "@/lib/farm";
-import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, FertilisationEntry, CompostEntry, Plant } from "@/lib/farm";
+import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, FertilisationEntry, CompostEntry, Plant, Member } from "@/lib/farm";
 import { formatDate, formatMoney, badgeClass } from "@/app/farm/utils";
 import { CropForm } from "@/app/farm/components/CropForm";
 import { TaskForm } from "@/app/farm/components/TaskForm";
@@ -59,6 +60,7 @@ export default function FarmPage() {
   const [fertilisations, setFertilisations] = useState<FertilisationEntry[]>([]);
   const [compostEntries, setCompostEntries] = useState<CompostEntry[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
 
   const [activeFarmId, setActiveFarmId] = useState<string>("");
   const [activeForm, setActiveForm] = useState<"crop" | "task" | "harvest" | "expense" | "asset" | "pest" | "sale" | "zone" | null>(null);
@@ -212,7 +214,7 @@ export default function FarmPage() {
   }
 
   async function loadFarmData(farmId: string) {
-    const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows, pestRows, saleRows, fertilisationRows, compostRows, plantRows] = await Promise.all([
+    const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows, pestRows, saleRows, fertilisationRows, compostRows, plantRows, memberRows] = await Promise.all([
       getZones(farmId),
       getCrops(farmId),
       getTasks(farmId),
@@ -224,6 +226,7 @@ export default function FarmPage() {
       getFertilisations(farmId),
       getCompost(farmId),
       getPlants(farmId),
+      getMembers(farmId),
     ]);
 
     setZones(zoneRows);
@@ -237,6 +240,7 @@ export default function FarmPage() {
     setFertilisations(fertilisationRows);
     setCompostEntries(compostRows);
     setPlants(plantRows);
+    setMembers(memberRows);
   }
 
   async function refreshAll() {
@@ -306,6 +310,30 @@ export default function FarmPage() {
 
   const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
   const totalSales = sales.reduce((sum, s) => sum + Number(s.total_amount ?? 0), 0);
+
+  const [taskGrouping, setTaskGrouping] = useState<"default" | "by_user">("default");
+
+  const memberEmailMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const m of members) {
+      map[m.profile_id] = m.user_email ?? m.profile_id.slice(0, 8);
+    }
+    return map;
+  }, [members]);
+
+  const tasksByUser = useMemo(() => {
+    const groups: Record<string, Task[]> = { Unassigned: [] };
+    for (const task of openTasks) {
+      if (!task.assigned_to) {
+        groups["Unassigned"].push(task);
+      } else {
+        const label = memberEmailMap[task.assigned_to] ?? task.assigned_to.slice(0, 8);
+        if (!groups[label]) groups[label] = [];
+        groups[label].push(task);
+      }
+    }
+    return groups;
+  }, [openTasks, memberEmailMap]);
 
   const defaultZoneId = zones.length === 1 ? zones[0].id : "";
   const defaultCropId = crops.length === 1 ? crops[0].id : "";
@@ -473,6 +501,7 @@ export default function FarmPage() {
         priority: data.priority,
         due_date: data.due_date || null,
         proof_required: data.proof_required,
+        assigned_to: data.assigned_to || null,
       });
       if (insertError) throw insertError;
 
@@ -539,6 +568,7 @@ export default function FarmPage() {
           priority: data.priority,
           due_date: data.due_date || null,
           proof_required: data.proof_required,
+          assigned_to: data.assigned_to || null,
         })
         .eq("id", id);
       if (updateError) throw updateError;
@@ -1195,6 +1225,7 @@ export default function FarmPage() {
                   <TaskForm
                     zones={zones}
                     crops={crops}
+                    members={members}
                     defaultZoneId={defaultZoneId}
                     onSubmit={async (data) => {
                       const ok = await handleCreateTask(data);
@@ -1302,8 +1333,18 @@ export default function FarmPage() {
                     All todo and in-progress tasks, due soonest first.
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <span className="text-sm text-zinc-500">{openTasks.length} open</span>
+                  <button
+                    onClick={() => setTaskGrouping(taskGrouping === "default" ? "by_user" : "default")}
+                    className={`rounded-2xl px-4 py-2 text-sm font-medium transition ${
+                      taskGrouping === "by_user"
+                        ? "bg-zinc-700 text-white"
+                        : "border border-zinc-200 text-zinc-700 hover:bg-zinc-100"
+                    }`}
+                  >
+                    {taskGrouping === "by_user" ? "Grouped by user" : "Group by user"}
+                  </button>
                   <button
                     onClick={() => setActiveForm(activeForm === "task" ? null : "task")}
                     className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
@@ -1319,6 +1360,72 @@ export default function FarmPage() {
                 </div>
               </div>
 
+              {taskGrouping === "by_user" ? (
+                <div className="mt-5 space-y-6">
+                  {Object.entries(tasksByUser).map(([userName, userTasks]) =>
+                    userTasks.length === 0 ? null : (
+                      <div key={userName}>
+                        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+                          {userName} ({userTasks.length})
+                        </h3>
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                          {userTasks.map((task) => {
+                            const isCompleting = completingTaskId === task.id;
+                            const isDeleting = deletingTaskId === task.id;
+                            const isSaving = savingTaskId === task.id;
+                            const isEditing = editingTaskId === task.id;
+                            const isToday = task.due_date === today;
+                            return (
+                              <div key={task.id} className="rounded-2xl border border-zinc-200 p-4">
+                                {isEditing && editingTaskForm ? null : (
+                                  <>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass(task.status)}`}>
+                                        {task.status}
+                                      </span>
+                                      <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
+                                        {task.priority}
+                                      </span>
+                                      {isToday ? (
+                                        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                                          today
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                    <h3 className="mt-3 text-base font-semibold">{task.title}</h3>
+                                    <div className="mt-2 text-sm text-zinc-600">
+                                      {task.zone?.[0]?.name ?? "No zone"}
+                                      <span className="mx-2">&middot;</span>
+                                      {task.crop?.[0]?.crop_name ?? "General task"}
+                                      <span className="mx-2">&middot;</span>
+                                      {formatDate(task.due_date)}
+                                    </div>
+                                    {task.description ? (
+                                      <p className="mt-2 text-sm text-zinc-500">{task.description}</p>
+                                    ) : null}
+                                    <div className="mt-4 flex flex-wrap gap-2">
+                                      <button
+                                        onClick={() => handleCompleteTask(task)}
+                                        disabled={isCompleting || isDeleting}
+                                        className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-60"
+                                      >
+                                        {isCompleting ? "Completing..." : "Mark done"}
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )
+                  )}
+                  {openTasks.length === 0 && (
+                    <p className="text-sm text-zinc-500">No open tasks.</p>
+                  )}
+                </div>
+              ) : (
               <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {openTasks.length === 0 ? (
                   <p className="text-sm text-zinc-500">No open tasks.</p>
@@ -1386,6 +1493,14 @@ export default function FarmPage() {
                                 {crops.map((c) => <option key={c.id} value={c.id}>{c.crop_name}{c.variety ? ` · ${c.variety}` : ""}</option>)}
                               </select>
                             </div>
+                            <select
+                              value={editingTaskForm.assigned_to}
+                              onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, assigned_to: e.target.value } : prev)}
+                              className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                            >
+                              <option value="">Unassigned</option>
+                              {members.map((m) => <option key={m.profile_id} value={m.profile_id}>{m.user_email ?? m.profile_id.slice(0, 8)}</option>)}
+                            </select>
                             <input
                               type="date"
                               value={editingTaskForm.due_date}
@@ -1435,6 +1550,11 @@ export default function FarmPage() {
                                   photo proof
                                 </span>
                               ) : null}
+                              {task.assigned_to ? (
+                                <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                                  {memberEmailMap[task.assigned_to] ?? task.assigned_to.slice(0, 8)}
+                                </span>
+                              ) : null}
                             </div>
 
                             <h3 className="mt-3 text-base font-semibold">{task.title}</h3>
@@ -1471,6 +1591,7 @@ export default function FarmPage() {
                                     priority: task.priority ?? "medium",
                                     due_date: task.due_date ?? "",
                                     proof_required: task.proof_required ?? false,
+                                    assigned_to: task.assigned_to ?? "",
                                   });
                                 }}
                                 disabled={isCompleting || isDeleting}
@@ -1493,6 +1614,7 @@ export default function FarmPage() {
                   })
                 )}
               </div>
+              )}
             </section>
 
             <section className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
