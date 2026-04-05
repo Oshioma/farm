@@ -86,6 +86,8 @@ export default function FarmPage() {
   const [joinSearch, setJoinSearch] = useState("");
   const [joinResults, setJoinResults] = useState<{ id: string; name: string }[]>([]);
   const [joinSearching, setJoinSearching] = useState(false);
+  const [allFarms, setAllFarms] = useState<{ id: string; name: string }[]>([]);
+  const [loadingAllFarms, setLoadingAllFarms] = useState(false);
   const [requestingId, setRequestingId] = useState<string | null>(null);
   const [requestSent, setRequestSent] = useState<string | null>(null);
   const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
@@ -170,18 +172,15 @@ export default function FarmPage() {
     }
   }
 
-  async function handleSearchFarms(e: React.FormEvent) {
-    e.preventDefault();
-    if (!joinSearch.trim()) return;
-    setJoinSearching(true);
+  async function loadAllFarms() {
+    setLoadingAllFarms(true);
     const { data } = await supabase
       .from("farms")
       .select("id, name")
-      .ilike("name", `%${joinSearch.trim()}%`)
       .eq("is_active", true)
-      .limit(5);
-    setJoinResults((data ?? []) as { id: string; name: string }[]);
-    setJoinSearching(false);
+      .order("name");
+    setAllFarms((data ?? []) as { id: string; name: string }[]);
+    setLoadingAllFarms(false);
   }
 
   async function handleRequestJoin(farmId: string) {
@@ -1019,7 +1018,11 @@ export default function FarmPage() {
                   Create a farm
                 </button>
                 <button
-                  onClick={() => setNoFarmMode(noFarmMode === "join" ? "idle" : "join")}
+                  onClick={() => {
+                    const next = noFarmMode === "join" ? "idle" : "join";
+                    setNoFarmMode(next);
+                    if (next === "join") loadAllFarms();
+                  }}
                   className="rounded-2xl border border-zinc-200 px-5 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
                 >
                   Request to join a farm
@@ -1053,44 +1056,53 @@ export default function FarmPage() {
             {noFarmMode === "join" && (
               <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                 <h2 className="text-base font-semibold">Request to join</h2>
-                <form onSubmit={handleSearchFarms} className="mt-4 flex gap-2">
-                  <input
-                    type="text"
-                    value={joinSearch}
-                    onChange={(e) => setJoinSearch(e.target.value)}
-                    placeholder="Search farm name…"
-                    className="flex-1 rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                  />
-                  <button
-                    type="submit"
-                    disabled={joinSearching}
-                    className="rounded-2xl bg-zinc-900 px-4 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
-                  >
-                    Search
-                  </button>
-                </form>
-                {joinResults.length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    {joinResults.map((f) => (
-                      <div key={f.id} className="flex items-center justify-between rounded-2xl border border-zinc-100 px-4 py-3">
-                        <span className="text-sm font-medium">{f.name}</span>
-                        {requestSent === f.id ? (
-                          <span className="text-xs text-green-600 font-medium">Request sent ✓</span>
-                        ) : (
-                          <button
-                            onClick={() => handleRequestJoin(f.id)}
-                            disabled={requestingId === f.id}
-                            className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
-                          >
-                            {requestingId === f.id ? "Sending…" : "Request to join"}
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {joinResults.length === 0 && joinSearch && !joinSearching && (
-                  <p className="mt-4 text-sm text-zinc-500">No farms found. Check the name and try again.</p>
+                <p className="mt-1 text-sm text-zinc-500">Browse available farms or filter by name.</p>
+                <input
+                  type="text"
+                  value={joinSearch}
+                  onChange={(e) => setJoinSearch(e.target.value)}
+                  placeholder="Filter farms…"
+                  className="mt-4 w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                />
+                {loadingAllFarms ? (
+                  <p className="mt-4 text-sm text-zinc-500">Loading farms…</p>
+                ) : (
+                  <>
+                    {(() => {
+                      const filtered = allFarms.filter((f) =>
+                        f.name.toLowerCase().includes(joinSearch.toLowerCase().trim())
+                      );
+                      if (filtered.length === 0) {
+                        return (
+                          <p className="mt-4 text-sm text-zinc-500">
+                            {allFarms.length === 0
+                              ? "No farms on the system yet."
+                              : "No farms match your filter."}
+                          </p>
+                        );
+                      }
+                      return (
+                        <div className="mt-4 max-h-64 space-y-2 overflow-y-auto">
+                          {filtered.map((f) => (
+                            <div key={f.id} className="flex items-center justify-between rounded-2xl border border-zinc-100 px-4 py-3">
+                              <span className="text-sm font-medium">{f.name}</span>
+                              {requestSent === f.id ? (
+                                <span className="text-xs text-green-600 font-medium">Request sent ✓</span>
+                              ) : (
+                                <button
+                                  onClick={() => handleRequestJoin(f.id)}
+                                  disabled={requestingId === f.id}
+                                  className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
+                                >
+                                  {requestingId === f.id ? "Sending…" : "Request to join"}
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </>
                 )}
               </div>
             )}
