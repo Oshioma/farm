@@ -969,7 +969,7 @@ export default function FarmPage() {
               )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {farms.map((farm) => {
                 const isActive = farm.id === activeFarmId;
                 return (
@@ -986,6 +986,21 @@ export default function FarmPage() {
                   </button>
                 );
               })}
+              <button
+                onClick={() => {
+                  setNoFarmMode(noFarmMode === "join" ? "idle" : "join");
+                  if (noFarmMode !== "join") loadAllFarms();
+                }}
+                className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100"
+              >
+                Join a farm
+              </button>
+              <button
+                onClick={() => setNoFarmMode(noFarmMode === "create" ? "idle" : "create")}
+                className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
+              >
+                Create a farm
+              </button>
               <Link
                 href="/farm/invite"
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
@@ -1032,6 +1047,89 @@ export default function FarmPage() {
             ))}
           </div>
         </nav>
+
+        {noFarmMode === "create" && activeFarm && (
+          <div className="mb-6 mx-auto max-w-md rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold">New farm</h2>
+              <button onClick={() => setNoFarmMode("idle")} className="text-sm text-zinc-400 hover:text-zinc-600">Close</button>
+            </div>
+            <form onSubmit={handleCreateFarm} className="mt-4 space-y-4">
+              <input
+                type="text"
+                value={newFarmName}
+                onChange={(e) => setNewFarmName(e.target.value)}
+                placeholder="Farm name"
+                required
+                className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+              />
+              <button
+                type="submit"
+                disabled={creatingFarm}
+                className="w-full rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
+              >
+                {creatingFarm ? "Creating…" : "Create farm"}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {noFarmMode === "join" && activeFarm && (
+          <div className="mb-6 mx-auto max-w-md rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold">Request to join a farm</h2>
+              <button onClick={() => setNoFarmMode("idle")} className="text-sm text-zinc-400 hover:text-zinc-600">Close</button>
+            </div>
+            <p className="mt-1 text-sm text-zinc-500">Browse available farms or filter by name.</p>
+            <input
+              type="text"
+              value={joinSearch}
+              onChange={(e) => setJoinSearch(e.target.value)}
+              placeholder="Filter farms…"
+              className="mt-4 w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+            />
+            {loadingAllFarms ? (
+              <p className="mt-4 text-sm text-zinc-500">Loading farms…</p>
+            ) : (
+              <>
+                {(() => {
+                  const filtered = allFarms.filter((f) =>
+                    f.name.toLowerCase().includes(joinSearch.toLowerCase().trim())
+                  );
+                  if (filtered.length === 0) {
+                    return (
+                      <p className="mt-4 text-sm text-zinc-500">
+                        {allFarms.length === 0
+                          ? "No farms on the system yet."
+                          : "No farms match your filter."}
+                      </p>
+                    );
+                  }
+                  return (
+                    <div className="mt-4 max-h-64 space-y-2 overflow-y-auto">
+                      {filtered.map((f) => (
+                        <div key={f.id} className="flex items-center justify-between rounded-2xl border border-zinc-100 px-4 py-3">
+                          <span className="text-sm font-medium">{f.name}</span>
+                          {requestSent === f.id ? (
+                            <span className="text-xs text-green-600 font-medium">Request sent</span>
+                          ) : (
+                            <button
+                              onClick={() => handleRequestJoin(f.id)}
+                              disabled={requestingId === f.id}
+                              className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
+                            >
+                              {requestingId === f.id ? "Sending…" : "Request to join"}
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </>
+            )}
+          </div>
+        )}
 
         {error ? (
           <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
