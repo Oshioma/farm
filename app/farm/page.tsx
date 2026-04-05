@@ -355,6 +355,7 @@ export default function FarmPage() {
           farm_id: activeFarmId,
           name: plantName,
           image_url: imageUrl,
+          notes: data.notes.trim() || null,
           zone_id: data.zone_id || null,
         });
       }
