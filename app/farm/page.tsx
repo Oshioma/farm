@@ -1059,6 +1059,8 @@ export default function FarmPage() {
         <nav className="mb-6 rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
           <div className="flex flex-wrap items-center gap-1.5 text-sm">
             {[
+              { href: "#map", label: "Map" },
+              { href: "#crops", label: "Crops" },
               { href: "/farm/trees", label: "Trees" },
               { href: "/farm/planting-plan", label: "Planting plan" },
               { href: "/farm/seedlings", label: "Seedlings" },
@@ -1689,7 +1691,7 @@ export default function FarmPage() {
               ) : null}
             </section>
 
-            <section className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+            <section id="map" className="mb-6 scroll-mt-4 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-semibold">Zones / Beds</h2>
@@ -1775,7 +1777,7 @@ export default function FarmPage() {
               )}
             </section>
 
-            <div className="space-y-6">
+            <div id="crops" className="scroll-mt-4 space-y-6">
                 <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                   <div className="flex items-center justify-between gap-4">
                     <div>
