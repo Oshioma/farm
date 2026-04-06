@@ -28,19 +28,13 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const admin = getSupabaseAdmin();
-
-    // Verify caller is an owner of at least one farm
-    const { data: ownerCheck } = await admin
-      .from("farm_members")
-      .select("id")
-      .eq("profile_id", user.id)
-      .eq("role_on_farm", "owner")
-      .limit(1);
-
-    if (!ownerCheck || ownerCheck.length === 0) {
-      return NextResponse.json({ error: "Only farm owners can access admin" }, { status: 403 });
+    // Only the super admin can access this endpoint
+    const superAdminEmail = process.env.SUPER_ADMIN_EMAIL;
+    if (!superAdminEmail || user.email !== superAdminEmail) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+
+    const admin = getSupabaseAdmin();
 
     // Fetch all farms
     const { data: farms, error: farmsError } = await admin
