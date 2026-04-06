@@ -55,13 +55,18 @@ export async function GET() {
       return NextResponse.json({ error: membersError.message }, { status: 500 });
     }
 
-    // Enrich emails from Supabase Auth
+    // Fetch all auth users to enrich emails and find orphaned users
+    const memberProfileIds = new Set((members ?? []).map((m) => m.profile_id));
     const emailMap: Record<string, string> = {};
+    const orphanedUsers: { id: string; email: string | undefined; created_at: string }[] = [];
     try {
       const { data: listData } = await admin.auth.admin.listUsers({ perPage: 1000 });
       if (listData?.users) {
         for (const u of listData.users) {
           if (u.email) emailMap[u.id] = u.email;
+          if (!memberProfileIds.has(u.id)) {
+            orphanedUsers.push({ id: u.id, email: u.email, created_at: u.created_at });
+          }
         }
       }
     } catch {
@@ -73,7 +78,12 @@ export async function GET() {
       user_email: emailMap[m.profile_id] || m.user_email || null,
     }));
 
-    return NextResponse.json({ farms: farms ?? [], members: enrichedMembers, currentUserId: user.id });
+    return NextResponse.json({
+      farms: farms ?? [],
+      members: enrichedMembers,
+      orphanedUsers,
+      currentUserId: user.id,
+    });
   } catch (err) {
     console.error("admin/farms error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

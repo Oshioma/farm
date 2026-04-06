@@ -22,9 +22,16 @@ type Member = {
   created_at: string;
 };
 
+type OrphanedUser = {
+  id: string;
+  email: string | undefined;
+  created_at: string;
+};
+
 export default function AdminPage() {
   const [farms, setFarms] = useState<Farm[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [orphanedUsers, setOrphanedUsers] = useState<OrphanedUser[]>([]);
   const [currentUserId, setCurrentUserId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -40,6 +47,7 @@ export default function AdminPage() {
     if (!res.ok) throw new Error(data.error || "Failed to load");
     setFarms(data.farms);
     setMembers(data.members);
+    setOrphanedUsers(data.orphanedUsers ?? []);
     setCurrentUserId(data.currentUserId);
   }
 
@@ -239,6 +247,73 @@ export default function AdminPage() {
                 </div>
               )}
             </div>
+
+            {/* Orphaned users (signed up but not on any farm) */}
+            {orphanedUsers.length > 0 && (
+              <div className="rounded-3xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
+                <h2 className="text-xl font-semibold text-amber-900">
+                  Users without a farm
+                  <span className="ml-2 rounded-full bg-amber-200 px-2 py-0.5 text-sm font-medium text-amber-800">
+                    {orphanedUsers.length}
+                  </span>
+                </h2>
+                <p className="mt-1 text-sm text-amber-700">
+                  Signed up but never joined or created a farm.
+                </p>
+                <div className="mt-4 space-y-2">
+                  {orphanedUsers.map((u) => {
+                    const isYou = u.id === currentUserId;
+                    return (
+                      <div
+                        key={u.id}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-white px-4 py-3"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-zinc-900">
+                            {u.email ?? "No email"}
+                            {isYou && <span className="ml-1 text-xs text-zinc-400">(you)</span>}
+                          </p>
+                          <p className="text-xs text-zinc-400">
+                            Signed up {fmtDate(u.created_at)}
+                          </p>
+                        </div>
+                        {!isYou && (
+                          <div>
+                            {confirmDeleteUserId === u.id ? (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => deleteUser(u.id)}
+                                  disabled={deletingUserId === u.id}
+                                  className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60"
+                                >
+                                  {deletingUserId === u.id ? "Deleting..." : "Confirm delete"}
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDeleteUserId(null)}
+                                  className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setConfirmDeleteUserId(u.id);
+                                  setSuccessMsg("");
+                                }}
+                                className="rounded-xl border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                              >
+                                Delete user
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Farms section */}
             {farms.length === 0 ? (
