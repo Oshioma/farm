@@ -38,6 +38,7 @@ export default function PlantsPage() {
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [promotingToCrop, setPromotingToCrop] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -196,6 +197,43 @@ export default function PlantsPage() {
     } finally {
       setDeletingId(null);
       setConfirmDeleteId(null);
+    }
+  }
+
+  async function handlePromoteToCrop(plant: Plant) {
+    if (!activeFarmId) return;
+    try {
+      setPromotingToCrop(true);
+      setError("");
+
+      const notesParts: string[] = [];
+      if (plant.notes) notesParts.push(plant.notes);
+      if (plant.medicinal_properties) notesParts.push(`Medicinal: ${plant.medicinal_properties}`);
+      const combinedNotes = notesParts.join("\n\n") || null;
+
+      const { error: insertError } = await supabase.from("crops").insert({
+        farm_id: activeFarmId,
+        crop_name: plant.name || "Unnamed plant",
+        zone_id: plant.zone_id || null,
+        notes: combinedNotes,
+        status: "planned",
+        is_active: true,
+      });
+      if (insertError) throw insertError;
+
+      await supabase.from("activities").insert({
+        farm_id: activeFarmId,
+        type: "crop_created",
+        title: `${plant.name || "Unnamed plant"} added as crop`,
+        meta: "Plant promoted to crop tracker",
+      });
+
+      setEditPlant(null);
+      alert(`"${plant.name || "Unnamed plant"}" is now tracked as a crop on the Farm page.`);
+    } catch (err) {
+      setError(errMsg(err, "Failed to promote to crop"));
+    } finally {
+      setPromotingToCrop(false);
     }
   }
 
@@ -444,7 +482,7 @@ export default function PlantsPage() {
         {/* Edit modal */}
         {editPlant ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
+            <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 shadow-xl">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold">Edit plant</h2>
                 <button onClick={() => setEditPlant(null)} className="rounded-full p-1 hover:bg-zinc-100">
@@ -519,6 +557,14 @@ export default function PlantsPage() {
                     Cancel
                   </button>
                 </div>
+
+                <button
+                  onClick={() => handlePromoteToCrop(editPlant)}
+                  disabled={promotingToCrop}
+                  className="w-full rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60"
+                >
+                  {promotingToCrop ? "Adding…" : "Track as crop"}
+                </button>
               </div>
             </div>
           </div>

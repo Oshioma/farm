@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Zone, Crop, FertilisationEntry, CompostEntry } from "@/lib/farm";
+import type { Zone, Crop, FertilisationEntry, CompostEntry, HarvestEtaEntry } from "@/lib/farm";
 
 type BedDef = {
   id: string;
@@ -209,11 +209,12 @@ type Props = {
   crops: Crop[];
   fertilisations?: FertilisationEntry[];
   compostEntries?: CompostEntry[];
+  harvestEta?: HarvestEtaEntry[];
   farmName?: string;
   onSelectBed?: (bedId: string) => void;
 };
 
-export function FarmMap({ zones, crops, fertilisations = [], compostEntries = [], farmName, onSelectBed }: Props) {
+export function FarmMap({ zones, crops, fertilisations = [], compostEntries = [], harvestEta = [], farmName, onSelectBed }: Props) {
   const [hoveredBed, setHoveredBed] = useState<string | null>(null);
   const [selectedBed, setSelectedBed] = useState<string | null>(null);
 
@@ -249,6 +250,20 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
       .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   }
 
+  function getHarvestEtaForBed(bedId: string): HarvestEtaEntry | undefined {
+    const id = bedId.toUpperCase();
+    // Match by zone_id if zone exists, or by bed_name
+    const zone = getZoneForBed(bedId);
+    if (zone) {
+      const byZone = harvestEta.find((h) => h.zone_id === zone.id);
+      if (byZone) return byZone;
+    }
+    return harvestEta.find((h) => h.bed_name?.toUpperCase() === id);
+  }
+
+  const MONTH_KEYS = ["mar","apr","may","jun","jul","aug","sep","oct","nov","dec","jan","feb"] as const;
+  const MONTH_LABELS = ["Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb"];
+
   function fmtDate(d: string | null) {
     if (!d) return "";
     const [y, m, day] = d.split("-");
@@ -281,6 +296,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
   const selectedCrops = selected ? getCropsForZone(selected.id) : [];
   const selectedFertilisations = selected ? getFertilisationsForZone(selected.id) : [];
   const selectedCompost = selected ? getCompostForZone(selected.id) : [];
+  const selectedHarvestEta = selectedBed ? getHarvestEtaForBed(selectedBed) : undefined;
 
   return (
     <div>
@@ -486,6 +502,36 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
               ) : (
                 <div className="mt-2 text-xs text-zinc-400">
                   Not mapped to a zone. Create a zone with code &quot;{selectedBed}&quot; to link it.
+                </div>
+              )}
+              {selectedHarvestEta && (
+                <div className="mt-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Harvest ETA</div>
+                  <div className="mt-1.5 rounded-xl border border-orange-100 bg-orange-50/50 p-2.5">
+                    {selectedHarvestEta.main_crop && (
+                      <div className="text-xs font-medium text-orange-800">{selectedHarvestEta.main_crop}</div>
+                    )}
+                    {selectedHarvestEta.expected_harvest_date && (
+                      <div className="mt-0.5 text-[10px] text-orange-600">Harvest: {selectedHarvestEta.expected_harvest_date}</div>
+                    )}
+                    {selectedHarvestEta.beneficial_companions && (
+                      <div className="mt-0.5 text-[10px] text-orange-600">Companions: {selectedHarvestEta.beneficial_companions}</div>
+                    )}
+                    <div className="mt-1.5 grid grid-cols-3 gap-1">
+                      {MONTH_KEYS.map((mk, i) => {
+                        const exp = (selectedHarvestEta as Record<string, unknown>)[`${mk}_expected`] as string | null;
+                        const act = (selectedHarvestEta as Record<string, unknown>)[`${mk}_actual`] as string | null;
+                        if (!exp && !act) return null;
+                        return (
+                          <div key={mk} className="rounded-lg bg-white p-1 text-center">
+                            <div className="text-[9px] font-semibold text-zinc-400">{MONTH_LABELS[i]}</div>
+                            {exp && <div className="text-[10px] text-emerald-600">{exp}</div>}
+                            {act && <div className="text-[10px] text-blue-600">{act}</div>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

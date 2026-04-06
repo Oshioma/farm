@@ -17,8 +17,9 @@ import {
   getFertilisations,
   getCompost,
   getPlants,
+  getHarvestEta,
 } from "@/lib/farm";
-import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, FertilisationEntry, CompostEntry, Plant } from "@/lib/farm";
+import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, FertilisationEntry, CompostEntry, Plant, HarvestEtaEntry } from "@/lib/farm";
 import { formatDate, formatMoney, badgeClass } from "@/app/farm/utils";
 import { CropForm } from "@/app/farm/components/CropForm";
 import { TaskForm } from "@/app/farm/components/TaskForm";
@@ -59,6 +60,7 @@ export default function FarmPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [fertilisations, setFertilisations] = useState<FertilisationEntry[]>([]);
   const [compostEntries, setCompostEntries] = useState<CompostEntry[]>([]);
+  const [harvestEtaEntries, setHarvestEtaEntries] = useState<HarvestEtaEntry[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
 
   const [activeFarmId, setActiveFarmId] = useState<string>("");
@@ -217,7 +219,8 @@ export default function FarmPage() {
   }
 
   async function loadFarmData(farmId: string) {
-    const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows, pestRows, saleRows, fertilisationRows, compostRows, plantRows] = await Promise.all([
+    const currentYear = new Date().getFullYear();
+    const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows, pestRows, saleRows, fertilisationRows, compostRows, plantRows, harvestEtaRows] = await Promise.all([
       getZones(farmId),
       getCrops(farmId),
       getTasks(farmId),
@@ -229,6 +232,7 @@ export default function FarmPage() {
       getFertilisations(farmId),
       getCompost(farmId),
       getPlants(farmId),
+      getHarvestEta(farmId, currentYear),
     ]);
 
     setZones(zoneRows);
@@ -242,6 +246,7 @@ export default function FarmPage() {
     setFertilisations(fertilisationRows);
     setCompostEntries(compostRows);
     setPlants(plantRows);
+    setHarvestEtaEntries(harvestEtaRows);
 
     // Fetch current user's role on this farm
     const { data: { user } } = await supabase.auth.getUser();
@@ -1093,6 +1098,7 @@ export default function FarmPage() {
               { href: "/farm/seedlings", label: "Seedlings" },
               { href: "/plants", label: "Plants" },
               { href: "/fertiliser", label: "Fertiliser" },
+              { href: "/farm/harvest-eta", label: "Harvest ETA" },
               { href: "/farm/compost", label: "Compost" },
               { href: "/farm/soil-tests", label: "Soil tests" },
               { href: "/farm/soil-improvements", label: "Soil improvements" },
@@ -1763,7 +1769,7 @@ export default function FarmPage() {
 
               {zonesView === "map" ? (
                 <div className="mt-5">
-                  <FarmMap zones={zones} crops={crops} fertilisations={fertilisations} compostEntries={compostEntries} farmName={activeFarm?.name} />
+                  <FarmMap zones={zones} crops={crops} fertilisations={fertilisations} compostEntries={compostEntries} harvestEta={harvestEtaEntries} farmName={activeFarm?.name} />
                   <p className="mt-2 text-xs text-zinc-400">
                     Click a bed to see details. To link a bed, create a zone with a matching code (e.g. R1, CL2).
                   </p>

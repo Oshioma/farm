@@ -583,6 +583,56 @@ export async function getSeedlings(farmId: string): Promise<SeedlingEntry[]> {
   return (data ?? []) as SeedlingEntry[];
 }
 
+export type HarvestEtaEntry = {
+  id: string;
+  farm_id: string;
+  year: number;
+  bed_name: string;
+  zone_id: string | null;
+  zone: { name: string; code: string | null }[] | null;
+  main_crop: string | null;
+  expected_harvest_date: string | null;
+  beneficial_companions: string | null;
+  mar_expected: string | null;
+  mar_actual: string | null;
+  apr_expected: string | null;
+  apr_actual: string | null;
+  may_expected: string | null;
+  may_actual: string | null;
+  jun_expected: string | null;
+  jun_actual: string | null;
+  jul_expected: string | null;
+  jul_actual: string | null;
+  aug_expected: string | null;
+  aug_actual: string | null;
+  sep_expected: string | null;
+  sep_actual: string | null;
+  oct_expected: string | null;
+  oct_actual: string | null;
+  nov_expected: string | null;
+  nov_actual: string | null;
+  dec_expected: string | null;
+  dec_actual: string | null;
+  jan_expected: string | null;
+  jan_actual: string | null;
+  feb_expected: string | null;
+  feb_actual: string | null;
+  notes: string | null;
+  created_at: string | null;
+};
+
+export async function getHarvestEta(farmId: string, year: number): Promise<HarvestEtaEntry[]> {
+  const { data, error } = await supabase
+    .from("harvest_eta")
+    .select("id, farm_id, year, bed_name, zone_id, zone:zones(name, code), main_crop, expected_harvest_date, beneficial_companions, mar_expected, mar_actual, apr_expected, apr_actual, may_expected, may_actual, jun_expected, jun_actual, jul_expected, jul_actual, aug_expected, aug_actual, sep_expected, sep_actual, oct_expected, oct_actual, nov_expected, nov_actual, dec_expected, dec_actual, jan_expected, jan_actual, feb_expected, feb_actual, notes, created_at")
+    .eq("farm_id", farmId)
+    .eq("year", year)
+    .order("bed_name");
+
+  if (error) throw new Error(`getHarvestEta failed: ${error.message}`);
+  return (data ?? []) as HarvestEtaEntry[];
+}
+
 export type WorkHoursEntry = {
   id: string;
   farm_id: string;
