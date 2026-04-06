@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import type { Zone, Crop, FertilisationEntry, CompostEntry, HarvestEtaEntry } from "@/lib/farm";
 
 type BedDef = {
@@ -11,7 +11,7 @@ type BedDef = {
   w: number;
   h: number;
   rotate?: number;
-  zone?: string; // matches zone code or name
+  zone?: string;
 };
 
 type LandmarkDef = {
@@ -30,8 +30,28 @@ type FarmLayout = {
   minWidth: number;
   beds: BedDef[];
   landmarks: LandmarkDef[];
+  backgroundImage?: string;
   extraSvg?: React.ReactNode;
 };
+
+// ── localStorage helpers ──
+function storageKey(farmName: string) {
+  return `farm-map-layout:${farmName}`;
+}
+
+function saveCustomLayout(farmName: string, beds: BedDef[], backgroundImage?: string) {
+  try {
+    localStorage.setItem(storageKey(farmName), JSON.stringify({ beds, backgroundImage }));
+  } catch { /* quota exceeded – ignore */ }
+}
+
+function loadCustomLayout(farmName: string): { beds: BedDef[]; backgroundImage?: string } | null {
+  try {
+    const raw = localStorage.getItem(storageKey(farmName));
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
 
 // ── Mount Solomun layout ──
 const mountSolBeds: BedDef[] = [
@@ -167,7 +187,10 @@ const topLandLandmarks: LandmarkDef[] = [
 ];
 
 function getLayout(farmName?: string): FarmLayout {
-  const isTopLand = farmName?.toLowerCase().includes("top land");
+  const name = farmName?.toLowerCase() ?? "";
+  const isTopLand = name.includes("top land");
+  const isMountSol = name.includes("mount sol") || name.includes("solomon");
+
   if (isTopLand) {
     return {
       viewBox: "0 0 980 600",
@@ -176,31 +199,40 @@ function getLayout(farmName?: string): FarmLayout {
       landmarks: topLandLandmarks,
     };
   }
+  if (isMountSol) {
+    return {
+      viewBox: "0 0 740 730",
+      minWidth: 400,
+      beds: mountSolBeds,
+      landmarks: mountSolLandmarks,
+      extraSvg: (
+        <>
+          <path
+            d="M 660,540 Q 580,580 450,620 Q 350,650 200,640 Q 140,635 100,620"
+            fill="none"
+            stroke="#d4d4d8"
+            strokeWidth="4"
+            strokeDasharray="8,4"
+          />
+          <path
+            d="M 660,540 L 700,580"
+            fill="none"
+            stroke="#d4d4d8"
+            strokeWidth="4"
+          />
+          <text x="410" y="200" textAnchor="middle" className="text-[14px] font-bold" fill="#71717a">
+            x
+          </text>
+        </>
+      ),
+    };
+  }
+  // Unknown farm — blank canvas for custom map upload
   return {
-    viewBox: "0 0 740 730",
+    viewBox: "0 0 800 600",
     minWidth: 400,
-    beds: mountSolBeds,
-    landmarks: mountSolLandmarks,
-    extraSvg: (
-      <>
-        <path
-          d="M 660,540 Q 580,580 450,620 Q 350,650 200,640 Q 140,635 100,620"
-          fill="none"
-          stroke="#d4d4d8"
-          strokeWidth="4"
-          strokeDasharray="8,4"
-        />
-        <path
-          d="M 660,540 L 700,580"
-          fill="none"
-          stroke="#d4d4d8"
-          strokeWidth="4"
-        />
-        <text x="410" y="200" textAnchor="middle" className="text-[14px] font-bold" fill="#71717a">
-          x
-        </text>
-      </>
-    ),
+    beds: [],
+    landmarks: [],
   };
 }
 
@@ -210,15 +242,165 @@ type Props = {
   fertilisations?: FertilisationEntry[];
   compostEntries?: CompostEntry[];
   harvestEta?: HarvestEtaEntry[];
+  harvestEta?: HarvestEtaEntry[];
   farmName?: string;
+  farmId?: string;
   onSelectBed?: (bedId: string) => void;
 };
 
-export function FarmMap({ zones, crops, fertilisations = [], compostEntries = [], harvestEta = [], farmName, onSelectBed }: Props) {
+export function FarmMap({ zones, crops, fertilisations = [], compostEntries = [], harvestEta = [], farmName, farmId, onSelectBed }: Props) {
   const [hoveredBed, setHoveredBed] = useState<string | null>(null);
   const [selectedBed, setSelectedBed] = useState<string | null>(null);
 
-  const layout = getLayout(farmName);
+  // ── Edit mode state ──
+  const [editMode, setEditMode] = useState(false);
+  const [editBeds, setEditBeds] = useState<BedDef[]>([]);
+  const [dragBed, setDragBed] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [resizeBed, setResizeBed] = useState<string | null>(null);
+  const [customBg, setCustomBg] = useState<string | undefined>();
+  const [addingBed, setAddingBed] = useState(false);
+  const [newBedLabel, setNewBedLabel] = useState("");
+  const svgRef = useRef<SVGSVGElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const baseLayout = getLayout(farmName);
+
+  // Load custom layout from localStorage on mount / farm change
+  useEffect(() => {
+    if (!farmName) return;
+    const saved = loadCustomLayout(farmName);
+    if (saved) {
+      setEditBeds(saved.beds);
+      setCustomBg(saved.backgroundImage);
+    }
+  }, [farmName]);
+
+  // The active layout merges saved customisations
+  const layout: FarmLayout = {
+    ...baseLayout,
+    beds: editMode ? editBeds : (editBeds.length > 0 ? editBeds : baseLayout.beds),
+    backgroundImage: customBg || baseLayout.backgroundImage,
+  };
+
+  // Enter edit mode
+  function startEdit() {
+    setEditBeds(editBeds.length > 0 ? [...editBeds] : baseLayout.beds.map((b) => ({ ...b })));
+    setEditMode(true);
+    setSelectedBed(null);
+  }
+
+  // Save edits
+  function saveEdit() {
+    if (farmName) saveCustomLayout(farmName, editBeds, customBg);
+    setEditMode(false);
+  }
+
+  // Cancel edits
+  function cancelEdit() {
+    if (farmName) {
+      const saved = loadCustomLayout(farmName);
+      if (saved) {
+        setEditBeds(saved.beds);
+        setCustomBg(saved.backgroundImage);
+      } else {
+        setEditBeds([]);
+        setCustomBg(undefined);
+      }
+    }
+    setEditMode(false);
+  }
+
+  // ── SVG coordinate helpers ──
+  function svgPoint(e: React.MouseEvent): { x: number; y: number } {
+    const svg = svgRef.current;
+    if (!svg) return { x: 0, y: 0 };
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return { x: 0, y: 0 };
+    const svgP = pt.matrixTransform(ctm.inverse());
+    return { x: svgP.x, y: svgP.y };
+  }
+
+  // ── Drag handlers ──
+  const handleMouseDown = useCallback((bedId: string, e: React.MouseEvent) => {
+    if (!editMode) return;
+    e.stopPropagation();
+    const pt = svgPoint(e);
+    const bed = editBeds.find((b) => b.id === bedId);
+    if (!bed) return;
+    setDragBed(bedId);
+    setDragOffset({ x: pt.x - bed.x, y: pt.y - bed.y });
+  }, [editMode, editBeds]);
+
+  const handleResizeDown = useCallback((bedId: string, e: React.MouseEvent) => {
+    if (!editMode) return;
+    e.stopPropagation();
+    setResizeBed(bedId);
+  }, [editMode]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!editMode) return;
+    const pt = svgPoint(e);
+
+    if (dragBed) {
+      setEditBeds((prev) =>
+        prev.map((b) =>
+          b.id === dragBed ? { ...b, x: Math.round(pt.x - dragOffset.x), y: Math.round(pt.y - dragOffset.y) } : b
+        )
+      );
+    }
+
+    if (resizeBed) {
+      setEditBeds((prev) =>
+        prev.map((b) => {
+          if (b.id !== resizeBed) return b;
+          const newW = Math.max(20, Math.round(pt.x - b.x));
+          const newH = Math.max(15, Math.round(pt.y - b.y));
+          return { ...b, w: newW, h: newH };
+        })
+      );
+    }
+  }, [editMode, dragBed, resizeBed, dragOffset]);
+
+  const handleMouseUp = useCallback(() => {
+    setDragBed(null);
+    setResizeBed(null);
+  }, []);
+
+  // ── Add new bed ──
+  function addBed() {
+    if (!newBedLabel.trim()) return;
+    const id = newBedLabel.trim().toUpperCase().replace(/\s+/g, "");
+    if (editBeds.find((b) => b.id === id)) return;
+    setEditBeds((prev) => [...prev, { id, label: newBedLabel.trim(), x: 100, y: 100, w: 80, h: 30 }]);
+    setNewBedLabel("");
+    setAddingBed(false);
+  }
+
+  // ── Delete bed ──
+  function deleteBed(bedId: string) {
+    setEditBeds((prev) => prev.filter((b) => b.id !== bedId));
+    if (selectedBed === bedId) setSelectedBed(null);
+  }
+
+  // ── Map image upload ──
+  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setCustomBg(dataUrl);
+      // If this is a brand new farm with no beds, start with empty bed list in edit mode
+      if (editBeds.length === 0 && baseLayout.beds.length === 0) {
+        setEditBeds([]);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
 
   // Try to match beds to zones by code
   function getZoneForBed(bedId: string): Zone | undefined {
@@ -298,18 +480,123 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
   const selectedCompost = selected ? getCompostForZone(selected.id) : [];
   const selectedHarvestEta = selectedBed ? getHarvestEtaForBed(selectedBed) : undefined;
 
+  // Check if this is a new/unknown farm with no layout
+  const isBlankFarm = baseLayout.beds.length === 0 && editBeds.length === 0 && !customBg;
+
   return (
     <div>
+      {/* ── Edit toolbar ── */}
+      <div className="mb-3 flex items-center gap-2 flex-wrap">
+        {editMode ? (
+          <>
+            <button onClick={saveEdit} className="rounded-xl bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">
+              Save Layout
+            </button>
+            <button onClick={cancelEdit} className="rounded-xl bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-300">
+              Cancel
+            </button>
+            <div className="h-5 w-px bg-zinc-300" />
+            {addingBed ? (
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  value={newBedLabel}
+                  onChange={(e) => setNewBedLabel(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addBed()}
+                  placeholder="Bed name (e.g. R1)"
+                  className="w-36 rounded-lg border border-zinc-300 px-2 py-1.5 text-sm"
+                  autoFocus
+                />
+                <button onClick={addBed} className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-800">Add</button>
+                <button onClick={() => setAddingBed(false)} className="text-sm text-zinc-500 hover:text-zinc-700">Cancel</button>
+              </div>
+            ) : (
+              <button onClick={() => setAddingBed(true)} className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                + Add Bed
+              </button>
+            )}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="rounded-xl bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700"
+            >
+              Upload Map Image
+            </button>
+            {customBg && (
+              <button
+                onClick={() => setCustomBg(undefined)}
+                className="rounded-xl bg-red-100 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-200"
+              >
+                Remove Background
+              </button>
+            )}
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+          </>
+        ) : (
+          <>
+            <button onClick={startEdit} className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800">
+              Edit Map
+            </button>
+            {isBlankFarm && (
+              <>
+                <button
+                  onClick={() => { startEdit(); setTimeout(() => fileInputRef.current?.click(), 100); }}
+                  className="rounded-xl bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
+                >
+                  Upload Your Farm Map
+                </button>
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+              </>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Blank farm prompt */}
+      {isBlankFarm && !editMode && (
+        <div className="mb-4 rounded-2xl border-2 border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
+          <p className="text-lg font-semibold text-zinc-600">No map configured for this farm</p>
+          <p className="mt-1 text-sm text-zinc-400">Upload an aerial photo or sketch of your farm, then place beds on top of it.</p>
+          <button
+            onClick={() => { startEdit(); setTimeout(() => fileInputRef.current?.click(), 100); }}
+            className="mt-4 rounded-xl bg-purple-600 px-6 py-3 text-sm font-medium text-white hover:bg-purple-700"
+          >
+            Upload Farm Map
+          </button>
+        </div>
+      )}
+
       <div className="flex gap-4">
         {/* Map */}
-        <div className="flex-1 overflow-auto rounded-2xl border border-zinc-200 bg-white">
+        <div className={`flex-1 overflow-auto rounded-2xl border bg-white ${editMode ? "border-blue-400 ring-2 ring-blue-100" : "border-zinc-200"}`}>
+          {editMode && (
+            <div className="bg-blue-50 px-3 py-1.5 text-xs text-blue-700 border-b border-blue-200">
+              Drag beds to move them. Drag the bottom-right corner to resize. Click a bed then press Delete to remove it.
+            </div>
+          )}
           <svg
+            ref={svgRef}
             viewBox={layout.viewBox}
-            className="w-full"
+            className={`w-full ${editMode ? "cursor-crosshair" : ""}`}
             style={{ minWidth: layout.minWidth }}
+            onMouseMove={editMode ? handleMouseMove : undefined}
+            onMouseUp={editMode ? handleMouseUp : undefined}
+            onMouseLeave={editMode ? handleMouseUp : undefined}
           >
           {/* Background */}
           <rect width="100%" height="100%" fill="#fafaf9" />
+
+          {/* Custom background image */}
+          {layout.backgroundImage && (
+            <image
+              href={layout.backgroundImage}
+              x="0"
+              y="0"
+              width={layout.viewBox.split(" ")[2]}
+              height={layout.viewBox.split(" ")[3]}
+              preserveAspectRatio="xMidYMid meet"
+              opacity={editMode ? 0.6 : 0.8}
+            />
+          )}
 
           {/* Farm-specific extra SVG (e.g. driveway for Mount Sol) */}
           {layout.extraSvg}
@@ -376,17 +663,19 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
             <g
               key={bed.id}
               transform={
-                bed.rotate
+                bed.rotate && !editMode
                   ? `rotate(${bed.rotate}, ${bed.x + bed.w / 2}, ${bed.y + bed.h / 2})`
                   : undefined
               }
+              onMouseDown={editMode ? (e) => handleMouseDown(bed.id, e) : undefined}
               onClick={() => {
+                if (editMode) { setSelectedBed(selectedBed === bed.id ? null : bed.id); return; }
                 setSelectedBed(selectedBed === bed.id ? null : bed.id);
                 onSelectBed?.(bed.id);
               }}
               onMouseEnter={() => setHoveredBed(bed.id)}
               onMouseLeave={() => setHoveredBed(null)}
-              className="cursor-pointer"
+              className={editMode ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}
             >
               <rect
                 x={bed.x}
@@ -395,11 +684,11 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                 height={bed.h}
                 rx="2"
                 fill={bedColor(bed.id)}
-                stroke={bedStroke(bed.id)}
+                stroke={editMode && selectedBed === bed.id ? "#3b82f6" : bedStroke(bed.id)}
                 strokeWidth={selectedBed === bed.id ? 2 : 1.2}
+                strokeDasharray={editMode ? "4,2" : undefined}
               />
-              {isVerticalLayout ? (
-                // Vertical rows: label at the top, horizontal
+              {isVerticalLayout && !editMode ? (
                 <text
                   x={bed.x + bed.w / 2}
                   y={bed.y - 6}
@@ -421,6 +710,21 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                   {bed.label}
                 </text>
               )}
+              {/* Resize handle (bottom-right corner) */}
+              {editMode && (
+                <rect
+                  x={bed.x + bed.w - 6}
+                  y={bed.y + bed.h - 6}
+                  width={8}
+                  height={8}
+                  rx="1"
+                  fill="#3b82f6"
+                  stroke="white"
+                  strokeWidth={1}
+                  className="cursor-se-resize"
+                  onMouseDown={(e) => handleResizeDown(bed.id, e)}
+                />
+              )}
             </g>
           ))}
         </svg>
@@ -428,7 +732,30 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
 
         {/* Side panel — bed info */}
         <div className="w-56 shrink-0 space-y-3">
-          {selectedBed ? (
+          {/* Edit mode: selected bed controls */}
+          {editMode && selectedBed && (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm space-y-3">
+              <div className="text-lg font-semibold text-blue-900">Editing: {selectedBed}</div>
+              {(() => {
+                const bed = editBeds.find((b) => b.id === selectedBed);
+                if (!bed) return null;
+                return (
+                  <div className="space-y-2 text-xs text-blue-800">
+                    <div>Position: ({bed.x}, {bed.y})</div>
+                    <div>Size: {bed.w} x {bed.h}</div>
+                  </div>
+                );
+              })()}
+              <button
+                onClick={() => deleteBed(selectedBed)}
+                className="w-full rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+              >
+                Delete Bed
+              </button>
+            </div>
+          )}
+
+          {selectedBed && !editMode ? (
             <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-sm">
               <div className="text-lg font-semibold">{isVerticalLayout ? "Row" : "Bed"} {selectedBed}</div>
               {selected ? (
@@ -535,11 +862,11 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                 </div>
               )}
             </div>
-          ) : (
+          ) : !editMode ? (
             <div className="rounded-2xl border border-dashed border-zinc-200 p-4 text-center text-xs text-zinc-400">
               Click a {isVerticalLayout ? "row" : "bed"} on the map to see details
             </div>
-          )}
+          ) : null}
 
           {/* Legend */}
           <div className="rounded-2xl border border-zinc-200 bg-white p-3">
