@@ -251,8 +251,9 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
   }
 
   function getHarvestEtaForBed(bedId: string): HarvestEtaEntry | undefined {
-    const id = bedId.toUpperCase();
-    return harvestEta.find((h) => h.bed_name?.toUpperCase() === id);
+    const zone = getZoneForBed(bedId);
+    if (!zone) return undefined;
+    return harvestEta.find((h) => h.zone_id === zone.id);
   }
 
   const MONTH_KEYS = ["mar","apr","may","jun","jul","aug","sep","oct","nov","dec","jan","feb"] as const;

@@ -32,7 +32,7 @@ const MONTHS = [
 type MonthKey = (typeof MONTHS)[number]["key"];
 
 type FormData = {
-  bed_name: string;
+  zone_id: string;
   main_crop: string;
   expected_harvest_date: string;
   beneficial_companions: string;
@@ -41,7 +41,7 @@ type FormData = {
 
 function blankForm(): FormData {
   const f: Record<string, string> = {
-    bed_name: "",
+    zone_id: "",
     main_crop: "",
     expected_harvest_date: "",
     beneficial_companions: "",
@@ -56,7 +56,7 @@ function blankForm(): FormData {
 
 function entryToForm(e: HarvestEtaEntry): FormData {
   const f: Record<string, string> = {
-    bed_name: e.bed_name ?? "",
+    zone_id: e.zone_id ?? "",
     main_crop: e.main_crop ?? "",
     expected_harvest_date: e.expected_harvest_date ?? "",
     beneficial_companions: e.beneficial_companions ?? "",
@@ -67,6 +67,13 @@ function entryToForm(e: HarvestEtaEntry): FormData {
     f[`${m.key}_actual`] = (e as Record<string, unknown>)[`${m.key}_actual`] as string ?? "";
   }
   return f as FormData;
+}
+
+function zoneName(entry: HarvestEtaEntry, zones: Zone[]): string {
+  const z = entry.zone;
+  if (z && z.length > 0) return z[0].code ?? z[0].name;
+  const found = zones.find((zn) => zn.id === entry.zone_id);
+  return found?.code ?? found?.name ?? "—";
 }
 
 export default function HarvestEtaPage() {
@@ -116,14 +123,14 @@ export default function HarvestEtaPage() {
   }, [activeFarmId, year]);
 
   async function handleSave() {
-    if (!activeFarmId) return;
+    if (!activeFarmId || !form.zone_id) return;
     try {
       setSaving(true);
       setError("");
       const payload: Record<string, unknown> = {
         farm_id: activeFarmId,
         year,
-        bed_name: form.bed_name.trim() || null,
+        zone_id: form.zone_id,
         main_crop: form.main_crop.trim() || null,
         expected_harvest_date: form.expected_harvest_date || null,
         beneficial_companions: form.beneficial_companions.trim() || null,
@@ -171,12 +178,6 @@ export default function HarvestEtaPage() {
     setForm(blankForm());
     setModal("new");
   }
-
-  // Build a list of zone codes for the dropdown
-  const zoneOptions = zones.map((z) => ({
-    code: z.code ?? z.name,
-    label: z.code ? `${z.code} — ${z.name}` : z.name,
-  }));
 
   const activeFarm = farms.find((f) => f.id === activeFarmId);
 
@@ -288,7 +289,7 @@ export default function HarvestEtaPage() {
                 <tbody>
                   {entries.map((row) => (
                     <tr key={row.id} className="border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50 align-top transition-colors">
-                      <td className="sticky left-0 z-10 bg-white px-3 py-2 font-semibold text-zinc-900 whitespace-nowrap">{row.bed_name}</td>
+                      <td className="sticky left-0 z-10 bg-white px-3 py-2 font-semibold text-zinc-900 whitespace-nowrap">{zoneName(row, zones)}</td>
                       <td className="px-3 py-2 whitespace-nowrap font-medium">{row.main_crop ?? <span className="text-zinc-300">—</span>}</td>
                       <td className="px-3 py-2 whitespace-nowrap text-zinc-600">{row.expected_harvest_date ?? <span className="text-zinc-300">—</span>}</td>
                       <td className="px-3 py-2 text-zinc-600 max-w-[120px] truncate">{row.beneficial_companions ?? <span className="text-zinc-300">—</span>}</td>
@@ -337,25 +338,25 @@ export default function HarvestEtaPage() {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-8">
           <div className="w-full max-w-2xl rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl">
             <h2 className="mb-5 text-lg font-semibold">
-              {modal === "new" ? "Add bed entry" : `Edit — ${(modal as HarvestEtaEntry).bed_name}`}
+              {modal === "new" ? "Add bed entry" : `Edit — ${zoneName(modal as HarvestEtaEntry, zones)}`}
             </h2>
             <div className="space-y-3">
               {/* Core fields */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-zinc-600">Bed / Zone</label>
-                  <input
-                    list="bed-options"
+                  <select
                     className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
-                    value={form.bed_name}
-                    onChange={(e) => setForm((p) => ({ ...p, bed_name: e.target.value }))}
-                    placeholder="TR1, R1, CL1…"
-                  />
-                  <datalist id="bed-options">
-                    {zoneOptions.map((z) => (
-                      <option key={z.code} value={z.code}>{z.label}</option>
+                    value={form.zone_id}
+                    onChange={(e) => setForm((p) => ({ ...p, zone_id: e.target.value }))}
+                  >
+                    <option value="">Select a zone…</option>
+                    {zones.map((z) => (
+                      <option key={z.id} value={z.id}>
+                        {z.code ? `${z.code} — ${z.name}` : z.name}
+                      </option>
                     ))}
-                  </datalist>
+                  </select>
                 </div>
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-zinc-600">Main crop</label>
@@ -408,7 +409,7 @@ export default function HarvestEtaPage() {
               </div>
             </div>
             <div className="mt-5 flex gap-2">
-              <button onClick={handleSave} disabled={saving} className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60">
+              <button onClick={handleSave} disabled={saving || !form.zone_id} className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60">
                 {saving ? "Saving..." : "Save"}
               </button>
               <button onClick={() => setModal(null)} className="rounded-2xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
