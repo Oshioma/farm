@@ -1066,6 +1066,7 @@ export default function FarmPage() {
               { href: "/farm/seedlings", label: "Seedlings" },
               { href: "/plants", label: "Plants" },
               { href: "/fertiliser", label: "Fertiliser" },
+              { href: "/farm/harvest-eta", label: "Harvest ETA" },
               { href: "/farm/compost", label: "Compost" },
               { href: "/farm/soil-tests", label: "Soil tests" },
               { href: "/farm/soil-improvements", label: "Soil improvements" },
