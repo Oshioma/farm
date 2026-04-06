@@ -199,12 +199,12 @@ export default function FarmPage() {
   async function handleRequestJoin(farmId: string) {
     setRequestingId(farmId);
     const { data: { user } } = await supabase.auth.getUser();
-    const { error: err } = await supabase.from("join_requests").insert({
+    const { error: err } = await supabase.from("join_requests").upsert({
       farm_id: farmId,
       user_id: user?.id,
       user_email: user?.email,
       status: "pending",
-    });
+    }, { onConflict: "farm_id,user_id" });
     if (err) setError(errMsg(err, "Failed to send request"));
     else setRequestSent(farmId);
     setRequestingId(null);

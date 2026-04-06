@@ -14,6 +14,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(callbackUrl);
   }
 
+  // Handle Supabase token_hash links (e.g. /auth/confirm?token_hash=...&type=recovery)
+  const tokenHash = searchParams.get("token_hash");
+  const type = searchParams.get("type");
+  if (pathname === "/auth/confirm" && tokenHash && type) {
+    const callbackUrl = new URL("/auth/callback", request.url);
+    callbackUrl.searchParams.set("token_hash", tokenHash);
+    callbackUrl.searchParams.set("type", type);
+    callbackUrl.searchParams.set("next", type === "recovery" ? "/reset-password" : "/farm");
+    return NextResponse.redirect(callbackUrl);
+  }
+
   // Protected routes — check auth
   const protectedPaths = ["/farm", "/plants", "/admin"];
   const isProtected = protectedPaths.some(
@@ -59,5 +70,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/farm/:path*", "/plants/:path*", "/admin/:path*", "/reset-password"],
+  matcher: ["/farm/:path*", "/plants/:path*", "/admin/:path*", "/reset-password", "/auth/confirm"],
 };

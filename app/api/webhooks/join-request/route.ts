@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -12,6 +13,7 @@ export async function POST(req: NextRequest) {
   const payload = await req.json();
   const record = payload?.record;
   const userId = record?.user_id ?? "unknown";
+  const userEmail = record?.user_email ?? null;
   const farmId = record?.farm_id ?? "unknown";
   const createdAt = record?.created_at ?? new Date().toISOString();
 
@@ -21,15 +23,40 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "NOTIFY_EMAIL not configured" }, { status: 500 });
   }
 
+  // Look up user email and farm name
+  const admin = getSupabaseAdmin();
+
+  let resolvedEmail = userEmail;
+  if (!resolvedEmail) {
+    try {
+      const { data } = await admin.auth.admin.getUserById(userId);
+      resolvedEmail = data?.user?.email ?? userId;
+    } catch {
+      resolvedEmail = userId;
+    }
+  }
+
+  let farmName = farmId;
+  try {
+    const { data } = await admin
+      .from("farms")
+      .select("name")
+      .eq("id", farmId)
+      .single();
+    if (data?.name) farmName = data.name;
+  } catch {
+    // keep farmId as fallback
+  }
+
   const { error } = await resend.emails.send({
-    from: "Shamba Farm Manager <onboarding@resend.dev>",
+    from: "Shamba Online <onboarding@resend.dev>",
     to: notifyEmail,
-    subject: "New join request",
+    subject: `Join request from ${resolvedEmail}`,
     html: `
-      <p>Someone has requested to join a farm on Shamba Farm Manager.</p>
+      <p>Someone has requested to join a farm on Shamba Online.</p>
       <ul>
-        <li><strong>User ID:</strong> ${userId}</li>
-        <li><strong>Farm ID:</strong> ${farmId}</li>
+        <li><strong>Email:</strong> ${resolvedEmail}</li>
+        <li><strong>Farm:</strong> ${farmName}</li>
         <li><strong>Requested at:</strong> ${new Date(createdAt).toUTCString()}</li>
       </ul>
       <p>Log in to your farm to accept or reject this request.</p>
