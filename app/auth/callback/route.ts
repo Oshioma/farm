@@ -45,11 +45,6 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    // Sign out any existing session first so the code exchange establishes
-    // a clean session for the invited / reset-password user instead of
-    // silently keeping the old logged-in user's session.
-    await supabase.auth.signOut();
-
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
