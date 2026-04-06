@@ -242,7 +242,6 @@ type Props = {
   fertilisations?: FertilisationEntry[];
   compostEntries?: CompostEntry[];
   harvestEta?: HarvestEtaEntry[];
-  harvestEta?: HarvestEtaEntry[];
   farmName?: string;
   farmId?: string;
   onSelectBed?: (bedId: string) => void;
