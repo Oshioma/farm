@@ -306,9 +306,9 @@ export default function HarvestEtaPage() {
                     <tr key={row.id} className="border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50 align-top transition-colors">
                       <td className="sticky left-0 z-10 bg-white px-3 py-2 font-semibold text-zinc-900 whitespace-nowrap">
                         {displayName(row, zones)}
-                        {(row as Record<string, unknown>).crop_id && (
+                        {(row as Record<string, unknown>).crop_id ? (
                           <span className="ml-1 text-[9px] font-normal text-emerald-600" title="Linked to crop">&#x1F517;</span>
-                        )}
+                        ) : null}
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap font-medium">{row.main_crop ?? <span className="text-zinc-300">—</span>}</td>
                       <td className="px-3 py-2 whitespace-nowrap text-zinc-600">{row.expected_harvest_date ?? <span className="text-zinc-300">—</span>}</td>
