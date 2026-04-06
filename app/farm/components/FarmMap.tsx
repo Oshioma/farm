@@ -251,9 +251,14 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
   }
 
   function getHarvestEtaForBed(bedId: string): HarvestEtaEntry | undefined {
+    const id = bedId.toUpperCase();
+    // Match by zone_id if zone exists, or by bed_name
     const zone = getZoneForBed(bedId);
-    if (!zone) return undefined;
-    return harvestEta.find((h) => h.zone_id === zone.id);
+    if (zone) {
+      const byZone = harvestEta.find((h) => h.zone_id === zone.id);
+      if (byZone) return byZone;
+    }
+    return harvestEta.find((h) => h.bed_name?.toUpperCase() === id);
   }
 
   const MONTH_KEYS = ["mar","apr","may","jun","jul","aug","sep","oct","nov","dec","jan","feb"] as const;

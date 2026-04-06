@@ -32,6 +32,7 @@ const MONTHS = [
 type MonthKey = (typeof MONTHS)[number]["key"];
 
 type FormData = {
+  bed_name: string;
   zone_id: string;
   main_crop: string;
   expected_harvest_date: string;
@@ -41,6 +42,7 @@ type FormData = {
 
 function blankForm(): FormData {
   const f: Record<string, string> = {
+    bed_name: "",
     zone_id: "",
     main_crop: "",
     expected_harvest_date: "",
@@ -56,6 +58,7 @@ function blankForm(): FormData {
 
 function entryToForm(e: HarvestEtaEntry): FormData {
   const f: Record<string, string> = {
+    bed_name: e.bed_name ?? "",
     zone_id: e.zone_id ?? "",
     main_crop: e.main_crop ?? "",
     expected_harvest_date: e.expected_harvest_date ?? "",
@@ -69,11 +72,16 @@ function entryToForm(e: HarvestEtaEntry): FormData {
   return f as FormData;
 }
 
-function zoneName(entry: HarvestEtaEntry, zones: Zone[]): string {
-  const z = entry.zone;
-  if (z && z.length > 0) return z[0].code ?? z[0].name;
-  const found = zones.find((zn) => zn.id === entry.zone_id);
-  return found?.code ?? found?.name ?? "—";
+function displayName(entry: HarvestEtaEntry, zones: Zone[]): string {
+  if (entry.zone && entry.zone.length > 0) {
+    const z = entry.zone[0];
+    return z.code ?? z.name;
+  }
+  if (entry.zone_id) {
+    const found = zones.find((zn) => zn.id === entry.zone_id);
+    if (found) return found.code ?? found.name;
+  }
+  return entry.bed_name || "—";
 }
 
 export default function HarvestEtaPage() {
@@ -123,14 +131,15 @@ export default function HarvestEtaPage() {
   }, [activeFarmId, year]);
 
   async function handleSave() {
-    if (!activeFarmId || !form.zone_id) return;
+    if (!activeFarmId || !form.bed_name.trim()) return;
     try {
       setSaving(true);
       setError("");
       const payload: Record<string, unknown> = {
         farm_id: activeFarmId,
         year,
-        zone_id: form.zone_id,
+        bed_name: form.bed_name.trim(),
+        zone_id: form.zone_id || null,
         main_crop: form.main_crop.trim() || null,
         expected_harvest_date: form.expected_harvest_date || null,
         beneficial_companions: form.beneficial_companions.trim() || null,
@@ -289,7 +298,7 @@ export default function HarvestEtaPage() {
                 <tbody>
                   {entries.map((row) => (
                     <tr key={row.id} className="border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50 align-top transition-colors">
-                      <td className="sticky left-0 z-10 bg-white px-3 py-2 font-semibold text-zinc-900 whitespace-nowrap">{zoneName(row, zones)}</td>
+                      <td className="sticky left-0 z-10 bg-white px-3 py-2 font-semibold text-zinc-900 whitespace-nowrap">{displayName(row, zones)}</td>
                       <td className="px-3 py-2 whitespace-nowrap font-medium">{row.main_crop ?? <span className="text-zinc-300">—</span>}</td>
                       <td className="px-3 py-2 whitespace-nowrap text-zinc-600">{row.expected_harvest_date ?? <span className="text-zinc-300">—</span>}</td>
                       <td className="px-3 py-2 text-zinc-600 max-w-[120px] truncate">{row.beneficial_companions ?? <span className="text-zinc-300">—</span>}</td>
@@ -338,25 +347,19 @@ export default function HarvestEtaPage() {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-8">
           <div className="w-full max-w-2xl rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl">
             <h2 className="mb-5 text-lg font-semibold">
-              {modal === "new" ? "Add bed entry" : `Edit — ${zoneName(modal as HarvestEtaEntry, zones)}`}
+              {modal === "new" ? "Add bed entry" : `Edit — ${displayName(modal as HarvestEtaEntry, zones)}`}
             </h2>
             <div className="space-y-3">
               {/* Core fields */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Bed / Zone</label>
-                  <select
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Bed name</label>
+                  <input
                     className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
-                    value={form.zone_id}
-                    onChange={(e) => setForm((p) => ({ ...p, zone_id: e.target.value }))}
-                  >
-                    <option value="">Select a zone…</option>
-                    {zones.map((z) => (
-                      <option key={z.id} value={z.id}>
-                        {z.code ? `${z.code} — ${z.name}` : z.name}
-                      </option>
-                    ))}
-                  </select>
+                    value={form.bed_name}
+                    onChange={(e) => setForm((p) => ({ ...p, bed_name: e.target.value }))}
+                    placeholder="TR1, R1, CL1…"
+                  />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-zinc-600">Main crop</label>
@@ -373,6 +376,23 @@ export default function HarvestEtaPage() {
                   <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.beneficial_companions} onChange={(e) => setForm((p) => ({ ...p, beneficial_companions: e.target.value }))} placeholder="Basil, Marigold" />
                 </div>
               </div>
+              {zones.length > 0 && (
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Link to zone <span className="font-normal text-zinc-400">(optional)</span></label>
+                  <select
+                    className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                    value={form.zone_id}
+                    onChange={(e) => setForm((p) => ({ ...p, zone_id: e.target.value }))}
+                  >
+                    <option value="">— None —</option>
+                    {zones.map((z) => (
+                      <option key={z.id} value={z.id}>
+                        {z.code ? `${z.code} — ${z.name}` : z.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Monthly fields */}
               <div>
@@ -409,7 +429,7 @@ export default function HarvestEtaPage() {
               </div>
             </div>
             <div className="mt-5 flex gap-2">
-              <button onClick={handleSave} disabled={saving || !form.zone_id} className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60">
+              <button onClick={handleSave} disabled={saving || !form.bed_name.trim()} className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60">
                 {saving ? "Saving..." : "Save"}
               </button>
               <button onClick={() => setModal(null)} className="rounded-2xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
