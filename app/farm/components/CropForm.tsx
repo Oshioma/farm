@@ -1,31 +1,34 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { Plus, X } from "lucide-react";
 import type { Zone } from "@/lib/farm";
 
 export type CropFormData = {
   crop_name: string;
   variety: string;
-  zone_id: string;
+  zone_ids: string[];
   status: string;
   planted_on: string;
   expected_harvest_start: string;
   estimated_yield_kg: string;
   expected_sale_price_per_kg: string;
   notes: string;
+  medicinal_properties: string;
   image_file: File | null;
 };
 
 const blank: CropFormData = {
   crop_name: "",
   variety: "",
-  zone_id: "",
+  zone_ids: [],
   status: "planned",
   planted_on: "",
   expected_harvest_start: "",
   estimated_yield_kg: "",
   expected_sale_price_per_kg: "",
   notes: "",
+  medicinal_properties: "",
   image_file: null,
 };
 
@@ -43,7 +46,7 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
 
   useEffect(() => {
     if (defaultZoneId) {
-      setForm((prev) => (prev.zone_id ? prev : { ...prev, zone_id: defaultZoneId }));
+      setForm((prev) => (prev.zone_ids.length ? prev : { ...prev, zone_ids: [defaultZoneId] }));
     }
   }, [defaultZoneId]);
 
@@ -54,25 +57,49 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
     setPreview(f ? URL.createObjectURL(f) : "");
   }
 
+  function handleZoneChange(index: number, value: string) {
+    setForm((prev) => {
+      const next = [...prev.zone_ids];
+      next[index] = value;
+      return { ...prev, zone_ids: next };
+    });
+  }
+
+  function addZone() {
+    setForm((prev) => ({ ...prev, zone_ids: [...prev.zone_ids, ""] }));
+  }
+
+  function removeZone(index: number) {
+    setForm((prev) => ({
+      ...prev,
+      zone_ids: prev.zone_ids.filter((_, i) => i !== index),
+    }));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const ok = await onSubmit(form);
+    // Filter out empty zone selections before submitting
+    const cleanedForm = { ...form, zone_ids: form.zone_ids.filter(Boolean) };
+    const ok = await onSubmit(cleanedForm);
     setSaving(false);
     if (ok) {
       if (preview && preview.startsWith("blob:")) URL.revokeObjectURL(preview);
       setPreview("");
-      setForm({ ...blank, zone_id: defaultZoneId });
+      setForm({ ...blank, zone_ids: defaultZoneId ? [defaultZoneId] : [] });
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
+
+  // Zones already selected (to filter from dropdowns)
+  const selectedZoneIds = new Set(form.zone_ids.filter(Boolean));
 
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
       <div className="mb-5">
         <h2 className="text-xl font-semibold">Create crop</h2>
         <p className="mt-1 text-sm text-zinc-500">
-          Add the crop cycle and link it to a zone.
+          Add the crop cycle and link it to one or more zones.
         </p>
       </div>
 
@@ -122,19 +149,47 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
         ) : null}
 
         <div>
-          <label className="mb-2 block text-sm font-medium">Zone</label>
-          <select
-            value={form.zone_id}
-            onChange={(e) => setForm((prev) => ({ ...prev, zone_id: e.target.value }))}
-            className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-          >
-            <option value="">No zone</option>
-            {zones.map((zone) => (
-              <option key={zone.id} value={zone.id}>
-                {zone.name}
-              </option>
+          <label className="mb-2 block text-sm font-medium">Zones</label>
+          <div className="space-y-2">
+            {form.zone_ids.map((zoneId, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <select
+                  value={zoneId}
+                  onChange={(e) => handleZoneChange(index, e.target.value)}
+                  className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                >
+                  <option value="">Select zone</option>
+                  {zones.map((zone) => (
+                    <option
+                      key={zone.id}
+                      value={zone.id}
+                      disabled={selectedZoneIds.has(zone.id) && zone.id !== zoneId}
+                    >
+                      {zone.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => removeZone(index)}
+                  className="flex-shrink-0 rounded-xl border border-zinc-200 p-2 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"
+                  title="Remove zone"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             ))}
-          </select>
+            {form.zone_ids.length < zones.length && (
+              <button
+                type="button"
+                onClick={addZone}
+                className="flex items-center gap-1.5 rounded-xl border border-dashed border-zinc-300 px-3 py-2 text-sm text-zinc-500 transition hover:border-zinc-400 hover:text-zinc-700"
+              >
+                <Plus size={14} />
+                {form.zone_ids.length === 0 ? "Add zone" : "Add another zone"}
+              </button>
+            )}
+          </div>
         </div>
 
         <div>
@@ -212,7 +267,19 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
             value={form.notes}
             onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
             className="min-h-[80px] w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            placeholder="Growing conditions, observations, medicinal properties…"
+            placeholder="Growing conditions, observations…"
+          />
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium">
+            Medicinal properties <span className="font-normal text-zinc-400">(optional)</span>
+          </label>
+          <textarea
+            value={form.medicinal_properties}
+            onChange={(e) => setForm((prev) => ({ ...prev, medicinal_properties: e.target.value }))}
+            className="min-h-[80px] w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+            placeholder="Known medicinal uses, healing properties…"
           />
         </div>
 
