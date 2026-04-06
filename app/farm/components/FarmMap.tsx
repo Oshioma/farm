@@ -39,13 +39,13 @@ function storageKey(farmName: string) {
   return `farm-map-layout:${farmName}`;
 }
 
-function saveCustomLayout(farmName: string, beds: BedDef[], backgroundImage?: string) {
+function saveCustomLayout(farmName: string, beds: BedDef[], landmarks: LandmarkDef[], backgroundImage?: string) {
   try {
-    localStorage.setItem(storageKey(farmName), JSON.stringify({ beds, backgroundImage }));
+    localStorage.setItem(storageKey(farmName), JSON.stringify({ beds, landmarks, backgroundImage }));
   } catch { /* quota exceeded – ignore */ }
 }
 
-function loadCustomLayout(farmName: string): { beds: BedDef[]; backgroundImage?: string } | null {
+function loadCustomLayout(farmName: string): { beds: BedDef[]; landmarks?: LandmarkDef[]; backgroundImage?: string } | null {
   try {
     const raw = localStorage.getItem(storageKey(farmName));
     if (!raw) return null;
@@ -260,6 +260,14 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
   const [customBg, setCustomBg] = useState<string | undefined>();
   const [addingBed, setAddingBed] = useState(false);
   const [newBedLabel, setNewBedLabel] = useState("");
+  // Landmark editing state
+  const [editLandmarks, setEditLandmarks] = useState<LandmarkDef[]>([]);
+  const [dragLandmark, setDragLandmark] = useState<number | null>(null);
+  const [dragLmOffset, setDragLmOffset] = useState({ x: 0, y: 0 });
+  const [editingLabelIdx, setEditingLabelIdx] = useState<number | null>(null);
+  const [editingLabelText, setEditingLabelText] = useState("");
+  const [addingLabel, setAddingLabel] = useState(false);
+  const [newLabelText, setNewLabelText] = useState("");
   const svgRef = useRef<SVGSVGElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -271,28 +279,34 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
     const saved = loadCustomLayout(farmName);
     if (saved) {
       setEditBeds(saved.beds);
+      if (saved.landmarks) setEditLandmarks(saved.landmarks);
       setCustomBg(saved.backgroundImage);
     }
   }, [farmName]);
 
   // The active layout merges saved customisations
+  const hasCustom = editBeds.length > 0 || editLandmarks.length > 0;
   const layout: FarmLayout = {
     ...baseLayout,
-    beds: editMode ? editBeds : (editBeds.length > 0 ? editBeds : baseLayout.beds),
+    beds: editMode ? editBeds : (hasCustom ? editBeds : baseLayout.beds),
+    landmarks: editMode ? editLandmarks : (editLandmarks.length > 0 ? editLandmarks : baseLayout.landmarks),
     backgroundImage: customBg || baseLayout.backgroundImage,
   };
 
   // Enter edit mode
   function startEdit() {
     setEditBeds(editBeds.length > 0 ? [...editBeds] : baseLayout.beds.map((b) => ({ ...b })));
+    setEditLandmarks(editLandmarks.length > 0 ? [...editLandmarks] : baseLayout.landmarks.map((l) => ({ ...l })));
     setEditMode(true);
     setSelectedBed(null);
+    setEditingLabelIdx(null);
   }
 
   // Save edits
   function saveEdit() {
-    if (farmName) saveCustomLayout(farmName, editBeds, customBg);
+    if (farmName) saveCustomLayout(farmName, editBeds, editLandmarks, customBg);
     setEditMode(false);
+    setEditingLabelIdx(null);
   }
 
   // Cancel edits
@@ -301,13 +315,16 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
       const saved = loadCustomLayout(farmName);
       if (saved) {
         setEditBeds(saved.beds);
+        setEditLandmarks(saved.landmarks ?? []);
         setCustomBg(saved.backgroundImage);
       } else {
         setEditBeds([]);
+        setEditLandmarks([]);
         setCustomBg(undefined);
       }
     }
     setEditMode(false);
+    setEditingLabelIdx(null);
   }
 
   // ── SVG coordinate helpers ──
@@ -340,6 +357,17 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
     setResizeBed(bedId);
   }, [editMode]);
 
+  // ── Landmark drag handler ──
+  const handleLandmarkDown = useCallback((idx: number, e: React.MouseEvent) => {
+    if (!editMode) return;
+    e.stopPropagation();
+    const pt = svgPoint(e);
+    const lm = editLandmarks[idx];
+    if (!lm) return;
+    setDragLandmark(idx);
+    setDragLmOffset({ x: pt.x - lm.x, y: pt.y - lm.y });
+  }, [editMode, editLandmarks]);
+
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!editMode) return;
     const pt = svgPoint(e);
@@ -362,11 +390,20 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
         })
       );
     }
-  }, [editMode, dragBed, resizeBed, dragOffset]);
+
+    if (dragLandmark !== null) {
+      setEditLandmarks((prev) =>
+        prev.map((lm, i) =>
+          i === dragLandmark ? { ...lm, x: Math.round(pt.x - dragLmOffset.x), y: Math.round(pt.y - dragLmOffset.y) } : lm
+        )
+      );
+    }
+  }, [editMode, dragBed, resizeBed, dragOffset, dragLandmark, dragLmOffset]);
 
   const handleMouseUp = useCallback(() => {
     setDragBed(null);
     setResizeBed(null);
+    setDragLandmark(null);
   }, []);
 
   // ── Add new bed ──
@@ -383,6 +420,37 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
   function deleteBed(bedId: string) {
     setEditBeds((prev) => prev.filter((b) => b.id !== bedId));
     if (selectedBed === bedId) setSelectedBed(null);
+  }
+
+  // ── Add new text label ──
+  function addLabel() {
+    if (!newLabelText.trim()) return;
+    setEditLandmarks((prev) => [...prev, { type: "label", x: 150, y: 150, label: newLabelText.trim() }]);
+    setNewLabelText("");
+    setAddingLabel(false);
+  }
+
+  // ── Edit label text ──
+  function startEditLabel(idx: number) {
+    const lm = editLandmarks[idx];
+    if (!lm || lm.type !== "label") return;
+    setEditingLabelIdx(idx);
+    setEditingLabelText(lm.label ?? "");
+  }
+
+  function saveEditLabel() {
+    if (editingLabelIdx === null) return;
+    setEditLandmarks((prev) =>
+      prev.map((lm, i) => i === editingLabelIdx ? { ...lm, label: editingLabelText } : lm)
+    );
+    setEditingLabelIdx(null);
+    setEditingLabelText("");
+  }
+
+  // ── Delete landmark ──
+  function deleteLandmark(idx: number) {
+    setEditLandmarks((prev) => prev.filter((_, i) => i !== idx));
+    if (editingLabelIdx === idx) setEditingLabelIdx(null);
   }
 
   // ── Map image upload ──
@@ -514,6 +582,25 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                 + Add Bed
               </button>
             )}
+            {addingLabel ? (
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  value={newLabelText}
+                  onChange={(e) => setNewLabelText(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addLabel()}
+                  placeholder="Label text"
+                  className="w-36 rounded-lg border border-zinc-300 px-2 py-1.5 text-sm"
+                  autoFocus
+                />
+                <button onClick={addLabel} className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-800">Add</button>
+                <button onClick={() => setAddingLabel(false)} className="text-sm text-zinc-500 hover:text-zinc-700">Cancel</button>
+              </div>
+            ) : (
+              <button onClick={() => setAddingLabel(true)} className="rounded-xl bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700">
+                + Add Text
+              </button>
+            )}
             <button
               onClick={() => fileInputRef.current?.click()}
               className="rounded-xl bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700"
@@ -569,7 +656,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
         <div className={`flex-1 overflow-auto rounded-2xl border bg-white ${editMode ? "border-blue-400 ring-2 ring-blue-100" : "border-zinc-200"}`}>
           {editMode && (
             <div className="bg-blue-50 px-3 py-1.5 text-xs text-blue-700 border-b border-blue-200">
-              Drag beds to move them. Drag the bottom-right corner to resize. Click a bed then press Delete to remove it.
+              Drag beds &amp; labels to move them. Drag corners to resize beds. Double-click text to edit it.
             </div>
           )}
           <svg
@@ -602,6 +689,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
 
           {/* Landmarks */}
           {layout.landmarks.map((lm, i) => {
+            const isSelected = editMode && editingLabelIdx === i;
             if (lm.type === "dashed-rect") {
               return (
                 <rect
@@ -610,11 +698,13 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                   y={lm.y}
                   width={lm.w}
                   height={lm.h}
-                  fill="none"
-                  stroke="#a1a1aa"
+                  fill={editMode ? "rgba(161,161,170,0.08)" : "none"}
+                  stroke={editMode ? "#3b82f6" : "#a1a1aa"}
                   strokeWidth="1.5"
                   strokeDasharray="6,4"
                   rx="3"
+                  className={editMode ? "cursor-grab" : undefined}
+                  onMouseDown={editMode ? (e) => handleLandmarkDown(i, e) : undefined}
                 />
               );
             }
@@ -625,28 +715,50 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                   cx={lm.x}
                   cy={lm.y}
                   r={lm.r}
-                  fill={lm.label === "tree-filled" ? "#92400e" : "none"}
-                  stroke="#a1a1aa"
+                  fill={lm.label === "tree-filled" ? "#92400e" : editMode ? "rgba(161,161,170,0.08)" : "none"}
+                  stroke={editMode ? "#3b82f6" : "#a1a1aa"}
                   strokeWidth="1.2"
+                  className={editMode ? "cursor-grab" : undefined}
+                  onMouseDown={editMode ? (e) => handleLandmarkDown(i, e) : undefined}
                 />
               );
             }
             if (lm.type === "label") {
               const lines = (lm.label ?? "").split("\n");
               return (
-                <text
+                <g
                   key={i}
-                  x={lm.x}
-                  y={lm.y}
-                  className="text-[11px] font-semibold uppercase tracking-wider"
-                  fill="#71717a"
+                  className={editMode ? "cursor-grab" : undefined}
+                  onMouseDown={editMode ? (e) => handleLandmarkDown(i, e) : undefined}
+                  onDoubleClick={editMode ? () => startEditLabel(i) : undefined}
                 >
-                  {lines.map((line, li) => (
-                    <tspan key={li} x={lm.x} dy={li === 0 ? 0 : 14}>
-                      {line}
-                    </tspan>
-                  ))}
-                </text>
+                  {/* Hit area for easier grabbing */}
+                  {editMode && (
+                    <rect
+                      x={lm.x - 4}
+                      y={lm.y - 12}
+                      width={Math.max(40, (lm.label ?? "").length * 7)}
+                      height={lines.length * 14 + 8}
+                      fill={isSelected ? "rgba(59,130,246,0.1)" : "rgba(161,161,170,0.08)"}
+                      stroke={isSelected ? "#3b82f6" : "#d4d4d8"}
+                      strokeWidth={isSelected ? 1.5 : 0.5}
+                      strokeDasharray="3,2"
+                      rx="2"
+                    />
+                  )}
+                  <text
+                    x={lm.x}
+                    y={lm.y}
+                    className="text-[11px] font-semibold uppercase tracking-wider"
+                    fill={isSelected ? "#3b82f6" : "#71717a"}
+                  >
+                    {lines.map((line, li) => (
+                      <tspan key={li} x={lm.x} dy={li === 0 ? 0 : 14}>
+                        {line}
+                      </tspan>
+                    ))}
+                  </text>
+                </g>
               );
             }
             return null;
@@ -750,6 +862,40 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                 className="w-full rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
               >
                 Delete Bed
+              </button>
+            </div>
+          )}
+
+          {/* Edit mode: label editing panel */}
+          {editMode && editingLabelIdx !== null && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm space-y-3">
+              <div className="text-lg font-semibold text-amber-900">Edit Text</div>
+              <textarea
+                value={editingLabelText}
+                onChange={(e) => setEditingLabelText(e.target.value)}
+                placeholder="Label text (use newlines for multi-line)"
+                className="w-full rounded-lg border border-amber-300 px-2 py-1.5 text-sm"
+                rows={3}
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={saveEditLabel}
+                  className="flex-1 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700"
+                >
+                  Save Text
+                </button>
+                <button
+                  onClick={() => setEditingLabelIdx(null)}
+                  className="rounded-lg bg-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-300"
+                >
+                  Cancel
+                </button>
+              </div>
+              <button
+                onClick={() => deleteLandmark(editingLabelIdx)}
+                className="w-full rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+              >
+                Delete Label
               </button>
             </div>
           )}
