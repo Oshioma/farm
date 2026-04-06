@@ -128,7 +128,7 @@ export default function SystemsPage() {
       const { error: err } = await supabase.from("system_docs").insert({
         farm_id: activeFarmId,
         title: form.title.trim(),
-        url: form.url.trim() || null,
+        url: form.url.trim(),
         description: form.description.trim() || null,
         category: form.category,
       });
@@ -152,7 +152,7 @@ export default function SystemsPage() {
       setSuccess("");
       const { error: err } = await supabase.from("system_docs").update({
         title: editForm.title.trim(),
-        url: editForm.url.trim() || null,
+        url: editForm.url.trim(),
         description: editForm.description.trim() || null,
         category: editForm.category,
       }).eq("id", id);
