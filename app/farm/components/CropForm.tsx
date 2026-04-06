@@ -14,6 +14,7 @@ export type CropFormData = {
   estimated_yield_kg: string;
   expected_sale_price_per_kg: string;
   notes: string;
+  medicinal_properties: string;
   image_file: File | null;
 };
 
@@ -27,6 +28,7 @@ const blank: CropFormData = {
   estimated_yield_kg: "",
   expected_sale_price_per_kg: "",
   notes: "",
+  medicinal_properties: "",
   image_file: null,
 };
 
@@ -149,55 +151,34 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
         <div>
           <label className="mb-2 block text-sm font-medium">Zones</label>
           <div className="space-y-2">
-            {form.zone_ids.length === 0 ? (
-              <div className="flex items-center gap-2">
+            {form.zone_ids.map((zoneId, index) => (
+              <div key={index} className="flex items-center gap-2">
                 <select
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setForm((prev) => ({ ...prev, zone_ids: [e.target.value] }));
-                    }
-                  }}
+                  value={zoneId}
+                  onChange={(e) => handleZoneChange(index, e.target.value)}
                   className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
                 >
-                  <option value="">No zone</option>
+                  <option value="">Select zone</option>
                   {zones.map((zone) => (
-                    <option key={zone.id} value={zone.id}>
+                    <option
+                      key={zone.id}
+                      value={zone.id}
+                      disabled={selectedZoneIds.has(zone.id) && zone.id !== zoneId}
+                    >
                       {zone.name}
                     </option>
                   ))}
                 </select>
+                <button
+                  type="button"
+                  onClick={() => removeZone(index)}
+                  className="flex-shrink-0 rounded-xl border border-zinc-200 p-2 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"
+                  title="Remove zone"
+                >
+                  <X size={16} />
+                </button>
               </div>
-            ) : (
-              form.zone_ids.map((zoneId, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <select
-                    value={zoneId}
-                    onChange={(e) => handleZoneChange(index, e.target.value)}
-                    className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                  >
-                    <option value="">Select zone</option>
-                    {zones.map((zone) => (
-                      <option
-                        key={zone.id}
-                        value={zone.id}
-                        disabled={selectedZoneIds.has(zone.id) && zone.id !== zoneId}
-                      >
-                        {zone.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => removeZone(index)}
-                    className="flex-shrink-0 rounded-xl border border-zinc-200 p-2 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"
-                    title="Remove zone"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              ))
-            )}
+            ))}
             {form.zone_ids.length < zones.length && (
               <button
                 type="button"
@@ -205,7 +186,7 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
                 className="flex items-center gap-1.5 rounded-xl border border-dashed border-zinc-300 px-3 py-2 text-sm text-zinc-500 transition hover:border-zinc-400 hover:text-zinc-700"
               >
                 <Plus size={14} />
-                Add another zone
+                {form.zone_ids.length === 0 ? "Add zone" : "Add another zone"}
               </button>
             )}
           </div>
@@ -286,7 +267,19 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
             value={form.notes}
             onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
             className="min-h-[80px] w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            placeholder="Growing conditions, observations, medicinal properties…"
+            placeholder="Growing conditions, observations…"
+          />
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium">
+            Medicinal properties <span className="font-normal text-zinc-400">(optional)</span>
+          </label>
+          <textarea
+            value={form.medicinal_properties}
+            onChange={(e) => setForm((prev) => ({ ...prev, medicinal_properties: e.target.value }))}
+            className="min-h-[80px] w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+            placeholder="Known medicinal uses, healing properties…"
           />
         </div>
 

@@ -77,12 +77,13 @@ export default function FarmPage() {
   const [editingCropForm, setEditingCropForm] = useState({
     crop_name: "", variety: "", zone_ids: [] as string[], status: "", planted_on: "",
     expected_harvest_start: "", estimated_yield_kg: "", expected_sale_price_per_kg: "",
-    notes: "",
+    notes: "", medicinal_properties: "",
   });
   const [savingCropId, setSavingCropId] = useState<string | null>(null);
   const [deletingCropId, setDeletingCropId] = useState<string | null>(null);
   const [expandedCropId, setExpandedCropId] = useState<string | null>(null);
   const [cropNoteText, setCropNoteText] = useState("");
+  const [cropMedicinalText, setCropMedicinalText] = useState("");
   const [savingCropNote, setSavingCropNote] = useState(false);
   // No-farm state
   const [noFarmMode, setNoFarmMode] = useState<"idle" | "create" | "join">("idle");
@@ -380,6 +381,7 @@ export default function FarmPage() {
           ? Number(data.expected_sale_price_per_kg)
           : null,
         notes: data.notes.trim() || null,
+        medicinal_properties: data.medicinal_properties.trim() || null,
         is_active: true,
       }).select("id");
       if (insertError) throw insertError;
@@ -439,6 +441,7 @@ export default function FarmPage() {
       estimated_yield_kg: crop.estimated_yield_kg != null ? String(crop.estimated_yield_kg) : "",
       expected_sale_price_per_kg: crop.expected_sale_price_per_kg != null ? String(crop.expected_sale_price_per_kg) : "",
       notes: crop.notes ?? "",
+      medicinal_properties: crop.medicinal_properties ?? "",
     });
   }
 
@@ -458,6 +461,7 @@ export default function FarmPage() {
         estimated_yield_kg: editingCropForm.estimated_yield_kg ? Number(editingCropForm.estimated_yield_kg) : null,
         expected_sale_price_per_kg: editingCropForm.expected_sale_price_per_kg ? Number(editingCropForm.expected_sale_price_per_kg) : null,
         notes: editingCropForm.notes.trim() || null,
+        medicinal_properties: editingCropForm.medicinal_properties.trim() || null,
       };
       console.log("Crop update payload:", JSON.stringify(payload), "id:", id);
       const res = await supabase.from("crops").update(payload).eq("id", id).select();
@@ -485,9 +489,11 @@ export default function FarmPage() {
     if (expandedCropId === crop.id) {
       setExpandedCropId(null);
       setCropNoteText("");
+      setCropMedicinalText("");
     } else {
       setExpandedCropId(crop.id);
       setCropNoteText(crop.notes ?? "");
+      setCropMedicinalText(crop.medicinal_properties ?? "");
     }
   }
 
@@ -495,9 +501,12 @@ export default function FarmPage() {
     try {
       setSavingCropNote(true);
       setError("");
-      const { error: err } = await supabase.from("crops").update({ notes: cropNoteText.trim() || null }).eq("id", id);
+      const { error: err } = await supabase.from("crops").update({
+        notes: cropNoteText.trim() || null,
+        medicinal_properties: cropMedicinalText.trim() || null,
+      }).eq("id", id);
       if (err) throw err;
-      setCrops((prev) => prev.map((c) => c.id === id ? { ...c, notes: cropNoteText.trim() || null } : c));
+      setCrops((prev) => prev.map((c) => c.id === id ? { ...c, notes: cropNoteText.trim() || null, medicinal_properties: cropMedicinalText.trim() || null } : c));
     } catch (err) {
       setError(errMsg(err, "Failed to save note"));
     } finally {
@@ -1847,42 +1856,33 @@ export default function FarmPage() {
                                   </td>
                                   <td className="px-3 py-2">
                                     <div className="space-y-1">
-                                      {editingCropForm.zone_ids.length === 0 ? (
-                                        <select value=""
-                                          onChange={(e) => { if (e.target.value) setEditingCropForm((p) => ({ ...p, zone_ids: [e.target.value] })); }}
-                                          className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900">
-                                          <option value="">No zone</option>
-                                          {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
-                                        </select>
-                                      ) : (
-                                        editingCropForm.zone_ids.map((zid, idx) => (
-                                          <div key={idx} className="flex items-center gap-1">
-                                            <select value={zid}
-                                              onChange={(e) => setEditingCropForm((p) => {
-                                                const next = [...p.zone_ids];
-                                                next[idx] = e.target.value;
-                                                return { ...p, zone_ids: next };
-                                              })}
-                                              className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900">
-                                              <option value="">Select zone</option>
-                                              {zones.map((z) => (
-                                                <option key={z.id} value={z.id}
-                                                  disabled={editingCropForm.zone_ids.includes(z.id) && z.id !== zid}>
-                                                  {z.name}
-                                                </option>
-                                              ))}
-                                            </select>
-                                            <button type="button" onClick={() => setEditingCropForm((p) => ({ ...p, zone_ids: p.zone_ids.filter((_, i) => i !== idx) }))}
-                                              className="flex-shrink-0 rounded-lg border border-zinc-200 p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
-                                              <X size={14} />
-                                            </button>
-                                          </div>
-                                        ))
-                                      )}
+                                      {editingCropForm.zone_ids.map((zid, idx) => (
+                                        <div key={idx} className="flex items-center gap-1">
+                                          <select value={zid}
+                                            onChange={(e) => setEditingCropForm((p) => {
+                                              const next = [...p.zone_ids];
+                                              next[idx] = e.target.value;
+                                              return { ...p, zone_ids: next };
+                                            })}
+                                            className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900">
+                                            <option value="">Select zone</option>
+                                            {zones.map((z) => (
+                                              <option key={z.id} value={z.id}
+                                                disabled={editingCropForm.zone_ids.includes(z.id) && z.id !== zid}>
+                                                {z.name}
+                                              </option>
+                                            ))}
+                                          </select>
+                                          <button type="button" onClick={() => setEditingCropForm((p) => ({ ...p, zone_ids: p.zone_ids.filter((_, i) => i !== idx) }))}
+                                            className="flex-shrink-0 rounded-lg border border-zinc-200 p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+                                            <X size={14} />
+                                          </button>
+                                        </div>
+                                      ))}
                                       {editingCropForm.zone_ids.length < zones.length && (
                                         <button type="button" onClick={() => setEditingCropForm((p) => ({ ...p, zone_ids: [...p.zone_ids, ""] }))}
                                           className="flex items-center gap-1 rounded-lg border border-dashed border-zinc-300 px-2 py-1 text-xs text-zinc-500 hover:border-zinc-400 hover:text-zinc-700">
-                                          <Plus size={12} /> Add zone
+                                          <Plus size={12} /> {editingCropForm.zone_ids.length === 0 ? "Add zone" : "Add zone"}
                                         </button>
                                       )}
                                     </div>
@@ -1920,7 +1920,14 @@ export default function FarmPage() {
                                         value={editingCropForm.notes}
                                         onChange={(e) => setEditingCropForm((p) => ({ ...p, notes: e.target.value }))}
                                         className="min-h-[60px] w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
-                                        placeholder="Growing conditions, observations, medicinal properties…"
+                                        placeholder="Growing conditions, observations…"
+                                      />
+                                      <label className="block text-xs font-medium text-zinc-500">Medicinal properties</label>
+                                      <textarea
+                                        value={editingCropForm.medicinal_properties}
+                                        onChange={(e) => setEditingCropForm((p) => ({ ...p, medicinal_properties: e.target.value }))}
+                                        className="min-h-[60px] w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                                        placeholder="Known medicinal uses, healing properties…"
                                       />
                                       <div className="flex gap-1">
                                         <button onClick={() => handleSaveCrop(crop.id)} disabled={savingCropId === crop.id}
@@ -1947,8 +1954,11 @@ export default function FarmPage() {
                                         <div className="text-zinc-500">{crop.variety || "\u2014"}</div>
                                       </div>
                                     </div>
-                                    {crop.notes && expandedCropId !== crop.id && (
-                                      <div className="mt-1 ml-5 text-xs text-zinc-400 truncate max-w-[180px]">📝 Has notes</div>
+                                    {(crop.notes || crop.medicinal_properties) && expandedCropId !== crop.id && (
+                                      <div className="mt-1 ml-5 space-y-0.5">
+                                        {crop.notes && <div className="text-xs text-zinc-400 truncate max-w-[180px]">📝 Has notes</div>}
+                                        {crop.medicinal_properties && <div className="text-xs text-emerald-600 truncate max-w-[180px]">🌿 {crop.medicinal_properties}</div>}
+                                      </div>
                                     )}
                                   </td>
                                   <td className="px-4 py-4">{
@@ -1986,7 +1996,14 @@ export default function FarmPage() {
                                           value={cropNoteText}
                                           onChange={(e) => setCropNoteText(e.target.value)}
                                           className="min-h-[100px] w-full max-w-lg rounded-2xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-900"
-                                          placeholder="Add notes — growing conditions, observations, medicinal properties…"
+                                          placeholder="Add notes — growing conditions, observations…"
+                                        />
+                                        <label className="block text-sm font-medium text-zinc-700">Medicinal properties</label>
+                                        <textarea
+                                          value={cropMedicinalText}
+                                          onChange={(e) => setCropMedicinalText(e.target.value)}
+                                          className="min-h-[80px] w-full max-w-lg rounded-2xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-900"
+                                          placeholder="Known medicinal uses, healing properties…"
                                         />
                                         <div className="flex gap-2">
                                           <button
