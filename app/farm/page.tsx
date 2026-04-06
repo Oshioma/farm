@@ -1074,6 +1074,14 @@ export default function FarmPage() {
               >
                 Invite
               </Link>
+              {userEmail && userEmail === process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAIL && (
+                <Link
+                  href="/admin"
+                  className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                >
+                  Admin
+                </Link>
+              )}
               {userEmail && (
                 <span className="text-sm text-zinc-500">{userEmail}</span>
               )}
