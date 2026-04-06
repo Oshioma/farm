@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { getFarms, getZones, getCrops, getTasks } from "@/lib/farm";
-import type { Farm, Zone, Crop, Task } from "@/lib/farm";
+import { getFarms, getZones, getCrops, getTasks, getMembers } from "@/lib/farm";
+import type { Farm, Zone, Crop, Task, FarmMember } from "@/lib/farm";
 import { formatDate, badgeClass } from "@/app/farm/utils";
 
 function errMsg(err: unknown, fallback: string): string {
@@ -19,11 +19,13 @@ export default function WorkerTasksPage() {
   const [zones, setZones] = useState<Zone[]>([]);
   const [crops, setCrops] = useState<Crop[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [members, setMembers] = useState<FarmMember[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "today" | "overdue">("all");
+  const [groupBy, setGroupBy] = useState<"none" | "assignee">("assignee");
 
   useEffect(() => {
     (async () => {
@@ -45,14 +47,16 @@ export default function WorkerTasksPage() {
       try {
         setLoading(true);
         setError("");
-        const [zoneRows, cropRows, taskRows] = await Promise.all([
+        const [zoneRows, cropRows, taskRows, memberRows] = await Promise.all([
           getZones(activeFarmId),
           getCrops(activeFarmId),
           getTasks(activeFarmId),
+          getMembers(activeFarmId),
         ]);
         setZones(zoneRows);
         setCrops(cropRows);
         setTasks(taskRows);
+        setMembers(memberRows);
       } catch (err) {
         setError(errMsg(err, "Failed to load tasks"));
       } finally {
@@ -76,6 +80,30 @@ export default function WorkerTasksPage() {
     if (filter === "overdue") return open.filter((t) => t.due_date && t.due_date < today);
     return open;
   }, [tasks, filter, today]);
+
+  const groupedOpenTasks = useMemo(() => {
+    if (groupBy === "none") return [{ label: "", key: "__all__", tasks: openTasks }];
+    const groups: { label: string; key: string; tasks: Task[] }[] = [];
+    const unassigned: Task[] = [];
+    const byAssignee: Record<string, Task[]> = {};
+
+    for (const task of openTasks) {
+      if (task.assigned_to) {
+        if (!byAssignee[task.assigned_to]) byAssignee[task.assigned_to] = [];
+        byAssignee[task.assigned_to].push(task);
+      } else {
+        unassigned.push(task);
+      }
+    }
+
+    if (unassigned.length > 0) {
+      groups.push({ label: "General (unassigned)", key: "__unassigned__", tasks: unassigned });
+    }
+    for (const [assignee, assigneeTasks] of Object.entries(byAssignee).sort(([a], [b]) => a.localeCompare(b))) {
+      groups.push({ label: assignee, key: assignee, tasks: assigneeTasks });
+    }
+    return groups;
+  }, [openTasks, groupBy]);
 
   const completedTasks = tasks.filter(
     (t) => t.status === "done" || t.status === "cancelled"
@@ -178,7 +206,7 @@ export default function WorkerTasksPage() {
 
         {activeFarm && (
           <>
-            <div className="mb-4 flex flex-wrap gap-2">
+            <div className="mb-4 flex flex-wrap items-center gap-2">
               {(
                 [
                   { key: "all", label: `All open (${tasks.filter((t) => t.status === "todo" || t.status === "in_progress").length})` },
@@ -198,15 +226,35 @@ export default function WorkerTasksPage() {
                   {label}
                 </button>
               ))}
+              <span className="mx-1 text-zinc-300">|</span>
+              <button
+                onClick={() => setGroupBy(groupBy === "assignee" ? "none" : "assignee")}
+                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                  groupBy === "assignee"
+                    ? "bg-indigo-600 text-white"
+                    : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
+                }`}
+              >
+                Group by person
+              </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-6">
               {openTasks.length === 0 ? (
                 <div className="rounded-3xl border border-zinc-200 bg-white p-8 text-center text-sm text-zinc-500">
                   No tasks match this filter.
                 </div>
               ) : (
-                openTasks.map((task) => {
+                groupedOpenTasks.map((group) => (
+                  <div key={group.key}>
+                    {group.label && (
+                      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+                        {group.label}
+                        <span className="ml-2 text-xs font-normal">({group.tasks.length})</span>
+                      </h3>
+                    )}
+                    <div className="space-y-3">
+                {group.tasks.map((task) => {
                   const isCompleting = completingTaskId === task.id;
                   const isToday = task.due_date === today;
                   const isOverdue = task.due_date ? task.due_date < today : false;
@@ -255,6 +303,10 @@ export default function WorkerTasksPage() {
                         {formatDate(task.due_date)}
                       </div>
 
+                      {task.assigned_to && groupBy === "none" ? (
+                        <p className="mt-1.5 text-xs text-indigo-600 font-medium">{task.assigned_to}</p>
+                      ) : null}
+
                       {task.description && (
                         <p className="mt-2 text-sm text-zinc-500">{task.description}</p>
                       )}
@@ -278,7 +330,10 @@ export default function WorkerTasksPage() {
                       </div>
                     </div>
                   );
-                })
+                })}
+                    </div>
+                  </div>
+                ))
               )}
             </div>
 
