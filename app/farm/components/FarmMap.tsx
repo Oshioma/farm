@@ -234,7 +234,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
   }
 
   function getCropsForZone(zoneId: string): Crop[] {
-    return crops.filter((c) => c.zone_id === zoneId);
+    return crops.filter((c) => c.zone_ids?.includes(zoneId) || c.zone_id === zoneId);
   }
 
   function getFertilisationsForZone(zoneId: string): FertilisationEntry[] {
