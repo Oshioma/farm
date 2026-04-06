@@ -81,6 +81,12 @@ export default function WorkerTasksPage() {
     return open;
   }, [tasks, filter, today]);
 
+  const memberEmailMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const m of members) map[m.profile_id] = m.user_email ?? m.profile_id;
+    return map;
+  }, [members]);
+
   const groupedOpenTasks = useMemo(() => {
     if (groupBy === "none") return [{ label: "", key: "__all__", tasks: openTasks }];
     const groups: { label: string; key: string; tasks: Task[] }[] = [];
@@ -99,11 +105,13 @@ export default function WorkerTasksPage() {
     if (unassigned.length > 0) {
       groups.push({ label: "General (unassigned)", key: "__unassigned__", tasks: unassigned });
     }
-    for (const [assignee, assigneeTasks] of Object.entries(byAssignee).sort(([a], [b]) => a.localeCompare(b))) {
-      groups.push({ label: assignee, key: assignee, tasks: assigneeTasks });
+    for (const [assignee, assigneeTasks] of Object.entries(byAssignee).sort(([a], [b]) =>
+      (memberEmailMap[a] ?? a).localeCompare(memberEmailMap[b] ?? b)
+    )) {
+      groups.push({ label: memberEmailMap[assignee] ?? assignee, key: assignee, tasks: assigneeTasks });
     }
     return groups;
-  }, [openTasks, groupBy]);
+  }, [openTasks, groupBy, memberEmailMap]);
 
   const completedTasks = tasks.filter(
     (t) => t.status === "done" || t.status === "cancelled"
@@ -304,7 +312,7 @@ export default function WorkerTasksPage() {
                       </div>
 
                       {task.assigned_to && groupBy === "none" ? (
-                        <p className="mt-1.5 text-xs text-indigo-600 font-medium">{task.assigned_to}</p>
+                        <p className="mt-1.5 text-xs text-indigo-600 font-medium">{memberEmailMap[task.assigned_to] ?? task.assigned_to}</p>
                       ) : null}
 
                       {task.description && (

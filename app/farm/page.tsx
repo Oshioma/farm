@@ -340,6 +340,12 @@ export default function FarmPage() {
     (task) => task.status === "todo" || task.status === "in_progress"
   );
 
+  const memberEmailMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const m of members) map[m.profile_id] = m.user_email ?? m.profile_id;
+    return map;
+  }, [members]);
+
   const groupedOpenTasks = useMemo(() => {
     const groups: { label: string; key: string; tasks: Task[] }[] = [];
     const unassigned: Task[] = [];
@@ -357,12 +363,14 @@ export default function FarmPage() {
     if (unassigned.length > 0) {
       groups.push({ label: "General (unassigned)", key: "__unassigned__", tasks: unassigned });
     }
-    for (const [assignee, assigneeTasks] of Object.entries(byAssignee).sort(([a], [b]) => a.localeCompare(b))) {
-      groups.push({ label: assignee, key: assignee, tasks: assigneeTasks });
+    for (const [assignee, assigneeTasks] of Object.entries(byAssignee).sort(([a], [b]) =>
+      (memberEmailMap[a] ?? a).localeCompare(memberEmailMap[b] ?? b)
+    )) {
+      groups.push({ label: memberEmailMap[assignee] ?? assignee, key: assignee, tasks: assigneeTasks });
     }
 
     return groups;
-  }, [openTasks]);
+  }, [openTasks, memberEmailMap]);
 
   const completedTasks = tasks.filter(
     (task) => task.status === "done" || task.status === "cancelled"
@@ -1606,7 +1614,7 @@ export default function FarmPage() {
                               className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                             >
                               <option value="">Unassigned</option>
-                              {members.map((m) => <option key={m.profile_id} value={m.user_email ?? m.profile_id}>{m.user_email ?? m.profile_id}</option>)}
+                              {members.map((m) => <option key={m.profile_id} value={m.profile_id}>{m.user_email ?? m.profile_id}</option>)}
                             </select>
                             <input
                               type="date"
@@ -1670,7 +1678,7 @@ export default function FarmPage() {
                             </div>
 
                             {task.assigned_to ? (
-                              <p className="mt-1.5 text-xs text-indigo-600 font-medium">{task.assigned_to}</p>
+                              <p className="mt-1.5 text-xs text-indigo-600 font-medium">{memberEmailMap[task.assigned_to] ?? task.assigned_to}</p>
                             ) : null}
 
                             {task.description ? (

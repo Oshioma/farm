@@ -127,7 +127,7 @@ export function TaskForm({ zones, crops, members, defaultZoneId, onSubmit }: Pro
           >
             <option value="">Unassigned (general task)</option>
             {members.map((m) => (
-              <option key={m.profile_id} value={m.user_email ?? m.profile_id}>
+              <option key={m.profile_id} value={m.profile_id}>
                 {m.user_email ?? m.profile_id}
               </option>
             ))}
