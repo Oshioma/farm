@@ -368,9 +368,12 @@ export default function FarmPage() {
         imageUrl = urlData.publicUrl;
       }
 
-      const { data: inserted, error: insertError } = await supabase.from("crops").insert({
+      const extraZoneIds = zoneIds.length > 1 ? JSON.stringify(zoneIds.slice(1)) : null;
+
+      const { error: insertError } = await supabase.from("crops").insert({
         farm_id: activeFarmId,
         zone_id: primaryZoneId,
+        extra_zone_ids: extraZoneIds,
         crop_name: cropName,
         variety: data.variety.trim() || null,
         status: data.status,
@@ -383,15 +386,8 @@ export default function FarmPage() {
         notes: data.notes.trim() || null,
         medicinal_properties: data.medicinal_properties.trim() || null,
         is_active: true,
-      }).select("id");
+      });
       if (insertError) throw insertError;
-
-      // Insert multi-zone assignments into crop_zones junction table
-      const cropId = inserted?.[0]?.id;
-      if (cropId && zoneIds.length > 0) {
-        const rows = zoneIds.map((zid) => ({ crop_id: cropId, zone_id: zid }));
-        await supabase.from("crop_zones").insert(rows);
-      }
 
       // Sync image to plants gallery
       if (imageUrl) {
@@ -451,10 +447,12 @@ export default function FarmPage() {
       setError("");
       const zoneIds = editingCropForm.zone_ids.filter(Boolean);
       const primaryZoneId = zoneIds[0] || null;
+      const extraZoneIds = zoneIds.length > 1 ? JSON.stringify(zoneIds.slice(1)) : null;
       const payload = {
         crop_name: editingCropForm.crop_name.trim(),
         variety: editingCropForm.variety.trim() || null,
         zone_id: primaryZoneId,
+        extra_zone_ids: extraZoneIds,
         status: editingCropForm.status || null,
         planted_on: editingCropForm.planted_on || null,
         expected_harvest_start: editingCropForm.expected_harvest_start || null,
@@ -468,13 +466,6 @@ export default function FarmPage() {
       console.log("Crop update response:", JSON.stringify(res));
       if (res.error) throw res.error;
       if (!res.data || res.data.length === 0) throw new Error("Update returned no rows — RLS may be blocking updates.");
-
-      // Sync crop_zones junction table
-      await supabase.from("crop_zones").delete().eq("crop_id", id);
-      if (zoneIds.length > 0) {
-        const rows = zoneIds.map((zid) => ({ crop_id: id, zone_id: zid }));
-        await supabase.from("crop_zones").insert(rows);
-      }
 
       setEditingCropId(null);
       await loadFarmData(activeFarmId);
