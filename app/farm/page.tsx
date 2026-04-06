@@ -30,6 +30,7 @@ import { PestForm } from "@/app/farm/components/PestForm";
 import { SaleForm } from "@/app/farm/components/SaleForm";
 import { ZoneForm } from "@/app/farm/components/ZoneForm";
 import { FarmMap } from "@/app/farm/components/FarmMap";
+import { Plus, X } from "lucide-react";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
 import type { CropFormData } from "@/app/farm/components/CropForm";
 import type { TaskFormData } from "@/app/farm/components/TaskForm";
@@ -76,14 +77,15 @@ export default function FarmPage() {
   const [editingTaskForm, setEditingTaskForm] = useState<TaskFormData | null>(null);
   const [editingCropId, setEditingCropId] = useState<string | null>(null);
   const [editingCropForm, setEditingCropForm] = useState({
-    crop_name: "", variety: "", zone_id: "", status: "", planted_on: "",
+    crop_name: "", variety: "", zone_ids: [] as string[], status: "", planted_on: "",
     expected_harvest_start: "", estimated_yield_kg: "", expected_sale_price_per_kg: "",
-    notes: "",
+    notes: "", medicinal_properties: "",
   });
   const [savingCropId, setSavingCropId] = useState<string | null>(null);
   const [deletingCropId, setDeletingCropId] = useState<string | null>(null);
   const [expandedCropId, setExpandedCropId] = useState<string | null>(null);
   const [cropNoteText, setCropNoteText] = useState("");
+  const [cropMedicinalText, setCropMedicinalText] = useState("");
   const [savingCropNote, setSavingCropNote] = useState(false);
   // No-farm state
   const [noFarmMode, setNoFarmMode] = useState<"idle" | "create" | "join">("idle");
@@ -357,6 +359,9 @@ export default function FarmPage() {
       const cropName = data.crop_name.trim();
       if (!cropName) throw new Error("Crop name is required.");
 
+      const zoneIds = data.zone_ids.filter(Boolean);
+      const primaryZoneId = zoneIds[0] || null;
+
       // Upload image if provided
       let imageUrl: string | null = null;
       if (data.image_file) {
@@ -368,9 +373,12 @@ export default function FarmPage() {
         imageUrl = urlData.publicUrl;
       }
 
+      const extraZoneIds = zoneIds.length > 1 ? JSON.stringify(zoneIds.slice(1)) : null;
+
       const { error: insertError } = await supabase.from("crops").insert({
         farm_id: activeFarmId,
-        zone_id: data.zone_id || null,
+        zone_id: primaryZoneId,
+        extra_zone_ids: extraZoneIds,
         crop_name: cropName,
         variety: data.variety.trim() || null,
         status: data.status,
@@ -381,6 +389,7 @@ export default function FarmPage() {
           ? Number(data.expected_sale_price_per_kg)
           : null,
         notes: data.notes.trim() || null,
+        medicinal_properties: data.medicinal_properties.trim() || null,
         is_active: true,
       });
       if (insertError) throw insertError;
@@ -396,15 +405,20 @@ export default function FarmPage() {
           name: plantName,
           image_url: imageUrl,
           notes: data.notes.trim() || null,
-          zone_id: data.zone_id || null,
+          zone_id: primaryZoneId,
         });
       }
 
+      const zoneCount = zoneIds.length;
       await supabase.from("activities").insert({
         farm_id: activeFarmId,
         type: "crop_created",
         title: `${cropName} added`,
-        meta: data.zone_id ? "Crop linked to zone" : "Crop created",
+        meta: zoneCount > 1
+          ? `Crop linked to ${zoneCount} zones`
+          : zoneCount === 1
+            ? "Crop linked to zone"
+            : "Crop created",
       });
 
       await loadFarmData(activeFarmId);
@@ -417,16 +431,18 @@ export default function FarmPage() {
 
   function startEditCrop(crop: Crop) {
     setEditingCropId(crop.id);
+    const zoneIds = crop.zone_ids?.length ? crop.zone_ids : crop.zone_id ? [crop.zone_id] : [];
     setEditingCropForm({
       crop_name: crop.crop_name,
       variety: crop.variety ?? "",
-      zone_id: crop.zone_id ?? "",
+      zone_ids: zoneIds,
       status: crop.status ?? "planned",
       planted_on: crop.planted_on ?? "",
       expected_harvest_start: crop.expected_harvest_start ?? "",
       estimated_yield_kg: crop.estimated_yield_kg != null ? String(crop.estimated_yield_kg) : "",
       expected_sale_price_per_kg: crop.expected_sale_price_per_kg != null ? String(crop.expected_sale_price_per_kg) : "",
       notes: crop.notes ?? "",
+      medicinal_properties: crop.medicinal_properties ?? "",
     });
   }
 
@@ -434,22 +450,28 @@ export default function FarmPage() {
     try {
       setSavingCropId(id);
       setError("");
+      const zoneIds = editingCropForm.zone_ids.filter(Boolean);
+      const primaryZoneId = zoneIds[0] || null;
+      const extraZoneIds = zoneIds.length > 1 ? JSON.stringify(zoneIds.slice(1)) : null;
       const payload = {
         crop_name: editingCropForm.crop_name.trim(),
         variety: editingCropForm.variety.trim() || null,
-        zone_id: editingCropForm.zone_id || null,
+        zone_id: primaryZoneId,
+        extra_zone_ids: extraZoneIds,
         status: editingCropForm.status || null,
         planted_on: editingCropForm.planted_on || null,
         expected_harvest_start: editingCropForm.expected_harvest_start || null,
         estimated_yield_kg: editingCropForm.estimated_yield_kg ? Number(editingCropForm.estimated_yield_kg) : null,
         expected_sale_price_per_kg: editingCropForm.expected_sale_price_per_kg ? Number(editingCropForm.expected_sale_price_per_kg) : null,
         notes: editingCropForm.notes.trim() || null,
+        medicinal_properties: editingCropForm.medicinal_properties.trim() || null,
       };
       console.log("Crop update payload:", JSON.stringify(payload), "id:", id);
       const res = await supabase.from("crops").update(payload).eq("id", id).select();
       console.log("Crop update response:", JSON.stringify(res));
       if (res.error) throw res.error;
       if (!res.data || res.data.length === 0) throw new Error("Update returned no rows — RLS may be blocking updates.");
+
       setEditingCropId(null);
       await loadFarmData(activeFarmId);
     } catch (err) {
@@ -463,9 +485,11 @@ export default function FarmPage() {
     if (expandedCropId === crop.id) {
       setExpandedCropId(null);
       setCropNoteText("");
+      setCropMedicinalText("");
     } else {
       setExpandedCropId(crop.id);
       setCropNoteText(crop.notes ?? "");
+      setCropMedicinalText(crop.medicinal_properties ?? "");
     }
   }
 
@@ -473,9 +497,12 @@ export default function FarmPage() {
     try {
       setSavingCropNote(true);
       setError("");
-      const { error: err } = await supabase.from("crops").update({ notes: cropNoteText.trim() || null }).eq("id", id);
+      const { error: err } = await supabase.from("crops").update({
+        notes: cropNoteText.trim() || null,
+        medicinal_properties: cropMedicinalText.trim() || null,
+      }).eq("id", id);
       if (err) throw err;
-      setCrops((prev) => prev.map((c) => c.id === id ? { ...c, notes: cropNoteText.trim() || null } : c));
+      setCrops((prev) => prev.map((c) => c.id === id ? { ...c, notes: cropNoteText.trim() || null, medicinal_properties: cropMedicinalText.trim() || null } : c));
     } catch (err) {
       setError(errMsg(err, "Failed to save note"));
     } finally {
@@ -1752,7 +1779,7 @@ export default function FarmPage() {
               ) : (
                 <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {zones.map((zone) => {
-                    const zoneCrops = crops.filter((c) => c.zone_id === zone.id);
+                    const zoneCrops = crops.filter((c) => c.zone_ids?.includes(zone.id) || c.zone_id === zone.id);
                     return (
                       <div key={zone.id} className="rounded-2xl border border-zinc-200 p-4">
                         <div className="flex items-center justify-between gap-2">
@@ -1825,12 +1852,37 @@ export default function FarmPage() {
                                       className="mt-1 w-full min-w-[100px] rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
                                   </td>
                                   <td className="px-3 py-2">
-                                    <select value={editingCropForm.zone_id}
-                                      onChange={(e) => setEditingCropForm((p) => ({ ...p, zone_id: e.target.value }))}
-                                      className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900">
-                                      <option value="">No zone</option>
-                                      {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
-                                    </select>
+                                    <div className="space-y-1">
+                                      {editingCropForm.zone_ids.map((zid, idx) => (
+                                        <div key={idx} className="flex items-center gap-1">
+                                          <select value={zid}
+                                            onChange={(e) => setEditingCropForm((p) => {
+                                              const next = [...p.zone_ids];
+                                              next[idx] = e.target.value;
+                                              return { ...p, zone_ids: next };
+                                            })}
+                                            className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900">
+                                            <option value="">Select zone</option>
+                                            {zones.map((z) => (
+                                              <option key={z.id} value={z.id}
+                                                disabled={editingCropForm.zone_ids.includes(z.id) && z.id !== zid}>
+                                                {z.name}
+                                              </option>
+                                            ))}
+                                          </select>
+                                          <button type="button" onClick={() => setEditingCropForm((p) => ({ ...p, zone_ids: p.zone_ids.filter((_, i) => i !== idx) }))}
+                                            className="flex-shrink-0 rounded-lg border border-zinc-200 p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+                                            <X size={14} />
+                                          </button>
+                                        </div>
+                                      ))}
+                                      {editingCropForm.zone_ids.length < zones.length && (
+                                        <button type="button" onClick={() => setEditingCropForm((p) => ({ ...p, zone_ids: [...p.zone_ids, ""] }))}
+                                          className="flex items-center gap-1 rounded-lg border border-dashed border-zinc-300 px-2 py-1 text-xs text-zinc-500 hover:border-zinc-400 hover:text-zinc-700">
+                                          <Plus size={12} /> {editingCropForm.zone_ids.length === 0 ? "Add zone" : "Add zone"}
+                                        </button>
+                                      )}
+                                    </div>
                                   </td>
                                   <td className="px-3 py-2">
                                     <select value={editingCropForm.status}
@@ -1865,7 +1917,14 @@ export default function FarmPage() {
                                         value={editingCropForm.notes}
                                         onChange={(e) => setEditingCropForm((p) => ({ ...p, notes: e.target.value }))}
                                         className="min-h-[60px] w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
-                                        placeholder="Growing conditions, observations, medicinal properties…"
+                                        placeholder="Growing conditions, observations…"
+                                      />
+                                      <label className="block text-xs font-medium text-zinc-500">Medicinal properties</label>
+                                      <textarea
+                                        value={editingCropForm.medicinal_properties}
+                                        onChange={(e) => setEditingCropForm((p) => ({ ...p, medicinal_properties: e.target.value }))}
+                                        className="min-h-[60px] w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                                        placeholder="Known medicinal uses, healing properties…"
                                       />
                                       <div className="flex gap-1">
                                         <button onClick={() => handleSaveCrop(crop.id)} disabled={savingCropId === crop.id}
@@ -1892,11 +1951,18 @@ export default function FarmPage() {
                                         <div className="text-zinc-500">{crop.variety || "\u2014"}</div>
                                       </div>
                                     </div>
-                                    {crop.notes && expandedCropId !== crop.id && (
-                                      <div className="mt-1 ml-5 text-xs text-zinc-400 truncate max-w-[180px]">📝 Has notes</div>
+                                    {(crop.notes || crop.medicinal_properties) && expandedCropId !== crop.id && (
+                                      <div className="mt-1 ml-5 space-y-0.5">
+                                        {crop.notes && <div className="text-xs text-zinc-400 truncate max-w-[180px]">📝 Has notes</div>}
+                                        {crop.medicinal_properties && <div className="text-xs text-emerald-600 truncate max-w-[180px]">🌿 {crop.medicinal_properties}</div>}
+                                      </div>
                                     )}
                                   </td>
-                                  <td className="px-4 py-4">{crop.zone?.[0]?.name || (crop.zone_id ? zones.find((z) => z.id === crop.zone_id)?.name ?? "Unknown zone" : "No zone")}</td>
+                                  <td className="px-4 py-4">{
+                                    crop.zone_ids?.length
+                                      ? crop.zone_ids.map((zid) => zones.find((z) => z.id === zid)?.name).filter(Boolean).join(", ") || "Unknown zone"
+                                      : crop.zone?.[0]?.name || (crop.zone_id ? zones.find((z) => z.id === crop.zone_id)?.name ?? "Unknown zone" : "No zone")
+                                  }</td>
                                   <td className="px-4 py-4">
                                     <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass(crop.status)}`}>
                                       {crop.status}
@@ -1927,7 +1993,14 @@ export default function FarmPage() {
                                           value={cropNoteText}
                                           onChange={(e) => setCropNoteText(e.target.value)}
                                           className="min-h-[100px] w-full max-w-lg rounded-2xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-900"
-                                          placeholder="Add notes — growing conditions, observations, medicinal properties…"
+                                          placeholder="Add notes — growing conditions, observations…"
+                                        />
+                                        <label className="block text-sm font-medium text-zinc-700">Medicinal properties</label>
+                                        <textarea
+                                          value={cropMedicinalText}
+                                          onChange={(e) => setCropMedicinalText(e.target.value)}
+                                          className="min-h-[80px] w-full max-w-lg rounded-2xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-900"
+                                          placeholder="Known medicinal uses, healing properties…"
                                         />
                                         <div className="flex gap-2">
                                           <button

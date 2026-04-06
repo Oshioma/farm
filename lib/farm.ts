@@ -28,8 +28,11 @@ export type Crop = {
   actual_yield_kg: number | null;
   expected_sale_price_per_kg: number | null;
   notes: string | null;
+  medicinal_properties: string | null;
   zone_id: string | null;
+  extra_zone_ids: string | null;
   zone: { name: string }[] | null;
+  zone_ids?: string[];
 };
 
 export type Task = {
@@ -134,7 +137,9 @@ export async function getCrops(farmId: string): Promise<Crop[]> {
       actual_yield_kg,
       expected_sale_price_per_kg,
       notes,
+      medicinal_properties,
       zone_id,
+      extra_zone_ids,
       zone:zones(name)
     `
     )
@@ -143,7 +148,25 @@ export async function getCrops(farmId: string): Promise<Crop[]> {
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`getCrops failed: ${error.message}`);
-  return (data ?? []) as Crop[];
+
+  const crops = (data ?? []) as Crop[];
+
+  // Build zone_ids from zone_id + extra_zone_ids JSON column
+  for (const crop of crops) {
+    const ids: string[] = [];
+    if (crop.zone_id) ids.push(crop.zone_id);
+    if (crop.extra_zone_ids) {
+      try {
+        const extra = JSON.parse(crop.extra_zone_ids) as string[];
+        for (const eid of extra) {
+          if (eid && !ids.includes(eid)) ids.push(eid);
+        }
+      } catch { /* ignore bad JSON */ }
+    }
+    crop.zone_ids = ids;
+  }
+
+  return crops;
 }
 
 export async function getTasks(farmId: string): Promise<Task[]> {
