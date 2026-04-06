@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { getFarms, getHarvestEta } from "@/lib/farm";
-import type { Farm, HarvestEtaEntry } from "@/lib/farm";
+import { getFarms, getHarvestEta, getZones } from "@/lib/farm";
+import type { Farm, HarvestEtaEntry, Zone } from "@/lib/farm";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -32,7 +32,7 @@ const MONTHS = [
 type MonthKey = (typeof MONTHS)[number]["key"];
 
 type FormData = {
-  bed_number: string;
+  bed_name: string;
   main_crop: string;
   expected_harvest_date: string;
   beneficial_companions: string;
@@ -41,7 +41,7 @@ type FormData = {
 
 function blankForm(): FormData {
   const f: Record<string, string> = {
-    bed_number: "",
+    bed_name: "",
     main_crop: "",
     expected_harvest_date: "",
     beneficial_companions: "",
@@ -56,7 +56,7 @@ function blankForm(): FormData {
 
 function entryToForm(e: HarvestEtaEntry): FormData {
   const f: Record<string, string> = {
-    bed_number: String(e.bed_number),
+    bed_name: e.bed_name ?? "",
     main_crop: e.main_crop ?? "",
     expected_harvest_date: e.expected_harvest_date ?? "",
     beneficial_companions: e.beneficial_companions ?? "",
@@ -71,6 +71,7 @@ function entryToForm(e: HarvestEtaEntry): FormData {
 
 export default function HarvestEtaPage() {
   const [farms, setFarms] = useState<Farm[]>([]);
+  const [zones, setZones] = useState<Zone[]>([]);
   const [entries, setEntries] = useState<HarvestEtaEntry[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
   const [year, setYear] = useState(2025);
@@ -83,8 +84,9 @@ export default function HarvestEtaPage() {
   const router = useRouter();
 
   async function loadEntries(farmId: string, yr: number) {
-    const rows = await getHarvestEta(farmId, yr);
+    const [rows, zoneRows] = await Promise.all([getHarvestEta(farmId, yr), getZones(farmId)]);
     setEntries(rows);
+    setZones(zoneRows);
   }
 
   useEffect(() => {
@@ -121,7 +123,7 @@ export default function HarvestEtaPage() {
       const payload: Record<string, unknown> = {
         farm_id: activeFarmId,
         year,
-        bed_number: parseInt(form.bed_number, 10) || 0,
+        bed_name: form.bed_name.trim() || null,
         main_crop: form.main_crop.trim() || null,
         expected_harvest_date: form.expected_harvest_date || null,
         beneficial_companions: form.beneficial_companions.trim() || null,
@@ -170,10 +172,11 @@ export default function HarvestEtaPage() {
     setModal("new");
   }
 
-  function monthLabel(m: (typeof MONTHS)[number], yr: number) {
-    const isNextYear = m.key === "jan" || m.key === "feb";
-    return `${m.label} ${isNextYear ? yr + 1 : yr}`;
-  }
+  // Build a list of zone codes for the dropdown
+  const zoneOptions = zones.map((z) => ({
+    code: z.code ?? z.name,
+    label: z.code ? `${z.code} — ${z.name}` : z.name,
+  }));
 
   const activeFarm = farms.find((f) => f.id === activeFarmId);
 
@@ -285,7 +288,7 @@ export default function HarvestEtaPage() {
                 <tbody>
                   {entries.map((row) => (
                     <tr key={row.id} className="border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50 align-top transition-colors">
-                      <td className="sticky left-0 z-10 bg-white px-3 py-2 font-semibold text-zinc-900 whitespace-nowrap">{row.bed_number}</td>
+                      <td className="sticky left-0 z-10 bg-white px-3 py-2 font-semibold text-zinc-900 whitespace-nowrap">{row.bed_name}</td>
                       <td className="px-3 py-2 whitespace-nowrap font-medium">{row.main_crop ?? <span className="text-zinc-300">—</span>}</td>
                       <td className="px-3 py-2 whitespace-nowrap text-zinc-600">{row.expected_harvest_date ?? <span className="text-zinc-300">—</span>}</td>
                       <td className="px-3 py-2 text-zinc-600 max-w-[120px] truncate">{row.beneficial_companions ?? <span className="text-zinc-300">—</span>}</td>
@@ -334,14 +337,25 @@ export default function HarvestEtaPage() {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-8">
           <div className="w-full max-w-2xl rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl">
             <h2 className="mb-5 text-lg font-semibold">
-              {modal === "new" ? "Add bed entry" : `Edit — Bed ${(modal as HarvestEtaEntry).bed_number}`}
+              {modal === "new" ? "Add bed entry" : `Edit — ${(modal as HarvestEtaEntry).bed_name}`}
             </h2>
             <div className="space-y-3">
               {/* Core fields */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Bed number</label>
-                  <input type="number" className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.bed_number} onChange={(e) => setForm((p) => ({ ...p, bed_number: e.target.value }))} placeholder="1" />
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Bed / Zone</label>
+                  <input
+                    list="bed-options"
+                    className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                    value={form.bed_name}
+                    onChange={(e) => setForm((p) => ({ ...p, bed_name: e.target.value }))}
+                    placeholder="TR1, R1, CL1…"
+                  />
+                  <datalist id="bed-options">
+                    {zoneOptions.map((z) => (
+                      <option key={z.code} value={z.code}>{z.label}</option>
+                    ))}
+                  </datalist>
                 </div>
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-zinc-600">Main crop</label>
