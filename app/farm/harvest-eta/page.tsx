@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { getFarms, getHarvestEta, getZones } from "@/lib/farm";
-import type { Farm, HarvestEtaEntry, Zone } from "@/lib/farm";
+import { getFarms, getHarvestEta, getZones, getCrops } from "@/lib/farm";
+import type { Farm, HarvestEtaEntry, Zone, Crop } from "@/lib/farm";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -32,6 +32,7 @@ const MONTHS = [
 type MonthKey = (typeof MONTHS)[number]["key"];
 
 type FormData = {
+  crop_id: string;
   bed_name: string;
   zone_id: string;
   main_crop: string;
@@ -42,6 +43,7 @@ type FormData = {
 
 function blankForm(): FormData {
   const f: Record<string, string> = {
+    crop_id: "",
     bed_name: "",
     zone_id: "",
     main_crop: "",
@@ -58,6 +60,7 @@ function blankForm(): FormData {
 
 function entryToForm(e: HarvestEtaEntry): FormData {
   const f: Record<string, string> = {
+    crop_id: (e as Record<string, unknown>).crop_id as string ?? "",
     bed_name: e.bed_name ?? "",
     zone_id: e.zone_id ?? "",
     main_crop: e.main_crop ?? "",
@@ -87,6 +90,7 @@ function displayName(entry: HarvestEtaEntry, zones: Zone[]): string {
 export default function HarvestEtaPage() {
   const [farms, setFarms] = useState<Farm[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
+  const [crops, setCrops] = useState<Crop[]>([]);
   const [entries, setEntries] = useState<HarvestEtaEntry[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
   const [year, setYear] = useState(2025);
@@ -99,9 +103,10 @@ export default function HarvestEtaPage() {
   const router = useRouter();
 
   async function loadEntries(farmId: string, yr: number) {
-    const [rows, zoneRows] = await Promise.all([getHarvestEta(farmId, yr), getZones(farmId)]);
+    const [rows, zoneRows, cropRows] = await Promise.all([getHarvestEta(farmId, yr), getZones(farmId), getCrops(farmId)]);
     setEntries(rows);
     setZones(zoneRows);
+    setCrops(cropRows);
   }
 
   useEffect(() => {
@@ -139,6 +144,7 @@ export default function HarvestEtaPage() {
         farm_id: activeFarmId,
         year,
         bed_name: form.bed_name.trim(),
+        crop_id: form.crop_id || null,
         zone_id: form.zone_id || null,
         main_crop: form.main_crop.trim() || null,
         expected_harvest_date: form.expected_harvest_date || null,
@@ -298,7 +304,12 @@ export default function HarvestEtaPage() {
                 <tbody>
                   {entries.map((row) => (
                     <tr key={row.id} className="border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50 align-top transition-colors">
-                      <td className="sticky left-0 z-10 bg-white px-3 py-2 font-semibold text-zinc-900 whitespace-nowrap">{displayName(row, zones)}</td>
+                      <td className="sticky left-0 z-10 bg-white px-3 py-2 font-semibold text-zinc-900 whitespace-nowrap">
+                        {displayName(row, zones)}
+                        {(row as Record<string, unknown>).crop_id && (
+                          <span className="ml-1 text-[9px] font-normal text-emerald-600" title="Linked to crop">&#x1F517;</span>
+                        )}
+                      </td>
                       <td className="px-3 py-2 whitespace-nowrap font-medium">{row.main_crop ?? <span className="text-zinc-300">—</span>}</td>
                       <td className="px-3 py-2 whitespace-nowrap text-zinc-600">{row.expected_harvest_date ?? <span className="text-zinc-300">—</span>}</td>
                       <td className="px-3 py-2 text-zinc-600 max-w-[120px] truncate">{row.beneficial_companions ?? <span className="text-zinc-300">—</span>}</td>
@@ -350,6 +361,45 @@ export default function HarvestEtaPage() {
               {modal === "new" ? "Add bed entry" : `Edit — ${displayName(modal as HarvestEtaEntry, zones)}`}
             </h2>
             <div className="space-y-3">
+              {/* Link to existing crop */}
+              {crops.length > 0 && (
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">
+                    Link to crop <span className="font-normal text-zinc-400">(auto-fills bed, zone &amp; crop name)</span>
+                  </label>
+                  <select
+                    className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                    value={form.crop_id}
+                    onChange={(e) => {
+                      const selected = crops.find((c) => c.id === e.target.value);
+                      if (selected) {
+                        // Find the bed name from the zone code
+                        const primaryZone = zones.find((z) => z.id === selected.zone_id);
+                        const bedName = primaryZone?.code ?? primaryZone?.name ?? form.bed_name;
+                        setForm((p) => ({
+                          ...p,
+                          crop_id: selected.id,
+                          main_crop: selected.crop_name + (selected.variety ? ` · ${selected.variety}` : ""),
+                          zone_id: selected.zone_id ?? "",
+                          bed_name: bedName,
+                          expected_harvest_date: selected.expected_harvest_start ?? p.expected_harvest_date,
+                        }));
+                      } else {
+                        setForm((p) => ({ ...p, crop_id: "" }));
+                      }
+                    }}
+                  >
+                    <option value="">— Select a crop (optional) —</option>
+                    {crops.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.crop_name}{c.variety ? ` · ${c.variety}` : ""}
+                        {c.zone_ids?.length ? ` (${c.zone_ids.map((zid) => zones.find((z) => z.id === zid)?.code ?? zones.find((z) => z.id === zid)?.name).filter(Boolean).join(", ")})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Core fields */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
