@@ -46,8 +46,16 @@ export type Task = {
   proof_required: boolean | null;
   zone_id: string | null;
   crop_id: string | null;
+  assigned_to: string | null;
   crop: { crop_name: string }[] | null;
   zone: { name: string }[] | null;
+};
+
+export type FarmMember = {
+  id: string;
+  profile_id: string;
+  user_email: string | null;
+  role_on_farm: string | null;
 };
 
 export type Activity = {
@@ -184,6 +192,7 @@ export async function getTasks(farmId: string): Promise<Task[]> {
       proof_required,
       zone_id,
       crop_id,
+      assigned_to,
       crop:crops(crop_name),
       zone:zones(name)
     `
@@ -193,6 +202,16 @@ export async function getTasks(farmId: string): Promise<Task[]> {
 
   if (error) throw new Error(`getTasks failed: ${error.message}`);
   return (data ?? []) as Task[];
+}
+
+export async function getMembers(farmId: string): Promise<FarmMember[]> {
+  const { data, error } = await supabase
+    .from("farm_members")
+    .select("id, profile_id, user_email, role_on_farm")
+    .eq("farm_id", farmId);
+
+  if (error) throw new Error(`getMembers failed: ${error.message}`);
+  return (data ?? []) as FarmMember[];
 }
 
 export async function getActivities(farmId: string): Promise<Activity[]> {

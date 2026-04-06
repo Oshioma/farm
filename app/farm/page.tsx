@@ -9,6 +9,7 @@ import {
   getZones,
   getCrops,
   getTasks,
+  getMembers,
   getActivities,
   getExpenses,
   getAssets,
@@ -19,7 +20,7 @@ import {
   getPlants,
   getHarvestEta,
 } from "@/lib/farm";
-import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, FertilisationEntry, CompostEntry, Plant, HarvestEtaEntry } from "@/lib/farm";
+import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, FertilisationEntry, CompostEntry, Plant, HarvestEtaEntry, FarmMember } from "@/lib/farm";
 import { formatDate, formatMoney, badgeClass } from "@/app/farm/utils";
 import { CropForm } from "@/app/farm/components/CropForm";
 import { TaskForm } from "@/app/farm/components/TaskForm";
@@ -62,6 +63,7 @@ export default function FarmPage() {
   const [compostEntries, setCompostEntries] = useState<CompostEntry[]>([]);
   const [harvestEtaEntries, setHarvestEtaEntries] = useState<HarvestEtaEntry[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
+  const [members, setMembers] = useState<FarmMember[]>([]);
 
   const [activeFarmId, setActiveFarmId] = useState<string>("");
   const [activeForm, setActiveForm] = useState<"crop" | "task" | "harvest" | "expense" | "asset" | "pest" | "sale" | "zone" | null>(null);
@@ -220,7 +222,7 @@ export default function FarmPage() {
 
   async function loadFarmData(farmId: string) {
     const currentYear = new Date().getFullYear();
-    const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows, pestRows, saleRows, fertilisationRows, compostRows, plantRows, harvestEtaRows] = await Promise.all([
+    const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows, pestRows, saleRows, fertilisationRows, compostRows, plantRows, harvestEtaRows, memberRows] = await Promise.all([
       getZones(farmId),
       getCrops(farmId),
       getTasks(farmId),
@@ -233,6 +235,7 @@ export default function FarmPage() {
       getCompost(farmId),
       getPlants(farmId),
       getHarvestEta(farmId, currentYear),
+      getMembers(farmId),
     ]);
 
     setZones(zoneRows);
@@ -247,6 +250,7 @@ export default function FarmPage() {
     setCompostEntries(compostRows);
     setPlants(plantRows);
     setHarvestEtaEntries(harvestEtaRows);
+    setMembers(memberRows);
 
     // Fetch current user's role on this farm
     const { data: { user } } = await supabase.auth.getUser();
@@ -335,6 +339,30 @@ export default function FarmPage() {
   const openTasks = tasks.filter(
     (task) => task.status === "todo" || task.status === "in_progress"
   );
+
+  const groupedOpenTasks = useMemo(() => {
+    const groups: { label: string; key: string; tasks: Task[] }[] = [];
+    const unassigned: Task[] = [];
+    const byAssignee: Record<string, Task[]> = {};
+
+    for (const task of openTasks) {
+      if (task.assigned_to) {
+        if (!byAssignee[task.assigned_to]) byAssignee[task.assigned_to] = [];
+        byAssignee[task.assigned_to].push(task);
+      } else {
+        unassigned.push(task);
+      }
+    }
+
+    if (unassigned.length > 0) {
+      groups.push({ label: "General (unassigned)", key: "__unassigned__", tasks: unassigned });
+    }
+    for (const [assignee, assigneeTasks] of Object.entries(byAssignee).sort(([a], [b]) => a.localeCompare(b))) {
+      groups.push({ label: assignee, key: assignee, tasks: assigneeTasks });
+    }
+
+    return groups;
+  }, [openTasks]);
 
   const completedTasks = tasks.filter(
     (task) => task.status === "done" || task.status === "cancelled"
@@ -534,6 +562,7 @@ export default function FarmPage() {
         farm_id: activeFarmId,
         zone_id: data.zone_id || null,
         crop_id: data.crop_id || null,
+        assigned_to: data.assigned_to || null,
         title,
         description: data.description.trim() || null,
         status: data.status,
@@ -602,6 +631,7 @@ export default function FarmPage() {
           description: data.description.trim() || null,
           zone_id: data.zone_id || null,
           crop_id: data.crop_id || null,
+          assigned_to: data.assigned_to || null,
           status: data.status,
           priority: data.priority,
           due_date: data.due_date || null,
@@ -1371,6 +1401,7 @@ export default function FarmPage() {
                   <TaskForm
                     zones={zones}
                     crops={crops}
+                    members={members}
                     defaultZoneId={defaultZoneId}
                     onSubmit={async (data) => {
                       const ok = await handleCreateTask(data);
@@ -1495,11 +1526,18 @@ export default function FarmPage() {
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="mt-5 space-y-6">
                 {openTasks.length === 0 ? (
                   <p className="text-sm text-zinc-500">No open tasks.</p>
                 ) : (
-                  openTasks.map((task) => {
+                  groupedOpenTasks.map((group) => (
+                    <div key={group.key}>
+                      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+                        {group.label}
+                        <span className="ml-2 text-xs font-normal">({group.tasks.length})</span>
+                      </h3>
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {group.tasks.map((task) => {
                     const isCompleting = completingTaskId === task.id;
                     const isDeleting = deletingTaskId === task.id;
                     const isSaving = savingTaskId === task.id;
@@ -1562,6 +1600,14 @@ export default function FarmPage() {
                                 {crops.map((c) => <option key={c.id} value={c.id}>{c.crop_name}{c.variety ? ` · ${c.variety}` : ""}</option>)}
                               </select>
                             </div>
+                            <select
+                              value={editingTaskForm.assigned_to}
+                              onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, assigned_to: e.target.value } : prev)}
+                              className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                            >
+                              <option value="">Unassigned</option>
+                              {members.map((m) => <option key={m.profile_id} value={m.user_email ?? m.profile_id}>{m.user_email ?? m.profile_id}</option>)}
+                            </select>
                             <input
                               type="date"
                               value={editingTaskForm.due_date}
@@ -1623,6 +1669,10 @@ export default function FarmPage() {
                               {formatDate(task.due_date)}
                             </div>
 
+                            {task.assigned_to ? (
+                              <p className="mt-1.5 text-xs text-indigo-600 font-medium">{task.assigned_to}</p>
+                            ) : null}
+
                             {task.description ? (
                               <p className="mt-2 text-sm text-zinc-500">{task.description}</p>
                             ) : null}
@@ -1643,6 +1693,7 @@ export default function FarmPage() {
                                     description: task.description ?? "",
                                     zone_id: task.zone_id ?? "",
                                     crop_id: task.crop_id ?? "",
+                                    assigned_to: task.assigned_to ?? "",
                                     status: task.status ?? "todo",
                                     priority: task.priority ?? "medium",
                                     due_date: task.due_date ?? "",
@@ -1666,7 +1717,10 @@ export default function FarmPage() {
                         )}
                       </div>
                     );
-                  })
+                  })}
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
             </section>
