@@ -564,7 +564,7 @@ export type HarvestEtaEntry = {
   id: string;
   farm_id: string;
   year: number;
-  bed_number: number;
+  bed_name: string;
   main_crop: string | null;
   expected_harvest_date: string | null;
   beneficial_companions: string | null;
@@ -599,10 +599,10 @@ export type HarvestEtaEntry = {
 export async function getHarvestEta(farmId: string, year: number): Promise<HarvestEtaEntry[]> {
   const { data, error } = await supabase
     .from("harvest_eta")
-    .select("id, farm_id, year, bed_number, main_crop, expected_harvest_date, beneficial_companions, mar_expected, mar_actual, apr_expected, apr_actual, may_expected, may_actual, jun_expected, jun_actual, jul_expected, jul_actual, aug_expected, aug_actual, sep_expected, sep_actual, oct_expected, oct_actual, nov_expected, nov_actual, dec_expected, dec_actual, jan_expected, jan_actual, feb_expected, feb_actual, notes, created_at")
+    .select("id, farm_id, year, bed_name, main_crop, expected_harvest_date, beneficial_companions, mar_expected, mar_actual, apr_expected, apr_actual, may_expected, may_actual, jun_expected, jun_actual, jul_expected, jul_actual, aug_expected, aug_actual, sep_expected, sep_actual, oct_expected, oct_actual, nov_expected, nov_actual, dec_expected, dec_actual, jan_expected, jan_actual, feb_expected, feb_actual, notes, created_at")
     .eq("farm_id", farmId)
     .eq("year", year)
-    .order("bed_number");
+    .order("bed_name");
 
   if (error) throw new Error(`getHarvestEta failed: ${error.message}`);
   return (data ?? []) as HarvestEtaEntry[];
