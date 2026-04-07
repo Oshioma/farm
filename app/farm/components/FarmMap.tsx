@@ -34,41 +34,89 @@ type FarmLayout = {
   extraSvg?: React.ReactNode;
 };
 
-// ── localStorage helpers ──
-function storageKey(farmId: string) {
-  return `farm-map-layout:${farmId}`;
+// ── Storage helpers ──
+// localStorage for caching
+function cacheKey(farmId: string) {
+  return `farm-map-layout-cache:${farmId}`;
 }
 
-function saveCustomLayout(farmId: string, beds: BedDef[], landmarks: LandmarkDef[], backgroundImage?: string) {
+function getCachedLayout(farmId: string): { beds: BedDef[]; landmarks?: LandmarkDef[]; backgroundImage?: string } | null {
+  try {
+    const raw = localStorage.getItem(cacheKey(farmId));
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function setCachedLayout(farmId: string, beds: BedDef[], landmarks: LandmarkDef[], backgroundImage?: string) {
+  try {
+    localStorage.setItem(cacheKey(farmId), JSON.stringify({ beds, landmarks, backgroundImage }));
+  } catch {
+    // quota exceeded – ignore
+  }
+}
+
+// Save to database
+async function saveMapLayoutToDb(farmId: string, beds: BedDef[], landmarks: LandmarkDef[], backgroundImage?: string) {
   if (!farmId) {
     console.warn("Cannot save layout: no farmId provided");
-    return;
+    return false;
   }
+
   try {
-    const data = JSON.stringify({ beds, landmarks, backgroundImage });
-    localStorage.setItem(storageKey(farmId), data);
-    console.log(`Saved layout for farm ${farmId}:`, { beds: beds.length, landmarks: landmarks.length });
-  } catch (e) {
-    console.error("Failed to save layout to localStorage:", e);
+    const response = await fetch("/api/farm-map/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        farm_id: farmId,
+        beds,
+        landmarks,
+        background_image: backgroundImage,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error("Failed to save layout to database:", error);
+      return false;
+    }
+
+    console.log(`Saved layout for farm ${farmId} to database`);
+    // Also cache locally
+    setCachedLayout(farmId, beds, landmarks, backgroundImage);
+    return true;
+  } catch (error) {
+    console.error("Error saving layout to database:", error);
+    return false;
   }
 }
 
-function loadCustomLayout(farmId: string): { beds: BedDef[]; landmarks?: LandmarkDef[]; backgroundImage?: string } | null {
+// Load from database
+async function loadMapLayoutFromDb(farmId: string): Promise<{ beds: BedDef[]; landmarks?: LandmarkDef[]; backgroundImage?: string } | null> {
   if (!farmId) {
     console.warn("Cannot load layout: no farmId provided");
     return null;
   }
+
   try {
-    const raw = localStorage.getItem(storageKey(farmId));
-    if (!raw) {
-      console.log(`No saved layout found for farm ${farmId}`);
+    const response = await fetch(`/api/farm-map/load?farm_id=${farmId}`);
+
+    if (!response.ok) {
+      console.error("Failed to load layout from database");
       return null;
     }
-    const parsed = JSON.parse(raw);
-    console.log(`Loaded layout for farm ${farmId}:`, { beds: parsed.beds?.length, landmarks: parsed.landmarks?.length });
-    return parsed;
-  } catch (e) {
-    console.error("Failed to load layout from localStorage:", e);
+
+    const { data } = await response.json();
+    if (data) {
+      console.log(`Loaded layout for farm ${farmId} from database`);
+      // Cache it locally
+      setCachedLayout(farmId, data.beds, data.landmarks, data.background_image);
+    }
+    return data;
+  } catch (error) {
+    console.error("Error loading layout from database:", error);
     return null;
   }
 }
@@ -293,15 +341,29 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
 
   const baseLayout = getLayout(farmName);
 
-  // Load custom layout from localStorage on mount / farm change
+  // Load custom layout from database on mount / farm change
   useEffect(() => {
     if (!farmId) return;
-    const saved = loadCustomLayout(farmId);
-    if (saved) {
-      setEditBeds(saved.beds);
-      if (saved.landmarks) setEditLandmarks(saved.landmarks);
-      setCustomBg(saved.backgroundImage);
-    }
+
+    const loadLayout = async () => {
+      // Try cache first for instant load
+      const cached = getCachedLayout(farmId);
+      if (cached) {
+        setEditBeds(cached.beds);
+        if (cached.landmarks) setEditLandmarks(cached.landmarks);
+        setCustomBg(cached.backgroundImage);
+      }
+
+      // Then load from database to get latest
+      const dbLayout = await loadMapLayoutFromDb(farmId);
+      if (dbLayout) {
+        setEditBeds(dbLayout.beds);
+        if (dbLayout.landmarks) setEditLandmarks(dbLayout.landmarks);
+        setCustomBg(dbLayout.backgroundImage);
+      }
+    };
+
+    loadLayout();
   }, [farmId]);
 
   // The active layout merges saved customisations
@@ -323,16 +385,18 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
   }
 
   // Save edits
-  function saveEdit() {
-    if (farmId) saveCustomLayout(farmId, editBeds, editLandmarks, customBg);
+  async function saveEdit() {
+    if (farmId) {
+      await saveMapLayoutToDb(farmId, editBeds, editLandmarks, customBg);
+    }
     setEditMode(false);
     setEditingLabelIdx(null);
   }
 
   // Cancel edits
-  function cancelEdit() {
+  async function cancelEdit() {
     if (farmId) {
-      const saved = loadCustomLayout(farmId);
+      const saved = getCachedLayout(farmId) || (await loadMapLayoutFromDb(farmId));
       if (saved) {
         setEditBeds(saved.beds);
         setEditLandmarks(saved.landmarks ?? []);
