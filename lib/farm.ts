@@ -143,12 +143,8 @@ export async function getZones(farmId: string): Promise<Zone[]> {
       .eq("farm_id", farmId)
       .eq("is_active", true)
       .order("name");
-    data = fallback.data;
+    data = (fallback.data ?? []).map((z: Record<string, unknown>) => ({ ...z, map_position: null })) as typeof data;
     error = fallback.error;
-    // Add null map_position to each zone
-    if (data) {
-      data = data.map((z: Record<string, unknown>) => ({ ...z, map_position: null }));
-    }
   }
 
   if (error) throw new Error(`getZones failed: ${error.message}`);
