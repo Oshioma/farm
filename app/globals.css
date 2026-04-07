@@ -16,3 +16,47 @@ body {
 * {
   box-sizing: border-box;
 }
+
+@media print {
+  body {
+    background: white;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Hide all UI elements during print */
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Optimize map container for printing */
+  .farm-map-container {
+    width: 100%;
+    height: auto;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Ensure SVG prints at full size */
+  svg {
+    width: 100%;
+    height: auto;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Optimize colors for print */
+  body {
+    color: #000;
+  }
+
+  /* Remove borders and backgrounds for cleaner print */
+  .border {
+    border-color: #ccc !important;
+  }
+
+  /* Make text readable in print */
+  text {
+    font-size: 12px;
+  }
+}

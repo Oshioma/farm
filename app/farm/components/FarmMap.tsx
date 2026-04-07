@@ -622,6 +622,9 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
             <button onClick={startEdit} className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800">
               Edit Map
             </button>
+            <button onClick={() => window.print()} className="print:hidden rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+              Print Map
+            </button>
             {isBlankFarm && (
               <>
                 <button
@@ -653,7 +656,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
 
       <div className="flex gap-4">
         {/* Map */}
-        <div className={`flex-1 overflow-auto rounded-2xl border bg-white ${editMode ? "border-blue-400 ring-2 ring-blue-100" : "border-zinc-200"}`}>
+        <div className={`farm-map-container flex-1 overflow-auto rounded-2xl border bg-white ${editMode ? "border-blue-400 ring-2 ring-blue-100" : "border-zinc-200"}`}>
           {editMode && (
             <div className="bg-blue-50 px-3 py-1.5 text-xs text-blue-700 border-b border-blue-200">
               Drag beds &amp; labels to move them. Drag corners to resize beds. Double-click text to edit it.
