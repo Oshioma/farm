@@ -938,8 +938,29 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
               {(() => {
                 const bed = editBeds.find((b) => b.id === selectedBed);
                 if (!bed) return null;
+                const linkedZone = getZoneForBed(bed.id);
                 return editingBed ? (
                   <div className="space-y-2">
+                    <div>
+                      <label className="text-xs font-medium text-blue-700">Zone Code</label>
+                      <input
+                        type="text"
+                        value={bed.id}
+                        onChange={(e) => {
+                          const newId = e.target.value.toUpperCase().replace(/\s+/g, "");
+                          setEditBeds((prev) =>
+                            prev.map((b) => b.id === selectedBed ? { ...b, id: newId } : b)
+                          );
+                          setSelectedBed(newId);
+                        }}
+                        className="mt-0.5 w-full rounded-lg border border-blue-300 px-2 py-1.5 text-sm"
+                      />
+                      {linkedZone ? (
+                        <div className="mt-1 text-[10px] text-green-700">Linked to zone: {linkedZone.name}</div>
+                      ) : (
+                        <div className="mt-1 text-[10px] text-zinc-400">No zone with this code</div>
+                      )}
+                    </div>
                     <div>
                       <label className="text-xs font-medium text-blue-700">Label</label>
                       <input
@@ -991,6 +1012,10 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                   </div>
                 ) : (
                   <div className="space-y-2">
+                    <div className="text-xs text-blue-800">Code: {bed.id}</div>
+                    {linkedZone && (
+                      <div className="text-xs text-green-700">Zone: {linkedZone.name}</div>
+                    )}
                     <div className="text-xs text-blue-800">Position: ({bed.x}, {bed.y})</div>
                     <div className="text-xs text-blue-800">Size: {bed.w} x {bed.h}</div>
                     <button
