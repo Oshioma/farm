@@ -5,8 +5,14 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const farm_id = searchParams.get("farm_id");
 
-    if (!farm_id) {
-      return Response.json({ error: "farm_id is required" }, { status: 400 });
+    console.log("Farm map load request for farm_id:", farm_id);
+
+    if (!farm_id || farm_id === "undefined" || farm_id === "null") {
+      console.error("Invalid farm_id:", farm_id);
+      return Response.json(
+        { error: "farm_id is required and must be a valid UUID" },
+        { status: 400 }
+      );
     }
 
     const { data, error } = await supabase
@@ -15,20 +21,25 @@ export async function GET(request: Request) {
       .eq("farm_id", farm_id)
       .single();
 
-    if (error && error.code !== "PGRST116") {
-      // PGRST116 = no rows found, which is fine
+    if (error) {
+      // PGRST116 = no rows found, which is fine (table might not have entry yet)
+      if (error.code === "PGRST116") {
+        console.log("No layout found for farm:", farm_id);
+        return Response.json({ data: null });
+      }
       console.error("Error loading farm map layout:", error);
       return Response.json(
-        { error: error.message },
+        { error: `Database error: ${error.message}` },
         { status: 500 }
       );
     }
 
     if (!data) {
-      // No layout found, return null
+      console.log("No data returned for farm:", farm_id);
       return Response.json({ data: null });
     }
 
+    console.log("Successfully loaded layout for farm:", farm_id);
     return Response.json({ data });
   } catch (error) {
     console.error("Error in farm-map load route:", error);
