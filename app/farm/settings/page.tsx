@@ -78,15 +78,29 @@ export default function SettingsPage() {
         const ids = zoneIds.map((z: { id: string }) => z.id);
 
         // Delete linked data
-        await supabase.from("fertilisations").delete().in("zone_id", ids);
-        await supabase.from("compost").delete().in("zone_id", ids);
-        await supabase.from("crops").update({ zone_id: null }).in("zone_id", ids);
+        const { error: fertErr } = await supabase.from("fertilisations").delete().in("zone_id", ids);
+        if (fertErr) console.error("fertilisations delete:", fertErr);
 
-        // Delete zones
-        await supabase.from("zones").delete().eq("farm_id", activeFarmId);
+        const { error: compErr } = await supabase.from("compost").delete().in("zone_id", ids);
+        if (compErr) console.error("compost delete:", compErr);
+
+        const { error: cropErr } = await supabase.from("crops").update({ zone_id: null }).in("zone_id", ids);
+        if (cropErr) console.error("crops update:", cropErr);
+
+        // Delete zones - try hard delete first, fall back to soft delete
+        const { error: delErr } = await supabase.from("zones").delete().eq("farm_id", activeFarmId);
+        if (delErr) {
+          console.error("zones hard delete failed:", delErr);
+          // Try soft delete
+          const { error: softErr } = await supabase.from("zones").update({ is_active: false, map_position: null }).eq("farm_id", activeFarmId);
+          if (softErr) {
+            throw new Error("Failed to delete zones: " + softErr.message);
+          }
+        }
       }
 
-      setSuccess("All zones and linked data have been reset. Go to the Map tab to create fresh zones from the map.");
+      setSuccess("Done! All zones cleared. Redirecting to farm page to create fresh zones...");
+      setTimeout(() => router.push("/farm"), 1500);
       setResetStep(0);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to reset zones");
