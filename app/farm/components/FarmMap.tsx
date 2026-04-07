@@ -15,6 +15,17 @@ type MapZone = {
   rotate?: number;
 };
 
+// Internal type for hardcoded default bed positions
+type BedDef = {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  rotate?: number;
+};
+
 type LandmarkDef = {
   type: "circle" | "dashed-rect" | "label" | "path";
   x: number;
