@@ -365,7 +365,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
       if (z.map_position) {
         result.push({
           zoneId: z.id,
-          label: z.code || z.name,
+          label: z.name,
           ...z.map_position,
         });
         continue;
@@ -385,7 +385,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
         matchedBedIds.add(fallback.id);
         result.push({
           zoneId: z.id,
-          label: z.code || z.name,
+          label: z.name,
           x: fallback.x,
           y: fallback.y,
           w: fallback.w,
@@ -1063,7 +1063,6 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                     ) : (
                       <div className="space-y-2">
                         {zone && <div className="text-xs text-blue-800">Zone: {zone.name}</div>}
-                        {zone?.code && <div className="text-xs text-blue-800">Code: {zone.code}</div>}
                         <div className="text-xs text-blue-800">Position: ({mz.x}, {mz.y})</div>
                         <div className="text-xs text-blue-800">Size: {mz.w} x {mz.h}</div>
                         <button
@@ -1125,10 +1124,9 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
               {selected ? (
                 <>
                   <div className="text-lg font-semibold">{selected.name}</div>
-                  <div className="mt-1 text-zinc-500">
-                    {selected.code ? `Code: ${selected.code}` : ""}
-                    {selected.size_acres ? ` · ${selected.size_acres} ac` : ""}
-                  </div>
+                  {selected.size_acres && (
+                    <div className="mt-1 text-zinc-500">{selected.size_acres} ac</div>
+                  )}
                   {selectedCrops.length > 0 ? (
                     <div className="mt-3 space-y-2">
                       {selectedCrops.map((c) => (
