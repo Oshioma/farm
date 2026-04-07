@@ -336,6 +336,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
   const [editingLabelText, setEditingLabelText] = useState("");
   const [addingLabel, setAddingLabel] = useState(false);
   const [newLabelText, setNewLabelText] = useState("");
+  const [editingBed, setEditingBed] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -867,7 +868,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
               }
               onMouseDown={editMode ? (e) => handleMouseDown(bed.id, e) : undefined}
               onClick={() => {
-                if (editMode) { setSelectedBed(selectedBed === bed.id ? null : bed.id); return; }
+                if (editMode) { setSelectedBed(selectedBed === bed.id ? null : bed.id); setEditingBed(false); return; }
                 setSelectedBed(selectedBed === bed.id ? null : bed.id);
                 onSelectBed?.(bed.id);
               }}
@@ -937,7 +938,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
               {(() => {
                 const bed = editBeds.find((b) => b.id === selectedBed);
                 if (!bed) return null;
-                return (
+                return editingBed ? (
                   <div className="space-y-2">
                     <div>
                       <label className="text-xs font-medium text-blue-700">Label</label>
@@ -981,6 +982,23 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                       </div>
                     </div>
                     <div className="text-xs text-blue-600">Position: ({bed.x}, {bed.y})</div>
+                    <button
+                      onClick={() => setEditingBed(false)}
+                      className="w-full rounded-lg bg-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-300"
+                    >
+                      Done
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="text-xs text-blue-800">Position: ({bed.x}, {bed.y})</div>
+                    <div className="text-xs text-blue-800">Size: {bed.w} x {bed.h}</div>
+                    <button
+                      onClick={() => setEditingBed(true)}
+                      className="w-full rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                    >
+                      Edit Bed
+                    </button>
                   </div>
                 );
               })()}
