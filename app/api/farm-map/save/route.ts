@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export async function POST(request: Request) {
   try {
@@ -13,6 +13,8 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    const supabase = getSupabaseAdmin();
 
     // Check if layout exists
     const { data: existing, error: checkError } = await supabase

@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export async function GET(request: Request) {
   try {
@@ -14,6 +14,8 @@ export async function GET(request: Request) {
         { status: 400 }
       );
     }
+
+    const supabase = getSupabaseAdmin();
 
     const { data, error } = await supabase
       .from("farm_map_layouts")
