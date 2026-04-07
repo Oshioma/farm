@@ -8,12 +8,21 @@ export type Farm = {
   size_acres: number | null;
 };
 
+export type MapPosition = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  rotate?: number;
+};
+
 export type Zone = {
   id: string;
   farm_id: string;
   name: string;
   code: string | null;
   size_acres: number | null;
+  map_position: MapPosition | null;
 };
 
 export type Crop = {
@@ -120,7 +129,7 @@ export async function getFarms(): Promise<Farm[]> {
 export async function getZones(farmId: string): Promise<Zone[]> {
   const { data, error } = await supabase
     .from("zones")
-    .select("id, farm_id, name, code, size_acres")
+    .select("id, farm_id, name, code, size_acres, map_position")
     .eq("farm_id", farmId)
     .eq("is_active", true)
     .order("name");

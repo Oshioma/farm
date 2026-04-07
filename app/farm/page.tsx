@@ -2015,9 +2015,9 @@ export default function FarmPage() {
 
               {zonesView === "map" ? (
                 <div className="mt-5">
-                  <FarmMap zones={zones} crops={crops} fertilisations={fertilisations} compostEntries={compostEntries} harvestEta={harvestEtaEntries} farmName={activeFarm?.name} farmId={activeFarm?.id} />
+                  <FarmMap zones={zones} crops={crops} fertilisations={fertilisations} compostEntries={compostEntries} harvestEta={harvestEtaEntries} farmName={activeFarm?.name} farmId={activeFarm?.id} onZonesChanged={() => activeFarmId && loadFarmData(activeFarmId)} />
                   <p className="mt-2 text-xs text-zinc-400">
-                    Click a bed to see details. To link a bed, create a zone with a matching code (e.g. R1, CL2).
+                    Click a zone on the map to see details. Use Edit Map to rearrange or add zones.
                   </p>
                 </div>
               ) : zones.length === 0 ? (
