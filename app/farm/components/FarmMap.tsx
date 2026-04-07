@@ -431,6 +431,48 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
     });
   }, [farmId]);
 
+  // Auto-create zones for any hardcoded bed that doesn't have a matching zone
+  const [autoCreated, setAutoCreated] = useState(false);
+  useEffect(() => {
+    if (!farmId || autoCreated || baseLayout.beds.length === 0) return;
+    // Find beds with no matching zone
+    const unmatched = baseLayout.beds.filter((bed) => {
+      const bid = bed.id.toUpperCase();
+      return !zones.some((z) => {
+        const code = z.code?.toUpperCase() ?? "";
+        const name = z.name.toUpperCase();
+        return bid === code || bid === name || bid === code.replace(/^ROW\s*/i, "") || bid === name.replace(/^ROW\s*/i, "");
+      });
+    });
+    if (unmatched.length === 0) return;
+    setAutoCreated(true);
+    (async () => {
+      for (const bed of unmatched) {
+        const pos: MapPosition = { x: bed.x, y: bed.y, w: bed.w, h: bed.h };
+        if (bed.rotate) pos.rotate = bed.rotate;
+        // Check if zone with this name exists (maybe inactive or different code)
+        const { data: existing } = await supabase
+          .from("zones")
+          .select("id")
+          .eq("farm_id", farmId)
+          .eq("name", bed.id)
+          .maybeSingle();
+        if (existing) {
+          await supabase.from("zones").update({ map_position: pos, is_active: true }).eq("id", existing.id);
+        } else {
+          await supabase.from("zones").insert({
+            farm_id: farmId,
+            name: bed.id,
+            code: bed.id,
+            is_active: true,
+            map_position: pos,
+          });
+        }
+      }
+      onZonesChanged?.();
+    })();
+  }, [farmId, zones, autoCreated, baseLayout.beds]);
+
   const mapZones = buildMapZones();
   const activeZones = editMode ? editZones : mapZones;
 
@@ -807,67 +849,6 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
           </button>
         </div>
       )}
-
-      {/* Bulk create zones for unlinked beds */}
-      {(() => {
-        const unlinkedBeds = baseLayout.beds.filter((bed) => {
-          const bid = bed.id.toUpperCase();
-          return !zones.some((z) => {
-            const code = z.code?.toUpperCase() ?? "";
-            const name = z.name.toUpperCase();
-            return bid === code || bid === name || bid === code.replace(/^ROW\s*/i, "") || bid === name.replace(/^ROW\s*/i, "");
-          });
-        });
-        if (unlinkedBeds.length === 0 || editMode) return null;
-        return (
-          <div className="mb-3 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-            <span className="text-sm text-amber-800">{unlinkedBeds.length} spots on the map don&apos;t have zones yet.</span>
-            <button
-              disabled={creatingZones || !farmId}
-              onClick={async () => {
-                if (!farmId) return;
-                setCreatingZones(true);
-                try {
-                  for (const bed of unlinkedBeds) {
-                    const pos: MapPosition = { x: bed.x, y: bed.y, w: bed.w, h: bed.h };
-                    if (bed.rotate) pos.rotate = bed.rotate;
-                    // Check if exists
-                    const { data: existing } = await supabase
-                      .from("zones")
-                      .select("id")
-                      .eq("farm_id", farmId)
-                      .eq("name", bed.id)
-                      .maybeSingle();
-                    if (existing) {
-                      await supabase.from("zones").update({ map_position: pos, is_active: true }).eq("id", existing.id);
-                    } else {
-                      const { error } = await supabase.from("zones").insert({
-                        farm_id: farmId,
-                        name: bed.id,
-                        code: bed.id,
-                        is_active: true,
-                        map_position: pos,
-                      });
-                      if (error) {
-                        console.error("Failed to create zone:", bed.id, error);
-                      }
-                    }
-                  }
-                  onZonesChanged?.();
-                } catch (err) {
-                  console.error("Error creating zones:", err);
-                  alert("Error creating zones - check console");
-                } finally {
-                  setCreatingZones(false);
-                }
-              }}
-              className="rounded-lg bg-amber-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-60"
-            >
-              {creatingZones ? "Creating…" : `Create all ${unlinkedBeds.length} zones`}
-            </button>
-          </div>
-        );
-      })()}
 
       <div className="flex gap-4">
         {/* Map */}
@@ -1255,71 +1236,8 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                 <div className="space-y-3">
                   <div className="text-lg font-semibold">{selectedZoneId.replace("_default_", "")}</div>
                   <div className="text-xs text-zinc-400">
-                    This spot isn&apos;t linked to a zone yet.
+                    Setting up this zone…
                   </div>
-                  {zones.length > 0 && (
-                    <div>
-                      <label className="mb-1 block text-xs font-medium">Link existing zone ({zones.length} available)</label>
-                      <select
-                        className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
-                        defaultValue=""
-                        onChange={async (e) => {
-                          const zoneId = e.target.value;
-                          if (!zoneId) return;
-                          const bedId = selectedZoneId.replace("_default_", "");
-                          const bed = baseLayout.beds.find((b) => b.id === bedId);
-                          if (!bed) return;
-                          const pos: MapPosition = { x: bed.x, y: bed.y, w: bed.w, h: bed.h };
-                          if (bed.rotate) pos.rotate = bed.rotate;
-                          const { error } = await supabase.from("zones").update({ map_position: pos }).eq("id", zoneId);
-                          if (error) { alert("Failed to link zone: " + error.message); return; }
-                          onZonesChanged?.();
-                        }}
-                      >
-                        <option value="">Select a zone…</option>
-                        {zones.map((z) => (
-                          <option key={z.id} value={z.id}>{z.name}{z.code && z.code !== z.name ? ` (${z.code})` : ""}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  <div className="text-xs text-zinc-300 text-center">or</div>
-                  <button
-                    onClick={async () => {
-                      if (!farmId) { alert("No farm selected"); return; }
-                      const bedId = selectedZoneId.replace("_default_", "");
-                      const bed = baseLayout.beds.find((b) => b.id === bedId);
-                      if (!bed) { alert("Bed not found: " + bedId); return; }
-                      const pos: MapPosition = { x: bed.x, y: bed.y, w: bed.w, h: bed.h };
-                      if (bed.rotate) pos.rotate = bed.rotate;
-                      // Check if zone already exists
-                      const { data: existing } = await supabase
-                        .from("zones")
-                        .select("id")
-                        .eq("farm_id", farmId)
-                        .eq("name", bedId)
-                        .maybeSingle();
-                      if (existing) {
-                        // Update existing zone with map position
-                        const { error } = await supabase.from("zones").update({ map_position: pos, is_active: true }).eq("id", existing.id);
-                        if (error) { alert("Failed to update zone: " + error.message); return; }
-                      } else {
-                        // Create new zone
-                        const { error } = await supabase.from("zones").insert({
-                          farm_id: farmId,
-                          name: bedId,
-                          code: bedId,
-                          is_active: true,
-                          map_position: pos,
-                        });
-                        if (error) { alert("Failed to create zone: " + error.message); return; }
-                      }
-                      onZonesChanged?.();
-                    }}
-                    className="w-full rounded-lg bg-zinc-900 px-3 py-2 text-xs font-medium text-white hover:bg-zinc-800"
-                  >
-                    Create new zone &quot;{selectedZoneId.replace("_default_", "")}&quot;
-                  </button>
                 </div>
               ) : null}
               {selectedHarvestEta && (
