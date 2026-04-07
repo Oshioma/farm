@@ -460,8 +460,9 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
   async function saveEdit() {
     setSaving(true);
     try {
-      // Update each zone's map_position in DB
+      // Update each zone's map_position in DB (skip _default_ placeholders)
       for (const mz of editZones) {
+        if (mz.zoneId.startsWith("_default_")) continue;
         const pos: MapPosition = { x: mz.x, y: mz.y, w: mz.w, h: mz.h };
         if (mz.rotate) pos.rotate = mz.rotate;
         await supabase
