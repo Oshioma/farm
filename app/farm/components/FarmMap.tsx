@@ -551,9 +551,9 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
   const isBlankFarm = baseLayout.beds.length === 0 && editBeds.length === 0 && !customBg;
 
   return (
-    <div>
+    <div className="farm-map-print-wrapper">
       {/* ── Edit toolbar ── */}
-      <div className="mb-3 flex items-center gap-2 flex-wrap">
+      <div className="mb-3 flex items-center gap-2 flex-wrap print:hidden">
         {editMode ? (
           <>
             <button onClick={saveEdit} className="rounded-xl bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">
@@ -845,7 +845,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
         </div>
 
         {/* Side panel — bed info */}
-        <div className="w-56 shrink-0 space-y-3">
+        <div className="farm-map-sidebar w-56 shrink-0 space-y-3">
           {/* Edit mode: selected bed controls */}
           {editMode && selectedBed && (
             <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm space-y-3">
