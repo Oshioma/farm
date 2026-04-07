@@ -18,68 +18,51 @@ body {
 }
 
 @media print {
-  * {
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-
   body {
     background: white !important;
     margin: 0 !important;
     padding: 0 !important;
   }
 
-  /* Hide everything except the map during print */
-  body > * {
+  /* Hide toolbar and sidebar during print */
+  .print\:hidden {
     display: none !important;
-  }
-
-  /* Show only the farm map container */
-  .farm-map-print-wrapper {
-    display: block !important;
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: white !important;
-  }
-
-  .farm-map-container {
-    width: 100% !important;
-    height: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: none !important;
-    border-radius: 0 !important;
-    overflow: visible !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
   }
 
   .farm-map-sidebar {
     display: none !important;
   }
 
-  /* Ensure SVG fills the page */
-  svg {
+  /* Style the wrapper for print */
+  .farm-map-print-wrapper {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Make flex container work well for printing */
+  .farm-map-print-wrapper > div:last-child {
+    gap: 0 !important;
+  }
+
+  /* Optimize map container for printing */
+  .farm-map-container {
+    flex: 1 !important;
     width: 100% !important;
-    height: 100% !important;
-    max-width: 100% !important;
-    max-height: 100% !important;
+    border: none !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
 
-  /* Print button and controls */
-  .print\:hidden {
-    display: none !important;
+  /* Make SVG fill the print area */
+  svg {
+    width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }
