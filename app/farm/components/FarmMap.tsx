@@ -357,32 +357,60 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
 
   // Build MapZones from zones — use map_position if available, else match hardcoded defaults
   function buildMapZones(): MapZone[] {
-    return zones
-      .map((z) => {
-        if (z.map_position) {
-          return {
-            zoneId: z.id,
-            label: z.code || z.name,
-            ...z.map_position,
-          };
-        }
-        // Fallback: try to match to a hardcoded bed by code
-        const code = (z.code ?? z.name).toUpperCase().replace(/^ROW\s*/i, "");
-        const fallback = baseLayout.beds.find((b) => b.id.toUpperCase() === code);
-        if (fallback) {
-          return {
-            zoneId: z.id,
-            label: z.code || z.name,
-            x: fallback.x,
-            y: fallback.y,
-            w: fallback.w,
-            h: fallback.h,
-            rotate: fallback.rotate,
-          };
-        }
-        return null; // Zone has no map position and no matching default
-      })
-      .filter((mz): mz is MapZone => mz !== null);
+    // First: zones with map_position set in DB
+    const result: MapZone[] = [];
+    const matchedBedIds = new Set<string>();
+
+    for (const z of zones) {
+      if (z.map_position) {
+        result.push({
+          zoneId: z.id,
+          label: z.code || z.name,
+          ...z.map_position,
+        });
+        continue;
+      }
+      // Fallback: try multiple matching patterns against hardcoded beds
+      const code = z.code?.toUpperCase() ?? "";
+      const name = z.name.toUpperCase();
+      const codeStripped = code.replace(/^ROW\s*/i, "");
+      const nameStripped = name.replace(/^ROW\s*/i, "");
+
+      const fallback = baseLayout.beds.find((b) => {
+        const bid = b.id.toUpperCase();
+        return bid === code || bid === name || bid === codeStripped || bid === nameStripped;
+      });
+
+      if (fallback) {
+        matchedBedIds.add(fallback.id);
+        result.push({
+          zoneId: z.id,
+          label: z.code || z.name,
+          x: fallback.x,
+          y: fallback.y,
+          w: fallback.w,
+          h: fallback.h,
+          rotate: fallback.rotate,
+        });
+      }
+    }
+
+    // Also show hardcoded beds that have NO matching zone (so the map isn't empty)
+    for (const bed of baseLayout.beds) {
+      if (!matchedBedIds.has(bed.id)) {
+        result.push({
+          zoneId: `_default_${bed.id}`,
+          label: bed.label,
+          x: bed.x,
+          y: bed.y,
+          w: bed.w,
+          h: bed.h,
+          rotate: bed.rotate,
+        });
+      }
+    }
+
+    return result;
   }
 
   // Load landmarks from localStorage (landmarks aren't per-zone, they're per-farm decorations)
@@ -646,6 +674,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
   }
 
   function zoneColor(zoneId: string): string {
+    if (zoneId.startsWith("_default_")) return "#f4f4f5"; // zinc-100 — no zone in DB
     const zoneCrops = getCropsForZone(zoneId);
     if (zoneCrops.length === 0) return "#e4e4e7"; // zinc-200 — empty
     const status = zoneCrops[0].status;
@@ -658,6 +687,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
   function zoneStroke(zoneId: string): string {
     if (selectedZoneId === zoneId) return "#18181b"; // zinc-900
     if (hoveredZone === zoneId) return "#52525b"; // zinc-600
+    if (zoneId.startsWith("_default_")) return "#d4d4d8"; // zinc-300 — unmapped
     return "#a1a1aa"; // zinc-400
   }
 
@@ -1161,6 +1191,13 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                     </div>
                   )}
                 </>
+              ) : selectedZoneId?.startsWith("_default_") ? (
+                <div>
+                  <div className="text-lg font-semibold">{selectedZoneId.replace("_default_", "")}</div>
+                  <div className="mt-2 text-xs text-zinc-400">
+                    No zone created yet. Add a zone with code &quot;{selectedZoneId.replace("_default_", "")}&quot; to link data to this spot.
+                  </div>
+                </div>
               ) : null}
               {selectedHarvestEta && (
                 <div className="mt-4">
@@ -1203,6 +1240,9 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
           <div className="rounded-2xl border border-zinc-200 bg-white p-3">
             <div className="mb-2 text-xs font-semibold text-zinc-500">Legend</div>
             <div className="space-y-1.5 text-xs text-zinc-500">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-zinc-100" /> No zone
+              </span>
               <span className="flex items-center gap-1.5">
                 <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-zinc-200" /> Empty
               </span>
