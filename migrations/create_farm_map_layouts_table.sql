@@ -15,7 +15,12 @@ CREATE INDEX IF NOT EXISTS idx_farm_map_layouts_farm_id ON farm_map_layouts(farm
 -- Enable RLS if needed
 ALTER TABLE farm_map_layouts ENABLE ROW LEVEL SECURITY;
 
--- Create policy to allow users to access their farm's map layout
+-- Drop old policies if they exist (to avoid conflicts)
+DROP POLICY IF EXISTS "Users can view their farm's map layout" ON farm_map_layouts;
+DROP POLICY IF EXISTS "Users can update their farm's map layout" ON farm_map_layouts;
+DROP POLICY IF EXISTS "Users can insert their farm's map layout" ON farm_map_layouts;
+
+-- Create policies to allow users to access their farm's map layout
 CREATE POLICY "Users can view their farm's map layout"
   ON farm_map_layouts
   FOR SELECT
