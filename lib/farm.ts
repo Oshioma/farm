@@ -127,12 +127,29 @@ export async function getFarms(): Promise<Farm[]> {
 }
 
 export async function getZones(farmId: string): Promise<Zone[]> {
-  const { data, error } = await supabase
+  // Try with map_position first, fall back without it if column doesn't exist yet
+  let { data, error } = await supabase
     .from("zones")
     .select("id, farm_id, name, code, size_acres, map_position")
     .eq("farm_id", farmId)
     .eq("is_active", true)
     .order("name");
+
+  if (error && error.message?.includes("map_position")) {
+    // Column doesn't exist yet — query without it
+    const fallback = await supabase
+      .from("zones")
+      .select("id, farm_id, name, code, size_acres")
+      .eq("farm_id", farmId)
+      .eq("is_active", true)
+      .order("name");
+    data = fallback.data;
+    error = fallback.error;
+    // Add null map_position to each zone
+    if (data) {
+      data = data.map((z: Record<string, unknown>) => ({ ...z, map_position: null }));
+    }
+  }
 
   if (error) throw new Error(`getZones failed: ${error.message}`);
   return (data ?? []) as Zone[];
