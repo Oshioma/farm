@@ -828,21 +828,30 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                 if (!farmId) return;
                 setCreatingZones(true);
                 try {
-                  const inserts = unlinkedBeds.map((bed) => {
+                  for (const bed of unlinkedBeds) {
                     const pos: MapPosition = { x: bed.x, y: bed.y, w: bed.w, h: bed.h };
                     if (bed.rotate) pos.rotate = bed.rotate;
-                    return {
-                      farm_id: farmId,
-                      name: bed.id,
-                      code: bed.id,
-                      is_active: true,
-                      map_position: pos,
-                    };
-                  });
-                  const { error } = await supabase.from("zones").upsert(inserts, { onConflict: "farm_id,name" });
-                  if (error) {
-                    console.error("Failed to create zones:", error);
-                    alert("Failed to create zones: " + error.message);
+                    // Check if exists
+                    const { data: existing } = await supabase
+                      .from("zones")
+                      .select("id")
+                      .eq("farm_id", farmId)
+                      .eq("name", bed.id)
+                      .maybeSingle();
+                    if (existing) {
+                      await supabase.from("zones").update({ map_position: pos, is_active: true }).eq("id", existing.id);
+                    } else {
+                      const { error } = await supabase.from("zones").insert({
+                        farm_id: farmId,
+                        name: bed.id,
+                        code: bed.id,
+                        is_active: true,
+                        map_position: pos,
+                      });
+                      if (error) {
+                        console.error("Failed to create zone:", bed.id, error);
+                      }
+                    }
                   }
                   onZonesChanged?.();
                 } catch (err) {
@@ -1283,14 +1292,28 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                       if (!bed) { alert("Bed not found: " + bedId); return; }
                       const pos: MapPosition = { x: bed.x, y: bed.y, w: bed.w, h: bed.h };
                       if (bed.rotate) pos.rotate = bed.rotate;
-                      const { error } = await supabase.from("zones").upsert({
-                        farm_id: farmId,
-                        name: bedId,
-                        code: bedId,
-                        is_active: true,
-                        map_position: pos,
-                      }, { onConflict: "farm_id,name" });
-                      if (error) { alert("Failed to create zone: " + error.message); return; }
+                      // Check if zone already exists
+                      const { data: existing } = await supabase
+                        .from("zones")
+                        .select("id")
+                        .eq("farm_id", farmId)
+                        .eq("name", bedId)
+                        .maybeSingle();
+                      if (existing) {
+                        // Update existing zone with map position
+                        const { error } = await supabase.from("zones").update({ map_position: pos, is_active: true }).eq("id", existing.id);
+                        if (error) { alert("Failed to update zone: " + error.message); return; }
+                      } else {
+                        // Create new zone
+                        const { error } = await supabase.from("zones").insert({
+                          farm_id: farmId,
+                          name: bedId,
+                          code: bedId,
+                          is_active: true,
+                          map_position: pos,
+                        });
+                        if (error) { alert("Failed to create zone: " + error.message); return; }
+                      }
                       onZonesChanged?.();
                     }}
                     className="w-full rounded-lg bg-zinc-900 px-3 py-2 text-xs font-medium text-white hover:bg-zinc-800"
