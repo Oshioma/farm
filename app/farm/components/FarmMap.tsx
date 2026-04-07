@@ -350,6 +350,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
   const [addingLabel, setAddingLabel] = useState(false);
   const [newLabelText, setNewLabelText] = useState("");
   const [editingBed, setEditingBed] = useState(false);
+  const [creatingZones, setCreatingZones] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -809,38 +810,53 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
 
       {/* Bulk create zones for unlinked beds */}
       {(() => {
-        const unlinkedBeds = baseLayout.beds.filter((bed) =>
-          !zones.some((z) => {
-            if (z.map_position) return false; // already has position
+        const unlinkedBeds = baseLayout.beds.filter((bed) => {
+          const bid = bed.id.toUpperCase();
+          // Check if ANY zone matches this bed (by position, code, or name)
+          return !zones.some((z) => {
+            if (z.map_position) return true; // has position = it's placed on map already
             const code = z.code?.toUpperCase() ?? "";
             const name = z.name.toUpperCase();
-            const bid = bed.id.toUpperCase();
             return bid === code || bid === name || bid === code.replace(/^ROW\s*/i, "") || bid === name.replace(/^ROW\s*/i, "");
-          })
-        );
+          });
+        });
         if (unlinkedBeds.length === 0 || editMode) return null;
         return (
           <div className="mb-3 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
             <span className="text-sm text-amber-800">{unlinkedBeds.length} spots on the map don&apos;t have zones yet.</span>
             <button
+              disabled={creatingZones || !farmId}
               onClick={async () => {
                 if (!farmId) return;
-                for (const bed of unlinkedBeds) {
-                  const pos: MapPosition = { x: bed.x, y: bed.y, w: bed.w, h: bed.h };
-                  if (bed.rotate) pos.rotate = bed.rotate;
-                  await supabase.from("zones").insert({
-                    farm_id: farmId,
-                    name: bed.id,
-                    code: bed.id,
-                    is_active: true,
-                    map_position: pos,
+                setCreatingZones(true);
+                try {
+                  const inserts = unlinkedBeds.map((bed) => {
+                    const pos: MapPosition = { x: bed.x, y: bed.y, w: bed.w, h: bed.h };
+                    if (bed.rotate) pos.rotate = bed.rotate;
+                    return {
+                      farm_id: farmId,
+                      name: bed.id,
+                      code: bed.id,
+                      is_active: true,
+                      map_position: pos,
+                    };
                   });
+                  const { error } = await supabase.from("zones").insert(inserts);
+                  if (error) {
+                    console.error("Failed to create zones:", error);
+                    alert("Failed to create zones: " + error.message);
+                  }
+                  onZonesChanged?.();
+                } catch (err) {
+                  console.error("Error creating zones:", err);
+                  alert("Error creating zones - check console");
+                } finally {
+                  setCreatingZones(false);
                 }
-                onZonesChanged?.();
               }}
-              className="rounded-lg bg-amber-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-700"
+              className="rounded-lg bg-amber-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-60"
             >
-              Create all {unlinkedBeds.length} zones
+              {creatingZones ? "Creating…" : `Create all ${unlinkedBeds.length} zones`}
             </button>
           </div>
         );
