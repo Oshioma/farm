@@ -18,35 +18,47 @@ body {
 }
 
 @media print {
+  /* Hide all page content by default */
+  body * {
+    display: none !important;
+  }
+
+  /* Show only the map wrapper and its contents */
+  .farm-map-print-wrapper,
+  .farm-map-print-wrapper * {
+    display: block !important;
+  }
+
   body {
     background: white !important;
     margin: 0 !important;
     padding: 0 !important;
   }
 
-  /* Hide toolbar and sidebar during print */
-  .print\:hidden {
-    display: none !important;
-  }
-
+  /* Hide toolbar and sidebar */
+  .print\:hidden,
   .farm-map-sidebar {
     display: none !important;
   }
 
   /* Style the wrapper for print */
   .farm-map-print-wrapper {
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  /* Main flex container */
+  .farm-map-print-wrapper > div {
+    width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
   }
 
-  /* Make flex container work well for printing */
-  .farm-map-print-wrapper > div:last-child {
-    gap: 0 !important;
-  }
-
   /* Optimize map container for printing */
   .farm-map-container {
-    flex: 1 !important;
     width: 100% !important;
     border: none !important;
     border-radius: 0 !important;
@@ -64,5 +76,10 @@ body {
     display: block !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+  }
+
+  /* Show rect and other SVG elements */
+  rect, circle, path, text, tspan, g, defs, style {
+    display: block !important;
   }
 }

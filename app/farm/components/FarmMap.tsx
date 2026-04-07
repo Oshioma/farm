@@ -35,22 +35,42 @@ type FarmLayout = {
 };
 
 // ── localStorage helpers ──
-function storageKey(farmName: string) {
-  return `farm-map-layout:${farmName}`;
+function storageKey(farmId: string) {
+  return `farm-map-layout:${farmId}`;
 }
 
-function saveCustomLayout(farmName: string, beds: BedDef[], landmarks: LandmarkDef[], backgroundImage?: string) {
+function saveCustomLayout(farmId: string, beds: BedDef[], landmarks: LandmarkDef[], backgroundImage?: string) {
+  if (!farmId) {
+    console.warn("Cannot save layout: no farmId provided");
+    return;
+  }
   try {
-    localStorage.setItem(storageKey(farmName), JSON.stringify({ beds, landmarks, backgroundImage }));
-  } catch { /* quota exceeded – ignore */ }
+    const data = JSON.stringify({ beds, landmarks, backgroundImage });
+    localStorage.setItem(storageKey(farmId), data);
+    console.log(`Saved layout for farm ${farmId}:`, { beds: beds.length, landmarks: landmarks.length });
+  } catch (e) {
+    console.error("Failed to save layout to localStorage:", e);
+  }
 }
 
-function loadCustomLayout(farmName: string): { beds: BedDef[]; landmarks?: LandmarkDef[]; backgroundImage?: string } | null {
+function loadCustomLayout(farmId: string): { beds: BedDef[]; landmarks?: LandmarkDef[]; backgroundImage?: string } | null {
+  if (!farmId) {
+    console.warn("Cannot load layout: no farmId provided");
+    return null;
+  }
   try {
-    const raw = localStorage.getItem(storageKey(farmName));
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch { return null; }
+    const raw = localStorage.getItem(storageKey(farmId));
+    if (!raw) {
+      console.log(`No saved layout found for farm ${farmId}`);
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    console.log(`Loaded layout for farm ${farmId}:`, { beds: parsed.beds?.length, landmarks: parsed.landmarks?.length });
+    return parsed;
+  } catch (e) {
+    console.error("Failed to load layout from localStorage:", e);
+    return null;
+  }
 }
 
 // ── Mount Solomun layout ──
@@ -275,14 +295,14 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
 
   // Load custom layout from localStorage on mount / farm change
   useEffect(() => {
-    if (!farmName) return;
-    const saved = loadCustomLayout(farmName);
+    if (!farmId) return;
+    const saved = loadCustomLayout(farmId);
     if (saved) {
       setEditBeds(saved.beds);
       if (saved.landmarks) setEditLandmarks(saved.landmarks);
       setCustomBg(saved.backgroundImage);
     }
-  }, [farmName]);
+  }, [farmId]);
 
   // The active layout merges saved customisations
   const hasCustom = editBeds.length > 0 || editLandmarks.length > 0;
@@ -304,15 +324,15 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
 
   // Save edits
   function saveEdit() {
-    if (farmName) saveCustomLayout(farmName, editBeds, editLandmarks, customBg);
+    if (farmId) saveCustomLayout(farmId, editBeds, editLandmarks, customBg);
     setEditMode(false);
     setEditingLabelIdx(null);
   }
 
   // Cancel edits
   function cancelEdit() {
-    if (farmName) {
-      const saved = loadCustomLayout(farmName);
+    if (farmId) {
+      const saved = loadCustomLayout(farmId);
       if (saved) {
         setEditBeds(saved.beds);
         setEditLandmarks(saved.landmarks ?? []);
