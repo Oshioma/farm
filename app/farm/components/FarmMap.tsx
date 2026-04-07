@@ -938,9 +938,49 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                 const bed = editBeds.find((b) => b.id === selectedBed);
                 if (!bed) return null;
                 return (
-                  <div className="space-y-2 text-xs text-blue-800">
-                    <div>Position: ({bed.x}, {bed.y})</div>
-                    <div>Size: {bed.w} x {bed.h}</div>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs font-medium text-blue-700">Label</label>
+                      <input
+                        type="text"
+                        value={bed.label}
+                        onChange={(e) =>
+                          setEditBeds((prev) =>
+                            prev.map((b) => b.id === selectedBed ? { ...b, label: e.target.value } : b)
+                          )
+                        }
+                        className="mt-0.5 w-full rounded-lg border border-blue-300 px-2 py-1.5 text-sm"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs font-medium text-blue-700">Width</label>
+                        <input
+                          type="number"
+                          value={bed.w}
+                          onChange={(e) =>
+                            setEditBeds((prev) =>
+                              prev.map((b) => b.id === selectedBed ? { ...b, w: Math.max(10, Number(e.target.value)) } : b)
+                            )
+                          }
+                          className="mt-0.5 w-full rounded-lg border border-blue-300 px-2 py-1.5 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-blue-700">Height</label>
+                        <input
+                          type="number"
+                          value={bed.h}
+                          onChange={(e) =>
+                            setEditBeds((prev) =>
+                              prev.map((b) => b.id === selectedBed ? { ...b, h: Math.max(10, Number(e.target.value)) } : b)
+                            )
+                          }
+                          className="mt-0.5 w-full rounded-lg border border-blue-300 px-2 py-1.5 text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div className="text-xs text-blue-600">Position: ({bed.x}, {bed.y})</div>
                   </div>
                 );
               })()}
