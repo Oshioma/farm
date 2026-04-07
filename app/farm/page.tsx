@@ -1137,17 +1137,17 @@ export default function FarmPage() {
         <nav className="mb-6 rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
           <div className="flex flex-wrap items-center gap-1.5 text-sm">
             {[
-              { href: "#map", label: "Map" },
+              { href: "/farm/harvest-eta", label: "Harvest" },
               { href: "#crops", label: "Crops" },
+              { href: "/farm/tasks", label: "Tasks" },
+              { href: "#map", label: "Map" },
               { href: "/farm/trees", label: "Trees" },
               { href: "/farm/planting-plan", label: "Planting plan" },
               { href: "/farm/seedlings", label: "Seedlings" },
               { href: "/plants", label: "Plants" },
               { href: "/fertiliser", label: "Fertiliser" },
-              { href: "/farm/harvest-eta", label: "Harvest ETA" },
               { href: "/farm/compost", label: "Compost" },
               { href: "/farm/soil-tests", label: "Soil tests" },
-              { href: "/farm/soil-improvements", label: "Soil improvements" },
               { href: "/farm/work-hours", label: "Work hours" },
               { href: "/farm/systems", label: "Systems" },
               { href: "/companion", label: "Companion planting" },
