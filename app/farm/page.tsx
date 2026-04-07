@@ -1141,6 +1141,7 @@ export default function FarmPage() {
               { href: "#crops", label: "Crops" },
               { href: "/farm/tasks", label: "Tasks" },
               { href: "#map", label: "Map" },
+              { href: "/farm/zones", label: "Zones" },
               { href: "/farm/trees", label: "Trees" },
               { href: "/farm/planting-plan", label: "Planting plan" },
               { href: "/farm/seedlings", label: "Seedlings" },
