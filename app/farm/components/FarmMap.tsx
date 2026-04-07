@@ -316,6 +316,11 @@ function getLayout(farmName?: string): FarmLayout {
   };
 }
 
+// Expose default beds for a farm so the parent page can auto-create zones
+export function getDefaultBedsForFarm(farmName?: string): { id: string; x: number; y: number; w: number; h: number; rotate?: number }[] {
+  return getLayout(farmName).beds;
+}
+
 type Props = {
   zones: Zone[];
   crops: Crop[];
@@ -430,48 +435,6 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
       }
     });
   }, [farmId]);
-
-  // Auto-create zones for any hardcoded bed that doesn't have a matching zone
-  const [autoCreated, setAutoCreated] = useState(false);
-  useEffect(() => {
-    if (!farmId || autoCreated || baseLayout.beds.length === 0) return;
-    // Find beds with no matching zone
-    const unmatched = baseLayout.beds.filter((bed) => {
-      const bid = bed.id.toUpperCase();
-      return !zones.some((z) => {
-        const code = z.code?.toUpperCase() ?? "";
-        const name = z.name.toUpperCase();
-        return bid === code || bid === name || bid === code.replace(/^ROW\s*/i, "") || bid === name.replace(/^ROW\s*/i, "");
-      });
-    });
-    if (unmatched.length === 0) return;
-    setAutoCreated(true);
-    (async () => {
-      for (const bed of unmatched) {
-        const pos: MapPosition = { x: bed.x, y: bed.y, w: bed.w, h: bed.h };
-        if (bed.rotate) pos.rotate = bed.rotate;
-        // Check if zone with this name exists (maybe inactive or different code)
-        const { data: existing } = await supabase
-          .from("zones")
-          .select("id")
-          .eq("farm_id", farmId)
-          .eq("name", bed.id)
-          .maybeSingle();
-        if (existing) {
-          await supabase.from("zones").update({ map_position: pos, is_active: true }).eq("id", existing.id);
-        } else {
-          await supabase.from("zones").insert({
-            farm_id: farmId,
-            name: bed.id,
-            code: bed.id,
-            is_active: true,
-            map_position: pos,
-          });
-        }
-      }
-      onZonesChanged?.();
-    })();
-  }, [farmId, zones, autoCreated, baseLayout.beds]);
 
   const mapZones = buildMapZones();
   const activeZones = editMode ? editZones : mapZones;
@@ -1236,7 +1199,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                 <div className="space-y-3">
                   <div className="text-lg font-semibold">{selectedZoneId.replace("_default_", "")}</div>
                   <div className="text-xs text-zinc-400">
-                    Setting up this zone…
+                    No zone linked yet. This zone will be created automatically.
                   </div>
                 </div>
               ) : null}

@@ -30,7 +30,7 @@ import { AssetForm } from "@/app/farm/components/AssetForm";
 import { PestForm } from "@/app/farm/components/PestForm";
 import { SaleForm } from "@/app/farm/components/SaleForm";
 import { ZoneForm } from "@/app/farm/components/ZoneForm";
-import { FarmMap } from "@/app/farm/components/FarmMap";
+import { FarmMap, getDefaultBedsForFarm } from "@/app/farm/components/FarmMap";
 import { Plus, X } from "lucide-react";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
 import type { CropFormData } from "@/app/farm/components/CropForm";
@@ -267,6 +267,40 @@ export default function FarmPage() {
       setUserRoleOnFarm(membership?.role_on_farm ?? null);
     }
     setDeleteFarmStep(0);
+
+    // Auto-create zones for map beds that don't have matching zones
+    const defaultBeds = getDefaultBedsForFarm(farms.find((f) => f.id === farmId)?.name);
+    const missingBeds = defaultBeds.filter((bed) => {
+      const bid = bed.id.toUpperCase();
+      return !zoneRows.some((z) => {
+        const code = z.code?.toUpperCase() ?? "";
+        const name = z.name.toUpperCase();
+        return bid === code || bid === name || bid === code.replace(/^ROW\s*/i, "") || bid === name.replace(/^ROW\s*/i, "");
+      });
+    });
+    if (missingBeds.length > 0) {
+      let created = 0;
+      for (const bed of missingBeds) {
+        const pos = { x: bed.x, y: bed.y, w: bed.w, h: bed.h, ...(bed.rotate ? { rotate: bed.rotate } : {}) };
+        // Check if exists with same name (maybe inactive)
+        const { data: existing } = await supabase
+          .from("zones").select("id").eq("farm_id", farmId).eq("name", bed.id).maybeSingle();
+        if (existing) {
+          await supabase.from("zones").update({ map_position: pos, is_active: true }).eq("id", existing.id);
+          created++;
+        } else {
+          const { error: insertErr } = await supabase.from("zones").insert({
+            farm_id: farmId, name: bed.id, code: bed.id, is_active: true, map_position: pos,
+          });
+          if (!insertErr) created++;
+        }
+      }
+      if (created > 0) {
+        // Reload zones to pick up the new ones
+        const freshZones = await getZones(farmId);
+        setZones(freshZones);
+      }
+    }
   }
 
   async function handleDeleteFarm() {
