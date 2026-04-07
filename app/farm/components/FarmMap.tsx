@@ -807,6 +807,45 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
         </div>
       )}
 
+      {/* Bulk create zones for unlinked beds */}
+      {(() => {
+        const unlinkedBeds = baseLayout.beds.filter((bed) =>
+          !zones.some((z) => {
+            if (z.map_position) return false; // already has position
+            const code = z.code?.toUpperCase() ?? "";
+            const name = z.name.toUpperCase();
+            const bid = bed.id.toUpperCase();
+            return bid === code || bid === name || bid === code.replace(/^ROW\s*/i, "") || bid === name.replace(/^ROW\s*/i, "");
+          })
+        );
+        if (unlinkedBeds.length === 0 || editMode) return null;
+        return (
+          <div className="mb-3 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <span className="text-sm text-amber-800">{unlinkedBeds.length} spots on the map don&apos;t have zones yet.</span>
+            <button
+              onClick={async () => {
+                if (!farmId) return;
+                for (const bed of unlinkedBeds) {
+                  const pos: MapPosition = { x: bed.x, y: bed.y, w: bed.w, h: bed.h };
+                  if (bed.rotate) pos.rotate = bed.rotate;
+                  await supabase.from("zones").insert({
+                    farm_id: farmId,
+                    name: bed.id,
+                    code: bed.id,
+                    is_active: true,
+                    map_position: pos,
+                  });
+                }
+                onZonesChanged?.();
+              }}
+              className="rounded-lg bg-amber-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-700"
+            >
+              Create all {unlinkedBeds.length} zones
+            </button>
+          </div>
+        );
+      })()}
+
       <div className="flex gap-4">
         {/* Map */}
         <div className={`farm-map-container flex-1 overflow-auto rounded-2xl border bg-white ${editMode ? "border-blue-400 ring-2 ring-blue-100" : "border-zinc-200"}`}>
