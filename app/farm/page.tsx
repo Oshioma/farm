@@ -113,6 +113,9 @@ export default function FarmPage() {
   const [deletingPestId, setDeletingPestId] = useState<string | null>(null);
   const [confirmDeletePestId, setConfirmDeletePestId] = useState<string | null>(null);
   const [zonesView, setZonesView] = useState<"map" | "list">("map");
+  const [editingZoneId, setEditingZoneId] = useState<string | null>(null);
+  const [editingZoneForm, setEditingZoneForm] = useState<ZoneFormData>({ name: "", code: "", size_acres: "" });
+  const [savingZoneId, setSavingZoneId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState("");
   const [userRoleOnFarm, setUserRoleOnFarm] = useState<string | null>(null);
   const [deleteFarmStep, setDeleteFarmStep] = useState<0 | 1 | 2>(0);
@@ -1003,6 +1006,65 @@ export default function FarmPage() {
     }
   }
 
+  function startEditZone(zoneId: string) {
+    const zone = zones.find((z) => z.id === zoneId);
+    if (!zone) return;
+    setEditingZoneForm({
+      name: zone.name,
+      code: zone.code || "",
+      size_acres: zone.size_acres?.toString() || "",
+    });
+    setEditingZoneId(zoneId);
+  }
+
+  async function handleUpdateZone(data: ZoneFormData): Promise<boolean> {
+    if (!editingZoneId) return false;
+    try {
+      setSavingZoneId(editingZoneId);
+      setError("");
+      const name = data.name.trim();
+      if (!name) throw new Error("Zone name is required.");
+
+      const { error: updateError } = await supabase
+        .from("zones")
+        .update({
+          name,
+          code: data.code.trim() || null,
+          size_acres: data.size_acres ? Number(data.size_acres) : null,
+        })
+        .eq("id", editingZoneId);
+      if (updateError) throw updateError;
+
+      setEditingZoneId(null);
+      setEditingZoneForm({ name: "", code: "", size_acres: "" });
+      await loadFarmData(activeFarmId);
+      return true;
+    } catch (err) {
+      setError(errMsg(err, "Failed to update zone"));
+      return false;
+    } finally {
+      setSavingZoneId(null);
+    }
+  }
+
+  async function handleDeleteZone(zoneId: string) {
+    if (!confirm("Are you sure you want to delete this zone?")) return;
+    try {
+      setError("");
+      const { error: deleteError } = await supabase
+        .from("zones")
+        .delete()
+        .eq("id", zoneId);
+      if (deleteError) throw deleteError;
+
+      setEditingZoneId(null);
+      setEditingZoneForm({ name: "", code: "", size_acres: "" });
+      await loadFarmData(activeFarmId);
+    } catch (err) {
+      setError(errMsg(err, "Failed to delete zone"));
+    }
+  }
+
   return (
     <main className="min-h-screen bg-stone-50 text-zinc-900">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -1161,6 +1223,20 @@ export default function FarmPage() {
                 {label}
               </Link>
             ))}
+            {zones.length > 0 && (
+              <>
+                <div className="h-4 w-px bg-zinc-200" />
+                {zones.map((zone) => (
+                  <a
+                    key={zone.id}
+                    href={`#zone-${zone.id}`}
+                    className="rounded-full border border-zinc-100 px-3 py-1.5 font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900"
+                  >
+                    {zone.name}
+                  </a>
+                ))}
+              </>
+            )}
           </div>
         </nav>
 
@@ -1822,6 +1898,25 @@ export default function FarmPage() {
                   >
                     {activeForm === "zone" ? "Cancel" : "+ Add zone"}
                   </button>
+                  {editingZoneId ? (
+                    <button
+                      onClick={() => {
+                        setEditingZoneId(null);
+                        setEditingZoneForm({ name: "", code: "", size_acres: "" });
+                      }}
+                      className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
+                    >
+                      Cancel edit
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => zones.length > 0 && startEditZone(zones[0].id)}
+                      disabled={zones.length === 0}
+                      className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Edit zones
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1834,6 +1929,86 @@ export default function FarmPage() {
                       return ok;
                     }}
                   />
+                </div>
+              )}
+
+              {editingZoneId && (
+                <div className="mt-5 max-w-sm rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+                  <h3 className="mb-3 text-sm font-semibold">Edit zone</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium">Zone name</label>
+                      <input
+                        type="text"
+                        value={editingZoneForm.name}
+                        onChange={(e) => setEditingZoneForm((p) => ({ ...p, name: e.target.value }))}
+                        className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                        placeholder="Zone name"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium">Code</label>
+                        <input
+                          type="text"
+                          value={editingZoneForm.code}
+                          onChange={(e) => setEditingZoneForm((p) => ({ ...p, code: e.target.value }))}
+                          className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                          placeholder="e.g. B1"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium">Size (acres)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={editingZoneForm.size_acres}
+                          onChange={(e) => setEditingZoneForm((p) => ({ ...p, size_acres: e.target.value }))}
+                          className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                          placeholder="0.5"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        onClick={async () => {
+                          const ok = await handleUpdateZone(editingZoneForm);
+                          if (ok) {
+                            setEditingZoneId(null);
+                            setEditingZoneForm({ name: "", code: "", size_acres: "" });
+                          }
+                        }}
+                        disabled={!editingZoneForm.name.trim() || savingZoneId === editingZoneId}
+                        className="flex-1 rounded-xl bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
+                      >
+                        {savingZoneId === editingZoneId ? "Saving…" : "Save"}
+                      </button>
+                      <button
+                        onClick={() => editingZoneId && handleDeleteZone(editingZoneId)}
+                        className="rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                  {zones.length > 1 && editingZoneId && (
+                    <div className="mt-3 flex gap-2 border-t border-zinc-200 pt-3">
+                      {zones.map((zone) => (
+                        <button
+                          key={zone.id}
+                          onClick={() => startEditZone(zone.id)}
+                          className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                            editingZoneId === zone.id
+                              ? "bg-zinc-900 text-white"
+                              : "border border-zinc-200 text-zinc-600 hover:bg-zinc-100"
+                          }`}
+                        >
+                          {zone.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1851,15 +2026,23 @@ export default function FarmPage() {
                   {zones.map((zone) => {
                     const zoneCrops = crops.filter((c) => c.zone_ids?.includes(zone.id) || c.zone_id === zone.id);
                     return (
-                      <div key={zone.id} className="rounded-2xl border border-zinc-200 p-4">
+                      <div key={zone.id} id={`zone-${zone.id}`} className="scroll-mt-4 rounded-2xl border border-zinc-200 p-4">
                         <div className="flex items-center justify-between gap-2">
                           <div>
                             <p className="font-semibold">{zone.name}</p>
                             {zone.code && <p className="text-xs text-zinc-400">{zone.code}</p>}
                           </div>
-                          {zone.size_acres && (
-                            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">{zone.size_acres} ac</span>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {zone.size_acres && (
+                              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">{zone.size_acres} ac</span>
+                            )}
+                            <button
+                              onClick={() => startEditZone(zone.id)}
+                              className="rounded-full border border-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100"
+                            >
+                              Edit
+                            </button>
+                          </div>
                         </div>
                         {zoneCrops.length > 0 ? (
                           <ul className="mt-3 space-y-1">
