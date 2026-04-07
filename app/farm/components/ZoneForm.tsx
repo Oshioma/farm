@@ -20,8 +20,10 @@ export function ZoneForm({ onSubmit }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // Auto-generate code from name
+    const code = form.name.trim().toUpperCase().replace(/\s+/g, "");
     setSaving(true);
-    const ok = await onSubmit(form);
+    const ok = await onSubmit({ ...form, code });
     setSaving(false);
     if (ok) setForm(blank);
   }
@@ -48,34 +50,19 @@ export function ZoneForm({ onSubmit }: Props) {
           />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="mb-2 block text-sm font-medium">
-              Code <span className="font-normal text-zinc-400">(optional)</span>
-            </label>
-            <input
-              type="text"
-              value={form.code}
-              onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))}
-              className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-              placeholder="B1"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium">
-              Size (acres) <span className="font-normal text-zinc-400">(optional)</span>
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.size_acres}
-              onChange={(e) => setForm((prev) => ({ ...prev, size_acres: e.target.value }))}
-              className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-              placeholder="0.25"
-            />
-          </div>
+        <div>
+          <label className="mb-2 block text-sm font-medium">
+            Size (acres) <span className="font-normal text-zinc-400">(optional)</span>
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={form.size_acres}
+            onChange={(e) => setForm((prev) => ({ ...prev, size_acres: e.target.value }))}
+            className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+            placeholder="0.25"
+          />
         </div>
 
         <button

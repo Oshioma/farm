@@ -1224,20 +1224,6 @@ export default function FarmPage() {
                 {label}
               </Link>
             ))}
-            {zones.length > 0 && (
-              <>
-                <div className="h-4 w-px bg-zinc-200" />
-                {zones.map((zone) => (
-                  <a
-                    key={zone.id}
-                    href={`#zone-${zone.id}`}
-                    className="rounded-full border border-zinc-100 px-3 py-1.5 font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900"
-                  >
-                    {zone.name}
-                  </a>
-                ))}
-              </>
-            )}
           </div>
         </nav>
 
@@ -1947,17 +1933,7 @@ export default function FarmPage() {
                         placeholder="Zone name"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="mb-1 block text-xs font-medium">Code</label>
-                        <input
-                          type="text"
-                          value={editingZoneForm.code}
-                          onChange={(e) => setEditingZoneForm((p) => ({ ...p, code: e.target.value }))}
-                          className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
-                          placeholder="e.g. B1"
-                        />
-                      </div>
+                    <div>
                       <div>
                         <label className="mb-1 block text-xs font-medium">Size (acres)</label>
                         <input
@@ -2031,7 +2007,6 @@ export default function FarmPage() {
                         <div className="flex items-center justify-between gap-2">
                           <div>
                             <p className="font-semibold">{zone.name}</p>
-                            {zone.code && <p className="text-xs text-zinc-400">{zone.code}</p>}
                           </div>
                           <div className="flex items-center gap-2">
                             {zone.size_acres && (
