@@ -839,7 +839,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                       map_position: pos,
                     };
                   });
-                  const { error } = await supabase.from("zones").insert(inserts);
+                  const { error } = await supabase.from("zones").upsert(inserts, { onConflict: "farm_id,name" });
                   if (error) {
                     console.error("Failed to create zones:", error);
                     alert("Failed to create zones: " + error.message);
@@ -1283,13 +1283,13 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                       if (!bed) { alert("Bed not found: " + bedId); return; }
                       const pos: MapPosition = { x: bed.x, y: bed.y, w: bed.w, h: bed.h };
                       if (bed.rotate) pos.rotate = bed.rotate;
-                      const { error } = await supabase.from("zones").insert({
+                      const { error } = await supabase.from("zones").upsert({
                         farm_id: farmId,
                         name: bedId,
                         code: bedId,
                         is_active: true,
                         map_position: pos,
-                      });
+                      }, { onConflict: "farm_id,name" });
                       if (error) { alert("Failed to create zone: " + error.message); return; }
                       onZonesChanged?.();
                     }}
