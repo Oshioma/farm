@@ -1248,61 +1248,51 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                   <div className="text-xs text-zinc-400">
                     This spot isn&apos;t linked to a zone yet.
                   </div>
-                  {(() => {
-                    const bedId = selectedZoneId.replace("_default_", "");
-                    const linkedZoneIds = new Set(mapZones.filter((mz) => !mz.zoneId.startsWith("_default_")).map((mz) => mz.zoneId));
-                    const unlinkedZones = zones.filter((z) => !linkedZoneIds.has(z.id));
-                    return (
-                      <div className="space-y-2">
-                        {/* Link existing zone */}
-                        {unlinkedZones.length > 0 && (
-                          <div>
-                            <label className="mb-1 block text-xs font-medium">Link existing zone</label>
-                            <select
-                              className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
-                              defaultValue=""
-                              onChange={async (e) => {
-                                const zoneId = e.target.value;
-                                if (!zoneId) return;
-                                const bed = baseLayout.beds.find((b) => b.id === bedId);
-                                if (!bed) return;
-                                const pos: MapPosition = { x: bed.x, y: bed.y, w: bed.w, h: bed.h };
-                                if (bed.rotate) pos.rotate = bed.rotate;
-                                await supabase.from("zones").update({ map_position: pos }).eq("id", zoneId);
-                                onZonesChanged?.();
-                              }}
-                            >
-                              <option value="">Select a zone…</option>
-                              {unlinkedZones.map((z) => (
-                                <option key={z.id} value={z.id}>{z.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-                        {/* Or create new zone with the bed name */}
-                        <button
-                          onClick={async () => {
-                            if (!farmId) return;
-                            const bed = baseLayout.beds.find((b) => b.id === bedId);
-                            if (!bed) return;
-                            const pos: MapPosition = { x: bed.x, y: bed.y, w: bed.w, h: bed.h };
-                            if (bed.rotate) pos.rotate = bed.rotate;
-                            await supabase.from("zones").insert({
-                              farm_id: farmId,
-                              name: bedId,
-                              code: bedId,
-                              is_active: true,
-                              map_position: pos,
-                            });
-                            onZonesChanged?.();
-                          }}
-                          className="w-full rounded-lg bg-zinc-900 px-3 py-2 text-xs font-medium text-white hover:bg-zinc-800"
-                        >
-                          Create zone &quot;{bedId}&quot;
-                        </button>
-                      </div>
-                    );
-                  })()}
+                  <div>
+                    <label className="mb-1 block text-xs font-medium">Link existing zone</label>
+                    <select
+                      className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
+                      defaultValue=""
+                      onChange={async (e) => {
+                        const zoneId = e.target.value;
+                        if (!zoneId) return;
+                        const bedId = selectedZoneId.replace("_default_", "");
+                        const bed = baseLayout.beds.find((b) => b.id === bedId);
+                        if (!bed) return;
+                        const pos: MapPosition = { x: bed.x, y: bed.y, w: bed.w, h: bed.h };
+                        if (bed.rotate) pos.rotate = bed.rotate;
+                        await supabase.from("zones").update({ map_position: pos }).eq("id", zoneId);
+                        onZonesChanged?.();
+                      }}
+                    >
+                      <option value="">Select a zone…</option>
+                      {zones.map((z) => (
+                        <option key={z.id} value={z.id}>{z.name}{z.code ? ` (${z.code})` : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="text-xs text-zinc-300 text-center">or</div>
+                  <button
+                    onClick={async () => {
+                      if (!farmId) return;
+                      const bedId = selectedZoneId.replace("_default_", "");
+                      const bed = baseLayout.beds.find((b) => b.id === bedId);
+                      if (!bed) return;
+                      const pos: MapPosition = { x: bed.x, y: bed.y, w: bed.w, h: bed.h };
+                      if (bed.rotate) pos.rotate = bed.rotate;
+                      await supabase.from("zones").insert({
+                        farm_id: farmId,
+                        name: bedId,
+                        code: bedId,
+                        is_active: true,
+                        map_position: pos,
+                      });
+                      onZonesChanged?.();
+                    }}
+                    className="w-full rounded-lg bg-zinc-900 px-3 py-2 text-xs font-medium text-white hover:bg-zinc-800"
+                  >
+                    Create new zone &quot;{selectedZoneId.replace("_default_", "")}&quot;
+                  </button>
                 </div>
               ) : null}
               {selectedHarvestEta && (
