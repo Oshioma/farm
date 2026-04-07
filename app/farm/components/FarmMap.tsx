@@ -812,9 +812,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
       {(() => {
         const unlinkedBeds = baseLayout.beds.filter((bed) => {
           const bid = bed.id.toUpperCase();
-          // Check if ANY zone matches this bed (by position, code, or name)
           return !zones.some((z) => {
-            if (z.map_position) return true; // has position = it's placed on map already
             const code = z.code?.toUpperCase() ?? "";
             const name = z.name.toUpperCase();
             return bid === code || bid === name || bid === code.replace(/^ROW\s*/i, "") || bid === name.replace(/^ROW\s*/i, "");
