@@ -707,12 +707,31 @@ export type HarvestLog = {
 };
 
 export async function getHarvestLogs(farmId: string): Promise<HarvestLog[]> {
-  const { data, error } = await supabase
+  const { data: harvests, error: harvestError } = await supabase
     .from("harvests")
-    .select("id, farm_id, crop_id, zone_id, harvest_date, quantity_kg, quality, notes, created_at, crop:crops(crop_name), zone:zones(name)")
+    .select("id, farm_id, crop_id, zone_id, harvest_date, quantity_kg, quality, notes, created_at")
     .eq("farm_id", farmId)
     .order("harvest_date", { ascending: false });
 
-  if (error) throw new Error(`getHarvestLogs failed: ${error.message}`);
-  return (data ?? []) as HarvestLog[];
+  if (harvestError) throw new Error(`getHarvestLogs failed: ${harvestError.message}`);
+  if (!harvests?.length) return [];
+
+  // Fetch crops and zones
+  const cropIds = [...new Set(harvests.map(h => h.crop_id).filter(Boolean))];
+  const zoneIds = [...new Set(harvests.map(h => h.zone_id).filter(Boolean))];
+
+  const [{ data: crops }, { data: zones }] = await Promise.all([
+    cropIds.length ? supabase.from("crops").select("id, crop_name").in("id", cropIds) : Promise.resolve({ data: [] }),
+    zoneIds.length ? supabase.from("zones").select("id, name").in("id", zoneIds) : Promise.resolve({ data: [] })
+  ]);
+
+  // Map crops and zones to harvests
+  const cropMap = new Map((crops ?? []).map(c => [c.id, c]));
+  const zoneMap = new Map((zones ?? []).map(z => [z.id, z]));
+
+  return (harvests ?? []).map(h => ({
+    ...h,
+    crop: h.crop_id ? [cropMap.get(h.crop_id)].filter(Boolean) : null,
+    zone: h.zone_id ? [zoneMap.get(h.zone_id)].filter(Boolean) : null
+  })) as HarvestLog[];
 }
