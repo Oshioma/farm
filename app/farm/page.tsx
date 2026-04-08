@@ -120,6 +120,7 @@ export default function FarmPage() {
   const [userRoleOnFarm, setUserRoleOnFarm] = useState<string | null>(null);
   const [deleteFarmStep, setDeleteFarmStep] = useState<0 | 1 | 2>(0);
   const [deletingFarm, setDeletingFarm] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -323,6 +324,22 @@ export default function FarmPage() {
     };
 
     run();
+  }, [activeFarmId]);
+
+  // Refresh farm data when page comes back into focus (for mobile)
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === "visible" && activeFarmId) {
+        try {
+          await loadFarmData(activeFarmId);
+        } catch (err) {
+          console.error("Failed to refresh farm data:", err);
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [activeFarmId]);
 
   const activeFarm = useMemo(
@@ -1182,6 +1199,24 @@ export default function FarmPage() {
                   Admin
                 </Link>
               )}
+              <button
+                onClick={async () => {
+                  setIsRefreshing(true);
+                  try {
+                    if (activeFarmId) {
+                      await loadFarmData(activeFarmId);
+                    }
+                  } catch (err) {
+                    setError(errMsg(err, "Failed to refresh farm data"));
+                  } finally {
+                    setIsRefreshing(false);
+                  }
+                }}
+                disabled={isRefreshing}
+                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-60"
+              >
+                {isRefreshing ? "Refreshing..." : "Refresh"}
+              </button>
               {userEmail && (
                 <span className="text-sm text-zinc-500">{userEmail}</span>
               )}
