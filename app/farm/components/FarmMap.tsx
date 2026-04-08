@@ -1,21 +1,8 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import type { Zone, Crop, FertilisationEntry, CompostEntry, HarvestEtaEntry, MapPosition } from "@/lib/farm";
-import { supabase } from "@/lib/supabase";
+import type { Zone, Crop, FertilisationEntry, CompostEntry, HarvestEtaEntry } from "@/lib/farm";
 
-// A zone rendered on the map — position comes from zone.map_position or hardcoded defaults
-type MapZone = {
-  zoneId: string;       // zone.id from DB
-  label: string;        // zone.name or code
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  rotate?: number;
-};
-
-// Internal type for hardcoded default bed positions
 type BedDef = {
   id: string;
   label: string;
@@ -24,6 +11,7 @@ type BedDef = {
   w: number;
   h: number;
   rotate?: number;
+  zone?: string;
 };
 
 type LandmarkDef = {
@@ -46,91 +34,23 @@ type FarmLayout = {
   extraSvg?: React.ReactNode;
 };
 
-// ── Storage helpers ──
-// localStorage for caching
-function cacheKey(farmId: string) {
-  return `farm-map-layout-cache:${farmId}`;
+// ── localStorage helpers ──
+function storageKey(farmName: string) {
+  return `farm-map-layout:${farmName}`;
 }
 
-function getCachedLayout(farmId: string): { beds: BedDef[]; landmarks?: LandmarkDef[]; backgroundImage?: string } | null {
+function saveCustomLayout(farmName: string, beds: BedDef[], landmarks: LandmarkDef[], backgroundImage?: string) {
   try {
-    const raw = localStorage.getItem(cacheKey(farmId));
+    localStorage.setItem(storageKey(farmName), JSON.stringify({ beds, landmarks, backgroundImage }));
+  } catch { /* quota exceeded – ignore */ }
+}
+
+function loadCustomLayout(farmName: string): { beds: BedDef[]; landmarks?: LandmarkDef[]; backgroundImage?: string } | null {
+  try {
+    const raw = localStorage.getItem(storageKey(farmName));
     if (!raw) return null;
     return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-function setCachedLayout(farmId: string, beds: BedDef[], landmarks: LandmarkDef[], backgroundImage?: string) {
-  try {
-    localStorage.setItem(cacheKey(farmId), JSON.stringify({ beds, landmarks, backgroundImage }));
-  } catch {
-    // quota exceeded – ignore
-  }
-}
-
-// Save to database
-async function saveMapLayoutToDb(farmId: string, beds: BedDef[], landmarks: LandmarkDef[], backgroundImage?: string) {
-  if (!farmId) {
-    console.warn("Cannot save layout: no farmId provided");
-    return false;
-  }
-
-  try {
-    const response = await fetch("/api/farm-map/save", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        farm_id: farmId,
-        beds,
-        landmarks,
-        background_image: backgroundImage,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      console.error("Failed to save layout to database:", error);
-      return false;
-    }
-
-    console.log(`Saved layout for farm ${farmId} to database`);
-    // Also cache locally
-    setCachedLayout(farmId, beds, landmarks, backgroundImage);
-    return true;
-  } catch (error) {
-    console.error("Error saving layout to database:", error);
-    return false;
-  }
-}
-
-// Load from database
-async function loadMapLayoutFromDb(farmId: string): Promise<{ beds: BedDef[]; landmarks?: LandmarkDef[]; backgroundImage?: string } | null> {
-  if (!farmId) {
-    console.warn("Cannot load layout: no farmId provided");
-    return null;
-  }
-
-  try {
-    const response = await fetch(`/api/farm-map/load?farm_id=${farmId}`);
-
-    if (!response.ok) {
-      console.error("Failed to load layout from database");
-      return null;
-    }
-
-    const { data } = await response.json();
-    if (data) {
-      console.log(`Loaded layout for farm ${farmId} from database`);
-      // Cache it locally
-      setCachedLayout(farmId, data.beds, data.landmarks, data.background_image);
-    }
-    return data;
-  } catch (error) {
-    console.error("Error loading layout from database:", error);
-    return null;
-  }
+  } catch { return null; }
 }
 
 // ── Mount Solomun layout ──
@@ -316,11 +236,6 @@ function getLayout(farmName?: string): FarmLayout {
   };
 }
 
-// Expose default beds for a farm so the parent page can auto-create zones
-export function getDefaultBedsForFarm(farmName?: string): { id: string; x: number; y: number; w: number; h: number; rotate?: number }[] {
-  return getLayout(farmName).beds;
-}
-
 type Props = {
   zones: Zone[];
   crops: Crop[];
@@ -329,23 +244,22 @@ type Props = {
   harvestEta?: HarvestEtaEntry[];
   farmName?: string;
   farmId?: string;
-  onSelectZone?: (zoneId: string) => void;
-  onZonesChanged?: () => void;
+  onSelectBed?: (bedId: string) => void;
 };
 
-export function FarmMap({ zones, crops, fertilisations = [], compostEntries = [], harvestEta = [], farmName, farmId, onSelectZone, onZonesChanged }: Props) {
-  const [hoveredZone, setHoveredZone] = useState<string | null>(null);
-  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+export function FarmMap({ zones, crops, fertilisations = [], compostEntries = [], harvestEta = [], farmName, farmId, onSelectBed }: Props) {
+  const [hoveredBed, setHoveredBed] = useState<string | null>(null);
+  const [selectedBed, setSelectedBed] = useState<string | null>(null);
 
   // ── Edit mode state ──
   const [editMode, setEditMode] = useState(false);
-  const [editZones, setEditZones] = useState<MapZone[]>([]);
-  const [dragZone, setDragZone] = useState<string | null>(null);
+  const [editBeds, setEditBeds] = useState<BedDef[]>([]);
+  const [dragBed, setDragBed] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [resizeZone, setResizeZone] = useState<string | null>(null);
+  const [resizeBed, setResizeBed] = useState<string | null>(null);
   const [customBg, setCustomBg] = useState<string | undefined>();
-  const [addingZone, setAddingZone] = useState(false);
-  const [newZoneName, setNewZoneName] = useState("");
+  const [addingBed, setAddingBed] = useState(false);
+  const [newBedLabel, setNewBedLabel] = useState("");
   // Landmark editing state
   const [editLandmarks, setEditLandmarks] = useState<LandmarkDef[]>([]);
   const [dragLandmark, setDragLandmark] = useState<number | null>(null);
@@ -354,139 +268,61 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
   const [editingLabelText, setEditingLabelText] = useState("");
   const [addingLabel, setAddingLabel] = useState(false);
   const [newLabelText, setNewLabelText] = useState("");
-  const [editingBed, setEditingBed] = useState(false);
-  const [creatingZones, setCreatingZones] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const baseLayout = getLayout(farmName);
 
-  // Build MapZones from zones — use map_position if available, else match hardcoded defaults
-  function buildMapZones(): MapZone[] {
-    // First: zones with map_position set in DB
-    const result: MapZone[] = [];
-    const matchedBedIds = new Set<string>();
-
-    for (const z of zones) {
-      if (z.map_position) {
-        result.push({
-          zoneId: z.id,
-          label: z.name,
-          ...z.map_position,
-        });
-        continue;
-      }
-      // Fallback: try multiple matching patterns against hardcoded beds
-      const code = z.code?.toUpperCase() ?? "";
-      const name = z.name.toUpperCase();
-      const codeStripped = code.replace(/^ROW\s*/i, "");
-      const nameStripped = name.replace(/^ROW\s*/i, "");
-
-      const fallback = baseLayout.beds.find((b) => {
-        const bid = b.id.toUpperCase();
-        return bid === code || bid === name || bid === codeStripped || bid === nameStripped;
-      });
-
-      if (fallback) {
-        matchedBedIds.add(fallback.id);
-        result.push({
-          zoneId: z.id,
-          label: z.name,
-          x: fallback.x,
-          y: fallback.y,
-          w: fallback.w,
-          h: fallback.h,
-          rotate: fallback.rotate,
-        });
-      }
-    }
-
-    // Also show hardcoded beds that have NO matching zone (so the map isn't empty)
-    for (const bed of baseLayout.beds) {
-      if (!matchedBedIds.has(bed.id)) {
-        result.push({
-          zoneId: `_default_${bed.id}`,
-          label: bed.label,
-          x: bed.x,
-          y: bed.y,
-          w: bed.w,
-          h: bed.h,
-          rotate: bed.rotate,
-        });
-      }
-    }
-
-    return result;
-  }
-
-  // Load landmarks from localStorage (landmarks aren't per-zone, they're per-farm decorations)
+  // Load custom layout from localStorage on mount / farm change
   useEffect(() => {
-    if (!farmId) return;
-    const cached = getCachedLayout(farmId);
-    if (cached) {
-      if (cached.landmarks) setEditLandmarks(cached.landmarks);
-      setCustomBg(cached.backgroundImage);
+    if (!farmName) return;
+    const saved = loadCustomLayout(farmName);
+    if (saved) {
+      setEditBeds(saved.beds);
+      if (saved.landmarks) setEditLandmarks(saved.landmarks);
+      setCustomBg(saved.backgroundImage);
     }
-    // Also try DB
-    loadMapLayoutFromDb(farmId).then((data) => {
-      if (data) {
-        if (data.landmarks) setEditLandmarks(data.landmarks);
-        setCustomBg(data.backgroundImage);
-      }
-    });
-  }, [farmId]);
+  }, [farmName]);
 
-  const mapZones = buildMapZones();
-  const activeZones = editMode ? editZones : mapZones;
-
+  // The active layout merges saved customisations
+  const hasCustom = editBeds.length > 0 || editLandmarks.length > 0;
   const layout: FarmLayout = {
     ...baseLayout,
-    beds: [], // No longer used — zones render directly
+    beds: editMode ? editBeds : (hasCustom ? editBeds : baseLayout.beds),
     landmarks: editMode ? editLandmarks : (editLandmarks.length > 0 ? editLandmarks : baseLayout.landmarks),
     backgroundImage: customBg || baseLayout.backgroundImage,
   };
 
   // Enter edit mode
   function startEdit() {
-    setEditZones(mapZones.map((mz) => ({ ...mz })));
+    setEditBeds(editBeds.length > 0 ? [...editBeds] : baseLayout.beds.map((b) => ({ ...b })));
     setEditLandmarks(editLandmarks.length > 0 ? [...editLandmarks] : baseLayout.landmarks.map((l) => ({ ...l })));
     setEditMode(true);
-    setSelectedZoneId(null);
+    setSelectedBed(null);
     setEditingLabelIdx(null);
   }
 
-  // Save edits — write map_position to each zone in Supabase
-  const [saving, setSaving] = useState(false);
-  async function saveEdit() {
-    setSaving(true);
-    try {
-      // Update each zone's map_position in DB (skip _default_ placeholders)
-      for (const mz of editZones) {
-        if (mz.zoneId.startsWith("_default_")) continue;
-        const pos: MapPosition = { x: mz.x, y: mz.y, w: mz.w, h: mz.h };
-        if (mz.rotate) pos.rotate = mz.rotate;
-        await supabase
-          .from("zones")
-          .update({ map_position: pos })
-          .eq("id", mz.zoneId);
-      }
-      // Save landmarks/bg to the farm-map API (they're not per-zone)
-      if (farmId) {
-        await saveMapLayoutToDb(farmId, [], editLandmarks, customBg);
-      }
-      onZonesChanged?.(); // Refresh zones from parent
-    } catch (err) {
-      console.error("Failed to save map positions:", err);
-    }
-    setSaving(false);
+  // Save edits
+  function saveEdit() {
+    if (farmName) saveCustomLayout(farmName, editBeds, editLandmarks, customBg);
     setEditMode(false);
     setEditingLabelIdx(null);
   }
 
   // Cancel edits
   function cancelEdit() {
-    setEditZones([]);
-    setEditLandmarks(editLandmarks.length > 0 ? [...editLandmarks] : baseLayout.landmarks.map((l) => ({ ...l })));
+    if (farmName) {
+      const saved = loadCustomLayout(farmName);
+      if (saved) {
+        setEditBeds(saved.beds);
+        setEditLandmarks(saved.landmarks ?? []);
+        setCustomBg(saved.backgroundImage);
+      } else {
+        setEditBeds([]);
+        setEditLandmarks([]);
+        setCustomBg(undefined);
+      }
+    }
     setEditMode(false);
     setEditingLabelIdx(null);
   }
@@ -505,20 +341,20 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
   }
 
   // ── Drag handlers ──
-  const handleMouseDown = useCallback((zoneId: string, e: React.MouseEvent) => {
+  const handleMouseDown = useCallback((bedId: string, e: React.MouseEvent) => {
     if (!editMode) return;
     e.stopPropagation();
     const pt = svgPoint(e);
-    const mz = editZones.find((z) => z.zoneId === zoneId);
-    if (!mz) return;
-    setDragZone(zoneId);
-    setDragOffset({ x: pt.x - mz.x, y: pt.y - mz.y });
-  }, [editMode, editZones]);
+    const bed = editBeds.find((b) => b.id === bedId);
+    if (!bed) return;
+    setDragBed(bedId);
+    setDragOffset({ x: pt.x - bed.x, y: pt.y - bed.y });
+  }, [editMode, editBeds]);
 
-  const handleResizeDown = useCallback((zoneId: string, e: React.MouseEvent) => {
+  const handleResizeDown = useCallback((bedId: string, e: React.MouseEvent) => {
     if (!editMode) return;
     e.stopPropagation();
-    setResizeZone(zoneId);
+    setResizeBed(bedId);
   }, [editMode]);
 
   // ── Landmark drag handler ──
@@ -536,21 +372,21 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
     if (!editMode) return;
     const pt = svgPoint(e);
 
-    if (dragZone) {
-      setEditZones((prev) =>
-        prev.map((mz) =>
-          mz.zoneId === dragZone ? { ...mz, x: Math.round(pt.x - dragOffset.x), y: Math.round(pt.y - dragOffset.y) } : mz
+    if (dragBed) {
+      setEditBeds((prev) =>
+        prev.map((b) =>
+          b.id === dragBed ? { ...b, x: Math.round(pt.x - dragOffset.x), y: Math.round(pt.y - dragOffset.y) } : b
         )
       );
     }
 
-    if (resizeZone) {
-      setEditZones((prev) =>
-        prev.map((mz) => {
-          if (mz.zoneId !== resizeZone) return mz;
-          const newW = Math.max(20, Math.round(pt.x - mz.x));
-          const newH = Math.max(15, Math.round(pt.y - mz.y));
-          return { ...mz, w: newW, h: newH };
+    if (resizeBed) {
+      setEditBeds((prev) =>
+        prev.map((b) => {
+          if (b.id !== resizeBed) return b;
+          const newW = Math.max(20, Math.round(pt.x - b.x));
+          const newH = Math.max(15, Math.round(pt.y - b.y));
+          return { ...b, w: newW, h: newH };
         })
       );
     }
@@ -562,42 +398,28 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
         )
       );
     }
-  }, [editMode, dragZone, resizeZone, dragOffset, dragLandmark, dragLmOffset]);
+  }, [editMode, dragBed, resizeBed, dragOffset, dragLandmark, dragLmOffset]);
 
   const handleMouseUp = useCallback(() => {
-    setDragZone(null);
-    setResizeZone(null);
+    setDragBed(null);
+    setResizeBed(null);
     setDragLandmark(null);
   }, []);
 
-  // ── Add new zone to map ──
-  async function addZoneToMap() {
-    if (!newZoneName.trim() || !farmId) return;
-    const name = newZoneName.trim();
-    const code = name.toUpperCase().replace(/\s+/g, "");
-    const pos: MapPosition = { x: 100, y: 100, w: 80, h: 30 };
-    // Create zone in Supabase
-    const { data, error } = await supabase.from("zones").insert({
-      farm_id: farmId,
-      name,
-      code,
-      is_active: true,
-      map_position: pos,
-    }).select("id").single();
-    if (error || !data) {
-      console.error("Failed to create zone:", error);
-      return;
-    }
-    setEditZones((prev) => [...prev, { zoneId: data.id, label: code, ...pos }]);
-    setNewZoneName("");
-    setAddingZone(false);
-    onZonesChanged?.();
+  // ── Add new bed ──
+  function addBed() {
+    if (!newBedLabel.trim()) return;
+    const id = newBedLabel.trim().toUpperCase().replace(/\s+/g, "");
+    if (editBeds.find((b) => b.id === id)) return;
+    setEditBeds((prev) => [...prev, { id, label: newBedLabel.trim(), x: 100, y: 100, w: 80, h: 30 }]);
+    setNewBedLabel("");
+    setAddingBed(false);
   }
 
-  // ── Remove zone from map (sets map_position to null, does NOT delete zone) ──
-  function removeZoneFromMap(zoneId: string) {
-    setEditZones((prev) => prev.filter((mz) => mz.zoneId !== zoneId));
-    if (selectedZoneId === zoneId) setSelectedZoneId(null);
+  // ── Delete bed ──
+  function deleteBed(bedId: string) {
+    setEditBeds((prev) => prev.filter((b) => b.id !== bedId));
+    if (selectedBed === bedId) setSelectedBed(null);
   }
 
   // ── Add new text label ──
@@ -639,16 +461,26 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
     reader.onload = () => {
       const dataUrl = reader.result as string;
       setCustomBg(dataUrl);
-      // If this is a brand new farm with no zones on map, keep empty
-      if (editZones.length === 0 && mapZones.length === 0) {
-        setEditZones([]);
+      // If this is a brand new farm with no beds, start with empty bed list in edit mode
+      if (editBeds.length === 0 && baseLayout.beds.length === 0) {
+        setEditBeds([]);
       }
     };
     reader.readAsDataURL(file);
   }
 
-  function getZoneById(zoneId: string): Zone | undefined {
-    return zones.find((z) => z.id === zoneId);
+  // Try to match beds to zones by code
+  function getZoneForBed(bedId: string): Zone | undefined {
+    const id = bedId.toUpperCase();
+    return zones.find(
+      (z) => {
+        const code = z.code?.toUpperCase() ?? "";
+        const name = z.name.toUpperCase();
+        return code === id || name === id ||
+          code.replace(/^ROW\s*/i, "") === id ||
+          name.replace(/^ROW\s*/i, "") === id;
+      }
+    );
   }
 
   function getCropsForZone(zoneId: string): Crop[] {
@@ -667,8 +499,15 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
       .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   }
 
-  function getHarvestEtaForZone(zoneId: string): HarvestEtaEntry | undefined {
-    return harvestEta.find((h) => h.zone_id === zoneId);
+  function getHarvestEtaForBed(bedId: string): HarvestEtaEntry | undefined {
+    const id = bedId.toUpperCase();
+    // Match by zone_id if zone exists, or by bed_name
+    const zone = getZoneForBed(bedId);
+    if (zone) {
+      const byZone = harvestEta.find((h) => h.zone_id === zone.id);
+      if (byZone) return byZone;
+    }
+    return harvestEta.find((h) => h.bed_name?.toUpperCase() === id);
   }
 
   const MONTH_KEYS = ["mar","apr","may","jun","jul","aug","sep","oct","nov","dec","jan","feb"] as const;
@@ -680,10 +519,11 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
     return `${day}/${m}/${y}`;
   }
 
-  function zoneColor(zoneId: string): string {
-    if (zoneId.startsWith("_default_")) return "#f4f4f5"; // zinc-100 — no zone in DB
-    const zoneCrops = getCropsForZone(zoneId);
-    if (zoneCrops.length === 0) return "#e4e4e7"; // zinc-200 — empty
+  function bedColor(bedId: string): string {
+    const zone = getZoneForBed(bedId);
+    if (!zone) return "#f4f4f5"; // zinc-100 — unmapped
+    const zoneCrops = getCropsForZone(zone.id);
+    if (zoneCrops.length === 0) return "#e4e4e7"; // zinc-200 — empty zone
     const status = zoneCrops[0].status;
     if (status === "harvest_ready") return "#bbf7d0"; // green-200
     if (status === "growing") return "#d9f99d"; // lime-200
@@ -691,55 +531,55 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
     return "#e0f2fe"; // sky-100 — planned
   }
 
-  function zoneStroke(zoneId: string): string {
-    if (selectedZoneId === zoneId) return "#18181b"; // zinc-900
-    if (hoveredZone === zoneId) return "#52525b"; // zinc-600
-    if (zoneId.startsWith("_default_")) return "#d4d4d8"; // zinc-300 — unmapped
-    return "#a1a1aa"; // zinc-400
+  function bedStroke(bedId: string): string {
+    if (selectedBed === bedId) return "#18181b"; // zinc-900
+    if (hoveredBed === bedId) return "#52525b"; // zinc-600
+    const zone = getZoneForBed(bedId);
+    return zone ? "#a1a1aa" : "#d4d4d8"; // zinc-400 : zinc-300
   }
 
   // For vertical rows, render label rotated
   const isVerticalLayout = farmName?.toLowerCase().includes("top land");
 
-  const selected = selectedZoneId ? getZoneById(selectedZoneId) : null;
+  const selected = selectedBed ? getZoneForBed(selectedBed) : null;
   const selectedCrops = selected ? getCropsForZone(selected.id) : [];
   const selectedFertilisations = selected ? getFertilisationsForZone(selected.id) : [];
   const selectedCompost = selected ? getCompostForZone(selected.id) : [];
-  const selectedHarvestEta = selectedZoneId ? getHarvestEtaForZone(selectedZoneId) : undefined;
+  const selectedHarvestEta = selectedBed ? getHarvestEtaForBed(selectedBed) : undefined;
 
   // Check if this is a new/unknown farm with no layout
-  const isBlankFarm = mapZones.length === 0 && !customBg;
+  const isBlankFarm = baseLayout.beds.length === 0 && editBeds.length === 0 && !customBg;
 
   return (
-    <div className="farm-map-print-wrapper">
+    <div>
       {/* ── Edit toolbar ── */}
-      <div className="mb-3 flex items-center gap-2 flex-wrap print:hidden">
+      <div className="mb-3 flex items-center gap-2 flex-wrap">
         {editMode ? (
           <>
-            <button onClick={saveEdit} disabled={saving} className="rounded-xl bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60">
-              {saving ? "Saving…" : "Save Layout"}
+            <button onClick={saveEdit} className="rounded-xl bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">
+              Save Layout
             </button>
             <button onClick={cancelEdit} className="rounded-xl bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-300">
               Cancel
             </button>
             <div className="h-5 w-px bg-zinc-300" />
-            {addingZone ? (
+            {addingBed ? (
               <div className="flex items-center gap-1">
                 <input
                   type="text"
-                  value={newZoneName}
-                  onChange={(e) => setNewZoneName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && addZoneToMap()}
-                  placeholder="Zone name (e.g. Bed 1, Nursery)"
-                  className="w-48 rounded-lg border border-zinc-300 px-2 py-1.5 text-sm"
+                  value={newBedLabel}
+                  onChange={(e) => setNewBedLabel(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addBed()}
+                  placeholder="Bed name (e.g. R1)"
+                  className="w-36 rounded-lg border border-zinc-300 px-2 py-1.5 text-sm"
                   autoFocus
                 />
-                <button onClick={addZoneToMap} className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-800">Add</button>
-                <button onClick={() => setAddingZone(false)} className="text-sm text-zinc-500 hover:text-zinc-700">Cancel</button>
+                <button onClick={addBed} className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-800">Add</button>
+                <button onClick={() => setAddingBed(false)} className="text-sm text-zinc-500 hover:text-zinc-700">Cancel</button>
               </div>
             ) : (
-              <button onClick={() => setAddingZone(true)} className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
-                + Add Zone
+              <button onClick={() => setAddingBed(true)} className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                + Add Bed
               </button>
             )}
             {addingLabel ? (
@@ -782,9 +622,6 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
             <button onClick={startEdit} className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800">
               Edit Map
             </button>
-            <button onClick={() => window.print()} className="print:hidden rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
-              Print Map
-            </button>
             {isBlankFarm && (
               <>
                 <button
@@ -816,7 +653,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
 
       <div className="flex gap-4">
         {/* Map */}
-        <div className={`farm-map-container flex-1 overflow-auto rounded-2xl border bg-white ${editMode ? "border-blue-400 ring-2 ring-blue-100" : "border-zinc-200"}`}>
+        <div className={`flex-1 overflow-auto rounded-2xl border bg-white ${editMode ? "border-blue-400 ring-2 ring-blue-100" : "border-zinc-200"}`}>
           {editMode && (
             <div className="bg-blue-50 px-3 py-1.5 text-xs text-blue-700 border-b border-blue-200">
               Drag beds &amp; labels to move them. Drag corners to resize beds. Double-click text to edit it.
@@ -932,63 +769,63 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
             <circle cx={50} cy={510} r={18} fill="#92400e" stroke="#78350f" strokeWidth="1.5" />
           )}
 
-          {/* Zones on map */}
-          {activeZones.map((mz) => (
+          {/* Beds */}
+          {layout.beds.map((bed) => (
             <g
-              key={mz.zoneId}
+              key={bed.id}
               transform={
-                mz.rotate && !editMode
-                  ? `rotate(${mz.rotate}, ${mz.x + mz.w / 2}, ${mz.y + mz.h / 2})`
+                bed.rotate && !editMode
+                  ? `rotate(${bed.rotate}, ${bed.x + bed.w / 2}, ${bed.y + bed.h / 2})`
                   : undefined
               }
-              onMouseDown={editMode ? (e) => handleMouseDown(mz.zoneId, e) : undefined}
+              onMouseDown={editMode ? (e) => handleMouseDown(bed.id, e) : undefined}
               onClick={() => {
-                if (editMode) { setSelectedZoneId(selectedZoneId === mz.zoneId ? null : mz.zoneId); setEditingBed(false); return; }
-                setSelectedZoneId(selectedZoneId === mz.zoneId ? null : mz.zoneId);
-                onSelectZone?.(mz.zoneId);
+                if (editMode) { setSelectedBed(selectedBed === bed.id ? null : bed.id); return; }
+                setSelectedBed(selectedBed === bed.id ? null : bed.id);
+                onSelectBed?.(bed.id);
               }}
-              onMouseEnter={() => setHoveredZone(mz.zoneId)}
-              onMouseLeave={() => setHoveredZone(null)}
+              onMouseEnter={() => setHoveredBed(bed.id)}
+              onMouseLeave={() => setHoveredBed(null)}
               className={editMode ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}
             >
               <rect
-                x={mz.x}
-                y={mz.y}
-                width={mz.w}
-                height={mz.h}
+                x={bed.x}
+                y={bed.y}
+                width={bed.w}
+                height={bed.h}
                 rx="2"
-                fill={zoneColor(mz.zoneId)}
-                stroke={editMode && selectedZoneId === mz.zoneId ? "#3b82f6" : zoneStroke(mz.zoneId)}
-                strokeWidth={selectedZoneId === mz.zoneId ? 2 : 1.2}
+                fill={bedColor(bed.id)}
+                stroke={editMode && selectedBed === bed.id ? "#3b82f6" : bedStroke(bed.id)}
+                strokeWidth={selectedBed === bed.id ? 2 : 1.2}
                 strokeDasharray={editMode ? "4,2" : undefined}
               />
               {isVerticalLayout && !editMode ? (
                 <text
-                  x={mz.x + mz.w / 2}
-                  y={mz.y - 6}
+                  x={bed.x + bed.w / 2}
+                  y={bed.y - 6}
                   textAnchor="middle"
                   className="pointer-events-none text-[9px] font-semibold"
                   fill="#52525b"
                 >
-                  {mz.label}
+                  {bed.label}
                 </text>
               ) : (
                 <text
-                  x={mz.x + mz.w / 2}
-                  y={mz.y + mz.h / 2 + 1}
+                  x={bed.x + bed.w / 2}
+                  y={bed.y + bed.h / 2 + 1}
                   textAnchor="middle"
                   dominantBaseline="middle"
                   className="pointer-events-none text-[8px] font-medium"
                   fill="#52525b"
                 >
-                  {mz.label}
+                  {bed.label}
                 </text>
               )}
               {/* Resize handle (bottom-right corner) */}
               {editMode && (
                 <rect
-                  x={mz.x + mz.w - 6}
-                  y={mz.y + mz.h - 6}
+                  x={bed.x + bed.w - 6}
+                  y={bed.y + bed.h - 6}
                   width={8}
                   height={8}
                   rx="1"
@@ -996,7 +833,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                   stroke="white"
                   strokeWidth={1}
                   className="cursor-se-resize"
-                  onMouseDown={(e) => handleResizeDown(mz.zoneId, e)}
+                  onMouseDown={(e) => handleResizeDown(bed.id, e)}
                 />
               )}
             </g>
@@ -1005,90 +842,27 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
         </div>
 
         {/* Side panel — bed info */}
-        <div className="farm-map-sidebar w-56 shrink-0 space-y-3">
-          {/* Edit mode: selected zone controls */}
-          {editMode && selectedZoneId && (
+        <div className="w-56 shrink-0 space-y-3">
+          {/* Edit mode: selected bed controls */}
+          {editMode && selectedBed && (
             <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm space-y-3">
+              <div className="text-lg font-semibold text-blue-900">Editing: {selectedBed}</div>
               {(() => {
-                const mz = editZones.find((z) => z.zoneId === selectedZoneId);
-                const zone = getZoneById(selectedZoneId);
-                if (!mz) return null;
+                const bed = editBeds.find((b) => b.id === selectedBed);
+                if (!bed) return null;
                 return (
-                  <>
-                    <div className="text-lg font-semibold text-blue-900">{zone?.name || mz.label}</div>
-                    {editingBed ? (
-                      <div className="space-y-2">
-                        <div>
-                          <label className="text-xs font-medium text-blue-700">Display Label</label>
-                          <input
-                            type="text"
-                            value={mz.label}
-                            onChange={(e) =>
-                              setEditZones((prev) =>
-                                prev.map((z) => z.zoneId === selectedZoneId ? { ...z, label: e.target.value } : z)
-                              )
-                            }
-                            className="mt-0.5 w-full rounded-lg border border-blue-300 px-2 py-1.5 text-sm"
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="text-xs font-medium text-blue-700">Width</label>
-                            <input
-                              type="number"
-                              value={mz.w}
-                              onChange={(e) =>
-                                setEditZones((prev) =>
-                                  prev.map((z) => z.zoneId === selectedZoneId ? { ...z, w: Math.max(10, Number(e.target.value)) } : z)
-                                )
-                              }
-                              className="mt-0.5 w-full rounded-lg border border-blue-300 px-2 py-1.5 text-sm"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs font-medium text-blue-700">Height</label>
-                            <input
-                              type="number"
-                              value={mz.h}
-                              onChange={(e) =>
-                                setEditZones((prev) =>
-                                  prev.map((z) => z.zoneId === selectedZoneId ? { ...z, h: Math.max(10, Number(e.target.value)) } : z)
-                                )
-                              }
-                              className="mt-0.5 w-full rounded-lg border border-blue-300 px-2 py-1.5 text-sm"
-                            />
-                          </div>
-                        </div>
-                        <div className="text-xs text-blue-600">Position: ({mz.x}, {mz.y})</div>
-                        <button
-                          onClick={() => setEditingBed(false)}
-                          className="w-full rounded-lg bg-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-300"
-                        >
-                          Done
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {zone && <div className="text-xs text-blue-800">Zone: {zone.name}</div>}
-                        <div className="text-xs text-blue-800">Position: ({mz.x}, {mz.y})</div>
-                        <div className="text-xs text-blue-800">Size: {mz.w} x {mz.h}</div>
-                        <button
-                          onClick={() => setEditingBed(true)}
-                          className="w-full rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
-                        >
-                          Edit Zone
-                        </button>
-                      </div>
-                    )}
-                    <button
-                      onClick={() => removeZoneFromMap(selectedZoneId)}
-                      className="w-full rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-200"
-                    >
-                      Remove from Map
-                    </button>
-                  </>
+                  <div className="space-y-2 text-xs text-blue-800">
+                    <div>Position: ({bed.x}, {bed.y})</div>
+                    <div>Size: {bed.w} x {bed.h}</div>
+                  </div>
                 );
               })()}
+              <button
+                onClick={() => deleteBed(selectedBed)}
+                className="w-full rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+              >
+                Delete Bed
+              </button>
             </div>
           )}
 
@@ -1126,14 +900,15 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
             </div>
           )}
 
-          {selectedZoneId && !editMode ? (
+          {selectedBed && !editMode ? (
             <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-sm">
+              <div className="text-lg font-semibold">{isVerticalLayout ? "Row" : "Bed"} {selectedBed}</div>
               {selected ? (
                 <>
-                  <div className="text-lg font-semibold">{selected.name}</div>
-                  {selected.size_acres && (
-                    <div className="mt-1 text-zinc-500">{selected.size_acres} ac</div>
-                  )}
+                  <div className="mt-1 text-zinc-500">
+                    Zone: {selected.name}
+                    {selected.size_acres ? ` · ${selected.size_acres} ac` : ""}
+                  </div>
                   {selectedCrops.length > 0 ? (
                     <div className="mt-3 space-y-2">
                       {selectedCrops.map((c) => (
@@ -1196,14 +971,11 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                     </div>
                   )}
                 </>
-              ) : selectedZoneId?.startsWith("_default_") ? (
-                <div className="space-y-3">
-                  <div className="text-lg font-semibold">{selectedZoneId.replace("_default_", "")}</div>
-                  <div className="text-xs text-zinc-400">
-                    No zone linked yet. This zone will be created automatically.
-                  </div>
+              ) : (
+                <div className="mt-2 text-xs text-zinc-400">
+                  Not mapped to a zone. Create a zone with code &quot;{selectedBed}&quot; to link it.
                 </div>
-              ) : null}
+              )}
               {selectedHarvestEta && (
                 <div className="mt-4">
                   <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Harvest ETA</div>
@@ -1237,7 +1009,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
             </div>
           ) : !editMode ? (
             <div className="rounded-2xl border border-dashed border-zinc-200 p-4 text-center text-xs text-zinc-400">
-              Click a zone on the map to see details
+              Click a {isVerticalLayout ? "row" : "bed"} on the map to see details
             </div>
           ) : null}
 
@@ -1246,10 +1018,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
             <div className="mb-2 text-xs font-semibold text-zinc-500">Legend</div>
             <div className="space-y-1.5 text-xs text-zinc-500">
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-zinc-100" /> No zone
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-zinc-200" /> Empty
+                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-zinc-100" /> Unmapped
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-sky-100" /> Planned

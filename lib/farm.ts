@@ -8,21 +8,12 @@ export type Farm = {
   size_acres: number | null;
 };
 
-export type MapPosition = {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  rotate?: number;
-};
-
 export type Zone = {
   id: string;
   farm_id: string;
   name: string;
   code: string | null;
   size_acres: number | null;
-  map_position: MapPosition | null;
 };
 
 export type Crop = {
@@ -55,16 +46,8 @@ export type Task = {
   proof_required: boolean | null;
   zone_id: string | null;
   crop_id: string | null;
-  assigned_to: string | null;
   crop: { crop_name: string }[] | null;
   zone: { name: string }[] | null;
-};
-
-export type FarmMember = {
-  id: string;
-  profile_id: string;
-  user_email: string | null;
-  role_on_farm: string | null;
 };
 
 export type Activity = {
@@ -127,25 +110,12 @@ export async function getFarms(): Promise<Farm[]> {
 }
 
 export async function getZones(farmId: string): Promise<Zone[]> {
-  // Try with map_position first, fall back without it if column doesn't exist yet
-  let { data, error } = await supabase
+  const { data, error } = await supabase
     .from("zones")
-    .select("id, farm_id, name, code, size_acres, map_position")
+    .select("id, farm_id, name, code, size_acres")
     .eq("farm_id", farmId)
     .eq("is_active", true)
     .order("name");
-
-  if (error && error.message?.includes("map_position")) {
-    // Column doesn't exist yet — query without it
-    const fallback = await supabase
-      .from("zones")
-      .select("id, farm_id, name, code, size_acres")
-      .eq("farm_id", farmId)
-      .eq("is_active", true)
-      .order("name");
-    data = (fallback.data ?? []).map((z: Record<string, unknown>) => ({ ...z, map_position: null })) as typeof data;
-    error = fallback.error;
-  }
 
   if (error) throw new Error(`getZones failed: ${error.message}`);
   return (data ?? []) as Zone[];
@@ -214,7 +184,6 @@ export async function getTasks(farmId: string): Promise<Task[]> {
       proof_required,
       zone_id,
       crop_id,
-      assigned_to,
       crop:crops(crop_name),
       zone:zones(name)
     `
@@ -224,16 +193,6 @@ export async function getTasks(farmId: string): Promise<Task[]> {
 
   if (error) throw new Error(`getTasks failed: ${error.message}`);
   return (data ?? []) as Task[];
-}
-
-export async function getMembers(farmId: string): Promise<FarmMember[]> {
-  const { data, error } = await supabase
-    .from("farm_members")
-    .select("id, profile_id, user_email, role_on_farm")
-    .eq("farm_id", farmId);
-
-  if (error) throw new Error(`getMembers failed: ${error.message}`);
-  return (data ?? []) as FarmMember[];
 }
 
 export async function getActivities(farmId: string): Promise<Activity[]> {
