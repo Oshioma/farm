@@ -7,7 +7,6 @@ import { supabase } from "@/lib/supabase";
 import { getFarms, getHarvestLogs } from "@/lib/farm";
 import type { Farm, HarvestLog } from "@/lib/farm";
 import { formatDate } from "@/app/farm/utils";
-import { ChevronLeft } from "lucide-react";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -68,7 +67,7 @@ export default function HarvestLogsPage() {
 
   const totalQuantity = harvestLogs.reduce((sum, log) => sum + (log.quantity_kg || 0), 0);
 
-  if (loading) {
+  if (loading && farms.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <p className="text-zinc-500">Loading...</p>
@@ -93,46 +92,49 @@ export default function HarvestLogsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50">
-      {/* Header */}
-      <div className="border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <Link href="/farm" className="flex items-center gap-2 text-zinc-600 hover:text-zinc-900">
-            <ChevronLeft className="w-5 h-5" />
-            Back
-          </Link>
-          <h1 className="text-2xl font-bold">Harvest Logs</h1>
-          <button
-            onClick={handleSignOut}
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm text-white hover:bg-zinc-800"
-          >
-            Sign out
-          </button>
-        </div>
-      </div>
+    <main className="min-h-screen bg-stone-50 text-zinc-900">
+      <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
 
-      <div className="mx-auto max-w-7xl px-6 py-8">
-        {/* Farm selector */}
-        {farms.length > 1 && (
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-zinc-700 mb-2">Select Farm</label>
-            <select
-              value={activeFarmId}
-              onChange={(e) => setActiveFarmId(e.target.value)}
-              className="rounded-lg border border-zinc-300 px-4 py-2 outline-none focus:border-zinc-900"
-            >
-              {farms.map((farm) => (
-                <option key={farm.id} value={farm.id}>
-                  {farm.name}
-                </option>
+        {/* Header */}
+        <header className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                Shamba Farm Manager
+              </p>
+              <h1 className="mt-1 text-3xl font-semibold tracking-tight">Harvest Logs</h1>
+              {activeFarm && <p className="mt-1 text-sm text-zinc-500">{activeFarm.name}</p>}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {farms.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setActiveFarmId(f.id)}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                    activeFarmId === f.id
+                      ? "bg-zinc-900 text-white"
+                      : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
+                  }`}
+                >
+                  {f.name}
+                </button>
               ))}
-            </select>
+              <Link href="/farm" className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
+                ← Farm
+              </Link>
+              <button
+                onClick={handleSignOut}
+                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+              >
+                Sign out
+              </button>
+            </div>
           </div>
-        )}
+        </header>
 
         {/* Error message */}
         {error && (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-red-800">
+          <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
             {error}
           </div>
         )}
@@ -152,9 +154,11 @@ export default function HarvestLogsPage() {
         )}
 
         {/* Harvest logs table */}
-        {harvestLogs.length === 0 ? (
-          <div className="rounded-lg border border-zinc-200 bg-white p-8 text-center">
-            <p className="text-zinc-500">No harvest logs yet.</p>
+        {loading ? (
+          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">Loading...</div>
+        ) : harvestLogs.length === 0 ? (
+          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-center text-sm text-zinc-500">
+            <p>No harvest logs yet.</p>
             <Link href="/farm" className="mt-4 inline-block text-zinc-900 hover:text-zinc-700 font-medium">
               Log a harvest →
             </Link>
@@ -200,6 +204,6 @@ export default function HarvestLogsPage() {
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }
