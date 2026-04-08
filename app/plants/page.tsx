@@ -29,11 +29,11 @@ export default function PlantsPage() {
   const [plantName, setPlantName] = useState("");
   const [plantNotes, setPlantNotes] = useState("");
   const [plantMedicinal, setPlantMedicinal] = useState("");
-  const [zoneId, setZoneId] = useState("");
+  const [zoneIds, setZoneIds] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
 
   const [editPlant, setEditPlant] = useState<Plant | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", notes: "", medicinal_properties: "", zone_id: "" });
+  const [editForm, setEditForm] = useState({ name: "", notes: "", medicinal_properties: "", zone_id: "", zone_ids: [] as string[] });
   const [savingEdit, setSavingEdit] = useState(false);
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -119,13 +119,16 @@ export default function PlantsPage() {
         imageUrl = urlData.publicUrl;
       }
 
+      const primaryZone = zoneIds[0] || null;
+      const extraZones = zoneIds.slice(1);
       const { error: insertError } = await supabase.from("plants").insert({
         farm_id: activeFarmId,
         name: plantName.trim() || null,
         image_url: imageUrl,
         notes: plantNotes.trim() || null,
         medicinal_properties: plantMedicinal.trim() || null,
-        zone_id: zoneId || null,
+        zone_id: primaryZone,
+        extra_zone_ids: extraZones.length > 0 ? JSON.stringify(extraZones) : null,
       });
       if (insertError) throw insertError;
 
@@ -134,7 +137,7 @@ export default function PlantsPage() {
       setPlantName("");
       setPlantNotes("");
       setPlantMedicinal("");
-      setZoneId("");
+      setZoneIds([]);
       setShowUpload(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
       await loadPlants(activeFarmId);
@@ -152,6 +155,7 @@ export default function PlantsPage() {
       notes: plant.notes ?? "",
       medicinal_properties: plant.medicinal_properties ?? "",
       zone_id: plant.zone_id ?? "",
+      zone_ids: plant.zone_ids ?? (plant.zone_id ? [plant.zone_id] : []),
     });
   }
 
@@ -160,20 +164,23 @@ export default function PlantsPage() {
     try {
       setSavingEdit(true);
       setError("");
+      const primaryZone = editForm.zone_ids[0] || null;
+      const extraZones = editForm.zone_ids.slice(1);
       const { error: updateError } = await supabase
         .from("plants")
         .update({
           name: editForm.name.trim() || null,
           notes: editForm.notes.trim() || null,
           medicinal_properties: editForm.medicinal_properties.trim() || null,
-          zone_id: editForm.zone_id || null,
+          zone_id: primaryZone,
+          extra_zone_ids: extraZones.length > 0 ? JSON.stringify(extraZones) : null,
         })
         .eq("id", editPlant.id);
       if (updateError) throw updateError;
       setPlants((prev) =>
         prev.map((p) =>
           p.id === editPlant.id
-            ? { ...p, name: editForm.name.trim() || null, notes: editForm.notes.trim() || null, medicinal_properties: editForm.medicinal_properties.trim() || null, zone_id: editForm.zone_id || null }
+            ? { ...p, name: editForm.name.trim() || null, notes: editForm.notes.trim() || null, medicinal_properties: editForm.medicinal_properties.trim() || null, zone_id: primaryZone, extra_zone_ids: extraZones.length > 0 ? JSON.stringify(extraZones) : null, zone_ids: editForm.zone_ids }
             : p
         )
       );
@@ -382,18 +389,27 @@ export default function PlantsPage() {
                 {zones.length > 0 ? (
                   <div>
                     <label className="mb-2 block text-sm font-medium">
-                      Zone <span className="font-normal text-zinc-400">(optional)</span>
+                      Zones <span className="font-normal text-zinc-400">(optional)</span>
                     </label>
-                    <select
-                      value={zoneId}
-                      onChange={(e) => setZoneId(e.target.value)}
-                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                    >
-                      <option value="">No zone</option>
+                    <div className="max-h-40 overflow-y-auto rounded-2xl border border-zinc-300 p-3 space-y-1.5">
                       {zones.map((z) => (
-                        <option key={z.id} value={z.id}>{z.name}</option>
+                        <label key={z.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={zoneIds.includes(z.id)}
+                            onChange={(e) => {
+                              setZoneIds((prev) =>
+                                e.target.checked
+                                  ? [...prev, z.id]
+                                  : prev.filter((id) => id !== z.id)
+                              );
+                            }}
+                            className="rounded border-zinc-300"
+                          />
+                          {z.name}
+                        </label>
                       ))}
-                    </select>
+                    </div>
                   </div>
                 ) : null}
 
@@ -528,17 +544,27 @@ export default function PlantsPage() {
 
                 {zones.length > 0 ? (
                   <div>
-                    <label className="mb-2 block text-sm font-medium">Zone</label>
-                    <select
-                      value={editForm.zone_id}
-                      onChange={(e) => setEditForm((p) => ({ ...p, zone_id: e.target.value }))}
-                      className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                    >
-                      <option value="">No zone</option>
+                    <label className="mb-2 block text-sm font-medium">Zones</label>
+                    <div className="max-h-40 overflow-y-auto rounded-2xl border border-zinc-300 p-3 space-y-1.5">
                       {zones.map((z) => (
-                        <option key={z.id} value={z.id}>{z.name}</option>
+                        <label key={z.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={editForm.zone_ids.includes(z.id)}
+                            onChange={(e) => {
+                              setEditForm((p) => ({
+                                ...p,
+                                zone_ids: e.target.checked
+                                  ? [...p.zone_ids, z.id]
+                                  : p.zone_ids.filter((id) => id !== z.id),
+                              }));
+                            }}
+                            className="rounded border-zinc-300"
+                          />
+                          {z.name}
+                        </label>
                       ))}
-                    </select>
+                    </div>
                   </div>
                 ) : null}
 

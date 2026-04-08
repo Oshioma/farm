@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import type { Zone, Crop, FertilisationEntry, CompostEntry, HarvestEtaEntry } from "@/lib/farm";
+import type { Zone, Crop, FertilisationEntry, CompostEntry, HarvestEtaEntry, Plant } from "@/lib/farm";
 
 type BedDef = {
   id: string;
@@ -239,6 +239,7 @@ function getLayout(farmName?: string): FarmLayout {
 type Props = {
   zones: Zone[];
   crops: Crop[];
+  plants?: Plant[];
   fertilisations?: FertilisationEntry[];
   compostEntries?: CompostEntry[];
   harvestEta?: HarvestEtaEntry[];
@@ -247,7 +248,7 @@ type Props = {
   onSelectBed?: (bedId: string) => void;
 };
 
-export function FarmMap({ zones, crops, fertilisations = [], compostEntries = [], harvestEta = [], farmName, farmId, onSelectBed }: Props) {
+export function FarmMap({ zones, crops, plants = [], fertilisations = [], compostEntries = [], harvestEta = [], farmName, farmId, onSelectBed }: Props) {
   const [hoveredBed, setHoveredBed] = useState<string | null>(null);
   const [selectedBed, setSelectedBed] = useState<string | null>(null);
 
@@ -499,6 +500,10 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
       .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   }
 
+  function getPlantsForZone(zoneId: string): Plant[] {
+    return plants.filter((p) => p.zone_ids?.includes(zoneId) || p.zone_id === zoneId);
+  }
+
   function getHarvestEtaForBed(bedId: string): HarvestEtaEntry | undefined {
     const id = bedId.toUpperCase();
     // Match by zone_id if zone exists, or by bed_name
@@ -543,6 +548,7 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
 
   const selected = selectedBed ? getZoneForBed(selectedBed) : null;
   const selectedCrops = selected ? getCropsForZone(selected.id) : [];
+  const selectedPlants = selected ? getPlantsForZone(selected.id) : [];
   const selectedFertilisations = selected ? getFertilisationsForZone(selected.id) : [];
   const selectedCompost = selected ? getCompostForZone(selected.id) : [];
   const selectedHarvestEta = selectedBed ? getHarvestEtaForBed(selectedBed) : undefined;
@@ -936,6 +942,24 @@ export function FarmMap({ zones, crops, fertilisations = [], compostEntries = []
                     </div>
                   ) : (
                     <div className="mt-3 text-xs text-zinc-400">No crops in this zone</div>
+                  )}
+                  {selectedPlants.length > 0 && (
+                    <div className="mt-4">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Plants</div>
+                      <div className="mt-1.5 space-y-1.5">
+                        {selectedPlants.map((p) => (
+                          <div key={p.id} className="rounded-xl border border-violet-100 bg-violet-50/50 p-2">
+                            <div className="flex items-center gap-2">
+                              {p.image_url && (
+                                <img src={p.image_url} alt="" className="h-6 w-6 rounded object-cover" />
+                              )}
+                              <span className="text-xs font-medium text-violet-800">{p.name || "Unnamed"}</span>
+                            </div>
+                            {p.notes && <div className="mt-0.5 text-[10px] text-violet-600/70">{p.notes}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
                   {selectedFertilisations.length > 0 && (
                     <div className="mt-4">

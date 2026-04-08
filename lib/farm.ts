@@ -358,18 +358,36 @@ export type Plant = {
   notes: string | null;
   medicinal_properties: string | null;
   zone_id: string | null;
+  extra_zone_ids: string | null;
+  zone_ids?: string[];
   created_at: string | null;
 };
 
 export async function getPlants(farmId: string): Promise<Plant[]> {
   const { data, error } = await supabase
     .from("plants")
-    .select("id, farm_id, name, image_url, notes, medicinal_properties, zone_id, created_at")
+    .select("id, farm_id, name, image_url, notes, medicinal_properties, zone_id, extra_zone_ids, created_at")
     .eq("farm_id", farmId)
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`getPlants failed: ${error.message}`);
-  return (data ?? []) as Plant[];
+
+  const plants = (data ?? []) as Plant[];
+  for (const plant of plants) {
+    const ids: string[] = [];
+    if (plant.zone_id) ids.push(plant.zone_id);
+    if (plant.extra_zone_ids) {
+      try {
+        const extra = JSON.parse(plant.extra_zone_ids) as string[];
+        for (const eid of extra) {
+          if (eid && !ids.includes(eid)) ids.push(eid);
+        }
+      } catch { /* ignore bad JSON */ }
+    }
+    plant.zone_ids = ids;
+  }
+
+  return plants;
 }
 
 export type TreeEntry = {
