@@ -691,3 +691,28 @@ export async function getWorkHours(farmId: string): Promise<WorkHoursEntry[]> {
   if (error) throw new Error(`getWorkHours failed: ${error.message}`);
   return (data ?? []) as WorkHoursEntry[];
 }
+
+export type HarvestLog = {
+  id: string;
+  farm_id: string;
+  crop_id: string;
+  zone_id: string | null;
+  harvest_date: string;
+  quantity_kg: number;
+  quality: string;
+  notes: string | null;
+  created_at: string | null;
+  crop: { crop_name: string }[] | null;
+  zone: { name: string }[] | null;
+};
+
+export async function getHarvestLogs(farmId: string): Promise<HarvestLog[]> {
+  const { data, error } = await supabase
+    .from("harvests")
+    .select("id, farm_id, crop_id, zone_id, harvest_date, quantity_kg, quality, notes, created_at, crop:crops(crop_name), zone:zones(name)")
+    .eq("farm_id", farmId)
+    .order("harvest_date", { ascending: false });
+
+  if (error) throw new Error(`getHarvestLogs failed: ${error.message}`);
+  return (data ?? []) as HarvestLog[];
+}

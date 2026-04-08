@@ -1200,6 +1200,7 @@ export default function FarmPage() {
           <div className="flex flex-wrap items-center gap-1.5 text-sm">
             {[
               { href: "/farm/harvest-eta", label: "Harvest" },
+              { href: "/farm/harvest-logs", label: "Harvest logs" },
               { href: "#crops", label: "Crops" },
               { href: "/farm/tasks", label: "Tasks" },
               { href: "#map", label: "Map" },
