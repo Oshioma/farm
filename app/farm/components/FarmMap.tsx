@@ -274,23 +274,47 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
 
   const baseLayout = getLayout(farmName);
 
-  // Load custom layout from localStorage on mount / farm change
+  // Load custom layout from database or localStorage on mount / farm change
   useEffect(() => {
-    if (!farmName) return;
-    // Reset state when switching farms
-    setEditBeds([]);
-    setEditLandmarks([]);
-    setCustomBg(undefined);
+    if (!farmName || !farmId) return;
+
+    const loadLayout = async () => {
+      try {
+        // Try to load from database first
+        const response = await fetch(`/api/farm-map/load?farm_id=${farmId}`);
+        const result = await response.json();
+
+        if (result.data) {
+          console.log("[FarmMap] Loaded layout from database for farm:", farmId);
+          setEditBeds(result.data.beds || []);
+          if (result.data.landmarks) setEditLandmarks(result.data.landmarks);
+          setCustomBg(result.data.background_image);
+          return;
+        }
+      } catch (err) {
+        console.error("[FarmMap] Failed to load from database:", err);
+      }
+
+      // Fall back to localStorage
+      const saved = loadCustomLayout(farmName);
+      if (saved) {
+        console.log("[FarmMap] Loaded layout from localStorage for farm:", farmName);
+        setEditBeds(saved.beds);
+        if (saved.landmarks) setEditLandmarks(saved.landmarks);
+        setCustomBg(saved.backgroundImage);
+      } else {
+        // Reset state when no layout found
+        setEditBeds([]);
+        setEditLandmarks([]);
+        setCustomBg(undefined);
+      }
+    };
+
     setEditMode(false);
     setSelectedBed(null);
 
-    const saved = loadCustomLayout(farmName);
-    if (saved) {
-      setEditBeds(saved.beds);
-      if (saved.landmarks) setEditLandmarks(saved.landmarks);
-      setCustomBg(saved.backgroundImage);
-    }
-  }, [farmName]);
+    loadLayout();
+  }, [farmName, farmId]);
 
   // The active layout merges saved customisations
   const hasCustom = editBeds.length > 0 || editLandmarks.length > 0;
@@ -311,8 +335,35 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
   }
 
   // Save edits
-  function saveEdit() {
-    if (farmName) saveCustomLayout(farmName, editBeds, editLandmarks, customBg);
+  async function saveEdit() {
+    if (farmName) {
+      // Save to localStorage for immediate feedback
+      saveCustomLayout(farmName, editBeds, editLandmarks, customBg);
+    }
+
+    // Also save to database so it syncs across devices
+    if (farmId) {
+      try {
+        const response = await fetch(`/api/farm-map/save`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            farm_id: farmId,
+            beds: editBeds,
+            landmarks: editLandmarks,
+            background_image: customBg,
+          }),
+        });
+        if (!response.ok) {
+          console.error("[FarmMap] Failed to save to database:", await response.text());
+        } else {
+          console.log("[FarmMap] Saved layout to database");
+        }
+      } catch (err) {
+        console.error("[FarmMap] Error saving to database:", err);
+      }
+    }
+
     setEditMode(false);
     setEditingLabelIdx(null);
   }
