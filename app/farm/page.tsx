@@ -279,26 +279,19 @@ export default function FarmPage() {
       });
     });
     if (missingBeds.length > 0) {
-      let created = 0;
-      for (const bed of missingBeds) {
-        const pos = { x: bed.x, y: bed.y, w: bed.w, h: bed.h, ...(bed.rotate ? { rotate: bed.rotate } : {}) };
-        // Check if exists with same name (maybe inactive)
-        const { data: existing } = await supabase
-          .from("zones").select("id").eq("farm_id", farmId).eq("name", bed.id).maybeSingle();
-        if (existing) {
-          await supabase.from("zones").update({ map_position: pos, is_active: true }).eq("id", existing.id);
-          created++;
-        } else {
-          const { error: insertErr } = await supabase.from("zones").insert({
-            farm_id: farmId, name: bed.id, code: bed.id, is_active: true, map_position: pos,
-          });
-          if (!insertErr) created++;
+      try {
+        const res = await fetch("/api/zones/auto-create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ farm_id: farmId, beds: missingBeds }),
+        });
+        const result = await res.json();
+        if (result.created > 0) {
+          const freshZones = await getZones(farmId);
+          setZones(freshZones);
         }
-      }
-      if (created > 0) {
-        // Reload zones to pick up the new ones
-        const freshZones = await getZones(farmId);
-        setZones(freshZones);
+      } catch (err) {
+        console.error("Auto-create zones failed:", err);
       }
     }
   }

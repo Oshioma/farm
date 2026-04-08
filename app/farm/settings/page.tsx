@@ -68,38 +68,15 @@ export default function SettingsPage() {
     setError("");
     setSuccess("");
     try {
-      // Delete compost entries linked to zones in this farm
-      const { data: zoneIds } = await supabase
-        .from("zones")
-        .select("id")
-        .eq("farm_id", activeFarmId);
+      const res = await fetch("/api/zones/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ farm_id: activeFarmId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Reset failed");
 
-      if (zoneIds && zoneIds.length > 0) {
-        const ids = zoneIds.map((z: { id: string }) => z.id);
-
-        // Delete linked data
-        const { error: fertErr } = await supabase.from("fertilisations").delete().in("zone_id", ids);
-        if (fertErr) console.error("fertilisations delete:", fertErr);
-
-        const { error: compErr } = await supabase.from("compost").delete().in("zone_id", ids);
-        if (compErr) console.error("compost delete:", compErr);
-
-        const { error: cropErr } = await supabase.from("crops").update({ zone_id: null }).in("zone_id", ids);
-        if (cropErr) console.error("crops update:", cropErr);
-
-        // Delete zones - try hard delete first, fall back to soft delete
-        const { error: delErr } = await supabase.from("zones").delete().eq("farm_id", activeFarmId);
-        if (delErr) {
-          console.error("zones hard delete failed:", delErr);
-          // Try soft delete
-          const { error: softErr } = await supabase.from("zones").update({ is_active: false, map_position: null }).eq("farm_id", activeFarmId);
-          if (softErr) {
-            throw new Error("Failed to delete zones: " + softErr.message);
-          }
-        }
-      }
-
-      setSuccess("Done! All zones cleared. Redirecting to farm page to create fresh zones...");
+      setSuccess(`Done! Deleted ${data.deleted} zones. Redirecting...`);
       setTimeout(() => router.push("/farm"), 1500);
       setResetStep(0);
     } catch (err) {
