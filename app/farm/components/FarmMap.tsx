@@ -277,6 +277,13 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
   // Load custom layout from localStorage on mount / farm change
   useEffect(() => {
     if (!farmName) return;
+    // Reset state when switching farms
+    setEditBeds([]);
+    setEditLandmarks([]);
+    setCustomBg(undefined);
+    setEditMode(false);
+    setSelectedBed(null);
+
     const saved = loadCustomLayout(farmName);
     if (saved) {
       setEditBeds(saved.beds);
