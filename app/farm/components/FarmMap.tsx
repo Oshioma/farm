@@ -276,23 +276,25 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
 
   // Load custom layout from database or localStorage on mount / farm change
   useEffect(() => {
-    if (!farmName || !farmId) return;
+    if (!farmName) return;
 
     const loadLayout = async () => {
-      try {
-        // Try to load from database first
-        const response = await fetch(`/api/farm-map/load?farm_id=${farmId}`);
-        const result = await response.json();
+      // Only try database if we have a valid farmId
+      if (farmId && farmId !== "undefined") {
+        try {
+          const response = await fetch(`/api/farm-map/load?farm_id=${farmId}`);
+          const result = await response.json();
 
-        if (result.data) {
-          console.log("[FarmMap] Loaded layout from database for farm:", farmId);
-          setEditBeds(result.data.beds || []);
-          if (result.data.landmarks) setEditLandmarks(result.data.landmarks);
-          setCustomBg(result.data.background_image);
-          return;
+          if (response.ok && result.data) {
+            console.log("[FarmMap] Loaded layout from database for farm:", farmId);
+            setEditBeds(result.data.beds || []);
+            if (result.data.landmarks) setEditLandmarks(result.data.landmarks);
+            setCustomBg(result.data.background_image);
+            return;
+          }
+        } catch (err) {
+          console.error("[FarmMap] Failed to load from database:", err);
         }
-      } catch (err) {
-        console.error("[FarmMap] Failed to load from database:", err);
       }
 
       // Fall back to localStorage
@@ -303,7 +305,8 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
         if (saved.landmarks) setEditLandmarks(saved.landmarks);
         setCustomBg(saved.backgroundImage);
       } else {
-        // Reset state when no layout found
+        // Reset state when no layout found - will use baseLayout.beds as fallback
+        console.log("[FarmMap] No custom layout found, using base layout");
         setEditBeds([]);
         setEditLandmarks([]);
         setCustomBg(undefined);
@@ -342,7 +345,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
     }
 
     // Also save to database so it syncs across devices
-    if (farmId) {
+    if (farmId && farmId !== "undefined") {
       try {
         const response = await fetch(`/api/farm-map/save`, {
           method: "POST",
