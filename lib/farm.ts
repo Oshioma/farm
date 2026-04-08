@@ -1,5 +1,10 @@
 import { supabase } from "@/lib/supabase";
 
+// Cache busting helper - adds timestamp to invalidate HTTP cache
+function getBustParam(): string {
+  return `_bust=${Date.now()}`;
+}
+
 export type Farm = {
   id: string;
   name: string;

@@ -227,6 +227,7 @@ export default function FarmPage() {
 
   async function loadFarmData(farmId: string) {
     const currentYear = new Date().getFullYear();
+    console.log(`[Farm] Loading farm data for ${farmId} at ${new Date().toISOString()}`);
     const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows, pestRows, saleRows, fertilisationRows, compostRows, plantRows, harvestEtaRows, memberRows] = await Promise.all([
       getZones(farmId),
       getCrops(farmId),
@@ -242,6 +243,8 @@ export default function FarmPage() {
       getHarvestEta(farmId, currentYear),
       getMembers(farmId),
     ]);
+
+    console.log(`[Farm] Loaded ${cropRows.length} crops:`, cropRows.map(c => ({ id: c.id, name: c.crop_name, status: c.status, zones: c.zone_ids })));
 
     setZones(zoneRows);
     setCrops(cropRows);
