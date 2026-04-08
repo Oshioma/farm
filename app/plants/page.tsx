@@ -33,8 +33,9 @@ export default function PlantsPage() {
   const [uploading, setUploading] = useState(false);
 
   const [editPlant, setEditPlant] = useState<Plant | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", notes: "", medicinal_properties: "", zone_id: "", zone_ids: [] as string[] });
+  const [editForm, setEditForm] = useState({ name: "", notes: "", medicinal_properties: "", zone_id: "", zone_ids: [] as string[], image_file: null as File | null, image_url: "" as string });
   const [savingEdit, setSavingEdit] = useState(false);
+  const [editPreview, setEditPreview] = useState("");
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -92,6 +93,13 @@ export default function PlantsPage() {
     const f = e.target.files?.[0] ?? null;
     setFile(f);
     setPreview(f ? URL.createObjectURL(f) : "");
+  }
+
+  function handleEditFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null;
+    setEditForm((prev) => ({ ...prev, image_file: f }));
+    if (editPreview && editPreview.startsWith("blob:")) URL.revokeObjectURL(editPreview);
+    setEditPreview(f ? URL.createObjectURL(f) : editForm.image_url);
   }
 
   async function handleUpload(e: React.FormEvent) {
@@ -156,7 +164,10 @@ export default function PlantsPage() {
       medicinal_properties: plant.medicinal_properties ?? "",
       zone_id: plant.zone_id ?? "",
       zone_ids: plant.zone_ids ?? (plant.zone_id ? [plant.zone_id] : []),
+      image_file: null,
+      image_url: plant.image_url ?? "",
     });
+    setEditPreview(plant.image_url ?? "");
   }
 
   async function handleSaveEdit() {
@@ -164,6 +175,25 @@ export default function PlantsPage() {
     try {
       setSavingEdit(true);
       setError("");
+
+      let imageUrl = editForm.image_url;
+
+      // Upload new image if provided
+      if (editForm.image_file) {
+        const ext = editForm.image_file.name.split(".").pop() ?? "jpg";
+        const path = `${activeFarmId}/${Date.now()}.${ext}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("plant-images")
+          .upload(path, editForm.image_file);
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage
+          .from("plant-images")
+          .getPublicUrl(path);
+        imageUrl = urlData.publicUrl;
+      }
+
       const primaryZone = editForm.zone_ids[0] || null;
       const extraZones = editForm.zone_ids.slice(1);
       const { error: updateError } = await supabase
@@ -172,6 +202,7 @@ export default function PlantsPage() {
           name: editForm.name.trim() || null,
           notes: editForm.notes.trim() || null,
           medicinal_properties: editForm.medicinal_properties.trim() || null,
+          image_url: imageUrl,
           zone_id: primaryZone,
           extra_zone_ids: extraZones.length > 0 ? JSON.stringify(extraZones) : null,
         })
@@ -180,11 +211,12 @@ export default function PlantsPage() {
       setPlants((prev) =>
         prev.map((p) =>
           p.id === editPlant.id
-            ? { ...p, name: editForm.name.trim() || null, notes: editForm.notes.trim() || null, medicinal_properties: editForm.medicinal_properties.trim() || null, zone_id: primaryZone, extra_zone_ids: extraZones.length > 0 ? JSON.stringify(extraZones) : null, zone_ids: editForm.zone_ids }
+            ? { ...p, name: editForm.name.trim() || null, notes: editForm.notes.trim() || null, medicinal_properties: editForm.medicinal_properties.trim() || null, image_url: imageUrl, zone_id: primaryZone, extra_zone_ids: extraZones.length > 0 ? JSON.stringify(extraZones) : null, zone_ids: editForm.zone_ids }
             : p
         )
       );
       setEditPlant(null);
+      setEditPreview("");
     } catch (err) {
       setError(errMsg(err, "Failed to save plant"));
     } finally {
@@ -506,11 +538,22 @@ export default function PlantsPage() {
                 </button>
               </div>
 
-              {editPlant.image_url ? (
-                <img src={editPlant.image_url} alt={editPlant.name ?? "Plant"} className="mt-4 h-40 w-full rounded-2xl object-cover" />
+              {editPreview ? (
+                <img src={editPreview} alt={editPlant.name ?? "Plant"} className="mt-4 h-40 w-full rounded-2xl object-cover" />
               ) : null}
 
               <div className="mt-4 space-y-4">
+                <div>
+                  <label className="mb-2 block text-sm font-medium">
+                    Photo <span className="font-normal text-zinc-400">(optional)</span>
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleEditFileChange}
+                    className="w-full text-sm text-zinc-600 file:mr-3 file:rounded-full file:border-0 file:bg-zinc-100 file:px-4 file:py-2 file:text-sm file:font-medium hover:file:bg-zinc-200"
+                  />
+                </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium">Name</label>
                   <input

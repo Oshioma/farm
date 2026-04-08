@@ -81,8 +81,9 @@ export default function FarmPage() {
   const [editingCropForm, setEditingCropForm] = useState({
     crop_name: "", variety: "", zone_ids: [] as string[], status: "", planted_on: "",
     expected_harvest_start: "", estimated_yield_kg: "", expected_sale_price_per_kg: "",
-    notes: "", medicinal_properties: "",
+    notes: "", medicinal_properties: "", image_file: null as File | null, image_url: "" as string,
   });
+  const [cropImagePreview, setCropImagePreview] = useState("");
   const [savingCropId, setSavingCropId] = useState<string | null>(null);
   const [deletingCropId, setDeletingCropId] = useState<string | null>(null);
   const [expandedCropId, setExpandedCropId] = useState<string | null>(null);
@@ -499,13 +500,35 @@ export default function FarmPage() {
       expected_sale_price_per_kg: crop.expected_sale_price_per_kg != null ? String(crop.expected_sale_price_per_kg) : "",
       notes: crop.notes ?? "",
       medicinal_properties: crop.medicinal_properties ?? "",
+      image_file: null,
+      image_url: crop.image_url ?? "",
     });
+    setCropImagePreview(crop.image_url ?? "");
   }
 
   async function handleSaveCrop(id: string) {
     try {
       setSavingCropId(id);
       setError("");
+
+      let imageUrl = editingCropForm.image_url;
+
+      // Upload new image if provided
+      if (editingCropForm.image_file) {
+        const ext = editingCropForm.image_file.name.split(".").pop() ?? "jpg";
+        const path = `${activeFarmId}/${Date.now()}.${ext}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("plant-images")
+          .upload(path, editingCropForm.image_file);
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage
+          .from("plant-images")
+          .getPublicUrl(path);
+        imageUrl = urlData.publicUrl;
+      }
+
       const zoneIds = editingCropForm.zone_ids.filter(Boolean);
       const primaryZoneId = zoneIds[0] || null;
       const extraZoneIds = zoneIds.length > 1 ? JSON.stringify(zoneIds.slice(1)) : null;
@@ -521,6 +544,7 @@ export default function FarmPage() {
         expected_sale_price_per_kg: editingCropForm.expected_sale_price_per_kg ? Number(editingCropForm.expected_sale_price_per_kg) : null,
         notes: editingCropForm.notes.trim() || null,
         medicinal_properties: editingCropForm.medicinal_properties.trim() || null,
+        image_url: imageUrl,
       };
       console.log("Crop update payload:", JSON.stringify(payload), "id:", id);
       const res = await supabase.from("crops").update(payload).eq("id", id).select();
@@ -529,6 +553,7 @@ export default function FarmPage() {
       if (!res.data || res.data.length === 0) throw new Error("Update returned no rows — RLS may be blocking updates.");
 
       setEditingCropId(null);
+      setCropImagePreview("");
       await loadFarmData(activeFarmId);
     } catch (err) {
       setError(errMsg(err, "Failed to update crop"));
@@ -547,6 +572,13 @@ export default function FarmPage() {
       setCropNoteText(crop.notes ?? "");
       setCropMedicinalText(crop.medicinal_properties ?? "");
     }
+  }
+
+  function handleCropImageFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null;
+    setEditingCropForm((prev) => ({ ...prev, image_file: f }));
+    if (cropImagePreview && cropImagePreview.startsWith("blob:")) URL.revokeObjectURL(cropImagePreview);
+    setCropImagePreview(f ? URL.createObjectURL(f) : editingCropForm.image_url);
   }
 
   async function handleSaveCropNote(id: string) {
@@ -2192,6 +2224,20 @@ export default function FarmPage() {
                                         className="min-h-[60px] w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                                         placeholder="Known medicinal uses, healing properties…"
                                       />
+                                      <label className="block text-xs font-medium text-zinc-500">Photo</label>
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleCropImageFileChange}
+                                        className="w-full text-xs text-zinc-600 file:mr-2 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-xs file:font-medium hover:file:bg-zinc-200"
+                                      />
+                                      {cropImagePreview && (
+                                        <img
+                                          src={cropImagePreview}
+                                          alt="Preview"
+                                          className="mt-2 h-24 w-full rounded-lg object-cover"
+                                        />
+                                      )}
                                       <div className="flex gap-1">
                                         <button onClick={() => handleSaveCrop(crop.id)} disabled={savingCropId === crop.id}
                                           className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-60">
@@ -2210,8 +2256,11 @@ export default function FarmPage() {
                                 <tr className={`border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50 transition-colors cursor-pointer ${expandedCropId === crop.id ? "bg-zinc-50" : ""}`}
                                     onClick={() => toggleExpandCrop(crop)}>
                                   <td className="px-4 py-4">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-3">
                                       <span className={`inline-block transition-transform text-zinc-400 ${expandedCropId === crop.id ? "rotate-90" : ""}`}>&#9654;</span>
+                                      {crop.image_url && (
+                                        <img src={crop.image_url} alt={crop.crop_name} className="h-10 w-10 rounded-lg object-cover" />
+                                      )}
                                       <div>
                                         <div className="font-semibold">{crop.crop_name}</div>
                                         <div className="text-zinc-500">{crop.variety || "\u2014"}</div>
