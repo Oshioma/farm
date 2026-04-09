@@ -48,6 +48,9 @@ export default function TreeRegistryPage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [moveTargetFarmId, setMoveTargetFarmId] = useState("");
+  const [moving, setMoving] = useState(false);
   const router = useRouter();
 
   async function load(farmId: string) {
@@ -140,7 +143,28 @@ export default function TreeRegistryPage() {
     }
   }
 
+  async function handleMoveAll() {
+    if (!activeFarmId || !moveTargetFarmId || moveTargetFarmId === activeFarmId) return;
+    setMoving(true);
+    setError("");
+    try {
+      const { error: err } = await supabase
+        .from("tree_registry")
+        .update({ farm_id: moveTargetFarmId })
+        .eq("farm_id", activeFarmId);
+      if (err) throw err;
+      await load(activeFarmId);
+      setShowMoveModal(false);
+      setMoveTargetFarmId("");
+    } catch (err) {
+      setError(errMsg(err, "Failed to move trees"));
+    } finally {
+      setMoving(false);
+    }
+  }
+
   const activeFarm = farms.find((f) => f.id === activeFarmId);
+  const otherFarms = farms.filter((f) => f.id !== activeFarmId);
   const totalTrees = trees.reduce((sum, t) => sum + (t.number_of_trees ?? 0), 0);
 
   return (
@@ -199,12 +223,22 @@ export default function TreeRegistryPage() {
                   {trees.length} species · {totalTrees} trees total
                 </p>
               </div>
-              <button
-                onClick={openAdd}
-                className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-              >
-                + Add tree
-              </button>
+              <div className="flex items-center gap-2">
+                {trees.length > 0 && otherFarms.length > 0 && (
+                  <button
+                    onClick={() => setShowMoveModal(true)}
+                    className="rounded-2xl border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
+                  >
+                    Move all to...
+                  </button>
+                )}
+                <button
+                  onClick={openAdd}
+                  className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+                >
+                  + Add tree
+                </button>
+              </div>
             </div>
 
             <div className="mt-6 overflow-x-auto">
@@ -353,6 +387,45 @@ export default function TreeRegistryPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Move modal */}
+      {showMoveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl">
+            <h2 className="mb-2 text-xl font-semibold">Move trees to another farm</h2>
+            <p className="mb-5 text-sm text-zinc-500">
+              All {trees.length} tree entries ({totalTrees} trees) from{" "}
+              <strong>{activeFarm?.name}</strong> will be moved.
+            </p>
+            <label className="mb-1.5 block text-sm font-medium">Target farm</label>
+            <select
+              value={moveTargetFarmId}
+              onChange={(e) => setMoveTargetFarmId(e.target.value)}
+              className="mb-5 w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+            >
+              <option value="">Select a farm…</option>
+              {otherFarms.map((f) => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
+            <div className="flex gap-3">
+              <button
+                onClick={handleMoveAll}
+                disabled={moving || !moveTargetFarmId}
+                className="flex-1 rounded-2xl bg-zinc-900 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
+              >
+                {moving ? "Moving…" : "Move all"}
+              </button>
+              <button
+                onClick={() => { setShowMoveModal(false); setMoveTargetFarmId(""); }}
+                className="flex-1 rounded-2xl border border-zinc-300 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
