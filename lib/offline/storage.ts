@@ -150,3 +150,10 @@ export async function getCacheMetadata(key: string): Promise<any | null> {
   const result = await getFromCache("metadata", key);
   return result?.data || null;
 }
+
+export async function markCacheRefreshTime(
+  store: string,
+  timestamp: number
+): Promise<void> {
+  await saveCacheMetadata(`${store}_refreshTime`, timestamp);
+}
