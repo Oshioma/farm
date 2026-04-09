@@ -1,4 +1,69 @@
 import { supabase } from "@/lib/supabase";
+import {
+  saveToCache,
+  getFromCache,
+  markCacheRefreshTime,
+} from "@/lib/offline/storage";
+import {
+  isCacheStale,
+  formatCacheAge,
+} from "@/lib/offline/cache-manager";
+
+// Helper to check if we're online
+function isOnline(): boolean {
+  if (typeof window === "undefined") return true;
+  return navigator.onLine;
+}
+
+// Helper to try cache fallback
+async function withCacheFallback<T>(
+  cacheKey: string,
+  storeName: "farms" | "zones" | "crops" | "tasks" | "activities" | "members" | "assets" | "expenses" | "pests" | "sales" | "fertilisations" | "compost" | "plants" | "harvestEta",
+  fetchFn: () => Promise<T>,
+  farmId?: string
+): Promise<T> {
+  try {
+    if (!isOnline()) {
+      console.log(`[Cache] Offline - attempting to load ${storeName} from cache`);
+      const cached = await getFromCache<T>(storeName, cacheKey);
+      if (cached) {
+        console.log(
+          `[Cache] Loaded ${storeName} from cache (${formatCacheAge(cached.timestamp)})`
+        );
+        return cached.data;
+      }
+      throw new Error("No cached data available");
+    }
+
+    // Online - try to fetch fresh data
+    const data = await fetchFn();
+
+    // Cache the result
+    await saveToCache(storeName, cacheKey, data, farmId);
+    await markCacheRefreshTime(storeName, Date.now());
+    console.log(`[Cache] Cached fresh ${storeName} data`);
+
+    return data;
+  } catch (err) {
+    // If fetch fails while online, try cache as fallback
+    if (isOnline()) {
+      console.log(
+        `[Cache] Fetch failed for ${storeName}, trying cache fallback`
+      );
+      const cached = await getFromCache<T>(storeName, cacheKey);
+      if (cached) {
+        const stale = isCacheStale(cached.timestamp, storeName);
+        console.log(
+          `[Cache] Using cached ${storeName} (${formatCacheAge(cached.timestamp)})${stale ? " - STALE" : ""}`
+        );
+        return cached.data;
+      }
+    }
+
+    // No cache available, throw the original error
+    throw err;
+  }
+}
 
 // Cache busting helper - adds timestamp to invalidate HTTP cache
 function getBustParam(): string {
@@ -129,116 +194,143 @@ export type Asset = {
 };
 
 export async function getFarms(): Promise<Farm[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
+  return withCacheFallback(
+    "farms_list",
+    "farms",
+    async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
 
-  const { data: members, error: membersError } = await supabase
-    .from("farm_members")
-    .select("farm_id")
-    .eq("profile_id", user.id);
+      const { data: members, error: membersError } = await supabase
+        .from("farm_members")
+        .select("farm_id")
+        .eq("profile_id", user.id);
 
-  if (membersError) throw new Error(`getFarms failed: ${membersError.message}`);
-  if (!members?.length) return [];
+      if (membersError) throw new Error(`getFarms failed: ${membersError.message}`);
+      if (!members?.length) return [];
 
-  const farmIds = members.map((m: { farm_id: string }) => m.farm_id);
+      const farmIds = members.map((m: { farm_id: string }) => m.farm_id);
 
-  const { data, error } = await supabase
-    .from("farms")
-    .select("id, name, slug, location, size_acres")
-    .in("id", farmIds)
-    .eq("is_active", true)
-    .order("name");
+      const { data, error } = await supabase
+        .from("farms")
+        .select("id, name, slug, location, size_acres")
+        .in("id", farmIds)
+        .eq("is_active", true)
+        .order("name");
 
-  if (error) throw new Error(`getFarms failed: ${error.message}`);
-  return (data ?? []) as Farm[];
+      if (error) throw new Error(`getFarms failed: ${error.message}`);
+      return (data ?? []) as Farm[];
+    }
+  );
 }
 
 export async function getZones(farmId: string): Promise<Zone[]> {
-  const { data, error } = await supabase
-    .from("zones")
-    .select("id, farm_id, name, code, size_acres")
-    .eq("farm_id", farmId)
-    .eq("is_active", true)
-    .order("name");
+  return withCacheFallback(
+    `zones_${farmId}`,
+    "zones",
+    async () => {
+      const { data, error } = await supabase
+        .from("zones")
+        .select("id, farm_id, name, code, size_acres")
+        .eq("farm_id", farmId)
+        .eq("is_active", true)
+        .order("name");
 
-  if (error) throw new Error(`getZones failed: ${error.message}`);
-  return (data ?? []) as Zone[];
+      if (error) throw new Error(`getZones failed: ${error.message}`);
+      return (data ?? []) as Zone[];
+    },
+    farmId
+  );
 }
 
 export async function getCrops(farmId: string): Promise<Crop[]> {
-  const { data, error } = await supabase
-    .from("crops")
-    .select(
-      `
-      id,
-      crop_name,
-      variety,
-      status,
-      planted_on,
-      expected_harvest_start,
-      expected_harvest_end,
-      estimated_yield_kg,
-      actual_yield_kg,
-      expected_sale_price_per_kg,
-      notes,
-      medicinal_properties,
-      image_url,
-      zone_id,
-      extra_zone_ids,
-      zone:zones(name)
-    `
-    )
-    .eq("farm_id", farmId)
-    .eq("is_active", true)
-    .order("created_at", { ascending: false });
+  return withCacheFallback(
+    `crops_${farmId}`,
+    "crops",
+    async () => {
+      const { data, error } = await supabase
+        .from("crops")
+        .select(
+          `
+          id,
+          crop_name,
+          variety,
+          status,
+          planted_on,
+          expected_harvest_start,
+          expected_harvest_end,
+          estimated_yield_kg,
+          actual_yield_kg,
+          expected_sale_price_per_kg,
+          notes,
+          medicinal_properties,
+          image_url,
+          zone_id,
+          extra_zone_ids,
+          zone:zones(name)
+        `
+        )
+        .eq("farm_id", farmId)
+        .eq("is_active", true)
+        .order("created_at", { ascending: false });
 
-  if (error) throw new Error(`getCrops failed: ${error.message}`);
+      if (error) throw new Error(`getCrops failed: ${error.message}`);
 
-  const crops = (data ?? []) as Crop[];
+      const crops = (data ?? []) as Crop[];
 
-  // Build zone_ids from zone_id + extra_zone_ids JSON column
-  for (const crop of crops) {
-    const ids: string[] = [];
-    if (crop.zone_id) ids.push(crop.zone_id);
-    if (crop.extra_zone_ids) {
-      try {
-        const extra = JSON.parse(crop.extra_zone_ids) as string[];
-        for (const eid of extra) {
-          if (eid && !ids.includes(eid)) ids.push(eid);
+      // Build zone_ids from zone_id + extra_zone_ids JSON column
+      for (const crop of crops) {
+        const ids: string[] = [];
+        if (crop.zone_id) ids.push(crop.zone_id);
+        if (crop.extra_zone_ids) {
+          try {
+            const extra = JSON.parse(crop.extra_zone_ids) as string[];
+            for (const eid of extra) {
+              if (eid && !ids.includes(eid)) ids.push(eid);
+            }
+          } catch { /* ignore bad JSON */ }
         }
-      } catch { /* ignore bad JSON */ }
-    }
-    crop.zone_ids = ids;
-  }
+        crop.zone_ids = ids;
+      }
 
-  return crops;
+      return crops;
+    },
+    farmId
+  );
 }
 
 export async function getTasks(farmId: string): Promise<Task[]> {
-  const { data, error } = await supabase
-    .from("tasks")
-    .select(
-      `
-      id,
-      title,
-      description,
-      status,
-      priority,
-      due_date,
-      due_time,
-      proof_required,
-      zone_id,
-      crop_id,
-      assigned_to,
-      crop:crops(crop_name),
-      zone:zones(name)
-    `
-    )
-    .eq("farm_id", farmId)
-    .order("due_date", { ascending: true, nullsFirst: false });
+  return withCacheFallback(
+    `tasks_${farmId}`,
+    "tasks",
+    async () => {
+      const { data, error } = await supabase
+        .from("tasks")
+        .select(
+          `
+          id,
+          title,
+          description,
+          status,
+          priority,
+          due_date,
+          due_time,
+          proof_required,
+          zone_id,
+          crop_id,
+          assigned_to,
+          crop:crops(crop_name),
+          zone:zones(name)
+        `
+        )
+        .eq("farm_id", farmId)
+        .order("due_date", { ascending: true, nullsFirst: false });
 
-  if (error) throw new Error(`getTasks failed: ${error.message}`);
-  return (data ?? []) as Task[];
+      if (error) throw new Error(`getTasks failed: ${error.message}`);
+      return (data ?? []) as Task[];
+    },
+    farmId
+  );
 }
 
 export async function getMembers(farmId: string): Promise<FarmMember[]> {

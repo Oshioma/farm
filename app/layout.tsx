@@ -1,5 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
 
 export const metadata: Metadata = {
   title: "Farm Manager",
@@ -13,7 +14,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <OfflineIndicator />
+      </body>
     </html>
   );
 }
