@@ -2503,6 +2503,42 @@ export default function FarmPage() {
                 <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                   <div className="flex items-center justify-between gap-4">
                     <div>
+                      <h2 className="text-xl font-semibold">New plants added</h2>
+                      <p className="mt-1 text-sm text-zinc-500">
+                        Recently added to the plants gallery.
+                      </p>
+                    </div>
+                    <Link href="/plants" className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100">
+                      View all
+                    </Link>
+                  </div>
+
+                  {plants.length === 0 ? (
+                    <div className="mt-5 rounded-2xl border border-zinc-200 px-4 py-6 text-sm text-zinc-500">No plants added yet.</div>
+                  ) : (
+                    <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                      {plants.slice(0, 8).map((plant) => (
+                        <Link key={plant.id} href="/plants" className="group overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm transition hover:shadow-md">
+                          {plant.image_url ? (
+                            <img src={plant.image_url} alt={plant.name ?? "Plant"} className="aspect-square w-full object-cover" />
+                          ) : (
+                            <div className="flex aspect-square w-full items-center justify-center bg-zinc-100">
+                              <span className="text-2xl text-zinc-300">🌱</span>
+                            </div>
+                          )}
+                          <div className="p-3">
+                            <div className="text-sm font-medium truncate">{plant.name ?? "Unnamed"}</div>
+                            {plant.notes && <p className="mt-0.5 text-xs text-zinc-400 line-clamp-1">{plant.notes}</p>}
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
                       <h2 className="text-xl font-semibold">Pest log</h2>
                       <p className="mt-1 text-sm text-zinc-500">
                         Issues spotted and actions taken.
@@ -2610,42 +2646,6 @@ export default function FarmPage() {
                           </div>
                         );
                       })}
-                    </div>
-                  )}
-                </div>
-
-                <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <h2 className="text-xl font-semibold">New plants added</h2>
-                      <p className="mt-1 text-sm text-zinc-500">
-                        Recently added to the plants gallery.
-                      </p>
-                    </div>
-                    <Link href="/plants" className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100">
-                      View all
-                    </Link>
-                  </div>
-
-                  {plants.length === 0 ? (
-                    <div className="mt-5 rounded-2xl border border-zinc-200 px-4 py-6 text-sm text-zinc-500">No plants added yet.</div>
-                  ) : (
-                    <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                      {plants.slice(0, 8).map((plant) => (
-                        <Link key={plant.id} href="/plants" className="group overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm transition hover:shadow-md">
-                          {plant.image_url ? (
-                            <img src={plant.image_url} alt={plant.name ?? "Plant"} className="aspect-square w-full object-cover" />
-                          ) : (
-                            <div className="flex aspect-square w-full items-center justify-center bg-zinc-100">
-                              <span className="text-2xl text-zinc-300">🌱</span>
-                            </div>
-                          )}
-                          <div className="p-3">
-                            <div className="text-sm font-medium truncate">{plant.name ?? "Unnamed"}</div>
-                            {plant.notes && <p className="mt-0.5 text-xs text-zinc-400 line-clamp-1">{plant.notes}</p>}
-                          </div>
-                        </Link>
-                      ))}
                     </div>
                   )}
                 </div>
