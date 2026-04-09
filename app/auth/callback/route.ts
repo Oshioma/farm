@@ -53,19 +53,46 @@ export async function GET(request: NextRequest) {
 
   if (token_hash && type) {
     // Handle token_hash flow (non-PKCE / email OTP verification)
+    const destination = new URL(next, request.url);
+    let supabaseResponse = NextResponse.redirect(destination);
+
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) => {
+              request.cookies.set(name, value);
+            });
+            supabaseResponse = NextResponse.redirect(destination);
+            cookiesToSet.forEach(({ name, value, options }) => {
+              supabaseResponse.cookies.set(name, value, options);
+            });
+          },
+        },
+      }
+    );
+
     const { error } = await supabase.auth.verifyOtp({
       token_hash,
       type: type as "recovery" | "signup" | "email",
     });
-    if (error) exchangeError = error.message;
+    if (error) {
+      exchangeError = error.message;
+    } else {
+      return supabaseResponse;
+    }
   } else if (!code) {
     exchangeError = "Missing authentication parameters";
   }
 
   if (!exchangeError) {
     const destination = new URL(next, request.url);
-    const supabaseResponse = NextResponse.redirect(destination);
-    return supabaseResponse;
+    return NextResponse.redirect(destination);
   }
 
   // Exchange failed — redirect to reset-password with error instead of login
