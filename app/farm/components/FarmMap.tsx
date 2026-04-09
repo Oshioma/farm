@@ -285,9 +285,10 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
           const response = await fetch(`/api/farm-map/load?farm_id=${farmId}`);
           const result = await response.json();
 
-          if (response.ok && result.data) {
-            console.log("[FarmMap] Loaded layout from database for farm:", farmId);
-            setEditBeds(result.data.beds || []);
+          // Only use database data if it has actual beds (don't overwrite with empty arrays)
+          if (response.ok && result.data && result.data.beds && result.data.beds.length > 0) {
+            console.log("[FarmMap] Loaded layout from database for farm:", farmId, "with", result.data.beds.length, "beds");
+            setEditBeds(result.data.beds);
             if (result.data.landmarks) setEditLandmarks(result.data.landmarks);
             setCustomBg(result.data.background_image);
             return;
