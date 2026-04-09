@@ -191,7 +191,10 @@ function getLayout(farmName?: string): FarmLayout {
   const isTopLand = name.includes("top land");
   const isMountSol = name.includes("mount") && (name.includes("sol") || name.includes("solomun"));
 
+  console.log(`[getLayout] farmName="${farmName}", isTopLand=${isTopLand}, isMountSol=${isMountSol}`);
+
   if (isTopLand) {
+    console.log("[getLayout] Returning Top Land layout with", topLandBeds.length, "beds");
     return {
       viewBox: "0 0 980 600",
       minWidth: 500,
@@ -200,6 +203,7 @@ function getLayout(farmName?: string): FarmLayout {
     };
   }
   if (isMountSol) {
+    console.log("[getLayout] Returning Mount Solomon layout with", mountSolBeds.length, "beds");
     return {
       viewBox: "0 0 740 730",
       minWidth: 400,
@@ -321,9 +325,12 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
 
   // The active layout merges saved customisations
   const hasCustom = editBeds.length > 0 || editLandmarks.length > 0;
+  const bedsToUse = editMode ? editBeds : (hasCustom ? editBeds : baseLayout.beds);
+  console.log(`[FarmMap] farmName="${farmName}", farmId="${farmId}", editBeds=${editBeds.length}, hasCustom=${hasCustom}, bedsToUse=${bedsToUse.length}`);
+
   const layout: FarmLayout = {
     ...baseLayout,
-    beds: editMode ? editBeds : (hasCustom ? editBeds : baseLayout.beds),
+    beds: bedsToUse,
     landmarks: editMode ? editLandmarks : (editLandmarks.length > 0 ? editLandmarks : baseLayout.landmarks),
     backgroundImage: customBg || baseLayout.backgroundImage,
   };
