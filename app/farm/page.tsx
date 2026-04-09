@@ -68,6 +68,7 @@ export default function FarmPage() {
   const [members, setMembers] = useState<FarmMember[]>([]);
 
   const [activeFarmId, setActiveFarmId] = useState<string>("");
+  const hasLoadedInitialFarm = React.useRef(false);
   const [activeForm, setActiveForm] = useState<"crop" | "task" | "harvest" | "expense" | "asset" | "pest" | "sale" | "zone" | null>(null);
   const [showExpenses, setShowExpenses] = useState(false);
   const [showAssets, setShowAssets] = useState(false);
@@ -316,10 +317,14 @@ export default function FarmPage() {
 
       await refreshAll();
 
-      // Load the last active farm ID from user profile
-      const lastFarmId = await getActiveFarmId();
-      if (lastFarmId) {
-        setActiveFarmId(lastFarmId);
+      // Only load the last active farm once per app session
+      // Don't reload it when navigating between pages, to preserve farm selection during a session
+      if (!hasLoadedInitialFarm.current) {
+        hasLoadedInitialFarm.current = true;
+        const lastFarmId = await getActiveFarmId();
+        if (lastFarmId) {
+          setActiveFarmId(lastFarmId);
+        }
       }
     };
 
