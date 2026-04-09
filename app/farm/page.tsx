@@ -1721,7 +1721,7 @@ export default function FarmPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-zinc-500">{openTasks.length} open</span>
-                  {groupedOpenTasks.find(g => g.isCurrentUser)?.tasks.length ?? 0 > 3 && (
+                  {((groupedOpenTasks.find(g => g.isCurrentUser)?.tasks.length) ?? 0) > 3 && (
                     <button
                       onClick={() => setExpandAllTasks(!expandAllTasks)}
                       className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 transition"
