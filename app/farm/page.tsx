@@ -1681,12 +1681,14 @@ export default function FarmPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-zinc-500">{openTasks.length} open</span>
-                  <button
-                    onClick={() => setExpandAllTasks(!expandAllTasks)}
-                    className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 transition"
-                  >
-                    {expandAllTasks ? "Show less" : "Show all"}
-                  </button>
+                  {groupedOpenTasks.length > 3 && (
+                    <button
+                      onClick={() => setExpandAllTasks(!expandAllTasks)}
+                      className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 transition"
+                    >
+                      {expandAllTasks ? "Show less" : "Show all"}
+                    </button>
+                  )}
                   <button
                     onClick={() => setActiveForm(activeForm === "task" ? null : "task")}
                     className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
