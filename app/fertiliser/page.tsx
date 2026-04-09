@@ -352,8 +352,8 @@ export default function FertiliserPage() {
                         </select>
                       </td>
                       <td className="px-3 py-2">
-                        <select value={editForm.zone_id}
-                          onChange={(e) => setEditForm((p) => ({ ...p, zone_id: e.target.value }))}
+                        <select value={editForm.zone_ids[0] ?? ""}
+                          onChange={(e) => setEditForm((p) => ({ ...p, zone_ids: e.target.value ? [e.target.value] : [] }))}
                           className="w-full min-w-[140px] rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900">
                           <option value="">—</option>
                           {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
