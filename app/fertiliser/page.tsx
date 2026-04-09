@@ -26,6 +26,15 @@ const blank = {
   notes: "",
 };
 
+const blankEdit = {
+  date: "",
+  fertiliser: "",
+  ready_to_use: "",
+  bin_colour: "",
+  zone_id: "",
+  notes: "",
+};
+
 export default function FertiliserPage() {
   const [farms, setFarms] = useState<Farm[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
@@ -38,7 +47,7 @@ export default function FertiliserPage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState(blank);
+  const [editForm, setEditForm] = useState(blankEdit);
   const [savingEditId, setSavingEditId] = useState<string | null>(null);
   const router = useRouter();
 
