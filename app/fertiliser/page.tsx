@@ -124,7 +124,7 @@ export default function FertiliserPage() {
           fertiliser: editForm.fertiliser.trim() || null,
           ready_to_use: editForm.ready_to_use || null,
           bin_colour: editForm.bin_colour || null,
-          zone_id: editForm.zone_id || null,
+          zone_id: editForm.zone_ids[0] || null,
           notes: editForm.notes.trim() || null,
         })
         .eq("id", id);
@@ -153,7 +153,7 @@ export default function FertiliserPage() {
       fertiliser: entry.fertiliser ?? "",
       ready_to_use: entry.ready_to_use ?? "",
       bin_colour: entry.bin_colour ?? "",
-      zone_id: entry.zone_id ?? "",
+      zone_ids: entry.zone_id ? [entry.zone_id] : [],
       notes: entry.notes ?? "",
     });
   }
