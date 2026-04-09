@@ -720,16 +720,18 @@ export async function getHarvestLogs(farmId: string): Promise<HarvestLog[]> {
   const cropIds = [...new Set(harvests.map(h => h.crop_id).filter(Boolean))];
   const zoneIds = [...new Set(harvests.map(h => h.zone_id).filter(Boolean))];
 
-  let crops: any[] = [];
-  let zones: any[] = [];
+  let crops: Array<{id: string; crop_name: string}> = [];
+  let zones: Array<{id: string; name: string}> = [];
 
   if (cropIds.length > 0) {
-    const { data } = await supabase.from("crops").select("id, crop_name").in("id", cropIds);
+    const { data, error } = await supabase.from("crops").select("id, crop_name").in("id", cropIds);
+    if (error) console.error("Failed to fetch crops:", error);
     crops = data ?? [];
   }
 
   if (zoneIds.length > 0) {
-    const { data } = await supabase.from("zones").select("id, name").in("id", zoneIds);
+    const { data, error } = await supabase.from("zones").select("id, name").in("id", zoneIds);
+    if (error) console.error("Failed to fetch zones:", error);
     zones = data ?? [];
   }
 
@@ -739,7 +741,7 @@ export async function getHarvestLogs(farmId: string): Promise<HarvestLog[]> {
 
   return harvests.map(h => ({
     ...h,
-    crop: h.crop_id && cropMap.has(h.crop_id) ? [cropMap.get(h.crop_id)] : null,
-    zone: h.zone_id && zoneMap.has(h.zone_id) ? [zoneMap.get(h.zone_id)] : null
+    crop: h.crop_id && cropMap.has(h.crop_id) ? [cropMap.get(h.crop_id)!] : null,
+    zone: h.zone_id && zoneMap.has(h.zone_id) ? [zoneMap.get(h.zone_id)!] : null
   })) as HarvestLog[];
 }
