@@ -2188,16 +2188,16 @@ export default function FarmPage() {
                                       className="mt-1 w-full min-w-[100px] rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
                                   </td>
                                   <td className="px-3 py-2">
-                                    <div className="space-y-1">
+                                    <div className="space-y-2">
                                       {editingCropForm.zone_ids.map((zid, idx) => (
-                                        <div key={idx} className="flex items-center gap-1">
+                                        <div key={idx} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                                           <select value={zid}
                                             onChange={(e) => setEditingCropForm((p) => {
                                               const next = [...p.zone_ids];
                                               next[idx] = e.target.value;
                                               return { ...p, zone_ids: next };
                                             })}
-                                            className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900">
+                                            className="flex-1 rounded-xl border border-zinc-300 px-3 py-2 text-base sm:text-sm outline-none focus:border-zinc-900">
                                             <option value="">Select zone</option>
                                             {zones.map((z) => (
                                               <option key={z.id} value={z.id}
@@ -2207,15 +2207,15 @@ export default function FarmPage() {
                                             ))}
                                           </select>
                                           <button type="button" onClick={() => setEditingCropForm((p) => ({ ...p, zone_ids: p.zone_ids.filter((_, i) => i !== idx) }))}
-                                            className="flex-shrink-0 rounded-lg border border-zinc-200 p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
-                                            <X size={14} />
+                                            className="flex-shrink-0 rounded-lg border border-zinc-200 p-2 sm:p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+                                            <X size={16} className="sm:w-3.5 sm:h-3.5" />
                                           </button>
                                         </div>
                                       ))}
                                       {editingCropForm.zone_ids.length < zones.length && (
                                         <button type="button" onClick={() => setEditingCropForm((p) => ({ ...p, zone_ids: [...p.zone_ids, ""] }))}
-                                          className="flex items-center gap-1 rounded-lg border border-dashed border-zinc-300 px-2 py-1 text-xs text-zinc-500 hover:border-zinc-400 hover:text-zinc-700">
-                                          <Plus size={12} /> {editingCropForm.zone_ids.length === 0 ? "Add zone" : "Add zone"}
+                                          className="flex items-center gap-1 rounded-lg border border-dashed border-zinc-300 px-2 py-2 sm:py-1 text-sm sm:text-xs text-zinc-500 hover:border-zinc-400 hover:text-zinc-700">
+                                          <Plus size={16} className="sm:w-3 sm:h-3" /> {editingCropForm.zone_ids.length === 0 ? "Add zone" : "Add zone"}
                                         </button>
                                       )}
                                     </div>
