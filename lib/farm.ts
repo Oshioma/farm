@@ -720,18 +720,26 @@ export async function getHarvestLogs(farmId: string): Promise<HarvestLog[]> {
   const cropIds = [...new Set(harvests.map(h => h.crop_id).filter(Boolean))];
   const zoneIds = [...new Set(harvests.map(h => h.zone_id).filter(Boolean))];
 
-  const [{ data: crops }, { data: zones }] = await Promise.all([
-    cropIds.length ? supabase.from("crops").select("id, crop_name").in("id", cropIds) : Promise.resolve({ data: [] }),
-    zoneIds.length ? supabase.from("zones").select("id, name").in("id", zoneIds) : Promise.resolve({ data: [] })
-  ]);
+  let crops: any[] = [];
+  let zones: any[] = [];
+
+  if (cropIds.length > 0) {
+    const { data } = await supabase.from("crops").select("id, crop_name").in("id", cropIds);
+    crops = data ?? [];
+  }
+
+  if (zoneIds.length > 0) {
+    const { data } = await supabase.from("zones").select("id, name").in("id", zoneIds);
+    zones = data ?? [];
+  }
 
   // Map crops and zones to harvests
-  const cropMap = new Map((crops ?? []).map(c => [c.id, c]));
-  const zoneMap = new Map((zones ?? []).map(z => [z.id, z]));
+  const cropMap = new Map(crops.map(c => [c.id, c]));
+  const zoneMap = new Map(zones.map(z => [z.id, z]));
 
-  return (harvests ?? []).map(h => ({
+  return harvests.map(h => ({
     ...h,
-    crop: h.crop_id ? [cropMap.get(h.crop_id)].filter(Boolean) : null,
-    zone: h.zone_id ? [zoneMap.get(h.zone_id)].filter(Boolean) : null
+    crop: h.crop_id && cropMap.has(h.crop_id) ? [cropMap.get(h.crop_id)] : null,
+    zone: h.zone_id && zoneMap.has(h.zone_id) ? [zoneMap.get(h.zone_id)] : null
   })) as HarvestLog[];
 }
