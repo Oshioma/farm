@@ -19,6 +19,8 @@ import {
   getCompost,
   getPlants,
   getHarvestEta,
+  saveActiveFarmId,
+  getActiveFarmId,
 } from "@/lib/farm";
 import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, FertilisationEntry, CompostEntry, Plant, HarvestEtaEntry, FarmMember } from "@/lib/farm";
 import { formatDate, formatMoney, badgeClass } from "@/app/farm/utils";
@@ -306,10 +308,21 @@ export default function FarmPage() {
   }
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user?.email) setUserEmail(user.email);
-    });
-    refreshAll();
+    const init = async () => {
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user?.email) setUserEmail(user.email);
+      });
+
+      await refreshAll();
+
+      // Load the last active farm ID from user profile
+      const lastFarmId = await getActiveFarmId();
+      if (lastFarmId) {
+        setActiveFarmId(lastFarmId);
+      }
+    };
+
+    init();
   }, []);
 
   useEffect(() => {
@@ -344,6 +357,13 @@ export default function FarmPage() {
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [activeFarmId]);
+
+  // Save active farm ID to user profile for cross-device sync
+  useEffect(() => {
+    if (activeFarmId) {
+      saveActiveFarmId(activeFarmId);
+    }
   }, [activeFarmId]);
 
   const activeFarm = useMemo(

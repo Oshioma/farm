@@ -5,6 +5,36 @@ function getBustParam(): string {
   return `_bust=${Date.now()}`;
 }
 
+export async function saveActiveFarmId(farmId: string): Promise<void> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    await supabase.auth.updateUser({
+      data: { last_active_farm_id: farmId }
+    });
+    console.log("[Farm] Saved active farm ID to user profile:", farmId);
+  } catch (err) {
+    console.error("[Farm] Failed to save active farm ID:", err);
+  }
+}
+
+export async function getActiveFarmId(): Promise<string | null> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const farmId = (user.user_metadata?.last_active_farm_id as string) || null;
+    if (farmId) {
+      console.log("[Farm] Loaded active farm ID from user profile:", farmId);
+    }
+    return farmId;
+  } catch (err) {
+    console.error("[Farm] Failed to load active farm ID:", err);
+    return null;
+  }
+}
+
 export type Farm = {
   id: string;
   name: string;
