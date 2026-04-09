@@ -92,6 +92,7 @@ export default function FarmPage() {
   const [cropNoteText, setCropNoteText] = useState("");
   const [cropMedicinalText, setCropMedicinalText] = useState("");
   const [savingCropNote, setSavingCropNote] = useState(false);
+  const [isAllCropsCollapsed, setIsAllCropsCollapsed] = useState(false);
   // No-farm state
   const [noFarmMode, setNoFarmMode] = useState<"idle" | "create" | "join">("idle");
   const [newFarmName, setNewFarmName] = useState("");
@@ -2140,9 +2141,18 @@ export default function FarmPage() {
                         What is planted, where it is, and how much it is really yielding.
                       </p>
                     </div>
-                    <span className="text-sm text-zinc-500">{crops.length} crops</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-zinc-500">{crops.length} crops</span>
+                      <button
+                        onClick={() => setIsAllCropsCollapsed(!isAllCropsCollapsed)}
+                        className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 transition"
+                      >
+                        {isAllCropsCollapsed ? "Expand" : "Collapse"}
+                      </button>
+                    </div>
                   </div>
 
+                  {!isAllCropsCollapsed && (
                   <div className="mt-5 overflow-hidden rounded-2xl border border-zinc-200">
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
@@ -2365,6 +2375,7 @@ export default function FarmPage() {
                       </table>
                     </div>
                   </div>
+                  )}
                 </div>
 
                 <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
