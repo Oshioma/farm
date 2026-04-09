@@ -41,8 +41,12 @@ export async function GET(request: Request) {
       return Response.json({ data: null });
     }
 
-    console.log("Successfully loaded layout for farm:", farm_id);
-    return Response.json({ data });
+    // Ensure beds and landmarks are arrays (not JSON strings)
+    const beds = Array.isArray(data.beds) ? data.beds : (typeof data.beds === "string" ? JSON.parse(data.beds) : data.beds || []);
+    const landmarks = Array.isArray(data.landmarks) ? data.landmarks : (typeof data.landmarks === "string" ? JSON.parse(data.landmarks) : data.landmarks || []);
+
+    console.log("Successfully loaded layout for farm:", farm_id, "with", beds.length, "beds");
+    return Response.json({ data: { beds, landmarks, background_image: data.background_image } });
   } catch (error) {
     console.error("Error in farm-map load route:", error);
     return Response.json(
