@@ -82,8 +82,9 @@ export default function CompostPage() {
         notes: form.notes.trim() || null,
       };
 
+      const zoneIds = form.zone_ids.filter(Boolean);
+
       if (modal === "new") {
-        const zoneIds = form.zone_ids.filter(Boolean);
         const entries = zoneIds.length > 0
           ? zoneIds.map(zid => ({ ...basePayload, zone_id: zid }))
           : [{ ...basePayload, zone_id: null }];
@@ -91,8 +92,19 @@ export default function CompostPage() {
         const { error: e } = await supabase.from("compost").insert(entries);
         if (e) throw e;
       } else if (modal) {
-        const { error: e } = await supabase.from("compost").update({ ...basePayload, zone_id: form.zone_ids[0] || null }).eq("id", (modal as CompostEntry).id);
+        // Update the original entry with the first zone (or null)
+        const { error: e } = await supabase.from("compost").update({ ...basePayload, zone_id: zoneIds[0] || null }).eq("id", (modal as CompostEntry).id);
         if (e) throw e;
+
+        // Create new entries for additional zones
+        if (zoneIds.length > 1) {
+          const additionalEntries = zoneIds.slice(1).map(zid => ({
+            ...basePayload,
+            zone_id: zid,
+          }));
+          const { error: e2 } = await supabase.from("compost").insert(additionalEntries);
+          if (e2) throw e2;
+        }
       }
       await loadEntries(activeFarmId);
       setModal(null);
