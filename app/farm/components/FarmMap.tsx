@@ -189,7 +189,7 @@ const topLandLandmarks: LandmarkDef[] = [
 function getLayout(farmName?: string): FarmLayout {
   const name = farmName?.toLowerCase() ?? "";
   const isTopLand = name.includes("top land");
-  const isMountSol = name.includes("mount sol") || name.includes("solomon");
+  const isMountSol = name.includes("mount") && (name.includes("sol") || name.includes("solomun"));
 
   if (isTopLand) {
     return {
