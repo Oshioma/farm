@@ -398,30 +398,70 @@ export default function FarmPage() {
   }, [members]);
 
   const groupedOpenTasks = useMemo(() => {
-    const groups: { label: string; key: string; tasks: Task[] }[] = [];
+    const groups: { label: string; key: string; tasks: Task[]; isCurrentUser?: boolean }[] = [];
     const unassigned: Task[] = [];
     const byAssignee: Record<string, Task[]> = {};
+    let myTasks: Task[] = [];
+    let myTasksKey: string | null = null;
 
     for (const task of openTasks) {
       if (task.assigned_to) {
         if (!byAssignee[task.assigned_to]) byAssignee[task.assigned_to] = [];
         byAssignee[task.assigned_to].push(task);
+
+        // Check if this is the current user's task
+        const assigneeEmail = memberEmailMap[task.assigned_to];
+        if (assigneeEmail === userEmail && !myTasksKey) {
+          myTasks = byAssignee[task.assigned_to];
+          myTasksKey = task.assigned_to;
+        }
       } else {
         unassigned.push(task);
       }
     }
 
+    // Add current user's tasks first if they exist
+    if (myTasksKey && myTasks.length > 0) {
+      groups.push({
+        label: "My tasks",
+        key: myTasksKey,
+        tasks: myTasks,
+        isCurrentUser: true
+      });
+    }
+
+    // Add unassigned tasks
     if (unassigned.length > 0) {
       groups.push({ label: "General (unassigned)", key: "__unassigned__", tasks: unassigned });
     }
+
+    // Add other people's tasks
     for (const [assignee, assigneeTasks] of Object.entries(byAssignee).sort(([a], [b]) =>
       (memberEmailMap[a] ?? a).localeCompare(memberEmailMap[b] ?? b)
     )) {
-      groups.push({ label: memberEmailMap[assignee] ?? assignee, key: assignee, tasks: assigneeTasks });
+      if (assignee !== myTasksKey) {
+        groups.push({ label: memberEmailMap[assignee] ?? assignee, key: assignee, tasks: assigneeTasks });
+      }
     }
 
     return groups;
-  }, [openTasks, memberEmailMap]);
+  }, [openTasks, memberEmailMap, userEmail]);
+
+  // Calculate which tasks to display based on expand state
+  const displayedTaskGroups = useMemo(() => {
+    if (expandAllTasks) {
+      // Show all groups with all tasks
+      return groupedOpenTasks;
+    } else {
+      // Show only current user's tasks, limited to 3
+      const myTasksGroup = groupedOpenTasks.find(g => g.isCurrentUser);
+      if (!myTasksGroup) return groupedOpenTasks;
+      return [{
+        ...myTasksGroup,
+        tasks: myTasksGroup.tasks.slice(0, 3)
+      }];
+    }
+  }, [groupedOpenTasks, expandAllTasks]);
 
   const completedTasks = tasks.filter(
     (task) => task.status === "done" || task.status === "cancelled"
@@ -1681,7 +1721,7 @@ export default function FarmPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-zinc-500">{openTasks.length} open</span>
-                  {groupedOpenTasks.length > 3 && (
+                  {groupedOpenTasks.find(g => g.isCurrentUser)?.tasks.length ?? 0 > 3 && (
                     <button
                       onClick={() => setExpandAllTasks(!expandAllTasks)}
                       className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 transition"
@@ -1708,14 +1748,15 @@ export default function FarmPage() {
                 {openTasks.length === 0 ? (
                   <p className="text-sm text-zinc-500">No open tasks.</p>
                 ) : (
-                  groupedOpenTasks.slice(0, expandAllTasks ? undefined : 3).map((group) => (
+                  displayedTaskGroups.map((group) => (
                     <div key={group.key}>
                       <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
                         {group.label}
-                        <span className="ml-2 text-xs font-normal">({group.tasks.length})</span>
+                        <span className="ml-2 text-xs font-normal">({group.tasks.length}{!expandAllTasks && group.isCurrentUser && group.tasks.length < groupedOpenTasks.find(g => g.isCurrentUser)?.tasks.length! ? `/${groupedOpenTasks.find(g => g.isCurrentUser)?.tasks.length}` : ''})</span>
                       </h3>
                       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {group.tasks.map((task) => {
+
                     const isCompleting = completingTaskId === task.id;
                     const isDeleting = deletingTaskId === task.id;
                     const isSaving = savingTaskId === task.id;
