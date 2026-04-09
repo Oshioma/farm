@@ -22,7 +22,7 @@ const blank = {
   fertiliser: "",
   ready_to_use: "",
   bin_colour: "",
-  zone_id: "",
+  zone_ids: [] as string[],
   notes: "",
 };
 
@@ -80,15 +80,28 @@ export default function FertiliserPage() {
     setSaving(true);
     setError("");
     try {
-      const { error: err } = await supabase.from("fertilisations").insert({
-        farm_id: activeFarmId,
-        date: form.date,
-        fertiliser: form.fertiliser.trim(),
-        ready_to_use: form.ready_to_use || null,
-        bin_colour: form.bin_colour || null,
-        zone_id: form.zone_id || null,
-        notes: form.notes.trim() || null,
-      });
+      const zoneIds = form.zone_ids.filter(Boolean);
+      const entries = zoneIds.length > 0
+        ? zoneIds.map(zid => ({
+            farm_id: activeFarmId,
+            date: form.date,
+            fertiliser: form.fertiliser.trim(),
+            ready_to_use: form.ready_to_use || null,
+            bin_colour: form.bin_colour || null,
+            zone_id: zid,
+            notes: form.notes.trim() || null,
+          }))
+        : [{
+            farm_id: activeFarmId,
+            date: form.date,
+            fertiliser: form.fertiliser.trim(),
+            ready_to_use: form.ready_to_use || null,
+            bin_colour: form.bin_colour || null,
+            zone_id: null,
+            notes: form.notes.trim() || null,
+          }];
+
+      const { error: err } = await supabase.from("fertilisations").insert(entries);
       if (err) throw err;
       setForm(blank);
       setShowForm(false);
@@ -244,13 +257,28 @@ export default function FertiliserPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Zone / Bed <span className="font-normal text-zinc-400">(optional)</span></label>
-                  <select value={form.zone_id}
-                    onChange={(e) => setForm((p) => ({ ...p, zone_id: e.target.value }))}
-                    className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900">
-                    <option value="">—</option>
-                    {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
-                  </select>
+                  <label className="mb-2 block text-sm font-medium">Zones / Beds <span className="font-normal text-zinc-400">(select multiple)</span></label>
+                  <div className="space-y-2 rounded-2xl border border-zinc-300 p-3">
+                    {zones.length === 0 ? (
+                      <p className="text-sm text-zinc-400">No zones available</p>
+                    ) : (
+                      zones.map((z) => (
+                        <label key={z.id} className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox"
+                            checked={form.zone_ids.includes(z.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setForm((p) => ({ ...p, zone_ids: [...p.zone_ids, z.id] }));
+                              } else {
+                                setForm((p) => ({ ...p, zone_ids: p.zone_ids.filter((id) => id !== z.id) }));
+                              }
+                            }}
+                            className="rounded border-zinc-300" />
+                          <span className="text-sm">{z.name}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium">Notes <span className="font-normal text-zinc-400">(optional)</span></label>
