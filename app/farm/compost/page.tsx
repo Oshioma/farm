@@ -14,7 +14,7 @@ function errMsg(err: unknown, fallback: string): string {
   return fallback;
 }
 
-const blankForm = { compost_type: "", date: "", ready_to_use_date: "", materials_used: "", place: "", zone_id: "", notes: "" };
+const blankForm = { compost_type: "", date: "", ready_to_use_date: "", materials_used: "", place: "", zone_ids: [] as string[], notes: "" };
 
 function fmt(d: string | null) {
   if (!d) return "—";
@@ -72,21 +72,26 @@ export default function CompostPage() {
     try {
       setSaving(true);
       setError("");
-      const payload = {
+      const basePayload = {
         farm_id: activeFarmId,
         compost_type: form.compost_type.trim() || null,
         date: form.date || null,
         ready_to_use_date: form.ready_to_use_date || null,
         materials_used: form.materials_used.trim() || null,
         place: form.place.trim() || null,
-        zone_id: form.zone_id || null,
         notes: form.notes.trim() || null,
       };
+
       if (modal === "new") {
-        const { error: e } = await supabase.from("compost").insert(payload);
+        const zoneIds = form.zone_ids.filter(Boolean);
+        const entries = zoneIds.length > 0
+          ? zoneIds.map(zid => ({ ...basePayload, zone_id: zid }))
+          : [{ ...basePayload, zone_id: null }];
+
+        const { error: e } = await supabase.from("compost").insert(entries);
         if (e) throw e;
       } else if (modal) {
-        const { error: e } = await supabase.from("compost").update(payload).eq("id", (modal as CompostEntry).id);
+        const { error: e } = await supabase.from("compost").update({ ...basePayload, zone_id: form.zone_ids[0] || null }).eq("id", (modal as CompostEntry).id);
         if (e) throw e;
       }
       await loadEntries(activeFarmId);
@@ -118,7 +123,7 @@ export default function CompostPage() {
       ready_to_use_date: entry.ready_to_use_date ?? "",
       materials_used: entry.materials_used ?? "",
       place: entry.place ?? "",
-      zone_id: entry.zone_id ?? "",
+      zone_ids: entry.zone_id ? [entry.zone_id] : [],
       notes: entry.notes ?? "",
     });
     setModal(entry);
@@ -267,11 +272,28 @@ export default function CompostPage() {
                 <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.materials_used} onChange={(e) => setForm((p) => ({ ...p, materials_used: e.target.value }))} placeholder="Manure + food scraps" />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Zone / Bed <span className="font-normal text-zinc-400">(optional)</span></label>
-                <select className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.zone_id} onChange={(e) => setForm((p) => ({ ...p, zone_id: e.target.value }))}>
-                  <option value="">—</option>
-                  {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
-                </select>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Zones / Beds <span className="font-normal text-zinc-400">(select multiple)</span></label>
+                <div className="space-y-1.5 rounded-xl border border-zinc-300 p-3">
+                  {zones.length === 0 ? (
+                    <p className="text-xs text-zinc-400">No zones available</p>
+                  ) : (
+                    zones.map((z) => (
+                      <label key={z.id} className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox"
+                          checked={form.zone_ids.includes(z.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setForm((p) => ({ ...p, zone_ids: [...p.zone_ids, z.id] }));
+                            } else {
+                              setForm((p) => ({ ...p, zone_ids: p.zone_ids.filter((id) => id !== z.id) }));
+                            }
+                          }}
+                          className="rounded border-zinc-300" />
+                        <span className="text-sm">{z.name}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-zinc-600">Notes</label>
