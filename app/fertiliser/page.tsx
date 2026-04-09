@@ -117,18 +117,39 @@ export default function FertiliserPage() {
     setSavingEditId(id);
     setError("");
     try {
-      const { error: err } = await supabase
+      const basePayload = {
+        date: editForm.date || null,
+        fertiliser: editForm.fertiliser.trim() || null,
+        ready_to_use: editForm.ready_to_use || null,
+        bin_colour: editForm.bin_colour || null,
+        notes: editForm.notes.trim() || null,
+      };
+
+      const zoneIds = editForm.zone_ids.filter(Boolean);
+
+      // Update the original entry with the first zone (or null)
+      const { error: updateErr } = await supabase
         .from("fertilisations")
         .update({
-          date: editForm.date || null,
-          fertiliser: editForm.fertiliser.trim() || null,
-          ready_to_use: editForm.ready_to_use || null,
-          bin_colour: editForm.bin_colour || null,
-          zone_id: editForm.zone_ids[0] || null,
-          notes: editForm.notes.trim() || null,
+          ...basePayload,
+          zone_id: zoneIds[0] || null,
         })
         .eq("id", id);
-      if (err) throw err;
+      if (updateErr) throw updateErr;
+
+      // Create new entries for additional zones
+      if (zoneIds.length > 1) {
+        const additionalEntries = zoneIds.slice(1).map(zoneId => ({
+          farm_id: activeFarmId,
+          ...basePayload,
+          zone_id: zoneId,
+        }));
+        const { error: insertErr } = await supabase
+          .from("fertilisations")
+          .insert(additionalEntries);
+        if (insertErr) throw insertErr;
+      }
+
       setEditingId(null);
       await loadEntries(activeFarmId);
     } catch (err) {
@@ -352,12 +373,27 @@ export default function FertiliserPage() {
                         </select>
                       </td>
                       <td className="px-3 py-2">
-                        <select value={editForm.zone_ids[0] ?? ""}
-                          onChange={(e) => setEditForm((p) => ({ ...p, zone_ids: e.target.value ? [e.target.value] : [] }))}
-                          className="w-full min-w-[140px] rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900">
-                          <option value="">—</option>
-                          {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
-                        </select>
+                        <div className="space-y-1 rounded border border-zinc-300 p-2">
+                          {zones.length === 0 ? (
+                            <p className="text-xs text-zinc-400">No zones</p>
+                          ) : (
+                            zones.map((z) => (
+                              <label key={z.id} className="flex items-center gap-2 cursor-pointer text-sm">
+                                <input type="checkbox"
+                                  checked={editForm.zone_ids.includes(z.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setEditForm((p) => ({ ...p, zone_ids: [...p.zone_ids, z.id] }));
+                                    } else {
+                                      setEditForm((p) => ({ ...p, zone_ids: p.zone_ids.filter((id) => id !== z.id) }));
+                                    }
+                                  }}
+                                  className="rounded border-zinc-300" />
+                                <span>{z.name}</span>
+                              </label>
+                            ))
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-2">
                         <input type="text" value={editForm.notes}
