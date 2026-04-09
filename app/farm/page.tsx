@@ -93,7 +93,8 @@ export default function FarmPage() {
   const [cropNoteText, setCropNoteText] = useState("");
   const [cropMedicinalText, setCropMedicinalText] = useState("");
   const [savingCropNote, setSavingCropNote] = useState(false);
-  const [isAllCropsCollapsed, setIsAllCropsCollapsed] = useState(false);
+  const [expandAllCrops, setExpandAllCrops] = useState(false);
+  const [expandAllTasks, setExpandAllTasks] = useState(false);
   // No-farm state
   const [noFarmMode, setNoFarmMode] = useState<"idle" | "create" | "join">("idle");
   const [newFarmName, setNewFarmName] = useState("");
@@ -1678,8 +1679,16 @@ export default function FarmPage() {
                     All todo and in-progress tasks, due soonest first.
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <span className="text-sm text-zinc-500">{openTasks.length} open</span>
+                  {groupedOpenTasks.length > 3 && (
+                    <button
+                      onClick={() => setExpandAllTasks(!expandAllTasks)}
+                      className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 transition"
+                    >
+                      {expandAllTasks ? "Show less" : "Show all"}
+                    </button>
+                  )}
                   <button
                     onClick={() => setActiveForm(activeForm === "task" ? null : "task")}
                     className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
@@ -1699,7 +1708,7 @@ export default function FarmPage() {
                 {openTasks.length === 0 ? (
                   <p className="text-sm text-zinc-500">No open tasks.</p>
                 ) : (
-                  groupedOpenTasks.map((group) => (
+                  groupedOpenTasks.slice(0, expandAllTasks ? undefined : 3).map((group) => (
                     <div key={group.key}>
                       <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
                         {group.label}
@@ -2146,18 +2155,19 @@ export default function FarmPage() {
                         What is planted, where it is, and how much it is really yielding.
                       </p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                       <span className="text-sm text-zinc-500">{crops.length} crops</span>
-                      <button
-                        onClick={() => setIsAllCropsCollapsed(!isAllCropsCollapsed)}
-                        className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 transition"
-                      >
-                        {isAllCropsCollapsed ? "Expand" : "Collapse"}
-                      </button>
+                      {crops.length > 3 && (
+                        <button
+                          onClick={() => setExpandAllCrops(!expandAllCrops)}
+                          className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 transition"
+                        >
+                          {expandAllCrops ? "Show less" : "Show all"}
+                        </button>
+                      )}
                     </div>
                   </div>
 
-                  {!isAllCropsCollapsed && (
                   <div className="mt-5 overflow-hidden rounded-2xl border border-zinc-200">
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
@@ -2176,7 +2186,7 @@ export default function FarmPage() {
                           {crops.length === 0 ? (
                             <tr><td colSpan={7} className="px-4 py-6 text-zinc-500">No crops yet.</td></tr>
                           ) : (
-                            crops.map((crop) =>
+                            crops.slice(0, expandAllCrops ? undefined : 3).map((crop) =>
                               editingCropId === crop.id ? (
                                 <tr key={crop.id} className="border-b border-zinc-100 bg-amber-50/40">
                                   <td className="px-3 py-2">
@@ -2380,7 +2390,6 @@ export default function FarmPage() {
                       </table>
                     </div>
                   </div>
-                  )}
                 </div>
 
                 <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
