@@ -233,6 +233,9 @@ export default function FarmPage() {
   async function loadFarmData(farmId: string) {
     const currentYear = new Date().getFullYear();
     console.log(`[Farm] Loading farm data for ${farmId} at ${new Date().toISOString()}`);
+    // Pre-warm auth session so parallel requests don't fight over the
+    // Supabase auth lock (navigator.locks with steal: true).
+    await supabase.auth.getSession();
     const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows, pestRows, saleRows, fertilisationRows, compostRows, plantRows, harvestEtaRows, memberRows] = await Promise.all([
       getZones(farmId),
       getCrops(farmId),

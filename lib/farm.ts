@@ -344,15 +344,22 @@ export async function getMembers(farmId: string): Promise<FarmMember[]> {
 }
 
 export async function getActivities(farmId: string): Promise<Activity[]> {
-  const { data, error } = await supabase
-    .from("activities")
-    .select("id, type, title, meta, created_at")
-    .eq("farm_id", farmId)
-    .order("created_at", { ascending: false })
-    .limit(10);
+  return withCacheFallback(
+    `activities_${farmId}`,
+    "activities",
+    async () => {
+      const { data, error } = await supabase
+        .from("activities")
+        .select("id, type, title, meta, created_at")
+        .eq("farm_id", farmId)
+        .order("created_at", { ascending: false })
+        .limit(10);
 
-  if (error) throw new Error(`getActivities failed: ${error.message}`);
-  return (data ?? []) as Activity[];
+      if (error) throw new Error(`getActivities failed: ${error.message}`);
+      return (data ?? []) as Activity[];
+    },
+    farmId
+  );
 }
 
 export async function getExpenses(farmId: string): Promise<Expense[]> {
