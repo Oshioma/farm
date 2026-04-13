@@ -894,16 +894,44 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                     strokeWidth={isSZSelected ? 2.5 : 1.8}
                     strokeDasharray="6,4"
                   />
-                  <text
-                    x={lm.x + w / 2}
-                    y={lm.y + h / 2}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    className="pointer-events-none text-[9px] font-semibold uppercase tracking-wider"
-                    fill="#047857"
-                  >
-                    {lm.label ?? "Seedling Zone"}
-                  </text>
+                  {(() => {
+                    // Wrap the label into lines that fit the box width. SVG <text>
+                    // doesn't auto-wrap, so split on spaces and greedy-pack words
+                    // assuming roughly ~5.5px per character at 9px font.
+                    const raw = (lm.label ?? "Seedling Zone").trim();
+                    const maxChars = Math.max(4, Math.floor((w - 8) / 5.5));
+                    const words = raw.split(/\s+/);
+                    const lines: string[] = [];
+                    let current = "";
+                    for (const word of words) {
+                      if (!current) {
+                        current = word;
+                      } else if ((current + " " + word).length <= maxChars) {
+                        current = current + " " + word;
+                      } else {
+                        lines.push(current);
+                        current = word;
+                      }
+                    }
+                    if (current) lines.push(current);
+                    const lineHeight = 11;
+                    const totalHeight = lines.length * lineHeight;
+                    const startY = lm.y + h / 2 - totalHeight / 2 + lineHeight * 0.75;
+                    return (
+                      <text
+                        x={lm.x + w / 2}
+                        textAnchor="middle"
+                        className="pointer-events-none text-[9px] font-semibold uppercase tracking-wider"
+                        fill="#047857"
+                      >
+                        {lines.map((line, li) => (
+                          <tspan key={li} x={lm.x + w / 2} y={startY + li * lineHeight}>
+                            {line}
+                          </tspan>
+                        ))}
+                      </text>
+                    );
+                  })()}
                   {editMode && (
                     <rect
                       x={lm.x + w - 8}
@@ -1182,9 +1210,20 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                   <div className="mt-3 max-h-[420px] space-y-2 overflow-y-auto pr-1">
                     {traysToShow.map((tray) => {
                       const rows = byTray.get(tray.code.toUpperCase()) ?? [];
+                      // Most-recent sown date across seedlings in this tray
+                      const latestDate = rows
+                        .map((r) => r.date)
+                        .filter((d): d is string => !!d)
+                        .sort()
+                        .pop();
                       return (
                         <div key={tray.code} className="rounded-xl border border-emerald-100 bg-white p-2.5">
-                          <div className="text-xs font-semibold text-emerald-900">Tray {tray.code}</div>
+                          <div className="flex items-baseline justify-between gap-2">
+                            <div className="text-xs font-semibold text-emerald-900">{tray.code}</div>
+                            {latestDate && (
+                              <div className="text-[10px] text-zinc-400">{fmtDate(latestDate)}</div>
+                            )}
+                          </div>
                           {rows.length === 0 ? (
                             <div className="mt-1 text-[10px] text-zinc-400">Empty</div>
                           ) : (
