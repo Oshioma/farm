@@ -15,7 +15,7 @@ type BedDef = {
 };
 
 type LandmarkDef = {
-  type: "circle" | "dashed-rect" | "label" | "path";
+  type: "circle" | "dashed-rect" | "label" | "path" | "seedling-zone";
   x: number;
   y: number;
   w?: number;
@@ -265,6 +265,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
   const [editLandmarks, setEditLandmarks] = useState<LandmarkDef[]>([]);
   const [dragLandmark, setDragLandmark] = useState<number | null>(null);
   const [dragLmOffset, setDragLmOffset] = useState({ x: 0, y: 0 });
+  const [resizeLandmark, setResizeLandmark] = useState<number | null>(null);
   const [editingLabelIdx, setEditingLabelIdx] = useState<number | null>(null);
   const [editingLabelText, setEditingLabelText] = useState("");
   const [addingLabel, setAddingLabel] = useState(false);
@@ -431,6 +432,12 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
     setDragLmOffset({ x: pt.x - lm.x, y: pt.y - lm.y });
   }, [editMode, editLandmarks]);
 
+  const handleLandmarkResizeDown = useCallback((idx: number, e: React.MouseEvent) => {
+    if (!editMode) return;
+    e.stopPropagation();
+    setResizeLandmark(idx);
+  }, [editMode]);
+
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!editMode) return;
     const pt = svgPoint(e);
@@ -461,12 +468,24 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
         )
       );
     }
-  }, [editMode, dragBed, resizeBed, dragOffset, dragLandmark, dragLmOffset]);
+
+    if (resizeLandmark !== null) {
+      setEditLandmarks((prev) =>
+        prev.map((lm, i) => {
+          if (i !== resizeLandmark) return lm;
+          const newW = Math.max(30, Math.round(pt.x - lm.x));
+          const newH = Math.max(30, Math.round(pt.y - lm.y));
+          return { ...lm, w: newW, h: newH };
+        })
+      );
+    }
+  }, [editMode, dragBed, resizeBed, dragOffset, dragLandmark, dragLmOffset, resizeLandmark]);
 
   const handleMouseUp = useCallback(() => {
     setDragBed(null);
     setResizeBed(null);
     setDragLandmark(null);
+    setResizeLandmark(null);
   }, []);
 
   // ── Add new bed ──
@@ -493,10 +512,18 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
     setAddingLabel(false);
   }
 
-  // ── Edit label text ──
+  // ── Add a seedling-zone block (draggable + resizable) ──
+  function addSeedlingZone() {
+    setEditLandmarks((prev) => [
+      ...prev,
+      { type: "seedling-zone", x: 120, y: 120, w: 160, h: 120, label: "Seedling Zone" },
+    ]);
+  }
+
+  // ── Edit label / seedling-zone text ──
   function startEditLabel(idx: number) {
     const lm = editLandmarks[idx];
-    if (!lm || lm.type !== "label") return;
+    if (!lm || (lm.type !== "label" && lm.type !== "seedling-zone")) return;
     setEditingLabelIdx(idx);
     setEditingLabelText(lm.label ?? "");
   }
@@ -670,6 +697,12 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
               </button>
             )}
             <button
+              onClick={addSeedlingZone}
+              className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+            >
+              + Add Seedling Zone
+            </button>
+            <button
               onClick={() => fileInputRef.current?.click()}
               className="rounded-xl bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700"
             >
@@ -758,6 +791,52 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
           {/* Landmarks */}
           {layout.landmarks.map((lm, i) => {
             const isSelected = editMode && editingLabelIdx === i;
+            if (lm.type === "seedling-zone") {
+              const w = lm.w ?? 160;
+              const h = lm.h ?? 120;
+              return (
+                <g
+                  key={i}
+                  className={editMode ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}
+                  onMouseDown={editMode ? (e) => handleLandmarkDown(i, e) : undefined}
+                  onDoubleClick={editMode ? () => startEditLabel(i) : undefined}
+                >
+                  <rect
+                    x={lm.x}
+                    y={lm.y}
+                    width={w}
+                    height={h}
+                    rx="6"
+                    fill="rgba(16,185,129,0.12)"
+                    stroke={editMode ? "#059669" : "#10b981"}
+                    strokeWidth="1.8"
+                    strokeDasharray="6,4"
+                  />
+                  <text
+                    x={lm.x + 8}
+                    y={lm.y + 18}
+                    className="pointer-events-none text-[11px] font-semibold uppercase tracking-wider"
+                    fill="#047857"
+                  >
+                    {lm.label ?? "Seedling Zone"}
+                  </text>
+                  {editMode && (
+                    <rect
+                      x={lm.x + w - 8}
+                      y={lm.y + h - 8}
+                      width={10}
+                      height={10}
+                      rx="1"
+                      fill="#059669"
+                      stroke="white"
+                      strokeWidth={1}
+                      className="cursor-se-resize"
+                      onMouseDown={(e) => handleLandmarkResizeDown(i, e)}
+                    />
+                  )}
+                </g>
+              );
+            }
             if (lm.type === "dashed-rect") {
               return (
                 <rect
