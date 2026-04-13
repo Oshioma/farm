@@ -110,24 +110,47 @@ export default function SeedlingsPage() {
       .finally(() => setLoading(false));
   }, [activeFarmId]);
 
-  // Load trays from the seedling map layout so the dropdown knows what's available
+  // Load trays from the seedling map layout so the dropdown knows what's available.
+  // Try the database first, then fall back to localStorage (matches SeedlingMap's own
+  // save path so trays drawn offline still appear in the dropdown).
   useEffect(() => {
     if (!activeFarmId) { setTrayCodes([]); return; }
+    const activeFarmName = farms.find((f) => f.id === activeFarmId)?.name;
     let cancelled = false;
+
+    const extractCodes = (trays: unknown): string[] => {
+      if (!Array.isArray(trays)) return [];
+      return (trays as { code?: string }[])
+        .map((t) => (t.code ?? "").toString())
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    };
+
+    const fromLocal = (): string[] => {
+      if (!activeFarmName) return [];
+      try {
+        const raw = localStorage.getItem(`seedling-map-layout:${activeFarmName}`);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return extractCodes(parsed?.trays);
+      } catch { return []; }
+    };
+
     fetch(`/api/seedling-map/load?farm_id=${activeFarmId}`)
       .then((r) => r.json())
       .then((result) => {
         if (cancelled) return;
-        const trays = Array.isArray(result?.data?.trays) ? result.data.trays : [];
-        const codes = trays
-          .map((t: { code?: string }) => (t.code ?? "").toString())
-          .filter(Boolean)
-          .sort((a: string, b: string) => a.localeCompare(b, undefined, { numeric: true }));
-        setTrayCodes(codes);
+        const dbCodes = extractCodes(result?.data?.trays);
+        if (dbCodes.length > 0) {
+          setTrayCodes(dbCodes);
+        } else {
+          setTrayCodes(fromLocal());
+        }
       })
-      .catch(() => { if (!cancelled) setTrayCodes([]); });
+      .catch(() => { if (!cancelled) setTrayCodes(fromLocal()); });
+
     return () => { cancelled = true; };
-  }, [activeFarmId]);
+  }, [activeFarmId, farms]);
 
   async function reload() {
     if (!activeFarmId) return;

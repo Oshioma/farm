@@ -70,6 +70,7 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
   const [newZoneLabel, setNewZoneLabel] = useState("");
   const [addingTray, setAddingTray] = useState(false);
   const [newTrayCode, setNewTrayCode] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -129,7 +130,12 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
 
   // ── Save / Cancel ──
   async function saveEdit() {
+    if (saving) return;
+    setSaving(true);
+    // Exit edit mode immediately so the button feels responsive; the DB write
+    // continues in the background and we keep the local state as source of truth.
     if (farmName) saveLocal(farmName, zones, trays);
+    setEditMode(false);
 
     if (farmId && farmId !== "undefined") {
       try {
@@ -148,7 +154,7 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
       }
     }
 
-    setEditMode(false);
+    setSaving(false);
   }
 
   function cancelEdit() {
@@ -339,12 +345,16 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
 
   return (
     <div>
-      {/* ── Edit toolbar ── */}
-      <div className="mb-3 flex items-center gap-2 flex-wrap">
+      {/* ── Edit toolbar (sticky so it's always reachable on tall maps) ── */}
+      <div className="sticky top-0 z-20 -mx-4 mb-3 flex items-center gap-2 flex-wrap bg-white/95 px-4 py-2 shadow-sm backdrop-blur sm:-mx-6 sm:px-6">
         {editMode ? (
           <>
-            <button onClick={saveEdit} className="rounded-xl bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">
-              Save Layout
+            <button
+              onClick={saveEdit}
+              disabled={saving}
+              className="rounded-xl bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60"
+            >
+              {saving ? "Saving…" : "Save Layout"}
             </button>
             <button onClick={cancelEdit} className="rounded-xl bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-300">
               Cancel
