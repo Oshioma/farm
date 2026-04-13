@@ -295,7 +295,7 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
     const y = parent ? parent.y + 10 : 120;
     setTrays((prev) => [
       ...prev,
-      { id, code, x, y, w: 40, h: 28, zoneId: parent?.id },
+      { id, code, x, y, w: 110, h: 80, zoneId: parent?.id },
     ]);
     setNewTrayCode("");
     setAddingTray(false);
@@ -478,9 +478,9 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
             {/* Trays */}
             {trays.map((tray) => {
               const isSel = selectedTray === tray.id;
-              // Adaptive cell grid to make the tray look like a real seedling tray
-              const cols = Math.max(3, Math.round(tray.w / 8));
-              const rows = Math.max(2, Math.round(tray.h / 8));
+              // Larger cells (~4× previous size) so grid lines are visible and legible
+              const cols = Math.max(2, Math.round(tray.w / 28));
+              const rows = Math.max(2, Math.round(tray.h / 24));
               const cellW = tray.w / cols;
               const cellH = tray.h / rows;
 
@@ -491,8 +491,8 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
                 ? `${latest.plant}${latest.variety ? ` · ${latest.variety}` : ""}`
                 : "";
 
-              // Wrap plant label to fit the tray width (~4.5px per char at 7px font)
-              const maxChars = Math.max(4, Math.floor((tray.w - 4) / 4.5));
+              // Wrap plant label to fit the tray width (~6px per char at 11px font)
+              const maxChars = Math.max(4, Math.floor((tray.w - 6) / 6));
               const lines: string[] = [];
               if (plantLabel) {
                 const words = plantLabel.split(/\s+/);
@@ -504,7 +504,7 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
                 }
                 if (current) lines.push(current);
               }
-              const lineHeight = 8;
+              const lineHeight = 13;
               const labelTotal = lines.length * lineHeight;
               const labelStartY = tray.y + tray.h / 2 - labelTotal / 2 + lineHeight * 0.75;
 
@@ -565,10 +565,10 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
                   ))}
                   {/* Tray code in top-left corner */}
                   <text
-                    x={tray.x + 2}
-                    y={tray.y + 7}
-                    className="pointer-events-none text-[6px] font-semibold uppercase tracking-wide"
-                    fill="#a1a1aa"
+                    x={tray.x + 4}
+                    y={tray.y + 11}
+                    className="pointer-events-none text-[9px] font-semibold uppercase tracking-wide"
+                    fill="#d4d4d8"
                   >
                     {tray.code}
                   </text>
@@ -576,8 +576,8 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
                   {lines.length > 0 && (
                     <text
                       textAnchor="middle"
-                      className="pointer-events-none text-[7px] font-semibold"
-                      fill="#fafafa"
+                      className="pointer-events-none text-[11px] font-semibold"
+                      fill="#ffffff"
                     >
                       {lines.map((line, li) => (
                         <tspan key={li} x={tray.x + tray.w / 2} y={labelStartY + li * lineHeight}>
