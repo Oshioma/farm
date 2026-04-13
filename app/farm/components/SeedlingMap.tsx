@@ -491,18 +491,24 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
               const cellW = tray.w / cols;
               const cellH = tray.h / rows;
 
-              // Plant name from linked seedlings (latest entry wins)
+              // All unique plants in this tray (not just the latest) so
+              // multiple seedlings in the same tray all show up.
               const linked = seedlingsForCode(tray.code);
-              const latest = linked[linked.length - 1];
-              const plantLabel = latest
-                ? `${latest.plant}${latest.variety ? ` · ${latest.variety}` : ""}`
-                : "";
+              const seenLabels = new Set<string>();
+              const plantEntries: string[] = [];
+              for (const s of linked) {
+                const label = `${s.plant}${s.variety ? ` · ${s.variety}` : ""}`.trim();
+                if (label && !seenLabels.has(label)) {
+                  seenLabels.add(label);
+                  plantEntries.push(label);
+                }
+              }
 
-              // Wrap plant label to fit the tray width (~6px per char at 11px font)
+              // Wrap each plant entry to fit the tray width (~6px per char at 12px font)
               const maxChars = Math.max(4, Math.floor((tray.w - 6) / 6));
               const lines: string[] = [];
-              if (plantLabel) {
-                const words = plantLabel.split(/\s+/);
+              for (const entry of plantEntries) {
+                const words = entry.split(/\s+/);
                 let current = "";
                 for (const word of words) {
                   if (!current) current = word;
