@@ -270,6 +270,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
   const [editingLabelText, setEditingLabelText] = useState("");
   const [addingLabel, setAddingLabel] = useState(false);
   const [newLabelText, setNewLabelText] = useState("");
+  const [saving, setSaving] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -341,10 +342,16 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
 
   // Save edits
   async function saveEdit() {
+    if (saving) return;
+    setSaving(true);
+
+    // Exit edit mode immediately so the button feels responsive; local state
+    // is the source of truth and the DB write continues in the background.
     if (farmName) {
-      // Save to localStorage for immediate feedback
       saveCustomLayout(farmName, editBeds, editLandmarks, customBg);
     }
+    setEditMode(false);
+    setEditingLabelIdx(null);
 
     // Also save to database so it syncs across devices
     if (farmId && farmId !== "undefined") {
@@ -369,8 +376,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
       }
     }
 
-    setEditMode(false);
-    setEditingLabelIdx(null);
+    setSaving(false);
   }
 
   // Cancel edits
@@ -647,12 +653,16 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
 
   return (
     <div>
-      {/* ── Edit toolbar ── */}
-      <div className="mb-3 flex items-center gap-2 flex-wrap">
+      {/* ── Edit toolbar (sticky so it stays reachable on tall maps) ── */}
+      <div className="sticky top-0 z-20 mb-3 flex items-center gap-2 flex-wrap bg-white/95 py-2 shadow-sm backdrop-blur">
         {editMode ? (
           <>
-            <button onClick={saveEdit} className="rounded-xl bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">
-              Save Layout
+            <button
+              onClick={saveEdit}
+              disabled={saving}
+              className="rounded-xl bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60"
+            >
+              {saving ? "Saving…" : "Save Layout"}
             </button>
             <button onClick={cancelEdit} className="rounded-xl bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-300">
               Cancel
@@ -813,9 +823,11 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                     strokeDasharray="6,4"
                   />
                   <text
-                    x={lm.x + 8}
-                    y={lm.y + 18}
-                    className="pointer-events-none text-[11px] font-semibold uppercase tracking-wider"
+                    x={lm.x + w / 2}
+                    y={lm.y + h / 2}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    className="pointer-events-none text-[9px] font-semibold uppercase tracking-wider"
                     fill="#047857"
                   >
                     {lm.label ?? "Seedling Zone"}
