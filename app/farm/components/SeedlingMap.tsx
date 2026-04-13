@@ -320,22 +320,6 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
     return seedlings.filter((s) => codes.has((s.row_location ?? "").toUpperCase()));
   }
 
-  function trayColor(tray: TrayDef): string {
-    const matches = seedlingsForCode(tray.code);
-    if (matches.length === 0) return "#f4f4f5"; // zinc-100
-    const latest = matches[matches.length - 1];
-    if (latest.germination === "green") return "#bbf7d0"; // green-200
-    if (latest.germination === "amber") return "#fef08a"; // yellow-200
-    if (latest.germination === "red") return "#fecaca"; // red-200
-    return "#e0f2fe"; // sky-100
-  }
-
-  function trayStroke(tray: TrayDef): string {
-    if (selectedTray === tray.id) return "#18181b";
-    if (hoveredTray === tray.id) return "#52525b";
-    return "#a1a1aa";
-  }
-
   const selectedTrayObj = selectedTray ? trays.find((t) => t.id === selectedTray) ?? null : null;
   const selectedZoneObj = selectedZone ? zones.find((z) => z.id === selectedZone) ?? null : null;
   const selectedTraySeedlings = selectedTrayObj ? seedlingsForCode(selectedTrayObj.code) : [];
@@ -494,6 +478,36 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
             {/* Trays */}
             {trays.map((tray) => {
               const isSel = selectedTray === tray.id;
+              // Adaptive cell grid to make the tray look like a real seedling tray
+              const cols = Math.max(3, Math.round(tray.w / 8));
+              const rows = Math.max(2, Math.round(tray.h / 8));
+              const cellW = tray.w / cols;
+              const cellH = tray.h / rows;
+
+              // Plant name from linked seedlings (latest entry wins)
+              const linked = seedlingsForCode(tray.code);
+              const latest = linked[linked.length - 1];
+              const plantLabel = latest
+                ? `${latest.plant}${latest.variety ? ` · ${latest.variety}` : ""}`
+                : "";
+
+              // Wrap plant label to fit the tray width (~4.5px per char at 7px font)
+              const maxChars = Math.max(4, Math.floor((tray.w - 4) / 4.5));
+              const lines: string[] = [];
+              if (plantLabel) {
+                const words = plantLabel.split(/\s+/);
+                let current = "";
+                for (const word of words) {
+                  if (!current) current = word;
+                  else if ((current + " " + word).length <= maxChars) current = current + " " + word;
+                  else { lines.push(current); current = word; }
+                }
+                if (current) lines.push(current);
+              }
+              const lineHeight = 8;
+              const labelTotal = lines.length * lineHeight;
+              const labelStartY = tray.y + tray.h / 2 - labelTotal / 2 + lineHeight * 0.75;
+
               return (
                 <g
                   key={tray.id}
@@ -511,27 +525,67 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
                   onMouseLeave={() => setHoveredTray(null)}
                   className={editMode ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}
                 >
+                  {/* Tray body — black with faint grey grid */}
                   <rect
                     x={tray.x}
                     y={tray.y}
                     width={tray.w}
                     height={tray.h}
-                    rx="2"
-                    fill={trayColor(tray)}
-                    stroke={editMode && isSel ? "#3b82f6" : trayStroke(tray)}
-                    strokeWidth={isSel ? 2 : 1.2}
+                    rx="1.5"
+                    fill="#18181b"
+                    stroke={editMode && isSel ? "#3b82f6" : isSel ? "#fafafa" : "#27272a"}
+                    strokeWidth={isSel ? 1.6 : 1}
                     strokeDasharray={editMode ? "4,2" : undefined}
                   />
+                  {/* Grid cells — vertical lines */}
+                  {Array.from({ length: cols - 1 }, (_, i) => (
+                    <line
+                      key={`v${i}`}
+                      x1={tray.x + (i + 1) * cellW}
+                      y1={tray.y + 0.5}
+                      x2={tray.x + (i + 1) * cellW}
+                      y2={tray.y + tray.h - 0.5}
+                      stroke="#3f3f46"
+                      strokeWidth={0.4}
+                      pointerEvents="none"
+                    />
+                  ))}
+                  {/* Grid cells — horizontal lines */}
+                  {Array.from({ length: rows - 1 }, (_, i) => (
+                    <line
+                      key={`h${i}`}
+                      x1={tray.x + 0.5}
+                      y1={tray.y + (i + 1) * cellH}
+                      x2={tray.x + tray.w - 0.5}
+                      y2={tray.y + (i + 1) * cellH}
+                      stroke="#3f3f46"
+                      strokeWidth={0.4}
+                      pointerEvents="none"
+                    />
+                  ))}
+                  {/* Tray code in top-left corner */}
                   <text
-                    x={tray.x + tray.w / 2}
-                    y={tray.y + tray.h / 2 + 1}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    className="pointer-events-none text-[8px] font-medium"
-                    fill="#52525b"
+                    x={tray.x + 2}
+                    y={tray.y + 7}
+                    className="pointer-events-none text-[6px] font-semibold uppercase tracking-wide"
+                    fill="#a1a1aa"
                   >
                     {tray.code}
                   </text>
+                  {/* Plant contents label (centered, wrapped) */}
+                  {lines.length > 0 && (
+                    <text
+                      textAnchor="middle"
+                      className="pointer-events-none text-[7px] font-semibold"
+                      fill="#fafafa"
+                    >
+                      {lines.map((line, li) => (
+                        <tspan key={li} x={tray.x + tray.w / 2} y={labelStartY + li * lineHeight}>
+                          {line}
+                        </tspan>
+                      ))}
+                    </text>
+                  )}
                   {editMode && (
                     <rect
                       x={tray.x + tray.w - 6}
