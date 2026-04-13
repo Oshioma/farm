@@ -85,6 +85,9 @@ export default function SeedlingsPage() {
   const [seedSaving, setSeedSaving] = useState(false);
   const [seedDeletingId, setSeedDeletingId] = useState<string | null>(null);
 
+  // Trays (from seedling map) — used for the tray dropdown
+  const [trayCodes, setTrayCodes] = useState<string[]>([]);
+
   const router = useRouter();
 
   useEffect(() => {
@@ -105,6 +108,25 @@ export default function SeedlingsPage() {
       .then(([s, seeds]) => { setEntries(s); setSeedEntries(seeds); })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load data"))
       .finally(() => setLoading(false));
+  }, [activeFarmId]);
+
+  // Load trays from the seedling map layout so the dropdown knows what's available
+  useEffect(() => {
+    if (!activeFarmId) { setTrayCodes([]); return; }
+    let cancelled = false;
+    fetch(`/api/seedling-map/load?farm_id=${activeFarmId}`)
+      .then((r) => r.json())
+      .then((result) => {
+        if (cancelled) return;
+        const trays = Array.isArray(result?.data?.trays) ? result.data.trays : [];
+        const codes = trays
+          .map((t: { code?: string }) => (t.code ?? "").toString())
+          .filter(Boolean)
+          .sort((a: string, b: string) => a.localeCompare(b, undefined, { numeric: true }));
+        setTrayCodes(codes);
+      })
+      .catch(() => { if (!cancelled) setTrayCodes([]); });
+    return () => { cancelled = true; };
   }, [activeFarmId]);
 
   async function reload() {
@@ -305,8 +327,8 @@ export default function SeedlingsPage() {
         ) : tab === "nursery" ? (
           <SeedlingTable
             rows={nursery}
-            columns={["date", "plant", "variety", "quantity", "successional_sowing", "germination_date", "germination", "healthy_seedlings", "notes", "yields"]}
-            headers={["Date", "Plant", "Variety", "Seeds", "Successional", "Germ. date", "Status", "Healthy", "Notes", "Yields"]}
+            columns={["date", "plant", "variety", "quantity", "row_location", "successional_sowing", "germination_date", "germination", "healthy_seedlings", "notes", "yields"]}
+            headers={["Date", "Plant", "Variety", "Seeds", "Tray", "Successional", "Germ. date", "Status", "Healthy", "Notes", "Yields"]}
             onEdit={openEdit}
             onDelete={handleDelete}
             deletingId={deletingId}
@@ -381,7 +403,28 @@ export default function SeedlingsPage() {
                 <Field label="Healthy seedlings">
                   <input className={inp} value={form.healthy_seedlings} onChange={(e) => setForm((p) => ({ ...p, healthy_seedlings: e.target.value }))} placeholder="8, All, None…" />
                 </Field>
-                {form.type === "field" && (
+                {form.type === "nursery" ? (
+                  <Field label="Tray">
+                    <select
+                      className={inp}
+                      value={form.row_location}
+                      onChange={(e) => setForm((p) => ({ ...p, row_location: e.target.value }))}
+                    >
+                      <option value="">— None —</option>
+                      {trayCodes.map((code) => (
+                        <option key={code} value={code}>{code}</option>
+                      ))}
+                      {form.row_location && !trayCodes.includes(form.row_location) && (
+                        <option value={form.row_location}>{form.row_location} (not on map)</option>
+                      )}
+                    </select>
+                    {trayCodes.length === 0 && (
+                      <p className="mt-1 text-[10px] text-zinc-400">
+                        No trays yet — add some on the Map tab.
+                      </p>
+                    )}
+                  </Field>
+                ) : (
                   <Field label="Row / Location">
                     <input className={inp} value={form.row_location} onChange={(e) => setForm((p) => ({ ...p, row_location: e.target.value }))} placeholder="A1, South border…" />
                   </Field>
