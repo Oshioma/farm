@@ -71,48 +71,55 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
   const [addingTray, setAddingTray] = useState(false);
   const [newTrayCode, setNewTrayCode] = useState("");
   const [saving, setSaving] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   const svgRef = useRef<SVGSVGElement>(null);
 
-  // Load layout from database or localStorage
+  // Load layout from database or localStorage.
+  // First read localStorage synchronously so the map paints immediately,
+  // then the DB result (if any) overrides it once the request resolves.
   useEffect(() => {
     if (!farmName) return;
 
-    const load = async () => {
+    setEditMode(false);
+    setSelectedTray(null);
+    setSelectedZone(null);
+    setLoaded(false);
+
+    // Paint whatever we already have in localStorage straight away — this
+    // avoids the "No seedling map yet" flash while the DB request is in flight.
+    const saved = loadLocal(farmName);
+    if (saved) {
+      setZones(saved.zones ?? []);
+      setTrays(saved.trays ?? []);
+    } else {
+      setZones([]);
+      setTrays([]);
+    }
+
+    let cancelled = false;
+    (async () => {
       if (farmId && farmId !== "undefined") {
         try {
           const response = await fetch(`/api/seedling-map/load?farm_id=${farmId}`);
           const result = await response.json();
+          if (cancelled) return;
           if (response.ok && result.data) {
             const z = Array.isArray(result.data.zones) ? result.data.zones : [];
             const t = Array.isArray(result.data.trays) ? result.data.trays : [];
             if (z.length > 0 || t.length > 0) {
-              console.log("[SeedlingMap] Loaded layout from database for farm:", farmId);
               setZones(z);
               setTrays(t);
-              return;
             }
           }
         } catch (err) {
           console.error("[SeedlingMap] Failed to load from database:", err);
         }
       }
+      if (!cancelled) setLoaded(true);
+    })();
 
-      const saved = loadLocal(farmName);
-      if (saved) {
-        console.log("[SeedlingMap] Loaded layout from localStorage for farm:", farmName);
-        setZones(saved.zones ?? []);
-        setTrays(saved.trays ?? []);
-      } else {
-        setZones([]);
-        setTrays([]);
-      }
-    };
-
-    setEditMode(false);
-    setSelectedTray(null);
-    setSelectedZone(null);
-    load();
+    return () => { cancelled = true; };
   }, [farmName, farmId]);
 
   // ── SVG coordinate helpers ──
@@ -391,7 +398,7 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
       </div>
 
       {/* Blank prompt */}
-      {isBlank && !editMode && (
+      {isBlank && !editMode && loaded && (
         <div className="mb-4 rounded-2xl border-2 border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
           <p className="text-lg font-semibold text-zinc-600">No seedling map yet</p>
           <p className="mt-1 text-sm text-zinc-400">Click Edit Map to draw your seedling zones and add trays inside them.</p>
@@ -572,10 +579,18 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
                     })
                   )}
                   {/* Label plate — semi-transparent bar across centre so the
-                      plant name + tray code are readable over the cells */}
+                      tray code and plant name are readable over the cells.
+                      Code sits centred at the top with the plant name below. */}
                   {(() => {
-                    const plateH = Math.min(tray.h - 10, 14 + lines.length * lineHeight);
+                    const codeLineH = 15;
+                    const nameLineH = 15;
+                    const innerPadV = 6;
+                    const contentH = codeLineH + (lines.length > 0 ? lines.length * nameLineH : nameLineH);
+                    const plateH = Math.min(tray.h - 10, contentH + innerPadV * 2);
                     const plateY = tray.y + (tray.h - plateH) / 2;
+                    const centerX = tray.x + tray.w / 2;
+                    const codeY = plateY + innerPadV + codeLineH * 0.75;
+                    const nameStartY = codeY + 4 + nameLineH * 0.75;
                     return (
                       <>
                         <rect
@@ -583,14 +598,16 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
                           y={plateY}
                           width={tray.w - 8}
                           height={plateH}
-                          rx="2"
-                          fill="rgba(0,0,0,0.72)"
+                          rx="3"
+                          fill="rgba(0,0,0,0.78)"
                           pointerEvents="none"
                         />
+                        {/* Tray code — centred, bold, on its own line */}
                         <text
-                          x={tray.x + 6}
-                          y={plateY + 10}
-                          className="pointer-events-none text-[9px] font-bold uppercase tracking-wide"
+                          x={centerX}
+                          y={codeY}
+                          textAnchor="middle"
+                          className="pointer-events-none text-[13px] font-bold uppercase tracking-wider"
                           fill="#e4e4e7"
                         >
                           {tray.code}
@@ -598,14 +615,14 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
                         {lines.length > 0 ? (
                           <text
                             textAnchor="middle"
-                            className="pointer-events-none text-[11px] font-semibold"
+                            className="pointer-events-none text-[12px] font-semibold"
                             fill="#ffffff"
                           >
                             {lines.map((line, li) => (
                               <tspan
                                 key={li}
-                                x={tray.x + tray.w / 2}
-                                y={plateY + 22 + li * lineHeight}
+                                x={centerX}
+                                y={nameStartY + li * nameLineH}
                               >
                                 {line}
                               </tspan>
@@ -613,10 +630,10 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
                           </text>
                         ) : (
                           <text
-                            x={tray.x + tray.w / 2}
-                            y={plateY + plateH - 4}
+                            x={centerX}
+                            y={nameStartY}
                             textAnchor="middle"
-                            className="pointer-events-none text-[9px] italic"
+                            className="pointer-events-none text-[11px] italic"
                             fill="#a1a1aa"
                           >
                             empty
