@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import type { Zone, Crop, FertilisationEntry, CompostEntry, HarvestEtaEntry, Plant } from "@/lib/farm";
+import { supabase } from "@/lib/supabase";
+import type { Zone, Crop, FertilisationEntry, CompostEntry, HarvestEtaEntry, Plant, SeedlingEntry } from "@/lib/farm";
+
+type SeedlingTray = { id?: string; code: string; zoneId?: string };
+type SeedlingZoneDef = { id: string; label: string };
 
 type BedDef = {
   id: string;
@@ -271,6 +275,11 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
   const [addingLabel, setAddingLabel] = useState(false);
   const [newLabelText, setNewLabelText] = useState("");
   const [saving, setSaving] = useState(false);
+  // Seedling map data — loaded lazily for the seedling-zone side panel
+  const [seedlingTrays, setSeedlingTrays] = useState<SeedlingTray[]>([]);
+  const [seedlingMapZones, setSeedlingMapZones] = useState<SeedlingZoneDef[]>([]);
+  const [seedlings, setSeedlings] = useState<SeedlingEntry[]>([]);
+  const [selectedSeedlingZoneIdx, setSelectedSeedlingZoneIdx] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -321,6 +330,64 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
 
     loadLayout();
   }, [farmName, farmId]);
+
+  // Load seedling map trays + seedlings so the seedling-zone side panel can
+  // show contents when the user clicks a zone on the farm map.
+  useEffect(() => {
+    if (!farmId || farmId === "undefined") {
+      setSeedlingTrays([]);
+      setSeedlingMapZones([]);
+      setSeedlings([]);
+      return;
+    }
+    let cancelled = false;
+
+    const loadLocalTraysZones = (): { trays: SeedlingTray[]; zones: SeedlingZoneDef[] } => {
+      if (!farmName) return { trays: [], zones: [] };
+      try {
+        const raw = localStorage.getItem(`seedling-map-layout:${farmName}`);
+        if (!raw) return { trays: [], zones: [] };
+        const parsed = JSON.parse(raw);
+        return {
+          trays: Array.isArray(parsed?.trays) ? parsed.trays : [],
+          zones: Array.isArray(parsed?.zones) ? parsed.zones : [],
+        };
+      } catch { return { trays: [], zones: [] }; }
+    };
+
+    fetch(`/api/seedling-map/load?farm_id=${farmId}`)
+      .then((r) => r.json())
+      .then((result) => {
+        if (cancelled) return;
+        const t = Array.isArray(result?.data?.trays) ? result.data.trays : [];
+        const z = Array.isArray(result?.data?.zones) ? result.data.zones : [];
+        if (t.length > 0 || z.length > 0) {
+          setSeedlingTrays(t);
+          setSeedlingMapZones(z);
+        } else {
+          const local = loadLocalTraysZones();
+          setSeedlingTrays(local.trays);
+          setSeedlingMapZones(local.zones);
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        const local = loadLocalTraysZones();
+        setSeedlingTrays(local.trays);
+        setSeedlingMapZones(local.zones);
+      });
+
+    supabase
+      .from("seedlings")
+      .select("id, farm_id, type, date, plant, variety, quantity, germination, germination_date, healthy_seedlings, successional_sowing, yields, row_location, notes, created_at")
+      .eq("farm_id", farmId)
+      .then(({ data }) => {
+        if (cancelled) return;
+        setSeedlings((data ?? []) as SeedlingEntry[]);
+      });
+
+    return () => { cancelled = true; };
+  }, [farmId, farmName]);
 
   // The active layout merges saved customisations
   const hasCustom = editBeds.length > 0 || editLandmarks.length > 0;
@@ -804,12 +871,17 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
             if (lm.type === "seedling-zone") {
               const w = lm.w ?? 160;
               const h = lm.h ?? 120;
+              const isSZSelected = !editMode && selectedSeedlingZoneIdx === i;
               return (
                 <g
                   key={i}
                   className={editMode ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}
                   onMouseDown={editMode ? (e) => handleLandmarkDown(i, e) : undefined}
                   onDoubleClick={editMode ? () => startEditLabel(i) : undefined}
+                  onClick={editMode ? undefined : () => {
+                    setSelectedSeedlingZoneIdx(selectedSeedlingZoneIdx === i ? null : i);
+                    setSelectedBed(null);
+                  }}
                 >
                   <rect
                     x={lm.x}
@@ -818,8 +890,8 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                     height={h}
                     rx="6"
                     fill="rgba(16,185,129,0.12)"
-                    stroke={editMode ? "#059669" : "#10b981"}
-                    strokeWidth="1.8"
+                    stroke={isSZSelected ? "#047857" : editMode ? "#059669" : "#10b981"}
+                    strokeWidth={isSZSelected ? 2.5 : 1.8}
                     strokeDasharray="6,4"
                   />
                   <text
@@ -941,6 +1013,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
               onClick={() => {
                 if (editMode) { setSelectedBed(selectedBed === bed.id ? null : bed.id); return; }
                 setSelectedBed(selectedBed === bed.id ? null : bed.id);
+                setSelectedSeedlingZoneIdx(null);
                 onSelectBed?.(bed.id);
               }}
               onMouseEnter={() => setHoveredBed(bed.id)}
@@ -1058,6 +1131,94 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
               </button>
             </div>
           )}
+
+          {/* Seedling-zone details (clicked in view mode) */}
+          {!editMode && selectedSeedlingZoneIdx !== null && (() => {
+            const lm = layout.landmarks[selectedSeedlingZoneIdx];
+            if (!lm || lm.type !== "seedling-zone") return null;
+            const label = (lm.label ?? "Seedling Zone").trim();
+
+            // Try to match the farm-map block's label to a saved seedling-map zone (by label)
+            const matchedZone = seedlingMapZones.find(
+              (z) => z.label.trim().toLowerCase() === label.toLowerCase()
+            );
+            // If matched, show only that zone's trays; otherwise show all trays
+            const traysToShow: SeedlingTray[] = matchedZone
+              ? seedlingTrays.filter((t) => t.zoneId === matchedZone.id)
+              : seedlingTrays;
+
+            const codesSet = new Set(traysToShow.map((t) => t.code.toUpperCase()));
+            const matchedSeedlings = seedlings.filter(
+              (s) => s.row_location && codesSet.has(s.row_location.toUpperCase())
+            );
+            // Group seedlings by tray code
+            const byTray = new Map<string, SeedlingEntry[]>();
+            matchedSeedlings.forEach((s) => {
+              const c = (s.row_location ?? "").toUpperCase();
+              if (!byTray.has(c)) byTray.set(c, []);
+              byTray.get(c)!.push(s);
+            });
+
+            return (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-lg font-semibold text-emerald-900">{label}</div>
+                  <button
+                    onClick={() => setSelectedSeedlingZoneIdx(null)}
+                    className="text-xs text-emerald-700 hover:text-emerald-900"
+                  >
+                    Close
+                  </button>
+                </div>
+                <div className="mt-1 text-xs text-emerald-700/80">
+                  {traysToShow.length} tray{traysToShow.length === 1 ? "" : "s"}
+                  {matchedZone ? ` · linked to "${matchedZone.label}"` : " · all trays"}
+                </div>
+                {traysToShow.length === 0 ? (
+                  <div className="mt-3 text-xs text-emerald-700/70">
+                    No trays on the seedling map yet. Add some on the Seedlings page.
+                  </div>
+                ) : (
+                  <div className="mt-3 max-h-[420px] space-y-2 overflow-y-auto pr-1">
+                    {traysToShow.map((tray) => {
+                      const rows = byTray.get(tray.code.toUpperCase()) ?? [];
+                      return (
+                        <div key={tray.code} className="rounded-xl border border-emerald-100 bg-white p-2.5">
+                          <div className="text-xs font-semibold text-emerald-900">Tray {tray.code}</div>
+                          {rows.length === 0 ? (
+                            <div className="mt-1 text-[10px] text-zinc-400">Empty</div>
+                          ) : (
+                            <div className="mt-1.5 space-y-1">
+                              {rows.map((s) => (
+                                <div key={s.id} className="flex items-center gap-1.5 text-[11px]">
+                                  <span
+                                    className={`inline-block h-2 w-2 rounded-full ${
+                                      s.germination === "green"
+                                        ? "bg-emerald-500"
+                                        : s.germination === "amber"
+                                        ? "bg-amber-400"
+                                        : s.germination === "red"
+                                        ? "bg-rose-500"
+                                        : "bg-sky-400"
+                                    }`}
+                                  />
+                                  <span className="font-medium text-zinc-700">
+                                    {s.plant}
+                                    {s.variety ? ` · ${s.variety}` : ""}
+                                  </span>
+                                  {s.quantity && <span className="text-zinc-400">· {s.quantity}</span>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {selectedBed && !editMode ? (
             <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-sm">
