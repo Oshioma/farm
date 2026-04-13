@@ -71,7 +71,7 @@ export default function SeedlingsPage() {
   const [entries, setEntries] = useState<SeedlingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"nursery" | "field" | "seeds" | "map">("nursery");
+  const [tab, setTab] = useState<"nursery" | "field" | "seeds">("nursery");
 
   const [modal, setModal] = useState<SeedlingEntry | null | "new">(null);
   const [form, setForm] = useState<FormData>(blank("nursery"));
@@ -321,7 +321,6 @@ export default function SeedlingsPage() {
               { key: "nursery", label: "Nursery starts", count: nursery.length },
               { key: "field",   label: "Field plantings", count: field.length },
               { key: "seeds", label: "Seed collection", count: seedEntries.length },
-              { key: "map", label: "Map", count: null },
             ] as const).map(({ key, label, count }) => (
               <button
                 key={key}
@@ -331,31 +330,38 @@ export default function SeedlingsPage() {
                 }`}
               >
                 {label}
-                {count !== null && <span className="ml-2 text-xs opacity-60">{count}</span>}
+                <span className="ml-2 text-xs opacity-60">{count}</span>
               </button>
             ))}
           </div>
-          {tab !== "map" && (
-            <button
-              onClick={openAdd}
-              className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
-            >
-              + Add entry
-            </button>
-          )}
+          <button
+            onClick={openAdd}
+            className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
+          >
+            + Add entry
+          </button>
         </div>
 
         {loading ? (
           <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">Loading...</div>
         ) : tab === "nursery" ? (
-          <SeedlingTable
-            rows={nursery}
-            columns={["date", "plant", "variety", "quantity", "row_location", "successional_sowing", "germination_date", "germination", "healthy_seedlings", "notes", "yields"]}
-            headers={["Date", "Plant", "Variety", "Seeds", "Tray", "Successional", "Germ. date", "Status", "Healthy", "Notes", "Yields"]}
-            onEdit={openEdit}
-            onDelete={handleDelete}
-            deletingId={deletingId}
-          />
+          <div className="space-y-6">
+            <div className="rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6">
+              <SeedlingMap
+                seedlings={entries}
+                farmName={activeFarm?.name}
+                farmId={activeFarmId}
+              />
+            </div>
+            <SeedlingTable
+              rows={nursery}
+              columns={["date", "plant", "variety", "quantity", "row_location", "successional_sowing", "germination_date", "germination", "healthy_seedlings", "notes", "yields"]}
+              headers={["Date", "Plant", "Variety", "Seeds", "Tray", "Successional", "Germ. date", "Status", "Healthy", "Notes", "Yields"]}
+              onEdit={openEdit}
+              onDelete={handleDelete}
+              deletingId={deletingId}
+            />
+          </div>
         ) : tab === "field" ? (
           <SeedlingTable
             rows={field}
@@ -372,14 +378,6 @@ export default function SeedlingsPage() {
             onDelete={handleSeedDelete}
             deletingId={seedDeletingId}
           />
-        ) : tab === "map" ? (
-          <div className="rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6">
-            <SeedlingMap
-              seedlings={entries}
-              farmName={activeFarm?.name}
-              farmId={activeFarmId}
-            />
-          </div>
         ) : null}
       </div>
 
