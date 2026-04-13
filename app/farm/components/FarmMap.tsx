@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import type { Zone, Crop, FertilisationEntry, CompostEntry, HarvestEtaEntry, Plant, SeedlingEntry } from "@/lib/farm";
 
@@ -1255,6 +1256,12 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                     })}
                   </div>
                 )}
+                <Link
+                  href="/farm/seedlings"
+                  className="mt-3 block rounded-xl border border-emerald-300 bg-white px-3 py-2 text-center text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                >
+                  Open seedling map →
+                </Link>
               </div>
             );
           })()}
