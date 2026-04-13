@@ -404,9 +404,9 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
         </div>
       )}
 
-      <div className="flex gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row">
         {/* Map */}
-        <div className={`flex-1 overflow-auto rounded-2xl border bg-white ${editMode ? "border-blue-400 ring-2 ring-blue-100" : "border-zinc-200"}`}>
+        <div className={`min-w-0 flex-1 overflow-auto rounded-2xl border bg-white ${editMode ? "border-blue-400 ring-2 ring-blue-100" : "border-zinc-200"}`}>
           {editMode && (
             <div className="bg-blue-50 px-3 py-1.5 text-xs text-blue-700 border-b border-blue-200">
               Drag zones &amp; trays to move them. Drag corners to resize. Drop a tray inside a zone to link it.
@@ -525,67 +525,106 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
                   onMouseLeave={() => setHoveredTray(null)}
                   className={editMode ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}
                 >
-                  {/* Tray body — black with faint grey grid */}
+                  {/* Tray outer rim (slightly raised) */}
                   <rect
                     x={tray.x}
                     y={tray.y}
                     width={tray.w}
                     height={tray.h}
-                    rx="1.5"
-                    fill="#18181b"
-                    stroke={editMode && isSel ? "#3b82f6" : isSel ? "#fafafa" : "#27272a"}
-                    strokeWidth={isSel ? 1.6 : 1}
+                    rx="3"
+                    fill="#0a0a0a"
+                    stroke={editMode && isSel ? "#3b82f6" : isSel ? "#fafafa" : "#52525b"}
+                    strokeWidth={isSel ? 1.8 : 1.2}
                     strokeDasharray={editMode ? "4,2" : undefined}
                   />
-                  {/* Grid cells — vertical lines */}
-                  {Array.from({ length: cols - 1 }, (_, i) => (
-                    <line
-                      key={`v${i}`}
-                      x1={tray.x + (i + 1) * cellW}
-                      y1={tray.y + 0.5}
-                      x2={tray.x + (i + 1) * cellW}
-                      y2={tray.y + tray.h - 0.5}
-                      stroke="#3f3f46"
-                      strokeWidth={0.4}
-                      pointerEvents="none"
-                    />
-                  ))}
-                  {/* Grid cells — horizontal lines */}
-                  {Array.from({ length: rows - 1 }, (_, i) => (
-                    <line
-                      key={`h${i}`}
-                      x1={tray.x + 0.5}
-                      y1={tray.y + (i + 1) * cellH}
-                      x2={tray.x + tray.w - 0.5}
-                      y2={tray.y + (i + 1) * cellH}
-                      stroke="#3f3f46"
-                      strokeWidth={0.4}
-                      pointerEvents="none"
-                    />
-                  ))}
-                  {/* Tray code in top-left corner */}
-                  <text
-                    x={tray.x + 4}
-                    y={tray.y + 11}
-                    className="pointer-events-none text-[9px] font-semibold uppercase tracking-wide"
-                    fill="#d4d4d8"
-                  >
-                    {tray.code}
-                  </text>
-                  {/* Plant contents label (centered, wrapped) */}
-                  {lines.length > 0 && (
-                    <text
-                      textAnchor="middle"
-                      className="pointer-events-none text-[11px] font-semibold"
-                      fill="#ffffff"
-                    >
-                      {lines.map((line, li) => (
-                        <tspan key={li} x={tray.x + tray.w / 2} y={labelStartY + li * lineHeight}>
-                          {line}
-                        </tspan>
-                      ))}
-                    </text>
+                  {/* Inset — inner floor of the tray */}
+                  <rect
+                    x={tray.x + 2}
+                    y={tray.y + 2}
+                    width={tray.w - 4}
+                    height={tray.h - 4}
+                    rx="2"
+                    fill="#18181b"
+                    pointerEvents="none"
+                  />
+                  {/* Individual cells — rounded rects laid out in a grid */}
+                  {Array.from({ length: rows }, (_, r) =>
+                    Array.from({ length: cols }, (_, c) => {
+                      const pad = 1.5;
+                      const cx = tray.x + 3 + c * ((tray.w - 6) / cols) + pad;
+                      const cy = tray.y + 3 + r * ((tray.h - 6) / rows) + pad;
+                      const cw = (tray.w - 6) / cols - pad * 2;
+                      const ch = (tray.h - 6) / rows - pad * 2;
+                      return (
+                        <rect
+                          key={`${r}-${c}`}
+                          x={cx}
+                          y={cy}
+                          width={cw}
+                          height={ch}
+                          rx={Math.min(cw, ch) * 0.18}
+                          fill="#2a2a2e"
+                          stroke="#3f3f46"
+                          strokeWidth={0.5}
+                          pointerEvents="none"
+                        />
+                      );
+                    })
                   )}
+                  {/* Label plate — semi-transparent bar across centre so the
+                      plant name + tray code are readable over the cells */}
+                  {(() => {
+                    const plateH = Math.min(tray.h - 10, 14 + lines.length * lineHeight);
+                    const plateY = tray.y + (tray.h - plateH) / 2;
+                    return (
+                      <>
+                        <rect
+                          x={tray.x + 4}
+                          y={plateY}
+                          width={tray.w - 8}
+                          height={plateH}
+                          rx="2"
+                          fill="rgba(0,0,0,0.72)"
+                          pointerEvents="none"
+                        />
+                        <text
+                          x={tray.x + 6}
+                          y={plateY + 10}
+                          className="pointer-events-none text-[9px] font-bold uppercase tracking-wide"
+                          fill="#e4e4e7"
+                        >
+                          {tray.code}
+                        </text>
+                        {lines.length > 0 ? (
+                          <text
+                            textAnchor="middle"
+                            className="pointer-events-none text-[11px] font-semibold"
+                            fill="#ffffff"
+                          >
+                            {lines.map((line, li) => (
+                              <tspan
+                                key={li}
+                                x={tray.x + tray.w / 2}
+                                y={plateY + 22 + li * lineHeight}
+                              >
+                                {line}
+                              </tspan>
+                            ))}
+                          </text>
+                        ) : (
+                          <text
+                            x={tray.x + tray.w / 2}
+                            y={plateY + plateH - 4}
+                            textAnchor="middle"
+                            className="pointer-events-none text-[9px] italic"
+                            fill="#a1a1aa"
+                          >
+                            empty
+                          </text>
+                        )}
+                      </>
+                    );
+                  })()}
                   {editMode && (
                     <rect
                       x={tray.x + tray.w - 6}
@@ -607,7 +646,7 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
         </div>
 
         {/* Side panel */}
-        <div className="w-56 shrink-0 space-y-3">
+        <div className="w-full shrink-0 space-y-3 lg:w-64">
           {/* Edit mode: selected zone controls */}
           {editMode && selectedZoneObj && (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm space-y-3">
@@ -650,10 +689,18 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
 
           {/* View mode: selected tray details */}
           {!editMode && selectedTrayObj && (
-            <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-sm">
-              <div className="text-lg font-semibold">Tray {selectedTrayObj.code}</div>
+            <div className="rounded-2xl border-2 border-emerald-400 bg-white p-4 text-sm shadow-md">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-lg font-semibold">{selectedTrayObj.code}</div>
+                <button
+                  onClick={() => setSelectedTray(null)}
+                  className="text-xs text-zinc-400 hover:text-zinc-700"
+                >
+                  Close
+                </button>
+              </div>
               {selectedTrayObj.zoneId && (
-                <div className="mt-1 text-xs text-zinc-500">
+                <div className="mt-0.5 text-xs text-zinc-500">
                   Zone: {zones.find((z) => z.id === selectedTrayObj.zoneId)?.label ?? "—"}
                 </div>
               )}
