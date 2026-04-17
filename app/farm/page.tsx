@@ -119,6 +119,10 @@ export default function FarmPage() {
   const [deletingPestId, setDeletingPestId] = useState<string | null>(null);
   const [confirmDeletePestId, setConfirmDeletePestId] = useState<string | null>(null);
   const [zonesView, setZonesView] = useState<"map" | "list">("map");
+  const [selectedMapBedId, setSelectedMapBedId] = useState<string>("");
+  const [selectedMapZoneId, setSelectedMapZoneId] = useState<string>("");
+  const [cropSearch, setCropSearch] = useState<string>("");
+  const [assigningCropId, setAssigningCropId] = useState<string | null>(null);
   const [editingZoneId, setEditingZoneId] = useState<string | null>(null);
   const [editingZoneForm, setEditingZoneForm] = useState<ZoneFormData>({ name: "", code: "", size_acres: "" });
   const [savingZoneId, setSavingZoneId] = useState<string | null>(null);
@@ -353,6 +357,12 @@ export default function FarmPage() {
     run();
   }, [activeFarmId]);
 
+  useEffect(() => {
+    setSelectedMapBedId("");
+    setSelectedMapZoneId("");
+    setAssigningCropId(null);
+  }, [activeFarmId]);
+
   // Refresh farm data when page comes back into focus (for mobile)
   useEffect(() => {
     const handleVisibilityChange = async () => {
@@ -481,6 +491,93 @@ export default function FarmPage() {
 
   const defaultZoneId = zones.length === 1 ? zones[0].id : "";
   const defaultCropId = crops.length === 1 ? crops[0].id : "";
+  const selectedMapZone = useMemo(
+    () => zones.find((zone) => zone.id === selectedMapZoneId) ?? null,
+    [zones, selectedMapZoneId]
+  );
+  const preferredCropZoneId = selectedMapZoneId || defaultZoneId;
+
+  const normalizedCropSearch = cropSearch.trim().toLowerCase();
+  const filteredCrops = useMemo(() => {
+    if (!normalizedCropSearch) return crops;
+    return crops.filter((crop) => {
+      const zoneNames = crop.zone_ids?.length
+        ? crop.zone_ids
+            .map((zoneId) => zones.find((zone) => zone.id === zoneId)?.name ?? "")
+            .filter(Boolean)
+        : crop.zone_id
+          ? [zones.find((zone) => zone.id === crop.zone_id)?.name ?? ""]
+          : [];
+      const searchable = [
+        crop.crop_name,
+        crop.variety ?? "",
+        crop.status ?? "",
+        ...zoneNames,
+      ]
+        .join(" ")
+        .toLowerCase();
+      return searchable.includes(normalizedCropSearch);
+    });
+  }, [crops, normalizedCropSearch, zones]);
+
+  const visibleCrops = useMemo(
+    () => (expandAllCrops ? filteredCrops : filteredCrops.slice(0, 3)),
+    [expandAllCrops, filteredCrops]
+  );
+
+  function resolveZoneForBed(bedId: string): Zone | null {
+    const id = bedId.toUpperCase().trim();
+    if (!id) return null;
+    return (
+      zones.find((zone) => {
+        const code = (zone.code ?? "").toUpperCase();
+        const name = zone.name.toUpperCase();
+        return (
+          code === id ||
+          name === id ||
+          code.replace(/^ROW\s*/i, "") === id ||
+          name.replace(/^ROW\s*/i, "") === id
+        );
+      }) ?? null
+    );
+  }
+
+  function handleAddCropFromMap(bedId: string, zoneId: string | null) {
+    const resolvedZoneId = zoneId ?? resolveZoneForBed(bedId)?.id ?? "";
+    setSelectedMapBedId(bedId);
+    setSelectedMapZoneId(resolvedZoneId);
+    setActiveForm("crop");
+    if (typeof window !== "undefined") {
+      document.getElementById("crops")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
+  async function handleAssignCropToSelectedBed(crop: Crop): Promise<void> {
+    if (!activeFarmId || !selectedMapZoneId) return;
+    try {
+      setAssigningCropId(crop.id);
+      setError("");
+      const currentZoneIds = crop.zone_ids?.length
+        ? crop.zone_ids.filter(Boolean)
+        : crop.zone_id
+          ? [crop.zone_id]
+          : [];
+      const nextZoneIds = [selectedMapZoneId, ...currentZoneIds.filter((zoneId) => zoneId !== selectedMapZoneId)];
+      const { error: updateError } = await supabase
+        .from("crops")
+        .update({
+          zone_id: nextZoneIds[0] ?? null,
+          extra_zone_ids: nextZoneIds.length > 1 ? JSON.stringify(nextZoneIds.slice(1)) : null,
+        })
+        .eq("id", crop.id);
+      if (updateError) throw updateError;
+      await loadFarmData(activeFarmId);
+    } catch (err) {
+      setError(errMsg(err, "Failed to assign crop to the selected bed"));
+    } finally {
+      setAssigningCropId(null);
+    }
+  }
 
   async function handleCreateCrop(data: CropFormData): Promise<boolean> {
     if (!activeFarmId) return false;
@@ -1602,7 +1699,8 @@ export default function FarmPage() {
                 {activeForm === "crop" && (
                   <CropForm
                     zones={zones}
-                    defaultZoneId={defaultZoneId}
+                    key={`crop-form-${preferredCropZoneId || "none"}-${selectedMapBedId || "none"}`}
+                    defaultZoneId={preferredCropZoneId}
                     onSubmit={async (data) => {
                       const ok = await handleCreateCrop(data);
                       if (ok) setActiveForm(null);
@@ -2142,9 +2240,20 @@ export default function FarmPage() {
 
               {zonesView === "map" ? (
                 <div className="mt-5">
-                  <FarmMap zones={zones} crops={crops} plants={plants} fertilisations={fertilisations} compostEntries={compostEntries} harvestEta={harvestEtaEntries} farmName={activeFarm?.name} farmId={activeFarm?.id} />
+                  <FarmMap
+                    zones={zones}
+                    crops={crops}
+                    plants={plants}
+                    fertilisations={fertilisations}
+                    compostEntries={compostEntries}
+                    harvestEta={harvestEtaEntries}
+                    farmName={activeFarm?.name}
+                    farmId={activeFarm?.id}
+                    onSelectBed={(bedId) => setSelectedMapBedId(bedId)}
+                    onAddCropToBed={handleAddCropFromMap}
+                  />
                   <p className="mt-2 text-xs text-zinc-400">
-                    Click a bed to see details. To link a bed, create a zone with a matching code (e.g. R1, CL2).
+                    Click a bed to see details and quickly add crops. To link a bed, create a zone with a matching code (e.g. R1, CL2).
                   </p>
                 </div>
               ) : zones.length === 0 ? (
@@ -2192,23 +2301,48 @@ export default function FarmPage() {
 
             <div id="crops" className="scroll-mt-4 space-y-6">
                 <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <h2 className="text-xl font-semibold">Crop tracker</h2>
-                      <p className="mt-1 text-sm text-zinc-500">
-                        What is planted, where it is, and how much it is really yielding.
-                      </p>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <h2 className="text-xl font-semibold">Crop tracker</h2>
+                        <p className="mt-1 text-sm text-zinc-500">
+                          What is planted, where it is, and how much it is really yielding.
+                        </p>
+                        {selectedMapBedId ? (
+                          <p className="mt-2 text-xs text-emerald-700">
+                            Bed {selectedMapBedId} selected{selectedMapZone ? ` · zone ${selectedMapZone.name}` : " · zone not mapped yet"}.
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-zinc-500">{filteredCrops.length} of {crops.length} crops</span>
+                        {filteredCrops.length > 3 && (
+                          <button
+                            onClick={() => setExpandAllCrops(!expandAllCrops)}
+                            className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 transition"
+                          >
+                            {expandAllCrops ? "Show less" : "Show all"}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-zinc-500">{crops.length} crops</span>
-                      {crops.length > 3 && (
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <input
+                        type="text"
+                        value={cropSearch}
+                        onChange={(e) => setCropSearch(e.target.value)}
+                        placeholder="Search crops, variety, status, or zone…"
+                        className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                      />
+                      {cropSearch ? (
                         <button
-                          onClick={() => setExpandAllCrops(!expandAllCrops)}
-                          className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 transition"
+                          type="button"
+                          onClick={() => setCropSearch("")}
+                          className="rounded-xl border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-100"
                         >
-                          {expandAllCrops ? "Show less" : "Show all"}
+                          Clear
                         </button>
-                      )}
+                      ) : null}
                     </div>
                   </div>
 
@@ -2229,8 +2363,10 @@ export default function FarmPage() {
                         <tbody>
                           {crops.length === 0 ? (
                             <tr><td colSpan={7} className="px-4 py-6 text-zinc-500">No crops yet.</td></tr>
+                          ) : filteredCrops.length === 0 ? (
+                            <tr><td colSpan={7} className="px-4 py-6 text-zinc-500">No crops match your search.</td></tr>
                           ) : (
-                            crops.slice(0, expandAllCrops ? undefined : 3).map((crop) =>
+                            visibleCrops.map((crop) =>
                               editingCropId === crop.id ? (
                                 <tr key={crop.id} className="border-b border-zinc-100 bg-amber-50/40">
                                   <td className="px-3 py-2">
@@ -2380,6 +2516,15 @@ export default function FarmPage() {
                                   <td className="px-4 py-4">{crop.actual_yield_kg ?? 0} kg</td>
                                   <td className="px-4 py-4">
                                     <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                                      {selectedMapZoneId ? (
+                                        <button
+                                          onClick={() => handleAssignCropToSelectedBed(crop)}
+                                          disabled={assigningCropId === crop.id}
+                                          className="rounded-lg border border-emerald-200 px-2.5 py-1 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
+                                        >
+                                          {assigningCropId === crop.id ? "Assigning…" : `Assign to ${selectedMapBedId || "bed"}`}
+                                        </button>
+                                      ) : null}
                                       <button onClick={() => startEditCrop(crop)}
                                         className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">
                                         Edit
