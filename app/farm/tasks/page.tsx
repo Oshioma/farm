@@ -5,7 +5,8 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { getFarms, getZones, getCrops, getTasks, getMembers } from "@/lib/farm";
 import type { Farm, Zone, Crop, Task, FarmMember } from "@/lib/farm";
-import { formatDate, badgeClass } from "@/app/farm/utils";
+import { formatDate, badgeClass, downloadCsvFile, toFileSlug } from "@/app/farm/utils";
+import { Download } from "lucide-react";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -117,6 +118,39 @@ export default function WorkerTasksPage() {
     (t) => t.status === "done" || t.status === "cancelled"
   );
 
+  function downloadTasksCsv(rows: Task[], mode: "filtered" | "all") {
+    if (rows.length === 0) return;
+    const farmSlug = toFileSlug(activeFarm?.name, "farm");
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadCsvFile(
+      `${farmSlug}-tasks-${mode}-${stamp}.csv`,
+      [
+        "Title",
+        "Status",
+        "Priority",
+        "Due Date",
+        "Due Time",
+        "Zone",
+        "Crop",
+        "Assigned To",
+        "Proof Required",
+        "Description",
+      ],
+      rows.map((task) => [
+        task.title,
+        task.status || "",
+        task.priority || "",
+        task.due_date || "",
+        task.due_time || "",
+        task.zone?.[0]?.name || "",
+        task.crop?.[0]?.crop_name || "",
+        task.assigned_to ? memberEmailMap[task.assigned_to] ?? task.assigned_to : "",
+        task.proof_required ? "Yes" : "No",
+        task.description || "",
+      ])
+    );
+  }
+
   async function handleComplete(task: Task) {
     if (!activeFarmId) return;
     try {
@@ -214,37 +248,59 @@ export default function WorkerTasksPage() {
 
         {activeFarm && (
           <>
-            <div className="mb-4 flex flex-wrap items-center gap-2">
-              {(
-                [
-                  { key: "all", label: `All open (${tasks.filter((t) => t.status === "todo" || t.status === "in_progress").length})` },
-                  { key: "today", label: `Due today (${tasks.filter((t) => t.due_date === today && t.status !== "done" && t.status !== "cancelled").length})` },
-                  { key: "overdue", label: `Overdue (${tasks.filter((t) => t.due_date && t.due_date < today && t.status !== "done" && t.status !== "cancelled").length})` },
-                ] as const
-              ).map(({ key, label }) => (
+            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+                {(
+                  [
+                    { key: "all", label: `All open (${tasks.filter((t) => t.status === "todo" || t.status === "in_progress").length})` },
+                    { key: "today", label: `Due today (${tasks.filter((t) => t.due_date === today && t.status !== "done" && t.status !== "cancelled").length})` },
+                    { key: "overdue", label: `Overdue (${tasks.filter((t) => t.due_date && t.due_date < today && t.status !== "done" && t.status !== "cancelled").length})` },
+                  ] as const
+                ).map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setFilter(key)}
+                    className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                      filter === key
+                        ? "bg-zinc-900 text-white"
+                        : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+                <span className="mx-1 text-zinc-300">|</span>
                 <button
-                  key={key}
-                  onClick={() => setFilter(key)}
+                  onClick={() => setGroupBy(groupBy === "assignee" ? "none" : "assignee")}
                   className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                    filter === key
-                      ? "bg-zinc-900 text-white"
+                    groupBy === "assignee"
+                      ? "bg-indigo-600 text-white"
                       : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
                   }`}
                 >
-                  {label}
+                  Group by person
                 </button>
-              ))}
-              <span className="mx-1 text-zinc-300">|</span>
-              <button
-                onClick={() => setGroupBy(groupBy === "assignee" ? "none" : "assignee")}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                  groupBy === "assignee"
-                    ? "bg-indigo-600 text-white"
-                    : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
-                }`}
-              >
-                Group by person
-              </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => downloadTasksCsv(openTasks, "filtered")}
+                  disabled={openTasks.length === 0}
+                  className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Download className="h-4 w-4" />
+                  Export filtered CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={() => downloadTasksCsv(tasks, "all")}
+                  disabled={tasks.length === 0}
+                  className="inline-flex items-center gap-2 rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Download className="h-4 w-4" />
+                  Export all CSV
+                </button>
+              </div>
             </div>
 
             <div className="space-y-6">

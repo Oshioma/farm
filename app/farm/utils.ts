@@ -13,6 +13,36 @@ export function formatMoney(value: number) {
   return `TZS ${value.toLocaleString()}`;
 }
 
+type CsvValue = string | number | boolean | null | undefined;
+
+function escapeCsv(value: CsvValue): string {
+  if (value === null || value === undefined) return "";
+  return `"${String(value).replace(/"/g, '""')}"`;
+}
+
+export function toFileSlug(value?: string | null, fallback = "farm"): string {
+  const normalized = (value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return normalized || fallback;
+}
+
+export function downloadCsvFile(filename: string, headers: string[], rows: CsvValue[][]): void {
+  if (typeof window === "undefined" || rows.length === 0) return;
+
+  const csv = [headers, ...rows]
+    .map((row) => row.map((cell) => escapeCsv(cell)).join(","))
+    .join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 export function badgeClass(status?: string | null) {
   switch (status) {
     case "done":
