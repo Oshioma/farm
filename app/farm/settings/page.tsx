@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { getFarms } from "@/lib/farm";
+import { getActiveFarmId, getFarms, saveActiveFarmId } from "@/lib/farm";
 import type { Farm } from "@/lib/farm";
 import { downloadCsvFile, toFileSlug } from "@/app/farm/utils";
 import { Download } from "lucide-react";
@@ -37,7 +37,7 @@ export default function SettingsPage() {
       try {
         const f = await getFarms();
         setFarms(f);
-        const saved = localStorage.getItem("activeFarmId");
+        const saved = await getActiveFarmId();
         if (saved && f.some((farm) => farm.id === saved)) {
           setActiveFarmId(saved);
         } else if (f.length > 0) {
@@ -50,6 +50,11 @@ export default function SettingsPage() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (!activeFarmId) return;
+    saveActiveFarmId(activeFarmId);
+  }, [activeFarmId]);
 
   // Get user role
   useEffect(() => {
@@ -216,7 +221,30 @@ export default function SettingsPage() {
       </div>
 
       {activeFarm && (
-        <p className="mb-6 text-sm text-zinc-500">Farm: {activeFarm.name}</p>
+        <div className="mb-6">
+          <p className="mb-2 text-sm text-zinc-500">Farm: {activeFarm.name}</p>
+          {farms.length > 1 && (
+            <div className="max-w-sm">
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500">
+                Export farm
+              </label>
+              <select
+                value={activeFarmId}
+                onChange={(e) => {
+                  setActiveFarmId(e.target.value);
+                  setSuccess("");
+                }}
+                className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-900"
+              >
+                {farms.map((farm) => (
+                  <option key={farm.id} value={farm.id}>
+                    {farm.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
       )}
 
       {error && (
