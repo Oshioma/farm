@@ -250,7 +250,7 @@ type Props = {
   harvestEta?: HarvestEtaEntry[];
   farmName?: string;
   farmId?: string;
-  onSelectBed?: (bedId: string) => void;
+  onSelectBed?: (bedId: string, zoneId: string | null) => void;
   onAddCropToBed?: (bedId: string, zoneId: string | null) => void;
 };
 
@@ -1044,7 +1044,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                 if (editMode) { setSelectedBed(selectedBed === bed.id ? null : bed.id); return; }
                 setSelectedBed(selectedBed === bed.id ? null : bed.id);
                 setSelectedSeedlingZoneIdx(null);
-                onSelectBed?.(bed.id);
+                onSelectBed?.(bed.id, getZoneForBed(bed.id)?.id ?? null);
               }}
               onMouseEnter={() => setHoveredBed(bed.id)}
               onMouseLeave={() => setHoveredBed(null)}
@@ -1399,6 +1399,14 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                   </div>
                 </div>
               )}
+              <button
+                type="button"
+                onClick={() => onAddCropToBed?.(selectedBed, selected?.id ?? null)}
+                disabled={!onAddCropToBed}
+                className="mt-4 w-full rounded-xl border border-emerald-200 bg-emerald-100 px-3 py-2 text-xs font-medium text-emerald-800 hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                + Add crop to {selectedBed}
+              </button>
             </div>
           ) : !editMode ? (
             <div className="rounded-2xl border border-dashed border-zinc-200 p-4 text-center text-xs text-zinc-400">
