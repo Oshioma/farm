@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getFarms, getHarvestLogs } from "@/lib/farm";
 import type { Farm, HarvestLog } from "@/lib/farm";
 import { formatDate } from "@/app/farm/utils";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Download } from "lucide-react";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -20,11 +20,82 @@ export default function HarvestLogsPage() {
   const [farms, setFarms] = useState<Farm[]>([]);
   const [harvestLogs, setHarvestLogs] = useState<HarvestLog[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [qualityFilter, setQualityFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const router = useRouter();
 
   const activeFarm = farms.find((f) => f.id === activeFarmId);
+  const qualityOptions = useMemo(() => {
+    return Array.from(new Set(harvestLogs.map((log) => log.quality).filter(Boolean))).sort((a, b) =>
+      a.localeCompare(b)
+    );
+  }, [harvestLogs]);
+
+  const filteredHarvestLogs = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    return harvestLogs.filter((log) => {
+      if (qualityFilter !== "all" && log.quality !== qualityFilter) return false;
+      if (!normalizedSearch) return true;
+      const cropName = log.crop?.[0]?.crop_name?.toLowerCase() || "";
+      const zoneName = log.zone?.[0]?.name?.toLowerCase() || "";
+      const quality = log.quality?.toLowerCase() || "";
+      const notes = log.notes?.toLowerCase() || "";
+      return (
+        cropName.includes(normalizedSearch) ||
+        zoneName.includes(normalizedSearch) ||
+        quality.includes(normalizedSearch) ||
+        notes.includes(normalizedSearch)
+      );
+    });
+  }, [harvestLogs, qualityFilter, searchTerm]);
+
+  function escapeCsv(value: string | number | null | undefined): string {
+    if (value === null || value === undefined) return "";
+    const stringValue = String(value);
+    return `"${stringValue.replace(/"/g, '""')}"`;
+  }
+
+  function downloadCsv(data: HarvestLog[], mode: "filtered" | "all") {
+    if (data.length === 0) return;
+
+    const headers = [
+      "Harvest Date",
+      "Crop",
+      "Zone",
+      "Quantity (kg)",
+      "Quality",
+      "Notes",
+      "Created At",
+    ];
+
+    const rows = data.map((log) => [
+      log.harvest_date,
+      log.crop?.[0]?.crop_name || "",
+      log.zone?.[0]?.name || "",
+      log.quantity_kg.toFixed(2),
+      log.quality,
+      log.notes || "",
+      log.created_at || "",
+    ]);
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map((value) => escapeCsv(value)).join(","))
+      .join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const farmName = (activeFarm?.name || "farm").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const stamp = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `${farmName}-harvest-logs-${mode}-${stamp}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
 
   useEffect(() => {
     (async () => {
@@ -66,7 +137,7 @@ export default function HarvestLogsPage() {
     router.push("/login");
   }
 
-  const totalQuantity = harvestLogs.reduce((sum, log) => sum + (log.quantity_kg || 0), 0);
+  const totalQuantity = filteredHarvestLogs.reduce((sum, log) => sum + (log.quantity_kg || 0), 0);
 
   if (loading) {
     return (
@@ -137,24 +208,79 @@ export default function HarvestLogsPage() {
           </div>
         )}
 
+        {/* Filters + export */}
+        <div className="mb-6 rounded-lg border border-zinc-200 bg-white p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-zinc-700">Search</span>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Crop, zone, quality, notes..."
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-zinc-700">Quality</span>
+                <select
+                  value={qualityFilter}
+                  onChange={(e) => setQualityFilter(e.target.value)}
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                >
+                  <option value="all">All qualities</option>
+                  {qualityOptions.map((quality) => (
+                    <option key={quality} value={quality}>
+                      {quality}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => downloadCsv(filteredHarvestLogs, "filtered")}
+                disabled={filteredHarvestLogs.length === 0}
+                className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Download className="h-4 w-4" />
+                Export filtered CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => downloadCsv(harvestLogs, "all")}
+                disabled={harvestLogs.length === 0}
+                className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Download className="h-4 w-4" />
+                Export all CSV
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Stats */}
-        {harvestLogs.length > 0 && (
+        {filteredHarvestLogs.length > 0 && (
           <div className="mb-6 grid gap-4 md:grid-cols-2">
             <div className="rounded-lg border border-zinc-200 bg-white p-6">
-              <p className="text-sm text-zinc-600">Total Harvests</p>
-              <p className="text-3xl font-bold">{harvestLogs.length}</p>
+              <p className="text-sm text-zinc-600">Total Harvests (filtered)</p>
+              <p className="text-3xl font-bold">{filteredHarvestLogs.length}</p>
             </div>
             <div className="rounded-lg border border-zinc-200 bg-white p-6">
-              <p className="text-sm text-zinc-600">Total Quantity (kg)</p>
+              <p className="text-sm text-zinc-600">Total Quantity (kg, filtered)</p>
               <p className="text-3xl font-bold">{totalQuantity.toFixed(2)}</p>
             </div>
           </div>
         )}
 
         {/* Harvest logs table */}
-        {harvestLogs.length === 0 ? (
+        {filteredHarvestLogs.length === 0 ? (
           <div className="rounded-lg border border-zinc-200 bg-white p-8 text-center">
-            <p className="text-zinc-500">No harvest logs yet.</p>
+            <p className="text-zinc-500">
+              {harvestLogs.length === 0 ? "No harvest logs yet." : "No harvest logs match the current filters."}
+            </p>
             <Link href="/farm" className="mt-4 inline-block text-zinc-900 hover:text-zinc-700 font-medium">
               Log a harvest →
             </Link>
@@ -173,7 +299,7 @@ export default function HarvestLogsPage() {
                 </tr>
               </thead>
               <tbody>
-                {harvestLogs.map((log) => (
+                {filteredHarvestLogs.map((log) => (
                   <tr key={log.id} className="border-b border-zinc-200 hover:bg-zinc-50">
                     <td className="px-6 py-4 text-sm text-zinc-900">{formatDate(log.harvest_date)}</td>
                     <td className="px-6 py-4 text-sm text-zinc-900">
