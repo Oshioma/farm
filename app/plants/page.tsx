@@ -7,6 +7,7 @@ import { ImagePlus, Leaf, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getFarms, getPlants, getZones } from "@/lib/farm";
 import type { Farm, Plant, Zone } from "@/lib/farm";
+import { useFarmSelection } from "@/hooks/useFarmSelection";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -43,11 +44,11 @@ export default function PlantsPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  useFarmSelection({ farms, activeFarmId, setActiveFarmId });
 
   async function loadFarms() {
     const farmRows = await getFarms();
     setFarms(farmRows);
-    if (farmRows.length > 0) setActiveFarmId(farmRows[0].id);
   }
 
   async function loadPlants(farmId: string) {

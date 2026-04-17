@@ -2,19 +2,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import {
-  getActiveFarmId,
   getFarms,
   getZones,
   getCrops,
   getTasks,
   getMembers,
-  saveActiveFarmId,
 } from "@/lib/farm";
 import type { Farm, Zone, Crop, Task, FarmMember } from "@/lib/farm";
 import { formatDate, badgeClass } from "@/app/farm/utils";
+import { useFarmSelection } from "@/hooks/useFarmSelection";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -24,10 +22,6 @@ function errMsg(err: unknown, fallback: string): string {
 }
 
 export default function WorkerTasksPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const requestedFarmId = searchParams.get("farmId") ?? "";
-  const searchParamsString = searchParams.toString();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
   const [crops, setCrops] = useState<Crop[]>([]);
@@ -39,6 +33,8 @@ export default function WorkerTasksPage() {
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "today" | "overdue">("all");
   const [groupBy, setGroupBy] = useState<"none" | "assignee">("assignee");
+
+  useFarmSelection({ farms, activeFarmId, setActiveFarmId });
 
   useEffect(() => {
     (async () => {
@@ -52,41 +48,6 @@ export default function WorkerTasksPage() {
       }
     })();
   }, []);
-
-  useEffect(() => {
-    if (!farms.length) return;
-
-    if (requestedFarmId) {
-      const hasRequestedFarm = farms.some((farm) => farm.id === requestedFarmId);
-      if (hasRequestedFarm) {
-        setActiveFarmId((current) => (current === requestedFarmId ? current : requestedFarmId));
-        return;
-      }
-    }
-
-    if (activeFarmId) return;
-
-    (async () => {
-      const savedFarmId = await getActiveFarmId();
-      if (savedFarmId && farms.some((farm) => farm.id === savedFarmId)) {
-        setActiveFarmId(savedFarmId);
-        return;
-      }
-      setActiveFarmId(farms[0].id);
-    })();
-  }, [farms, requestedFarmId, activeFarmId]);
-
-  useEffect(() => {
-    if (!activeFarmId) return;
-    void saveActiveFarmId(activeFarmId);
-  }, [activeFarmId]);
-
-  useEffect(() => {
-    if (!activeFarmId || requestedFarmId === activeFarmId) return;
-    const nextParams = new URLSearchParams(searchParamsString);
-    nextParams.set("farmId", activeFarmId);
-    router.replace(`/farm/tasks?${nextParams.toString()}`, { scroll: false });
-  }, [activeFarmId, requestedFarmId, searchParamsString, router]);
 
   useEffect(() => {
     if (!activeFarmId) return;

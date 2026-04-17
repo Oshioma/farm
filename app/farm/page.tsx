@@ -131,6 +131,8 @@ export default function FarmPage() {
   const [deleteFarmStep, setDeleteFarmStep] = useState<0 | 1 | 2>(0);
   const [deletingFarm, setDeletingFarm] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const withFarmContext = (path: string) =>
+    activeFarmId ? `${path}?farmId=${encodeURIComponent(activeFarmId)}` : path;
   const workerTasksHref = activeFarmId
     ? `/farm/tasks?farmId=${encodeURIComponent(activeFarmId)}`
     : "/farm/tasks";
@@ -1396,7 +1398,7 @@ export default function FarmPage() {
                 Create a farm
               </button>
               <Link
-                href="/farm/invite"
+                href={withFarmContext("/farm/invite")}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
                 Invite
@@ -1444,24 +1446,24 @@ export default function FarmPage() {
         <nav className="mb-6 rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
           <div className="flex flex-wrap items-center gap-1.5 text-sm">
             {[
-              { href: "/farm/harvest-eta", label: "Harvest" },
-              { href: "/farm/harvest-logs", label: "Harvest logs" },
+              { href: withFarmContext("/farm/harvest-eta"), label: "Harvest" },
+              { href: withFarmContext("/farm/harvest-logs"), label: "Harvest logs" },
               { href: "#crops", label: "Crops" },
               { href: workerTasksHref, label: "Tasks" },
               { href: "#map", label: "Map" },
-              { href: "/farm/zones", label: "Zones" },
-              { href: "/farm/trees", label: "Trees" },
-              { href: "/farm/planting-plan", label: "Planting plan" },
-              { href: "/farm/seedlings", label: "Seedlings" },
-              { href: "/plants", label: "Plants" },
-              { href: "/fertiliser", label: "Fertiliser" },
-              { href: "/farm/compost", label: "Compost" },
-              { href: "/farm/soil-tests", label: "Soil tests" },
-              { href: "/farm/work-hours", label: "Work hours" },
-              { href: "/farm/systems", label: "Systems" },
-              { href: "/companion", label: "Companion planting" },
-              { href: "/income-prediction", label: "Income prediction" },
-              { href: "/farm/settings", label: "Settings" },
+              { href: withFarmContext("/farm/zones"), label: "Zones" },
+              { href: withFarmContext("/farm/trees"), label: "Trees" },
+              { href: withFarmContext("/farm/planting-plan"), label: "Planting plan" },
+              { href: withFarmContext("/farm/seedlings"), label: "Seedlings" },
+              { href: withFarmContext("/plants"), label: "Plants" },
+              { href: withFarmContext("/fertiliser"), label: "Fertiliser" },
+              { href: withFarmContext("/farm/compost"), label: "Compost" },
+              { href: withFarmContext("/farm/soil-tests"), label: "Soil tests" },
+              { href: withFarmContext("/farm/work-hours"), label: "Work hours" },
+              { href: withFarmContext("/farm/systems"), label: "Systems" },
+              { href: withFarmContext("/companion"), label: "Companion planting" },
+              { href: withFarmContext("/income-prediction"), label: "Income prediction" },
+              { href: withFarmContext("/farm/settings"), label: "Settings" },
             ].map(({ href, label }) => (
               <Link
                 key={href}
@@ -2664,7 +2666,7 @@ export default function FarmPage() {
                         Recently added to the plants gallery.
                       </p>
                     </div>
-                    <Link href="/plants" className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100">
+                    <Link href={withFarmContext("/plants")} className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100">
                       View all
                     </Link>
                   </div>
@@ -2674,7 +2676,7 @@ export default function FarmPage() {
                   ) : (
                     <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                       {plants.slice(0, 8).map((plant) => (
-                        <Link key={plant.id} href="/plants" className="group overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm transition hover:shadow-md">
+                        <Link key={plant.id} href={withFarmContext("/plants")} className="group overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm transition hover:shadow-md">
                           {plant.image_url ? (
                             <img src={plant.image_url} alt={plant.name ?? "Plant"} className="aspect-square w-full object-cover" />
                           ) : (

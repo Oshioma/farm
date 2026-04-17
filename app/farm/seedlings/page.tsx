@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { getFarms, getSeedlings, getSeedCollection } from "@/lib/farm";
 import type { Farm, SeedlingEntry, SeedCollectionEntry } from "@/lib/farm";
 import { SeedlingMap } from "../components/SeedlingMap";
+import { useFarmSelection } from "@/hooks/useFarmSelection";
 
 /* ── Types ────────────────────────────────────────────────── */
 
@@ -90,12 +91,17 @@ export default function SeedlingsPage() {
 
   const router = useRouter();
 
+  useFarmSelection({
+    farms,
+    activeFarmId,
+    setActiveFarmId,
+    preferredFarmName: "top land",
+  });
+
   useEffect(() => {
     getFarms()
       .then((rows) => {
         setFarms(rows);
-        const topLand = rows.find((f) => /top land/i.test(f.name)) ?? rows[0];
-        if (topLand) setActiveFarmId(topLand.id);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load farms"));
   }, []);

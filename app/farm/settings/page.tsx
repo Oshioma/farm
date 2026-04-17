@@ -8,6 +8,7 @@ import { getFarms } from "@/lib/farm";
 import type { Farm } from "@/lib/farm";
 import { downloadCsvFile, toFileSlug } from "@/app/farm/utils";
 import { Download } from "lucide-react";
+import { useFarmSelection } from "@/hooks/useFarmSelection";
 
 type CsvValue = string | number | boolean | null | undefined;
 
@@ -31,18 +32,13 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState("");
 
   const activeFarm = farms.find((f) => f.id === activeFarmId);
+  useFarmSelection({ farms, activeFarmId, setActiveFarmId });
 
   useEffect(() => {
     (async () => {
       try {
         const f = await getFarms();
         setFarms(f);
-        const saved = localStorage.getItem("activeFarmId");
-        if (saved && f.some((farm) => farm.id === saved)) {
-          setActiveFarmId(saved);
-        } else if (f.length > 0) {
-          setActiveFarmId(f[0].id);
-        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load farms");
       } finally {

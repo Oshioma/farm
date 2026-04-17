@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getFarms, getSoilImprovements } from "@/lib/farm";
 import type { Farm, SoilImprovement } from "@/lib/farm";
+import { useFarmSelection } from "@/hooks/useFarmSelection";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -33,6 +34,7 @@ export default function SoilImprovementsPage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
+  useFarmSelection({ farms, activeFarmId, setActiveFarmId });
 
   async function loadEntries(farmId: string) {
     const rows = await getSoilImprovements(farmId);
@@ -45,10 +47,6 @@ export default function SoilImprovementsPage() {
         setLoading(true);
         const farmRows = await getFarms();
         setFarms(farmRows);
-        if (farmRows.length > 0) {
-          setActiveFarmId(farmRows[0].id);
-          await loadEntries(farmRows[0].id);
-        }
       } catch (err) {
         setError(errMsg(err, "Failed to load"));
       } finally {

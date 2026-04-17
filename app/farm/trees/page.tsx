@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getFarms, getTreeRegistry } from "@/lib/farm";
 import type { Farm, TreeEntry } from "@/lib/farm";
+import { useFarmSelection } from "@/hooks/useFarmSelection";
 
 type FormData = {
   tree_name: string;
@@ -49,6 +50,12 @@ export default function TreeRegistryPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const router = useRouter();
+  useFarmSelection({
+    farms,
+    activeFarmId,
+    setActiveFarmId,
+    preferredFarmName: "top land",
+  });
 
   async function load(farmId: string) {
     const rows = await getTreeRegistry(farmId);
@@ -61,11 +68,6 @@ export default function TreeRegistryPage() {
         setLoading(true);
         const farmRows = await getFarms();
         setFarms(farmRows);
-        const defaultFarm = farmRows.find((f) => /top land/i.test(f.name)) ?? farmRows[0];
-        if (defaultFarm) {
-          setActiveFarmId(defaultFarm.id);
-          await load(defaultFarm.id);
-        }
       } catch (err) {
         setError(errMsg(err, "Failed to load"));
       } finally {

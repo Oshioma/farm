@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getFarms, getPlantingPlan } from "@/lib/farm";
 import type { Farm, PlantingPlanEntry } from "@/lib/farm";
+import { useFarmSelection } from "@/hooks/useFarmSelection";
 
 /* ── Types ────────────────────────────────────────────────── */
 
@@ -62,14 +63,18 @@ export default function PlantingPlanPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const router = useRouter();
+  useFarmSelection({
+    farms,
+    activeFarmId,
+    setActiveFarmId,
+    preferredFarmName: "top land",
+  });
 
   useEffect(() => {
     async function load() {
       try {
         const farmRows = await getFarms();
         setFarms(farmRows);
-        const topLand = farmRows.find((f) => /top land/i.test(f.name)) ?? farmRows[0];
-        if (topLand) setActiveFarmId(topLand.id);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load farms");
       }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { getFarms } from "@/lib/farm";
 import type { Farm } from "@/lib/farm";
+import { useFarmSelection } from "@/hooks/useFarmSelection";
 
 type Member = {
   id: string;
@@ -42,6 +43,8 @@ export default function InvitePage() {
   const [inviting, setInviting] = useState(false);
   const [inviteSuccess, setInviteSuccess] = useState("");
 
+  useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+
   async function loadData(farmId: string) {
     const [membersRes, { data: requestRows }] = await Promise.all([
       fetch(`/api/members/list?farmId=${farmId}`).then(async (r) => {
@@ -67,10 +70,6 @@ export default function InvitePage() {
         setLoading(true);
         const farmRows = await getFarms();
         setFarms(farmRows);
-        if (farmRows.length > 0) {
-          setActiveFarmId(farmRows[0].id);
-          await loadData(farmRows[0].id);
-        }
       } catch (err) {
         setError(errMsg(err, "Failed to load"));
       } finally {

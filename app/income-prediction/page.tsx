@@ -7,6 +7,7 @@ import { TrendingUp } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getFarms, getIncomePrediction } from "@/lib/farm";
 import type { Farm, IncomePredictionRow } from "@/lib/farm";
+import { useFarmSelection } from "@/hooks/useFarmSelection";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -97,6 +98,7 @@ export default function IncomePredictionPage() {
   const [savingEditId, setSavingEditId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
+  useFarmSelection({ farms, activeFarmId, setActiveFarmId });
 
   async function loadRows(farmId: string) {
     const data = await getIncomePrediction(farmId);
@@ -109,10 +111,6 @@ export default function IncomePredictionPage() {
         setLoading(true);
         const farmRows = await getFarms();
         setFarms(farmRows);
-        if (farmRows.length > 0) {
-          setActiveFarmId(farmRows[0].id);
-          await loadRows(farmRows[0].id);
-        }
       } catch (err) {
         setError(errMsg(err, "Failed to load"));
       } finally {

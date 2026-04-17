@@ -8,6 +8,7 @@ import type { Farm, Zone, Crop } from "@/lib/farm";
 import { ZoneForm } from "@/app/farm/components/ZoneForm";
 import type { ZoneFormData } from "@/app/farm/components/ZoneForm";
 import { badgeClass } from "@/app/farm/utils";
+import { useFarmSelection } from "@/hooks/useFarmSelection";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -32,12 +33,13 @@ export default function ZonesPage() {
   });
   const [savingZoneId, setSavingZoneId] = useState<string | null>(null);
 
+  useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+
   useEffect(() => {
     (async () => {
       try {
         const farmRows = await getFarms();
         setFarms(farmRows);
-        if (farmRows.length > 0) setActiveFarmId(farmRows[0].id);
       } catch (err) {
         setError(errMsg(err, "Failed to load farms"));
       } finally {

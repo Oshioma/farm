@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getFarms, getHarvestEta, getZones, getCrops } from "@/lib/farm";
 import type { Farm, HarvestEtaEntry, Zone, Crop } from "@/lib/farm";
+import { useFarmSelection } from "@/hooks/useFarmSelection";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -101,6 +102,7 @@ export default function HarvestEtaPage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
+  useFarmSelection({ farms, activeFarmId, setActiveFarmId });
 
   async function loadEntries(farmId: string, yr: number) {
     const [rows, zoneRows, cropRows] = await Promise.all([getHarvestEta(farmId, yr), getZones(farmId), getCrops(farmId)]);
@@ -115,10 +117,6 @@ export default function HarvestEtaPage() {
         setLoading(true);
         const farmRows = await getFarms();
         setFarms(farmRows);
-        if (farmRows.length > 0) {
-          setActiveFarmId(farmRows[0].id);
-          await loadEntries(farmRows[0].id, year);
-        }
       } catch (err) {
         setError(errMsg(err, "Failed to load"));
       } finally {

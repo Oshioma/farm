@@ -8,6 +8,7 @@ import { getFarms, getHarvestLogs } from "@/lib/farm";
 import type { Farm, HarvestLog } from "@/lib/farm";
 import { formatDate } from "@/app/farm/utils";
 import { ChevronLeft } from "lucide-react";
+import { useFarmSelection } from "@/hooks/useFarmSelection";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -27,6 +28,7 @@ export default function HarvestLogsPage() {
   const router = useRouter();
 
   const activeFarm = farms.find((f) => f.id === activeFarmId);
+  useFarmSelection({ farms, activeFarmId, setActiveFarmId });
   const qualityOptions = useMemo(() => {
     return Array.from(new Set(harvestLogs.map((log) => log.quality).filter(Boolean))).sort((a, b) =>
       a.localeCompare(b)
@@ -57,11 +59,6 @@ export default function HarvestLogsPage() {
         setLoading(true);
         const farmRows = await getFarms();
         setFarms(farmRows);
-        if (farmRows.length > 0) {
-          setActiveFarmId(farmRows[0].id);
-          const logs = await getHarvestLogs(farmRows[0].id);
-          setHarvestLogs(logs);
-        }
       } catch (err) {
         setError(errMsg(err, "Failed to load harvest logs"));
       } finally {
