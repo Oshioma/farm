@@ -160,13 +160,13 @@ export function PestForm({
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium">Zone</label>
+            <label className="mb-2 block text-sm font-medium">Bed</label>
             <select
               value={form.zone_id}
               onChange={(e) => setForm((prev) => ({ ...prev, zone_id: e.target.value }))}
               className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
             >
-              <option value="">No zone</option>
+              <option value="">No bed</option>
               {zones.map((zone) => (
                 <option key={zone.id} value={zone.id}>
                   {zone.name}
