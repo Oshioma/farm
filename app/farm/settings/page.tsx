@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getFarms } from "@/lib/farm";
 import type { Farm } from "@/lib/farm";
+import { downloadCsvFile, toFileSlug } from "@/app/farm/utils";
+import { Download } from "lucide-react";
+
+type CsvValue = string | number | boolean | null | undefined;
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -21,6 +25,7 @@ export default function SettingsPage() {
   // Delete farm state
   const [deleteFarmStep, setDeleteFarmStep] = useState<0 | 1 | 2>(0);
   const [deletingFarm, setDeletingFarm] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -105,6 +110,107 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleExportFarmData() {
+    if (!activeFarmId || !activeFarm) return;
+    setExporting(true);
+    setError("");
+    setSuccess("");
+    try {
+      const stamp = new Date().toISOString().slice(0, 10);
+      const farmSlug = toFileSlug(activeFarm.name, "farm");
+
+      const exportDefs: Array<{
+        table: string;
+        filename: string;
+        headers: string[];
+        fields: string[];
+      }> = [
+        {
+          table: "tasks",
+          filename: `${farmSlug}-tasks-all-${stamp}.csv`,
+          headers: ["Title", "Description", "Status", "Priority", "Due Date", "Due Time", "Assigned To", "Created At"],
+          fields: ["title", "description", "status", "priority", "due_date", "due_time", "assigned_to", "created_at"],
+        },
+        {
+          table: "harvests",
+          filename: `${farmSlug}-harvest-logs-all-${stamp}.csv`,
+          headers: ["Harvest Date", "Crop ID", "Zone ID", "Quantity (kg)", "Quality", "Notes", "Created At"],
+          fields: ["harvest_date", "crop_id", "zone_id", "quantity_kg", "quality", "notes", "created_at"],
+        },
+        {
+          table: "work_hours",
+          filename: `${farmSlug}-work-hours-all-${stamp}.csv`,
+          headers: ["Date", "Worker", "Hours", "Role", "Notes", "Created At"],
+          fields: ["date", "worker_name", "hours", "role", "notes", "created_at"],
+        },
+        {
+          table: "seedlings",
+          filename: `${farmSlug}-seedlings-all-${stamp}.csv`,
+          headers: ["Type", "Date", "Plant", "Variety", "Quantity", "Germination", "Germination Date", "Healthy Seedlings", "Successional Sowing", "Yields", "Row Location", "Notes", "Created At"],
+          fields: ["type", "date", "plant", "variety", "quantity", "germination", "germination_date", "healthy_seedlings", "successional_sowing", "yields", "row_location", "notes", "created_at"],
+        },
+        {
+          table: "seed_collection",
+          filename: `${farmSlug}-seed-collection-all-${stamp}.csv`,
+          headers: ["Plant", "Distance", "Notes", "Additional Notes", "Created At"],
+          fields: ["plant", "distance", "notes", "notes2", "created_at"],
+        },
+        {
+          table: "expenses",
+          filename: `${farmSlug}-expenses-all-${stamp}.csv`,
+          headers: ["Category", "Amount", "Vendor", "Expense Date", "Notes", "Created At"],
+          fields: ["category", "amount", "vendor_name", "expense_date", "notes", "created_at"],
+        },
+        {
+          table: "sales",
+          filename: `${farmSlug}-sales-all-${stamp}.csv`,
+          headers: ["Sale Date", "Buyer", "Crop ID", "Quantity (kg)", "Price per kg", "Total Amount", "Notes", "Created At"],
+          fields: ["sale_date", "buyer_name", "crop_id", "quantity_kg", "price_per_kg", "total_amount", "notes", "created_at"],
+        },
+        {
+          table: "pest_logs",
+          filename: `${farmSlug}-pest-logs-all-${stamp}.csv`,
+          headers: ["Logged Date", "Pest Name", "Severity", "Description", "Action Taken", "Crop ID", "Zone ID", "Created At"],
+          fields: ["logged_date", "pest_name", "severity", "description", "action_taken", "crop_id", "zone_id", "created_at"],
+        },
+        {
+          table: "compost",
+          filename: `${farmSlug}-compost-all-${stamp}.csv`,
+          headers: ["Date", "Compost Type", "Ready To Use Date", "Materials Used", "Place", "Zone ID", "Notes", "Created At"],
+          fields: ["date", "compost_type", "ready_to_use_date", "materials_used", "place", "zone_id", "notes", "created_at"],
+        },
+        {
+          table: "fertilisations",
+          filename: `${farmSlug}-fertilisations-all-${stamp}.csv`,
+          headers: ["Date", "Fertiliser", "Ready To Use", "Bin Colour", "Plants", "Zone ID", "Notes", "Created At"],
+          fields: ["date", "fertiliser", "ready_to_use", "bin_colour", "plants", "zone_id", "notes", "created_at"],
+        },
+      ];
+
+      let generated = 0;
+      for (const def of exportDefs) {
+        const { data, error: fetchError } = await supabase
+          .from(def.table)
+          .select(def.fields.join(","))
+          .eq("farm_id", activeFarmId);
+        if (fetchError) throw fetchError;
+        const typedRows: Array<Record<string, CsvValue>> = Array.isArray(data)
+          ? (data as unknown as Array<Record<string, CsvValue>>)
+          : [];
+        const rows = typedRows.map((row) => def.fields.map((field) => row[field]));
+        if (rows.length > 0) {
+          downloadCsvFile(def.filename, def.headers, rows);
+          generated += 1;
+        }
+      }
+      setSuccess(generated > 0 ? `Export complete. Downloaded ${generated} CSV files.` : "No farm data found to export.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to export data");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -137,6 +243,21 @@ export default function SettingsPage() {
           {success}
         </div>
       )}
+
+      <section className="mb-6 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold">Data Export</h2>
+        <p className="mt-1 text-sm text-zinc-500">
+          Download all data for this farm as CSV files for backup, reporting, or offline work.
+        </p>
+        <button
+          onClick={handleExportFarmData}
+          disabled={!activeFarmId || exporting}
+          className="mt-4 inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60"
+        >
+          <Download className="h-4 w-4" />
+          {exporting ? "Exporting..." : "Export farm data (CSV)"}
+        </button>
+      </section>
 
       {/* Reset Zones */}
       <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">

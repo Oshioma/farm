@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { getFarms, getHarvestLogs } from "@/lib/farm";
 import type { Farm, HarvestLog } from "@/lib/farm";
 import { formatDate } from "@/app/farm/utils";
-import { ChevronLeft, Download } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -50,52 +50,6 @@ export default function HarvestLogsPage() {
       );
     });
   }, [harvestLogs, qualityFilter, searchTerm]);
-
-  function escapeCsv(value: string | number | null | undefined): string {
-    if (value === null || value === undefined) return "";
-    const stringValue = String(value);
-    return `"${stringValue.replace(/"/g, '""')}"`;
-  }
-
-  function downloadCsv(data: HarvestLog[], mode: "filtered" | "all") {
-    if (data.length === 0) return;
-
-    const headers = [
-      "Harvest Date",
-      "Crop",
-      "Zone",
-      "Quantity (kg)",
-      "Quality",
-      "Notes",
-      "Created At",
-    ];
-
-    const rows = data.map((log) => [
-      log.harvest_date,
-      log.crop?.[0]?.crop_name || "",
-      log.zone?.[0]?.name || "",
-      log.quantity_kg.toFixed(2),
-      log.quality,
-      log.notes || "",
-      log.created_at || "",
-    ]);
-
-    const csv = [headers, ...rows]
-      .map((row) => row.map((value) => escapeCsv(value)).join(","))
-      .join("\n");
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    const farmName = (activeFarm?.name || "farm").toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    const stamp = new Date().toISOString().slice(0, 10);
-    link.href = url;
-    link.download = `${farmName}-harvest-logs-${mode}-${stamp}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  }
 
   useEffect(() => {
     (async () => {
@@ -208,10 +162,9 @@ export default function HarvestLogsPage() {
           </div>
         )}
 
-        {/* Filters + export */}
+        {/* Filters */}
         <div className="mb-6 rounded-lg border border-zinc-200 bg-white p-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
               <label className="block">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">Search</span>
                 <input
@@ -237,27 +190,6 @@ export default function HarvestLogsPage() {
                   ))}
                 </select>
               </label>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => downloadCsv(filteredHarvestLogs, "filtered")}
-                disabled={filteredHarvestLogs.length === 0}
-                className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Download className="h-4 w-4" />
-                Export filtered CSV
-              </button>
-              <button
-                type="button"
-                onClick={() => downloadCsv(harvestLogs, "all")}
-                disabled={harvestLogs.length === 0}
-                className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Download className="h-4 w-4" />
-                Export all CSV
-              </button>
-            </div>
           </div>
         </div>
 
