@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { getFarms } from "@/lib/farm";
+import { getActiveFarmId, getFarms, saveActiveFarmId } from "@/lib/farm";
 import type { Farm } from "@/lib/farm";
 import { downloadCsvFile, toFileSlug } from "@/app/farm/utils";
 import { Download } from "lucide-react";
@@ -13,6 +13,7 @@ type CsvValue = string | number | boolean | null | undefined;
 
 export default function SettingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -31,17 +32,22 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState("");
 
   const activeFarm = farms.find((f) => f.id === activeFarmId);
+  const farmIdFromQuery = searchParams.get("farmId");
 
   useEffect(() => {
     (async () => {
       try {
         const f = await getFarms();
         setFarms(f);
-        const saved = localStorage.getItem("activeFarmId");
-        if (saved && f.some((farm) => farm.id === saved)) {
-          setActiveFarmId(saved);
-        } else if (f.length > 0) {
-          setActiveFarmId(f[0].id);
+        if (farmIdFromQuery && f.some((farm) => farm.id === farmIdFromQuery)) {
+          setActiveFarmId(farmIdFromQuery);
+        } else {
+          const saved = await getActiveFarmId();
+          if (saved && f.some((farm) => farm.id === saved)) {
+            setActiveFarmId(saved);
+          } else if (f.length > 0) {
+            setActiveFarmId(f[0].id);
+          }
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load farms");
@@ -49,7 +55,19 @@ export default function SettingsPage() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [farmIdFromQuery]);
+
+  useEffect(() => {
+    if (!farmIdFromQuery || farms.length === 0) return;
+    if (farms.some((farm) => farm.id === farmIdFromQuery)) {
+      setActiveFarmId(farmIdFromQuery);
+    }
+  }, [farmIdFromQuery, farms]);
+
+  useEffect(() => {
+    if (!activeFarmId) return;
+    saveActiveFarmId(activeFarmId);
+  }, [activeFarmId]);
 
   // Get user role
   useEffect(() => {
@@ -215,9 +233,7 @@ export default function SettingsPage() {
         </Link>
       </div>
 
-      {activeFarm && (
-        <p className="mb-6 text-sm text-zinc-500">Farm: {activeFarm.name}</p>
-      )}
+      {activeFarm && <p className="mb-6 text-sm text-zinc-500">Farm: {activeFarm.name}</p>}
 
       {error && (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
