@@ -131,6 +131,9 @@ export default function FarmPage() {
   const [deleteFarmStep, setDeleteFarmStep] = useState<0 | 1 | 2>(0);
   const [deletingFarm, setDeletingFarm] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const workerTasksHref = activeFarmId
+    ? `/farm/tasks?farmId=${encodeURIComponent(activeFarmId)}`
+    : "/farm/tasks";
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -1444,7 +1447,7 @@ export default function FarmPage() {
               { href: "/farm/harvest-eta", label: "Harvest" },
               { href: "/farm/harvest-logs", label: "Harvest logs" },
               { href: "#crops", label: "Crops" },
-              { href: "/farm/tasks", label: "Tasks" },
+              { href: workerTasksHref, label: "Tasks" },
               { href: "#map", label: "Map" },
               { href: "/farm/zones", label: "Zones" },
               { href: "/farm/trees", label: "Trees" },
@@ -1842,7 +1845,7 @@ export default function FarmPage() {
                     {activeForm === "task" ? "Cancel" : "+ New task"}
                   </button>
                   <Link
-                    href="/farm/tasks"
+                    href={workerTasksHref}
                     className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
                   >
                     Worker view
