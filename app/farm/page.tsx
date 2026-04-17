@@ -578,13 +578,6 @@ export default function FarmPage() {
       setAssigningCropId(null);
     }
   }
-
-  function handleMapBedSelection(bedId: string) {
-    setSelectedMapBedId(bedId);
-    const resolvedZoneId = resolveZoneForBed(bedId)?.id ?? "";
-    setSelectedMapZoneId(resolvedZoneId);
-  }
-
   async function handleCreateCrop(data: CropFormData): Promise<boolean> {
     if (!activeFarmId) return false;
     try {
@@ -2255,7 +2248,10 @@ export default function FarmPage() {
                     harvestEta={harvestEtaEntries}
                     farmName={activeFarm?.name}
                     farmId={activeFarm?.id}
-                    onSelectBed={handleMapBedSelection}
+                    onSelectBed={(bedId, zoneId) => {
+                      setSelectedMapBedId(bedId);
+                      setSelectedMapZoneId(zoneId ?? resolveZoneForBed(bedId)?.id ?? "");
+                    }}
                     onAddCropToBed={handleAddCropFromMap}
                   />
                   <p className="mt-2 text-xs text-zinc-400">

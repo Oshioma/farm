@@ -250,7 +250,7 @@ type Props = {
   harvestEta?: HarvestEtaEntry[];
   farmName?: string;
   farmId?: string;
-  onSelectBed?: (bedId: string, zoneId: string | null) => void;
+  onSelectBed?: (bedId: string) => void;
   onAddCropToBed?: (bedId: string, zoneId: string | null) => void;
 };
 
@@ -1044,7 +1044,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                 if (editMode) { setSelectedBed(selectedBed === bed.id ? null : bed.id); return; }
                 setSelectedBed(selectedBed === bed.id ? null : bed.id);
                 setSelectedSeedlingZoneIdx(null);
-                onSelectBed?.(bed.id, getZoneForBed(bed.id)?.id ?? null);
+                onSelectBed?.(bed.id);
               }}
               onMouseEnter={() => setHoveredBed(bed.id)}
               onMouseLeave={() => setHoveredBed(null)}
@@ -1270,6 +1270,14 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
           {selectedBed && !editMode ? (
             <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-sm">
               <div className="text-lg font-semibold">{isVerticalLayout ? "Row" : "Bed"} {selectedBed}</div>
+              <button
+                type="button"
+                onClick={() => onAddCropToBed?.(selectedBed, selected?.id ?? null)}
+                disabled={!onAddCropToBed}
+                className="mt-3 w-full rounded-xl bg-zinc-900 px-3 py-2 text-xs font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                + Add crop to {selectedBed}
+              </button>
               {selected ? (
                 <>
                   <div className="mt-1 text-zinc-500">
