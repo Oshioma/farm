@@ -121,73 +121,53 @@ export default function SettingsPage() {
 
       const exportDefs: Array<{
         table: string;
-        filename: string;
-        headers: string[];
         fields: string[];
       }> = [
         {
           table: "tasks",
-          filename: `${farmSlug}-tasks-all-${stamp}.csv`,
-          headers: ["Title", "Description", "Status", "Priority", "Due Date", "Due Time", "Assigned To", "Created At"],
           fields: ["title", "description", "status", "priority", "due_date", "due_time", "assigned_to", "created_at"],
         },
         {
           table: "harvests",
-          filename: `${farmSlug}-harvest-logs-all-${stamp}.csv`,
-          headers: ["Harvest Date", "Crop ID", "Zone ID", "Quantity (kg)", "Quality", "Notes", "Created At"],
           fields: ["harvest_date", "crop_id", "zone_id", "quantity_kg", "quality", "notes", "created_at"],
         },
         {
           table: "work_hours",
-          filename: `${farmSlug}-work-hours-all-${stamp}.csv`,
-          headers: ["Date", "Worker", "Hours", "Role", "Notes", "Created At"],
           fields: ["date", "worker_name", "hours", "role", "notes", "created_at"],
         },
         {
           table: "seedlings",
-          filename: `${farmSlug}-seedlings-all-${stamp}.csv`,
-          headers: ["Type", "Date", "Plant", "Variety", "Quantity", "Germination", "Germination Date", "Healthy Seedlings", "Successional Sowing", "Yields", "Row Location", "Notes", "Created At"],
           fields: ["type", "date", "plant", "variety", "quantity", "germination", "germination_date", "healthy_seedlings", "successional_sowing", "yields", "row_location", "notes", "created_at"],
         },
         {
           table: "seed_collection",
-          filename: `${farmSlug}-seed-collection-all-${stamp}.csv`,
-          headers: ["Plant", "Distance", "Notes", "Additional Notes", "Created At"],
           fields: ["plant", "distance", "notes", "notes2", "created_at"],
         },
         {
           table: "expenses",
-          filename: `${farmSlug}-expenses-all-${stamp}.csv`,
-          headers: ["Category", "Amount", "Vendor", "Expense Date", "Notes", "Created At"],
           fields: ["category", "amount", "vendor_name", "expense_date", "notes", "created_at"],
         },
         {
           table: "sales",
-          filename: `${farmSlug}-sales-all-${stamp}.csv`,
-          headers: ["Sale Date", "Buyer", "Crop ID", "Quantity (kg)", "Price per kg", "Total Amount", "Notes", "Created At"],
           fields: ["sale_date", "buyer_name", "crop_id", "quantity_kg", "price_per_kg", "total_amount", "notes", "created_at"],
         },
         {
           table: "pest_logs",
-          filename: `${farmSlug}-pest-logs-all-${stamp}.csv`,
-          headers: ["Logged Date", "Pest Name", "Severity", "Description", "Action Taken", "Crop ID", "Zone ID", "Created At"],
           fields: ["logged_date", "pest_name", "severity", "description", "action_taken", "crop_id", "zone_id", "created_at"],
         },
         {
           table: "compost",
-          filename: `${farmSlug}-compost-all-${stamp}.csv`,
-          headers: ["Date", "Compost Type", "Ready To Use Date", "Materials Used", "Place", "Zone ID", "Notes", "Created At"],
           fields: ["date", "compost_type", "ready_to_use_date", "materials_used", "place", "zone_id", "notes", "created_at"],
         },
         {
           table: "fertilisations",
-          filename: `${farmSlug}-fertilisations-all-${stamp}.csv`,
-          headers: ["Date", "Fertiliser", "Ready To Use", "Bin Colour", "Plants", "Zone ID", "Notes", "Created At"],
           fields: ["date", "fertiliser", "ready_to_use", "bin_colour", "plants", "zone_id", "notes", "created_at"],
         },
       ];
 
-      let generated = 0;
+      const headers = ["table", ...Array.from(new Set(exportDefs.flatMap((def) => def.fields)))];
+      const allRows: CsvValue[][] = [];
+
       for (const def of exportDefs) {
         const { data, error: fetchError } = await supabase
           .from(def.table)
@@ -197,13 +177,20 @@ export default function SettingsPage() {
         const typedRows: Array<Record<string, CsvValue>> = Array.isArray(data)
           ? (data as unknown as Array<Record<string, CsvValue>>)
           : [];
-        const rows = typedRows.map((row) => def.fields.map((field) => row[field]));
-        if (rows.length > 0) {
-          downloadCsvFile(def.filename, def.headers, rows);
-          generated += 1;
+
+        for (const row of typedRows) {
+          const rowByField: Record<string, CsvValue> = {};
+          for (const field of def.fields) rowByField[field] = row[field];
+          allRows.push([def.table, ...headers.slice(1).map((field) => rowByField[field])]);
         }
       }
-      setSuccess(generated > 0 ? `Export complete. Downloaded ${generated} CSV files.` : "No farm data found to export.");
+
+      if (allRows.length === 0) {
+        setSuccess("No farm data found to export.");
+      } else {
+        downloadCsvFile(`${farmSlug}-farm-data-all-${stamp}.csv`, headers, allRows);
+        setSuccess(`Export complete. Downloaded 1 CSV file with ${allRows.length} rows.`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to export data");
     } finally {
@@ -247,7 +234,7 @@ export default function SettingsPage() {
       <section className="mb-6 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold">Data Export</h2>
         <p className="mt-1 text-sm text-zinc-500">
-          Download all data for this farm as CSV files for backup, reporting, or offline work.
+          Download all data for this farm in a single CSV file for backup, reporting, or offline work.
         </p>
         <button
           onClick={handleExportFarmData}
