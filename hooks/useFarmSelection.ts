@@ -1,7 +1,7 @@
 "use client";
 
 import { Dispatch, SetStateAction, useEffect } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { getActiveFarmId, saveActiveFarmId } from "@/lib/farm";
 import type { Farm } from "@/lib/farm";
 
@@ -30,13 +30,12 @@ export function useFarmSelection({
   preferredFarmName,
 }: UseFarmSelectionOptions) {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const requestedFarmId = searchParams.get("farmId") ?? "";
-  const searchParamsString = searchParams.toString();
 
   useEffect(() => {
-    if (!farms.length) return;
+    if (!farms.length || typeof window === "undefined") return;
+
+    const requestedFarmId =
+      new URLSearchParams(window.location.search).get("farmId") ?? "";
 
     if (requestedFarmId && farms.some((farm) => farm.id === requestedFarmId)) {
       setActiveFarmId((current) =>
@@ -65,7 +64,7 @@ export function useFarmSelection({
     return () => {
       cancelled = true;
     };
-  }, [farms, requestedFarmId, activeFarmId, setActiveFarmId, preferredFarmName]);
+  }, [farms, activeFarmId, setActiveFarmId, preferredFarmName]);
 
   useEffect(() => {
     if (!activeFarmId) return;
@@ -73,9 +72,13 @@ export function useFarmSelection({
   }, [activeFarmId]);
 
   useEffect(() => {
-    if (!activeFarmId || requestedFarmId === activeFarmId) return;
-    const nextParams = new URLSearchParams(searchParamsString);
-    nextParams.set("farmId", activeFarmId);
-    router.replace(`${pathname}?${nextParams.toString()}`, { scroll: false });
-  }, [activeFarmId, requestedFarmId, searchParamsString, router, pathname]);
+    if (!activeFarmId || typeof window === "undefined") return;
+    const currentUrl = new URL(window.location.href);
+    const currentFarmId = currentUrl.searchParams.get("farmId") ?? "";
+    if (currentFarmId === activeFarmId) return;
+
+    currentUrl.searchParams.set("farmId", activeFarmId);
+    const nextUrl = `${currentUrl.pathname}?${currentUrl.searchParams.toString()}${currentUrl.hash}`;
+    router.replace(nextUrl, { scroll: false });
+  }, [activeFarmId, router]);
 }
