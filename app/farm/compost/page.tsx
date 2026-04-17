@@ -31,9 +31,14 @@ export default function CompostPage() {
   const [error, setError] = useState("");
   const [modal, setModal] = useState<CompostEntry | null | "new">(null);
   const [form, setForm] = useState(blankForm);
+  const [zoneSearch, setZoneSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
+  const normalizedZoneSearch = zoneSearch.trim().toLowerCase();
+  const filteredZones = zones.filter((z) =>
+    z.name.toLowerCase().includes(normalizedZoneSearch)
+  );
 
   async function loadEntries(farmId: string) {
     const [rows, zoneRows] = await Promise.all([getCompost(farmId), getZones(farmId)]);
@@ -129,6 +134,7 @@ export default function CompostPage() {
   }
 
   function openEdit(entry: CompostEntry) {
+    setZoneSearch("");
     setForm({
       compost_type: entry.compost_type ?? "",
       date: entry.date ?? "",
@@ -142,6 +148,7 @@ export default function CompostPage() {
   }
 
   function openAdd() {
+    setZoneSearch("");
     setForm(blankForm);
     setModal("new");
   }
@@ -285,11 +292,19 @@ export default function CompostPage() {
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-zinc-600">Zones / Beds <span className="font-normal text-zinc-400">(select multiple)</span></label>
+                <input
+                  value={zoneSearch}
+                  onChange={(e) => setZoneSearch(e.target.value)}
+                  placeholder="Search beds…"
+                  className="mb-2 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                />
                 <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-xl border border-zinc-300 p-3">
                   {zones.length === 0 ? (
                     <p className="text-xs text-zinc-400">No zones available</p>
+                  ) : filteredZones.length === 0 ? (
+                    <p className="text-xs text-zinc-400">No beds match your search.</p>
                   ) : (
-                    zones.map((z) => (
+                    filteredZones.map((z) => (
                       <label key={z.id} className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox"
                           checked={form.zone_ids.includes(z.id)}
