@@ -253,13 +253,13 @@ export default function CompostPage() {
 
       {/* Modal */}
       {modal !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-6 sm:items-center sm:py-10">
+          <div className="flex w-full max-w-lg max-h-[calc(100vh-2rem)] flex-col rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl sm:max-h-[calc(100vh-5rem)]">
             <h2 className="mb-5 text-lg font-semibold">
               {modal === "new" ? "Add compost entry" : `Edit — ${(modal as CompostEntry).compost_type ?? "entry"}`}
             </h2>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-3 overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-zinc-600">Compost type</label>
                   <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.compost_type} onChange={(e) => setForm((p) => ({ ...p, compost_type: e.target.value }))} placeholder="Horse manure, Bokashi…" />
@@ -269,7 +269,7 @@ export default function CompostPage() {
                   <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.place} onChange={(e) => setForm((p) => ({ ...p, place: e.target.value }))} placeholder="Next to the fence" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-zinc-600">Date started</label>
                   <input type="date" className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
@@ -285,7 +285,7 @@ export default function CompostPage() {
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-zinc-600">Zones / Beds <span className="font-normal text-zinc-400">(select multiple)</span></label>
-                <div className="space-y-1.5 rounded-xl border border-zinc-300 p-3">
+                <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-xl border border-zinc-300 p-3">
                   {zones.length === 0 ? (
                     <p className="text-xs text-zinc-400">No zones available</p>
                   ) : (
@@ -312,7 +312,7 @@ export default function CompostPage() {
                 <textarea className="min-h-[70px] w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
               </div>
             </div>
-            <div className="mt-5 flex gap-2">
+            <div className="mt-5 flex gap-2 border-t border-zinc-100 pt-4">
               <button onClick={handleSave} disabled={saving} className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60">
                 {saving ? "Saving..." : "Save"}
               </button>
