@@ -11,6 +11,7 @@ type SeedlingZoneDef = { id: string; label: string };
 type BedDef = {
   id: string;
   label: string;
+  bed_uid?: string;
   x: number;
   y: number;
   w: number;
@@ -44,9 +45,34 @@ function storageKey(farmName: string) {
   return `farm-map-layout:${farmName}`;
 }
 
+function randomBedUid(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `bed_${Math.random().toString(36).slice(2)}_${Date.now().toString(36)}`;
+}
+
+function withBedUid(bed: BedDef): BedDef {
+  if (bed.bed_uid) return bed;
+  return { ...bed, bed_uid: randomBedUid() };
+}
+
+function ensureBedsHaveUid(beds: BedDef[]): BedDef[] {
+  let changed = false;
+  const normalized = beds.map((bed) => {
+    if (bed.bed_uid) return bed;
+    changed = true;
+    return withBedUid(bed);
+  });
+  return changed ? normalized : beds;
+}
+
 function saveCustomLayout(farmName: string, beds: BedDef[], landmarks: LandmarkDef[], backgroundImage?: string) {
   try {
-    localStorage.setItem(storageKey(farmName), JSON.stringify({ beds, landmarks, backgroundImage }));
+    localStorage.setItem(
+      storageKey(farmName),
+      JSON.stringify({ beds: ensureBedsHaveUid(beds), landmarks, backgroundImage })
+    );
   } catch { /* quota exceeded – ignore */ }
 }
 
@@ -301,7 +327,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
           // Only use database data if it has actual beds (don't overwrite with empty arrays)
           if (response.ok && result.data && result.data.beds && result.data.beds.length > 0) {
             console.log("[FarmMap] Loaded layout from database for farm:", farmId, "with", result.data.beds.length, "beds");
-            setEditBeds(result.data.beds);
+            setEditBeds(ensureBedsHaveUid(result.data.beds as BedDef[]));
             if (result.data.landmarks) setEditLandmarks(result.data.landmarks);
             setCustomBg(result.data.background_image);
             return;
@@ -315,7 +341,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
       const saved = loadCustomLayout(farmName);
       if (saved) {
         console.log("[FarmMap] Loaded layout from localStorage for farm:", farmName);
-        setEditBeds(saved.beds);
+        setEditBeds(ensureBedsHaveUid(saved.beds));
         if (saved.landmarks) setEditLandmarks(saved.landmarks);
         setCustomBg(saved.backgroundImage);
       } else {
@@ -402,7 +428,11 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
 
   // Enter edit mode
   function startEdit() {
-    setEditBeds(editBeds.length > 0 ? [...editBeds] : baseLayout.beds.map((b) => ({ ...b })));
+    setEditBeds(
+      ensureBedsHaveUid(
+        editBeds.length > 0 ? [...editBeds] : baseLayout.beds.map((b) => ({ ...b }))
+      )
+    );
     setEditLandmarks(editLandmarks.length > 0 ? [...editLandmarks] : baseLayout.landmarks.map((l) => ({ ...l })));
     setEditMode(true);
     setSelectedBed(null);
@@ -416,8 +446,10 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
 
     // Exit edit mode immediately so the button feels responsive; local state
     // is the source of truth and the DB write continues in the background.
+    const bedsToSave = ensureBedsHaveUid(editBeds);
+    setEditBeds(bedsToSave);
     if (farmName) {
-      saveCustomLayout(farmName, editBeds, editLandmarks, customBg);
+      saveCustomLayout(farmName, bedsToSave, editLandmarks, customBg);
     }
     setEditMode(false);
     setEditingLabelIdx(null);
@@ -430,7 +462,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             farm_id: farmId,
-            beds: editBeds,
+            beds: bedsToSave,
             landmarks: editLandmarks,
             background_image: customBg,
           }),
@@ -453,7 +485,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
     if (farmName) {
       const saved = loadCustomLayout(farmName);
       if (saved) {
-        setEditBeds(saved.beds);
+        setEditBeds(ensureBedsHaveUid(saved.beds));
         setEditLandmarks(saved.landmarks ?? []);
         setCustomBg(saved.backgroundImage);
       } else {
@@ -568,7 +600,10 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
     if (!newBedLabel.trim()) return;
     const id = newBedLabel.trim().toUpperCase().replace(/\s+/g, "");
     if (editBeds.find((b) => b.id === id)) return;
-    setEditBeds((prev) => [...prev, { id, label: newBedLabel.trim(), x: 100, y: 100, w: 80, h: 30 }]);
+    setEditBeds((prev) => [
+      ...prev,
+      { id, label: newBedLabel.trim(), bed_uid: randomBedUid(), x: 100, y: 100, w: 80, h: 30 },
+    ]);
     setNewBedLabel("");
     setAddingBed(false);
   }
@@ -628,7 +663,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
       setCustomBg(dataUrl);
       // If this is a brand new farm with no beds, start with empty bed list in edit mode
       if (editBeds.length === 0 && baseLayout.beds.length === 0) {
-        setEditBeds([]);
+        setEditBeds(ensureBedsHaveUid([]));
       }
     };
     reader.readAsDataURL(file);
@@ -1273,7 +1308,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
               {selected ? (
                 <>
                   <div className="mt-1 text-zinc-500">
-                    Zone: {selected.name}
+                    Bed link: {selected.name}
                     {selected.size_acres ? ` · ${selected.size_acres} ac` : ""}
                   </div>
                   {selectedCrops.length > 0 ? (
@@ -1302,7 +1337,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                       ))}
                     </div>
                   ) : (
-                    <div className="mt-3 text-xs text-zinc-400">No crops in this zone</div>
+                    <div className="mt-3 text-xs text-zinc-400">No crops in this bed</div>
                   )}
                   {selectedPlants.length > 0 && (
                     <div className="mt-4">
@@ -1358,7 +1393,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                 </>
               ) : (
                 <div className="mt-2 text-xs text-zinc-400">
-                  Not mapped to a zone. Create a zone with code &quot;{selectedBed}&quot; to link it.
+                  This bed is still syncing. Save the map layout to auto-link it.
                 </div>
               )}
               {selectedHarvestEta && (

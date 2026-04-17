@@ -99,7 +99,7 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
       <div className="mb-5">
         <h2 className="text-xl font-semibold">Create crop</h2>
         <p className="mt-1 text-sm text-zinc-500">
-          Add the crop cycle and link it to one or more zones.
+          Add the crop cycle and link it to one or more beds.
         </p>
       </div>
 
@@ -149,7 +149,7 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
         ) : null}
 
         <div>
-          <label className="mb-2 block text-sm font-medium">Zones</label>
+          <label className="mb-2 block text-sm font-medium">Beds</label>
           <div className="space-y-2">
             {form.zone_ids.map((zoneId, index) => (
               <div key={index} className="flex items-center gap-2">
@@ -158,7 +158,7 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
                   onChange={(e) => handleZoneChange(index, e.target.value)}
                   className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
                 >
-                  <option value="">Select zone</option>
+                  <option value="">Select bed</option>
                   {zones.map((zone) => (
                     <option
                       key={zone.id}
@@ -173,7 +173,7 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
                   type="button"
                   onClick={() => removeZone(index)}
                   className="flex-shrink-0 rounded-xl border border-zinc-200 p-2 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"
-                  title="Remove zone"
+                  title="Remove bed"
                 >
                   <X size={16} />
                 </button>
@@ -186,7 +186,7 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
                 className="flex items-center gap-1.5 rounded-xl border border-dashed border-zinc-300 px-3 py-2 text-sm text-zinc-500 transition hover:border-zinc-400 hover:text-zinc-700"
               >
                 <Plus size={14} />
-                {form.zone_ids.length === 0 ? "Add zone" : "Add another zone"}
+                {form.zone_ids.length === 0 ? "Add bed" : "Add another bed"}
               </button>
             )}
           </div>
