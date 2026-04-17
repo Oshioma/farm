@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getFarms, getSeedlings, getSeedCollection } from "@/lib/farm";
 import type { Farm, SeedlingEntry, SeedCollectionEntry } from "@/lib/farm";
 import { SeedlingMap } from "../components/SeedlingMap";
+import { downloadCsvFile, toFileSlug } from "@/app/farm/utils";
+import { Download } from "lucide-react";
 
 /* ── Types ────────────────────────────────────────────────── */
 
@@ -77,6 +79,7 @@ export default function SeedlingsPage() {
   const [form, setForm] = useState<FormData>(blank("nursery"));
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [seedSearchTerm, setSeedSearchTerm] = useState("");
 
   // Seed collection
   const [seedEntries, setSeedEntries] = useState<SeedCollectionEntry[]>([]);
@@ -267,7 +270,126 @@ export default function SeedlingsPage() {
 
   const nursery = entries.filter((e) => e.type === "nursery");
   const field = entries.filter((e) => e.type === "field");
+  const normalizedSeedSearch = seedSearchTerm.trim().toLowerCase();
+  const filteredNursery = useMemo(() => {
+    if (!normalizedSeedSearch) return nursery;
+    return nursery.filter((entry) =>
+      `${entry.plant} ${entry.variety ?? ""} ${entry.row_location ?? ""} ${entry.notes ?? ""}`
+        .toLowerCase()
+        .includes(normalizedSeedSearch)
+    );
+  }, [nursery, normalizedSeedSearch]);
+  const filteredField = useMemo(() => {
+    if (!normalizedSeedSearch) return field;
+    return field.filter((entry) =>
+      `${entry.plant} ${entry.variety ?? ""} ${entry.row_location ?? ""} ${entry.notes ?? ""}`
+        .toLowerCase()
+        .includes(normalizedSeedSearch)
+    );
+  }, [field, normalizedSeedSearch]);
+  const filteredSeedCollection = useMemo(() => {
+    if (!normalizedSeedSearch) return seedEntries;
+    return seedEntries.filter((entry) =>
+      `${entry.plant} ${entry.distance ?? ""} ${entry.notes ?? ""} ${entry.notes2 ?? ""}`
+        .toLowerCase()
+        .includes(normalizedSeedSearch)
+    );
+  }, [seedEntries, normalizedSeedSearch]);
   const activeFarm = farms.find((f) => f.id === activeFarmId);
+
+  function downloadSeedlingsCsv(mode: "filtered" | "all") {
+    const farmSlug = toFileSlug(activeFarm?.name, "farm");
+    const stamp = new Date().toISOString().slice(0, 10);
+    const rows = mode === "filtered" ? filteredNursery : nursery;
+    if (rows.length === 0) return;
+    downloadCsvFile(
+      `${farmSlug}-seedlings-nursery-${mode}-${stamp}.csv`,
+      [
+        "Type",
+        "Date",
+        "Plant",
+        "Variety",
+        "Quantity",
+        "Germination",
+        "Germination Date",
+        "Healthy Seedlings",
+        "Successional Sowing",
+        "Yields",
+        "Tray / Row Location",
+        "Notes",
+        "Created At",
+      ],
+      rows.map((entry) => [
+        entry.type,
+        entry.date || "",
+        entry.plant,
+        entry.variety || "",
+        entry.quantity || "",
+        entry.germination || "",
+        entry.germination_date || "",
+        entry.healthy_seedlings || "",
+        entry.successional_sowing || "",
+        entry.yields || "",
+        entry.row_location || "",
+        entry.notes || "",
+        entry.created_at || "",
+      ])
+    );
+  }
+
+  function downloadFieldCsv(mode: "filtered" | "all") {
+    const farmSlug = toFileSlug(activeFarm?.name, "farm");
+    const stamp = new Date().toISOString().slice(0, 10);
+    const rows = mode === "filtered" ? filteredField : field;
+    if (rows.length === 0) return;
+    downloadCsvFile(
+      `${farmSlug}-seedlings-field-${mode}-${stamp}.csv`,
+      [
+        "Type",
+        "Date",
+        "Plant",
+        "Variety",
+        "Quantity",
+        "Germination",
+        "Germination Date",
+        "Healthy Seedlings",
+        "Row Location",
+        "Notes",
+        "Created At",
+      ],
+      rows.map((entry) => [
+        entry.type,
+        entry.date || "",
+        entry.plant,
+        entry.variety || "",
+        entry.quantity || "",
+        entry.germination || "",
+        entry.germination_date || "",
+        entry.healthy_seedlings || "",
+        entry.row_location || "",
+        entry.notes || "",
+        entry.created_at || "",
+      ])
+    );
+  }
+
+  function downloadSeedCollectionCsv(mode: "filtered" | "all") {
+    const farmSlug = toFileSlug(activeFarm?.name, "farm");
+    const stamp = new Date().toISOString().slice(0, 10);
+    const rows = mode === "filtered" ? filteredSeedCollection : seedEntries;
+    if (rows.length === 0) return;
+    downloadCsvFile(
+      `${farmSlug}-seed-collection-${mode}-${stamp}.csv`,
+      ["Plant", "Distance", "Notes", "Additional Notes", "Created At"],
+      rows.map((entry) => [
+        entry.plant,
+        entry.distance || "",
+        entry.notes || "",
+        entry.notes2 || "",
+        entry.created_at || "",
+      ])
+    );
+  }
 
   return (
     <main className="min-h-screen bg-stone-50 text-zinc-900">
@@ -334,12 +456,55 @@ export default function SeedlingsPage() {
               </button>
             ))}
           </div>
-          <button
-            onClick={openAdd}
-            className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
-          >
-            + Add entry
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              value={seedSearchTerm}
+              onChange={(e) => setSeedSearchTerm(e.target.value)}
+              placeholder="Search current tab..."
+              className="w-52 rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm outline-none transition focus:border-zinc-900"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                if (tab === "nursery") downloadSeedlingsCsv("filtered");
+                else if (tab === "field") downloadFieldCsv("filtered");
+                else downloadSeedCollectionCsv("filtered");
+              }}
+              disabled={
+                (tab === "nursery" && filteredNursery.length === 0) ||
+                (tab === "field" && filteredField.length === 0) ||
+                (tab === "seeds" && filteredSeedCollection.length === 0)
+              }
+              className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" />
+              Export filtered CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (tab === "nursery") downloadSeedlingsCsv("all");
+                else if (tab === "field") downloadFieldCsv("all");
+                else downloadSeedCollectionCsv("all");
+              }}
+              disabled={
+                (tab === "nursery" && nursery.length === 0) ||
+                (tab === "field" && field.length === 0) ||
+                (tab === "seeds" && seedEntries.length === 0)
+              }
+              className="inline-flex items-center gap-2 rounded-full border border-zinc-900 bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" />
+              Export all CSV
+            </button>
+            <button
+              onClick={openAdd}
+              className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
+            >
+              + Add entry
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -354,7 +519,7 @@ export default function SeedlingsPage() {
               />
             </div>
             <SeedlingTable
-              rows={nursery}
+              rows={filteredNursery}
               columns={["date", "plant", "variety", "quantity", "row_location", "successional_sowing", "germination_date", "germination", "healthy_seedlings", "notes", "yields"]}
               headers={["Date", "Plant", "Variety", "Seeds", "Tray", "Successional", "Germ. date", "Status", "Healthy", "Notes", "Yields"]}
               onEdit={openEdit}
@@ -364,7 +529,7 @@ export default function SeedlingsPage() {
           </div>
         ) : tab === "field" ? (
           <SeedlingTable
-            rows={field}
+            rows={filteredField}
             columns={["date", "row_location", "plant", "quantity", "germination_date", "germination", "healthy_seedlings", "notes"]}
             headers={["Date", "Row", "Plant", "Qty", "Germ. date", "Status", "Healthy", "Notes"]}
             onEdit={openEdit}
@@ -373,7 +538,7 @@ export default function SeedlingsPage() {
           />
         ) : tab === "seeds" ? (
           <SeedCollectionTable
-            rows={seedEntries}
+            rows={filteredSeedCollection}
             onEdit={(e) => { setSeedForm({ plant: e.plant, distance: e.distance ?? "", notes: e.notes ?? "", notes2: e.notes2 ?? "" }); setSeedModal(e); }}
             onDelete={handleSeedDelete}
             deletingId={seedDeletingId}

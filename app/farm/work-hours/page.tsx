@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getFarms, getWorkHours } from "@/lib/farm";
 import type { Farm, WorkHoursEntry } from "@/lib/farm";
+import { downloadCsvFile, toFileSlug } from "@/app/farm/utils";
+import { Download } from "lucide-react";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -184,6 +186,24 @@ export default function WorkHoursPage() {
   const activeFarm = farms.find((f) => f.id === activeFarmId);
   const inp = "w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900";
 
+  function downloadWorkHoursCsv(rows: WorkHoursEntry[], mode: "filtered" | "all") {
+    if (rows.length === 0) return;
+    const farmSlug = toFileSlug(activeFarm?.name, "farm");
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadCsvFile(
+      `${farmSlug}-work-hours-${mode}-${stamp}.csv`,
+      ["Date", "Worker", "Hours", "Role", "Notes", "Created At"],
+      rows.map((row) => [
+        row.date,
+        row.worker_name,
+        row.hours,
+        row.role,
+        row.notes || "",
+        row.created_at || "",
+      ])
+    );
+  }
+
   return (
     <main className="min-h-screen bg-stone-50 text-zinc-900">
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
@@ -239,7 +259,29 @@ export default function WorkHoursPage() {
               </div>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {tab === "log" && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => downloadWorkHoursCsv(filtered, "filtered")}
+                  disabled={filtered.length === 0}
+                  className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Download className="h-4 w-4" />
+                  Export filtered CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={() => downloadWorkHoursCsv(entries, "all")}
+                  disabled={entries.length === 0}
+                  className="inline-flex items-center gap-2 rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Download className="h-4 w-4" />
+                  Export all CSV
+                </button>
+              </>
+            )}
             <button
               onClick={() => setQuickMode(!quickMode)}
               className={`rounded-full px-4 py-2 text-sm font-medium transition ${quickMode ? "bg-zinc-900 text-white" : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"}`}
