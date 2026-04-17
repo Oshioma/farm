@@ -1356,7 +1356,7 @@ export default function FarmPage() {
               { href: "/farm/systems", label: "Systems" },
               { href: "/companion", label: "Companion planting" },
               { href: "/income-prediction", label: "Income prediction" },
-              { href: "/farm/settings", label: "Settings" },
+              { href: activeFarmId ? `/farm/settings?farmId=${activeFarmId}` : "/farm/settings", label: "Settings" },
             ].map(({ href, label }) => (
               <Link
                 key={href}

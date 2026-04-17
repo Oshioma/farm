@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getActiveFarmId, getFarms, saveActiveFarmId } from "@/lib/farm";
 import type { Farm } from "@/lib/farm";
@@ -13,6 +13,7 @@ type CsvValue = string | number | boolean | null | undefined;
 
 export default function SettingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -31,17 +32,22 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState("");
 
   const activeFarm = farms.find((f) => f.id === activeFarmId);
+  const farmIdFromQuery = searchParams.get("farmId");
 
   useEffect(() => {
     (async () => {
       try {
         const f = await getFarms();
         setFarms(f);
-        const saved = await getActiveFarmId();
-        if (saved && f.some((farm) => farm.id === saved)) {
-          setActiveFarmId(saved);
-        } else if (f.length > 0) {
-          setActiveFarmId(f[0].id);
+        if (farmIdFromQuery && f.some((farm) => farm.id === farmIdFromQuery)) {
+          setActiveFarmId(farmIdFromQuery);
+        } else {
+          const saved = await getActiveFarmId();
+          if (saved && f.some((farm) => farm.id === saved)) {
+            setActiveFarmId(saved);
+          } else if (f.length > 0) {
+            setActiveFarmId(f[0].id);
+          }
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load farms");
@@ -49,7 +55,14 @@ export default function SettingsPage() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [farmIdFromQuery]);
+
+  useEffect(() => {
+    if (!farmIdFromQuery || farms.length === 0) return;
+    if (farms.some((farm) => farm.id === farmIdFromQuery)) {
+      setActiveFarmId(farmIdFromQuery);
+    }
+  }, [farmIdFromQuery, farms]);
 
   useEffect(() => {
     if (!activeFarmId) return;
@@ -220,32 +233,7 @@ export default function SettingsPage() {
         </Link>
       </div>
 
-      {activeFarm && (
-        <div className="mb-6">
-          <p className="mb-2 text-sm text-zinc-500">Farm: {activeFarm.name}</p>
-          {farms.length > 1 && (
-            <div className="max-w-sm">
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500">
-                Export farm
-              </label>
-              <select
-                value={activeFarmId}
-                onChange={(e) => {
-                  setActiveFarmId(e.target.value);
-                  setSuccess("");
-                }}
-                className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-900"
-              >
-                {farms.map((farm) => (
-                  <option key={farm.id} value={farm.id}>
-                    {farm.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
-      )}
+      {activeFarm && <p className="mb-6 text-sm text-zinc-500">Farm: {activeFarm.name}</p>}
 
       {error && (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
