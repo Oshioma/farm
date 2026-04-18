@@ -31,7 +31,6 @@ import { ExpenseForm } from "@/app/farm/components/ExpenseForm";
 import { AssetForm } from "@/app/farm/components/AssetForm";
 import { PestForm } from "@/app/farm/components/PestForm";
 import { SaleForm } from "@/app/farm/components/SaleForm";
-import { ZoneForm } from "@/app/farm/components/ZoneForm";
 import { FarmMap } from "@/app/farm/components/FarmMap";
 import { Plus, X } from "lucide-react";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
@@ -42,7 +41,6 @@ import type { ExpenseFormData } from "@/app/farm/components/ExpenseForm";
 import type { AssetFormData } from "@/app/farm/components/AssetForm";
 import type { PestFormData } from "@/app/farm/components/PestForm";
 import type { SaleFormData } from "@/app/farm/components/SaleForm";
-import type { ZoneFormData } from "@/app/farm/components/ZoneForm";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -69,7 +67,7 @@ export default function FarmPage() {
 
   const [activeFarmId, setActiveFarmId] = useState<string>("");
   const hasLoadedInitialFarm = React.useRef(false);
-  const [activeForm, setActiveForm] = useState<"crop" | "task" | "harvest" | "expense" | "asset" | "pest" | "sale" | "zone" | null>(null);
+  const [activeForm, setActiveForm] = useState<"crop" | "task" | "harvest" | "expense" | "asset" | "pest" | "sale" | null>(null);
   const [showExpenses, setShowExpenses] = useState(false);
   const [showAssets, setShowAssets] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -118,14 +116,10 @@ export default function FarmPage() {
   const [editingPestId, setEditingPestId] = useState<string | null>(null);
   const [deletingPestId, setDeletingPestId] = useState<string | null>(null);
   const [confirmDeletePestId, setConfirmDeletePestId] = useState<string | null>(null);
-  const [zonesView, setZonesView] = useState<"map" | "list">("map");
   const [selectedMapBedId, setSelectedMapBedId] = useState<string>("");
   const [selectedMapZoneId, setSelectedMapZoneId] = useState<string>("");
   const [cropSearch, setCropSearch] = useState<string>("");
   const [assigningCropId, setAssigningCropId] = useState<string | null>(null);
-  const [editingZoneId, setEditingZoneId] = useState<string | null>(null);
-  const [editingZoneForm, setEditingZoneForm] = useState<ZoneFormData>({ name: "", code: "", size_acres: "" });
-  const [savingZoneId, setSavingZoneId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState("");
   const [userRoleOnFarm, setUserRoleOnFarm] = useState<string | null>(null);
   const [deleteFarmStep, setDeleteFarmStep] = useState<0 | 1 | 2>(0);
@@ -652,9 +646,9 @@ export default function FarmPage() {
         type: "crop_created",
         title: `${cropName} added`,
         meta: zoneCount > 1
-          ? `Crop linked to ${zoneCount} zones`
+          ? `Crop linked to ${zoneCount} beds`
           : zoneCount === 1
-            ? "Crop linked to zone"
+            ? "Crop linked to bed"
             : "Crop created",
       });
 
@@ -1211,89 +1205,6 @@ export default function FarmPage() {
     }
   }
 
-  async function handleCreateZone(data: ZoneFormData): Promise<boolean> {
-    if (!activeFarmId) return false;
-    try {
-      setError("");
-      const name = data.name.trim();
-      if (!name) throw new Error("Zone name is required.");
-
-      const { error: insertError } = await supabase.from("zones").insert({
-        farm_id: activeFarmId,
-        name,
-        code: data.code.trim() || null,
-        size_acres: data.size_acres ? Number(data.size_acres) : null,
-        is_active: true,
-      });
-      if (insertError) throw insertError;
-
-      await loadFarmData(activeFarmId);
-      return true;
-    } catch (err) {
-      setError(errMsg(err, "Failed to add zone"));
-      return false;
-    }
-  }
-
-  function startEditZone(zoneId: string) {
-    const zone = zones.find((z) => z.id === zoneId);
-    if (!zone) return;
-    setEditingZoneForm({
-      name: zone.name,
-      code: zone.code || "",
-      size_acres: zone.size_acres?.toString() || "",
-    });
-    setEditingZoneId(zoneId);
-  }
-
-  async function handleUpdateZone(data: ZoneFormData): Promise<boolean> {
-    if (!editingZoneId) return false;
-    try {
-      setSavingZoneId(editingZoneId);
-      setError("");
-      const name = data.name.trim();
-      if (!name) throw new Error("Zone name is required.");
-
-      const { error: updateError } = await supabase
-        .from("zones")
-        .update({
-          name,
-          code: data.code.trim() || null,
-          size_acres: data.size_acres ? Number(data.size_acres) : null,
-        })
-        .eq("id", editingZoneId);
-      if (updateError) throw updateError;
-
-      setEditingZoneId(null);
-      setEditingZoneForm({ name: "", code: "", size_acres: "" });
-      await loadFarmData(activeFarmId);
-      return true;
-    } catch (err) {
-      setError(errMsg(err, "Failed to update zone"));
-      return false;
-    } finally {
-      setSavingZoneId(null);
-    }
-  }
-
-  async function handleDeleteZone(zoneId: string) {
-    if (!confirm("Are you sure you want to delete this zone?")) return;
-    try {
-      setError("");
-      const { error: deleteError } = await supabase
-        .from("zones")
-        .delete()
-        .eq("id", zoneId);
-      if (deleteError) throw deleteError;
-
-      setEditingZoneId(null);
-      setEditingZoneForm({ name: "", code: "", size_acres: "" });
-      await loadFarmData(activeFarmId);
-    } catch (err) {
-      setError(errMsg(err, "Failed to delete zone"));
-    }
-  }
-
   return (
     <main className="min-h-screen bg-stone-50 text-zinc-900">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -1451,7 +1362,6 @@ export default function FarmPage() {
               { href: "#crops", label: "Crops" },
               { href: workerTasksHref, label: "Tasks" },
               { href: "#map", label: "Map" },
-              { href: withFarmContext("/farm/zones"), label: "Zones" },
               { href: withFarmContext("/farm/trees"), label: "Trees" },
               { href: withFarmContext("/farm/planting-plan"), label: "Planting plan" },
               { href: withFarmContext("/farm/seedlings"), label: "Seedlings" },
@@ -1681,7 +1591,6 @@ export default function FarmPage() {
               {(
                 [
                   { key: "crop", label: "+ Crop" },
-                  { key: "zone", label: "+ Zone" },
                   { key: "task", label: "+ Task" },
                   { key: "harvest", label: "+ Harvest" },
                   { key: "pest", label: "+ Pest" },
@@ -1704,7 +1613,7 @@ export default function FarmPage() {
               ))}
             </div>
 
-            {activeForm && ["crop", "task", "harvest", "expense", "asset", "pest", "sale", "zone"].includes(activeForm) ? (
+            {activeForm && ["crop", "task", "harvest", "expense", "asset", "pest", "sale"].includes(activeForm) ? (
               <div className="mb-6 max-w-sm">
                 {activeForm === "crop" && (
                   <CropForm
@@ -1782,15 +1691,6 @@ export default function FarmPage() {
                     crops={crops}
                     onSubmit={async (data) => {
                       const ok = await handleLogSale(data);
-                      if (ok) setActiveForm(null);
-                      return ok;
-                    }}
-                  />
-                )}
-                {activeForm === "zone" && (
-                  <ZoneForm
-                    onSubmit={async (data) => {
-                      const ok = await handleCreateZone(data);
                       if (ok) setActiveForm(null);
                       return ok;
                     }}
@@ -1918,7 +1818,7 @@ export default function FarmPage() {
                                 onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, zone_id: e.target.value } : prev)}
                                 className="rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                               >
-                                <option value="">No zone</option>
+                                <option value="">No bed</option>
                                 {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
                               </select>
                               <select
@@ -1992,7 +1892,7 @@ export default function FarmPage() {
                             <h3 className="mt-3 text-base font-semibold">{task.title}</h3>
 
                             <div className="mt-2 text-sm text-zinc-600">
-                              {task.zone?.[0]?.name ?? "No zone"}
+                              {task.zone?.[0]?.name ?? "No bed"}
                               <span className="mx-2">·</span>
                               {task.crop?.[0]?.crop_name ?? "General task"}
                               <span className="mx-2">·</span>
@@ -2088,7 +1988,7 @@ export default function FarmPage() {
                           <h3 className="mt-3 text-base font-medium text-zinc-600 line-through">{task.title}</h3>
 
                           <div className="mt-2 text-sm text-zinc-400">
-                            {task.zone?.[0]?.name ?? "No zone"}
+                            {task.zone?.[0]?.name ?? "No bed"}
                             <span className="mx-2">·</span>
                             {task.crop?.[0]?.crop_name ?? "General task"}
                             <span className="mx-2">·</span>
@@ -2119,194 +2019,28 @@ export default function FarmPage() {
             <section id="map" className="mb-6 scroll-mt-4 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-semibold">Zones / Beds</h2>
+                  <h2 className="text-xl font-semibold">Beds map</h2>
                   <p className="mt-1 text-sm text-zinc-500">Planting areas and what is growing in each.</p>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex rounded-full border border-zinc-200 p-0.5">
-                    <button
-                      onClick={() => setZonesView("map")}
-                      className={`rounded-full px-3 py-1 text-xs font-medium transition ${zonesView === "map" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-700"}`}
-                    >
-                      Map
-                    </button>
-                    <button
-                      onClick={() => setZonesView("list")}
-                      className={`rounded-full px-3 py-1 text-xs font-medium transition ${zonesView === "list" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-700"}`}
-                    >
-                      List
-                    </button>
-                  </div>
-                  <span className="text-sm text-zinc-500">{zones.length} zones</span>
-                  <button
-                    onClick={() => setActiveForm(activeForm === "zone" ? null : "zone")}
-                    className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-                  >
-                    {activeForm === "zone" ? "Cancel" : "+ Add zone"}
-                  </button>
-                  {editingZoneId ? (
-                    <button
-                      onClick={() => {
-                        setEditingZoneId(null);
-                        setEditingZoneForm({ name: "", code: "", size_acres: "" });
-                      }}
-                      className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
-                    >
-                      Cancel edit
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => zones.length > 0 && startEditZone(zones[0].id)}
-                      disabled={zones.length === 0}
-                      className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Edit zones
-                    </button>
-                  )}
-                </div>
+                <span className="text-sm text-zinc-500">{zones.length} mapped beds</span>
               </div>
-
-              {activeForm === "zone" && (
-                <div className="mt-5 max-w-sm">
-                  <ZoneForm
-                    onSubmit={async (data) => {
-                      const ok = await handleCreateZone(data);
-                      if (ok) setActiveForm(null);
-                      return ok;
-                    }}
-                  />
-                </div>
-              )}
-
-              {editingZoneId && (
-                <div className="mt-5 max-w-sm rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-                  <h3 className="mb-3 text-sm font-semibold">Edit zone</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="mb-1 block text-xs font-medium">Zone name</label>
-                      <input
-                        type="text"
-                        value={editingZoneForm.name}
-                        onChange={(e) => setEditingZoneForm((p) => ({ ...p, name: e.target.value }))}
-                        className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
-                        placeholder="Zone name"
-                      />
-                    </div>
-                    <div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium">Size (acres)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={editingZoneForm.size_acres}
-                          onChange={(e) => setEditingZoneForm((p) => ({ ...p, size_acres: e.target.value }))}
-                          className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
-                          placeholder="0.5"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex gap-2 pt-2">
-                      <button
-                        onClick={async () => {
-                          const ok = await handleUpdateZone(editingZoneForm);
-                          if (ok) {
-                            setEditingZoneId(null);
-                            setEditingZoneForm({ name: "", code: "", size_acres: "" });
-                          }
-                        }}
-                        disabled={!editingZoneForm.name.trim() || savingZoneId === editingZoneId}
-                        className="flex-1 rounded-xl bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
-                      >
-                        {savingZoneId === editingZoneId ? "Saving…" : "Save"}
-                      </button>
-                      <button
-                        onClick={() => editingZoneId && handleDeleteZone(editingZoneId)}
-                        className="rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                  {zones.length > 1 && editingZoneId && (
-                    <div className="mt-3 flex gap-2 border-t border-zinc-200 pt-3">
-                      {zones.map((zone) => (
-                        <button
-                          key={zone.id}
-                          onClick={() => startEditZone(zone.id)}
-                          className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                            editingZoneId === zone.id
-                              ? "bg-zinc-900 text-white"
-                              : "border border-zinc-200 text-zinc-600 hover:bg-zinc-100"
-                          }`}
-                        >
-                          {zone.name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {zonesView === "map" ? (
-                <div className="mt-5">
-                  <FarmMap
-                    zones={zones}
-                    crops={crops}
-                    plants={plants}
-                    fertilisations={fertilisations}
-                    compostEntries={compostEntries}
-                    harvestEta={harvestEtaEntries}
-                    farmName={activeFarm?.name}
-                    farmId={activeFarm?.id}
-                    onSelectBed={handleMapBedSelection}
-                    onAddCropToBed={handleAddCropFromMap}
-                  />
-                  <p className="mt-2 text-xs text-zinc-400">
-                    Click a bed to see details and quickly add crops. To link a bed, create a zone with a matching code (e.g. R1, CL2).
-                  </p>
-                </div>
-              ) : zones.length === 0 ? (
-                <p className="mt-5 text-sm text-zinc-500">No zones yet — add a bed, row, or area above.</p>
-              ) : (
-                <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {zones.map((zone) => {
-                    const zoneCrops = crops.filter((c) => c.zone_ids?.includes(zone.id) || c.zone_id === zone.id);
-                    return (
-                      <div key={zone.id} id={`zone-${zone.id}`} className="scroll-mt-4 rounded-2xl border border-zinc-200 p-4">
-                        <div className="flex items-center justify-between gap-2">
-                          <div>
-                            <p className="font-semibold">{zone.name}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {zone.size_acres && (
-                              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">{zone.size_acres} ac</span>
-                            )}
-                            <button
-                              onClick={() => startEditZone(zone.id)}
-                              className="rounded-full border border-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100"
-                            >
-                              Edit
-                            </button>
-                          </div>
-                        </div>
-                        {zoneCrops.length > 0 ? (
-                          <ul className="mt-3 space-y-1">
-                            {zoneCrops.map((c) => (
-                              <li key={c.id} className="flex items-center justify-between text-sm">
-                                <span>{c.crop_name}{c.variety ? ` · ${c.variety}` : ""}</span>
-                                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badgeClass(c.status)}`}>{c.status}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="mt-3 text-xs text-zinc-400">No crops assigned yet.</p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              <div className="mt-5">
+                <FarmMap
+                  zones={zones}
+                  crops={crops}
+                  plants={plants}
+                  fertilisations={fertilisations}
+                  compostEntries={compostEntries}
+                  harvestEta={harvestEtaEntries}
+                  farmName={activeFarm?.name}
+                  farmId={activeFarm?.id}
+                  onSelectBed={handleMapBedSelection}
+                  onAddCropToBed={handleAddCropFromMap}
+                />
+                <p className="mt-2 text-xs text-zinc-400">
+                  Click a bed to see details and quickly add crops.
+                </p>
+              </div>
             </section>
 
             <div id="crops" className="scroll-mt-4 space-y-6">
@@ -2320,7 +2054,7 @@ export default function FarmPage() {
                         </p>
                         {selectedMapBedId ? (
                           <p className="mt-2 text-xs text-emerald-700">
-                            Bed {selectedMapBedId} selected{selectedMapZone ? ` · zone ${selectedMapZone.name}` : " · zone not mapped yet"}.
+                            Bed {selectedMapBedId} selected{selectedMapZone ? ` · mapped bed ${selectedMapZone.name}` : " · bed not mapped yet"}.
                           </p>
                         ) : null}
                       </div>
@@ -2341,7 +2075,7 @@ export default function FarmPage() {
                         type="text"
                         value={cropSearch}
                         onChange={(e) => setCropSearch(e.target.value)}
-                        placeholder="Search crops, variety, status, or zone…"
+                        placeholder="Search crops, variety, status, or bed…"
                         className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                       />
                       {cropSearch ? (
@@ -2362,7 +2096,7 @@ export default function FarmPage() {
                         <thead>
                           <tr className="border-b border-zinc-200 bg-zinc-50 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
                             <th className="px-4 py-3 text-left">Crop</th>
-                            <th className="px-4 py-3 text-left">Zone</th>
+                            <th className="px-4 py-3 text-left">Bed</th>
                             <th className="px-4 py-3 text-left">Status</th>
                             <th className="px-4 py-3 text-left">Planted</th>
                             <th className="px-4 py-3 text-left">Harvest</th>
@@ -2398,7 +2132,7 @@ export default function FarmPage() {
                                               return { ...p, zone_ids: next };
                                             })}
                                             className="flex-1 rounded-xl border border-zinc-300 px-3 py-2 text-base sm:text-sm outline-none focus:border-zinc-900">
-                                            <option value="">Select zone</option>
+                                            <option value="">Select bed</option>
                                             {zones.map((z) => (
                                               <option key={z.id} value={z.id}
                                                 disabled={editingCropForm.zone_ids.includes(z.id) && z.id !== zid}>
@@ -2415,7 +2149,7 @@ export default function FarmPage() {
                                       {editingCropForm.zone_ids.length < zones.length && (
                                         <button type="button" onClick={() => setEditingCropForm((p) => ({ ...p, zone_ids: [...p.zone_ids, ""] }))}
                                           className="flex items-center gap-1 rounded-lg border border-dashed border-zinc-300 px-2 py-2 sm:py-1 text-sm sm:text-xs text-zinc-500 hover:border-zinc-400 hover:text-zinc-700">
-                                          <Plus size={16} className="sm:w-3 sm:h-3" /> {editingCropForm.zone_ids.length === 0 ? "Add zone" : "Add zone"}
+                                          <Plus size={16} className="sm:w-3 sm:h-3" /> {editingCropForm.zone_ids.length === 0 ? "Add bed" : "Add bed"}
                                         </button>
                                       )}
                                     </div>
@@ -2513,8 +2247,8 @@ export default function FarmPage() {
                                   </td>
                                   <td className="px-4 py-4">{
                                     crop.zone_ids?.length
-                                      ? crop.zone_ids.map((zid) => zones.find((z) => z.id === zid)?.name).filter(Boolean).join(", ") || "Unknown zone"
-                                      : crop.zone?.[0]?.name || (crop.zone_id ? zones.find((z) => z.id === crop.zone_id)?.name ?? "Unknown zone" : "No zone")
+                                      ? crop.zone_ids.map((zid) => zones.find((z) => z.id === zid)?.name).filter(Boolean).join(", ") || "Unknown bed"
+                                      : crop.zone?.[0]?.name || (crop.zone_id ? zones.find((z) => z.id === crop.zone_id)?.name ?? "Unknown bed" : "No bed")
                                   }</td>
                                   <td className="px-4 py-4">
                                     <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass(crop.status)}`}>

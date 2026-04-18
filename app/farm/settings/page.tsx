@@ -19,10 +19,6 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
 
-  // Reset zones state
-  const [resetStep, setResetStep] = useState<0 | 1 | 2>(0);
-  const [resetting, setResetting] = useState(false);
-
   // Delete farm state
   const [deleteFarmStep, setDeleteFarmStep] = useState<0 | 1 | 2>(0);
   const [deletingFarm, setDeletingFarm] = useState(false);
@@ -62,30 +58,6 @@ export default function SettingsPage() {
       setUserRole(membership?.role_on_farm ?? null);
     })();
   }, [activeFarmId]);
-
-  async function handleResetZones() {
-    if (!activeFarmId) return;
-    setResetting(true);
-    setError("");
-    setSuccess("");
-    try {
-      const res = await fetch("/api/zones/reset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ farm_id: activeFarmId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Reset failed");
-
-      setSuccess(`Done! Deleted ${data.deleted} zones. Redirecting...`);
-      setTimeout(() => router.push("/farm"), 1500);
-      setResetStep(0);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reset zones");
-    } finally {
-      setResetting(false);
-    }
-  }
 
   async function handleDeleteFarm() {
     if (!activeFarm) return;
@@ -211,9 +183,7 @@ export default function SettingsPage() {
         </Link>
       </div>
 
-      {activeFarm && (
-        <p className="mb-6 text-sm text-zinc-500">Farm: {activeFarm.name}</p>
-      )}
+      {activeFarm && <p className="mb-6 text-sm text-zinc-500">Farm: {activeFarm.name}</p>}
 
       {error && (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -240,59 +210,6 @@ export default function SettingsPage() {
           <Download className="h-4 w-4" />
           {exporting ? "Exporting..." : "Export farm data (CSV)"}
         </button>
-      </section>
-
-      {/* Reset Zones */}
-      <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">Reset All Zones</h2>
-        <p className="mt-1 text-sm text-zinc-500">
-          Deletes all zones and their linked fertiliser, compost, and crop assignments.
-          Map bed positions are preserved. You can then recreate zones from the map.
-        </p>
-
-        {resetStep === 0 && (
-          <button
-            onClick={() => setResetStep(1)}
-            className="mt-4 rounded-xl border border-red-200 px-5 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
-          >
-            Reset all zones
-          </button>
-        )}
-        {resetStep === 1 && (
-          <div className="mt-4 flex items-center gap-3">
-            <span className="text-sm text-red-600 font-medium">This will delete all zones and linked data. Continue?</span>
-            <button
-              onClick={() => setResetStep(2)}
-              className="rounded-xl bg-red-100 border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-200"
-            >
-              Yes, continue
-            </button>
-            <button
-              onClick={() => setResetStep(0)}
-              className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-100"
-            >
-              Cancel
-            </button>
-          </div>
-        )}
-        {resetStep === 2 && (
-          <div className="mt-4 flex items-center gap-3">
-            <span className="text-sm text-red-700 font-semibold">This cannot be undone.</span>
-            <button
-              onClick={handleResetZones}
-              disabled={resetting}
-              className="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
-            >
-              {resetting ? "Resetting…" : "Permanently reset"}
-            </button>
-            <button
-              onClick={() => setResetStep(0)}
-              className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-100"
-            >
-              Cancel
-            </button>
-          </div>
-        )}
       </section>
 
       {/* Delete Farm */}
