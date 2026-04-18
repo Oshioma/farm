@@ -1079,7 +1079,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                 if (editMode) { setSelectedBed(selectedBed === bed.id ? null : bed.id); return; }
                 setSelectedBed(selectedBed === bed.id ? null : bed.id);
                 setSelectedSeedlingZoneIdx(null);
-                onSelectBed?.(bed.id, getZoneForBed(bed.id)?.id ?? null);
+                onSelectBed?.(bed.id);
               }}
               onMouseEnter={() => setHoveredBed(bed.id)}
               onMouseLeave={() => setHoveredBed(null)}

@@ -577,6 +577,7 @@ export default function FarmPage() {
       setAssigningCropId(null);
     }
   }
+
   function handleMapBedSelection(bedId: string) {
     setSelectedMapBedId(bedId);
     const resolvedZoneId = resolveZoneForBed(bedId)?.id ?? "";
