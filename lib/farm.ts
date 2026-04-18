@@ -18,7 +18,7 @@ function isOnline(): boolean {
 // Helper to try cache fallback
 async function withCacheFallback<T>(
   cacheKey: string,
-  storeName: "farms" | "zones" | "crops" | "tasks" | "activities" | "members" | "assets" | "expenses" | "pests" | "sales" | "fertilisations" | "compost" | "plants" | "harvestEta",
+  storeName: "farms" | "zones" | "crops" | "tasks" | "activities" | "members" | "assets" | "expenses" | "pests" | "sales" | "fertilisations" | "compost" | "mulch" | "plants" | "harvestEta",
   fetchFn: () => Promise<T>,
   farmId?: string
 ): Promise<T> {
@@ -654,6 +654,29 @@ export async function getCompost(farmId: string): Promise<CompostEntry[]> {
 
   if (error) throw new Error(`getCompost failed: ${error.message}`);
   return (data ?? []) as CompostEntry[];
+}
+
+export type MulchEntry = {
+  id: string;
+  farm_id: string;
+  mulch_type: string | null;
+  date: string | null;
+  source: string | null;
+  zone_id: string | null;
+  zone: { name: string }[] | null;
+  notes: string | null;
+  created_at: string | null;
+};
+
+export async function getMulch(farmId: string): Promise<MulchEntry[]> {
+  const { data, error } = await supabase
+    .from("mulch")
+    .select("id, farm_id, mulch_type, date, source, zone_id, zone:zones(name), notes, created_at")
+    .eq("farm_id", farmId)
+    .order("date", { ascending: false });
+
+  if (error) throw new Error(`getMulch failed: ${error.message}`);
+  return (data ?? []) as MulchEntry[];
 }
 
 export type SeedCollectionEntry = {

@@ -15,6 +15,7 @@ const CACHE_TTL = {
   sales: 4 * 60 * 60 * 1000,
   fertilisations: 4 * 60 * 60 * 1000,
   compost: 4 * 60 * 60 * 1000,
+  mulch: 4 * 60 * 60 * 1000,
   plants: 4 * 60 * 60 * 1000,
   harvestEta: 4 * 60 * 60 * 1000,
 };

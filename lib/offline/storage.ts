@@ -16,6 +16,7 @@ const STORES = {
   sales: "sales",
   fertilisations: "fertilisations",
   compost: "compost",
+  mulch: "mulch",
   plants: "plants",
   harvestEta: "harvestEta",
   metadata: "metadata", // Store timestamps and cache info

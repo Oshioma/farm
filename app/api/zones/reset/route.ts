@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
     // Delete linked data
     await sb.from("fertilisations").delete().in("zone_id", ids);
     await sb.from("compost").delete().in("zone_id", ids);
+    await sb.from("mulch").delete().in("zone_id", ids);
     await sb.from("crops").update({ zone_id: null }).in("zone_id", ids);
     // Delete zones
     await sb.from("zones").delete().eq("farm_id", farm_id);
