@@ -131,6 +131,10 @@ export default function SettingsPage() {
           table: "fertilisations",
           fields: ["date", "fertiliser", "ready_to_use", "bin_colour", "plants", "zone_id", "notes", "created_at"],
         },
+        {
+          table: "mulch",
+          fields: ["date", "mulch_type", "source", "zone_id", "notes", "created_at"],
+        },
       ];
 
       const headers = ["table", ...Array.from(new Set(exportDefs.flatMap((def) => def.fields)))];

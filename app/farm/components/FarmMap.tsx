@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import type { Zone, Crop, FertilisationEntry, CompostEntry, HarvestEtaEntry, Plant, SeedlingEntry } from "@/lib/farm";
+import type { Zone, Crop, FertilisationEntry, CompostEntry, MulchEntry, HarvestEtaEntry, Plant, SeedlingEntry } from "@/lib/farm";
 
 type SeedlingTray = { id?: string; code: string; zoneId?: string };
 type SeedlingZoneDef = { id: string; label: string };
@@ -273,6 +273,7 @@ type Props = {
   plants?: Plant[];
   fertilisations?: FertilisationEntry[];
   compostEntries?: CompostEntry[];
+  mulchEntries?: MulchEntry[];
   harvestEta?: HarvestEtaEntry[];
   farmName?: string;
   farmId?: string;
@@ -280,7 +281,7 @@ type Props = {
   onAddCropToBed?: (bedId: string, zoneId: string | null) => void;
 };
 
-export function FarmMap({ zones, crops, plants = [], fertilisations = [], compostEntries = [], harvestEta = [], farmName, farmId, onSelectBed, onAddCropToBed }: Props) {
+export function FarmMap({ zones, crops, plants = [], fertilisations = [], compostEntries = [], mulchEntries = [], harvestEta = [], farmName, farmId, onSelectBed, onAddCropToBed }: Props) {
   const [hoveredBed, setHoveredBed] = useState<string | null>(null);
   const [selectedBed, setSelectedBed] = useState<string | null>(null);
 
@@ -699,6 +700,12 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
       .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   }
 
+  function getMulchForZone(zoneId: string): MulchEntry[] {
+    return mulchEntries
+      .filter((m) => m.zone_id === zoneId)
+      .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  }
+
   function getPlantsForZone(zoneId: string): Plant[] {
     return plants.filter((p) => p.zone_ids?.includes(zoneId) || p.zone_id === zoneId);
   }
@@ -750,6 +757,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
   const selectedPlants = selected ? getPlantsForZone(selected.id) : [];
   const selectedFertilisations = selected ? getFertilisationsForZone(selected.id) : [];
   const selectedCompost = selected ? getCompostForZone(selected.id) : [];
+  const selectedMulch = selected ? getMulchForZone(selected.id) : [];
   const selectedHarvestEta = selectedBed ? getHarvestEtaForBed(selectedBed) : undefined;
 
   // Check if this is a new/unknown farm with no layout
@@ -1385,6 +1393,23 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                             </div>
                             {c.materials_used && <div className="mt-0.5 text-[10px] text-emerald-600/70">{c.materials_used}</div>}
                             {c.notes && <div className="mt-0.5 text-[10px] text-emerald-600/70">{c.notes}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedMulch.length > 0 && (
+                    <div className="mt-4">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Mulch</div>
+                      <div className="mt-1.5 space-y-1.5">
+                        {selectedMulch.map((m) => (
+                          <div key={m.id} className="rounded-xl border border-amber-200 bg-amber-100/40 p-2">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-xs font-medium text-amber-900">{m.mulch_type ?? "Mulch"}</span>
+                              <span className="text-[10px] text-amber-700">{fmtDate(m.date)}</span>
+                            </div>
+                            {m.source && <div className="mt-0.5 text-[10px] text-amber-700/80">{m.source}</div>}
+                            {m.notes && <div className="mt-0.5 text-[10px] text-amber-700/80">{m.notes}</div>}
                           </div>
                         ))}
                       </div>

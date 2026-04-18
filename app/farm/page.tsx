@@ -17,12 +17,13 @@ import {
   getSales,
   getFertilisations,
   getCompost,
+  getMulch,
   getPlants,
   getHarvestEta,
   saveActiveFarmId,
   getActiveFarmId,
 } from "@/lib/farm";
-import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, FertilisationEntry, CompostEntry, Plant, HarvestEtaEntry, FarmMember } from "@/lib/farm";
+import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, FertilisationEntry, CompostEntry, MulchEntry, Plant, HarvestEtaEntry, FarmMember } from "@/lib/farm";
 import { formatDate, formatMoney, badgeClass } from "@/app/farm/utils";
 import { CropForm } from "@/app/farm/components/CropForm";
 import { TaskForm } from "@/app/farm/components/TaskForm";
@@ -61,6 +62,7 @@ export default function FarmPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [fertilisations, setFertilisations] = useState<FertilisationEntry[]>([]);
   const [compostEntries, setCompostEntries] = useState<CompostEntry[]>([]);
+  const [mulchEntries, setMulchEntries] = useState<MulchEntry[]>([]);
   const [harvestEtaEntries, setHarvestEtaEntries] = useState<HarvestEtaEntry[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
   const [members, setMembers] = useState<FarmMember[]>([]);
@@ -239,7 +241,7 @@ export default function FarmPage() {
     // Pre-warm auth session so parallel requests don't fight over the
     // Supabase auth lock (navigator.locks with steal: true).
     await supabase.auth.getSession();
-    const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows, pestRows, saleRows, fertilisationRows, compostRows, plantRows, harvestEtaRows, memberRows] = await Promise.all([
+    const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows, pestRows, saleRows, fertilisationRows, compostRows, mulchRows, plantRows, harvestEtaRows, memberRows] = await Promise.all([
       getZones(farmId),
       getCrops(farmId),
       getTasks(farmId),
@@ -250,6 +252,7 @@ export default function FarmPage() {
       getSales(farmId),
       getFertilisations(farmId),
       getCompost(farmId),
+      getMulch(farmId),
       getPlants(farmId),
       getHarvestEta(farmId, currentYear),
       getMembers(farmId),
@@ -267,6 +270,7 @@ export default function FarmPage() {
     setSales(saleRows);
     setFertilisations(fertilisationRows);
     setCompostEntries(compostRows);
+    setMulchEntries(mulchRows);
     setPlants(plantRows);
     setHarvestEtaEntries(harvestEtaRows);
     setMembers(memberRows);
@@ -1369,6 +1373,7 @@ export default function FarmPage() {
               { href: withFarmContext("/plants"), label: "Plants" },
               { href: withFarmContext("/fertiliser"), label: "Fertiliser" },
               { href: withFarmContext("/farm/compost"), label: "Compost" },
+              { href: withFarmContext("/farm/mulch"), label: "Mulch" },
               { href: withFarmContext("/farm/soil-tests"), label: "Soil tests" },
               { href: withFarmContext("/farm/work-hours"), label: "Work hours" },
               { href: withFarmContext("/farm/systems"), label: "Systems" },
@@ -2032,6 +2037,7 @@ export default function FarmPage() {
                   plants={plants}
                   fertilisations={fertilisations}
                   compostEntries={compostEntries}
+                  mulchEntries={mulchEntries}
                   harvestEta={harvestEtaEntries}
                   farmName={activeFarm?.name}
                   farmId={activeFarm?.id}
