@@ -4,7 +4,19 @@ type StoredBed = {
   id?: string;
   label?: string;
   bed_uid?: string;
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+  rotate?: number;
 };
+
+function randomBedUid(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `bed_${Math.random().toString(36).slice(2)}_${Date.now().toString(36)}`;
+}
 
 export async function POST(request: Request) {
   try {
@@ -47,19 +59,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const activeBedUids = new Set<string>();
-    const activeBedCodes = new Set<string>();
-    for (const bed of beds) {
-      if (bed.bed_uid) activeBedUids.add(bed.bed_uid);
-      const code = (bed.id ?? bed.label ?? "").toUpperCase();
-      if (code) activeBedCodes.add(code);
-    }
-
-    const { data: zoneRows, error: zoneFetchError } = await supabase
+    const { data: existingZones, error: zoneFetchError } = await supabase
       .from("zones")
       .select("id, name, code, bed_uid, source, is_active")
-      .eq("farm_id", farm_id)
-      .eq("is_active", true);
+      .eq("farm_id", farm_id);
 
     if (zoneFetchError) {
       console.error("Error loading zones for cleanup:", zoneFetchError);
@@ -69,33 +72,110 @@ export async function POST(request: Request) {
       );
     }
 
-    const orphans = (zoneRows ?? []).filter((zone) => {
-      const uidMatches = zone.bed_uid && activeBedUids.has(zone.bed_uid);
-      const codeMatches = zone.code && activeBedCodes.has(zone.code.toUpperCase());
-      return !uidMatches && !codeMatches;
-    });
+    const zones = existingZones ?? [];
+    type ZoneRow = (typeof zones)[number];
 
-    if (orphans.length === 0) {
-      return Response.json({ archived: 0, names: [] });
+    const zoneByBedUid = new Map<string, ZoneRow>();
+    const zoneByCode = new Map<string, ZoneRow>();
+    for (const zone of zones) {
+      if (zone.bed_uid) {
+        const existingByUid = zoneByBedUid.get(zone.bed_uid);
+        if (!existingByUid || (!existingByUid.is_active && !!zone.is_active)) {
+          zoneByBedUid.set(zone.bed_uid, zone);
+        }
+      }
+      if (zone.code && zone.is_active) {
+        const existingByCode = zoneByCode.get(zone.code.toUpperCase());
+        if (!existingByCode || !existingByCode.is_active) {
+          zoneByCode.set(zone.code.toUpperCase(), zone);
+        }
+      }
     }
 
-    const orphanIds = orphans.map((z) => z.id);
-    const { error: archiveError } = await supabase
-      .from("zones")
-      .update({ is_active: false })
-      .in("id", orphanIds);
+    const matchedZoneIds = new Set<string>();
+    let created = 0;
+    let updated = 0;
 
-    if (archiveError) {
-      console.error("Error archiving orphan zones:", archiveError);
-      return Response.json(
-        { error: `Database error: ${archiveError.message}` },
-        { status: 500 }
-      );
+    for (const bed of beds) {
+      const bedUid = bed.bed_uid || randomBedUid();
+      const bedCode = (bed.id ?? bed.label ?? "").toUpperCase();
+      const bedName = bed.label || bed.id || "Bed";
+      const mapPosition = {
+        x: bed.x ?? 0,
+        y: bed.y ?? 0,
+        w: bed.w ?? 0,
+        h: bed.h ?? 0,
+        ...(typeof bed.rotate === "number" ? { rotate: bed.rotate } : {}),
+      };
+
+      const matched = zoneByBedUid.get(bedUid) || zoneByCode.get(bedCode);
+      if (matched) {
+        matchedZoneIds.add(matched.id);
+        const { error } = await supabase
+          .from("zones")
+          .update({
+            name: bedName,
+            code: bedCode || null,
+            bed_uid: bedUid,
+            source: "bed-sync",
+            map_position: mapPosition,
+            is_active: true,
+          })
+          .eq("id", matched.id);
+        if (error) {
+          console.error("Error updating zone during cleanup:", error);
+          return Response.json(
+            { error: `Zone sync failed: ${error.message}` },
+            { status: 500 }
+          );
+        }
+        updated += 1;
+      } else {
+        const { error } = await supabase
+          .from("zones")
+          .insert({
+            farm_id,
+            name: bedName,
+            code: bedCode || null,
+            bed_uid: bedUid,
+            source: "bed-sync",
+            map_position: mapPosition,
+            is_active: true,
+          });
+        if (error) {
+          console.error("Error creating zone during cleanup:", error);
+          return Response.json(
+            { error: `Zone sync failed: ${error.message}` },
+            { status: 500 }
+          );
+        }
+        created += 1;
+      }
+    }
+
+    const orphans = zones.filter(
+      (zone) => zone.is_active && !matchedZoneIds.has(zone.id)
+    );
+
+    if (orphans.length > 0) {
+      const { error: archiveError } = await supabase
+        .from("zones")
+        .update({ is_active: false })
+        .in("id", orphans.map((z) => z.id));
+      if (archiveError) {
+        console.error("Error archiving orphan zones:", archiveError);
+        return Response.json(
+          { error: `Database error: ${archiveError.message}` },
+          { status: 500 }
+        );
+      }
     }
 
     return Response.json({
       archived: orphans.length,
-      names: orphans.map((z) => z.name),
+      created,
+      updated,
+      archived_names: orphans.map((z) => z.name),
     });
   } catch (error) {
     console.error("Error in cleanup-orphan-zones route:", error);
