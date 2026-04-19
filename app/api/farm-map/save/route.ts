@@ -145,6 +145,7 @@ export async function POST(request: Request) {
     }
 
     const activeBedUids = new Set<string>();
+    const matchedZoneIds = new Set<string>();
     for (const bed of normalizedBeds) {
       const bedUid = bed.bed_uid!;
       activeBedUids.add(bedUid);
@@ -161,6 +162,7 @@ export async function POST(request: Request) {
       const matched = zoneByBedUid.get(bedUid) || zoneByCode.get(bedCode);
 
       if (matched) {
+        matchedZoneIds.add(matched.id);
         const { error: updateZoneError } = await supabase
           .from("zones")
           .update({
@@ -208,20 +210,22 @@ export async function POST(request: Request) {
       }
     }
 
-    // Archive stale auto-synced zones instead of deleting.
-    const staleSyncedZoneIds = zones
-      .filter((zone) => zone.source === "bed-sync" && zone.bed_uid && !activeBedUids.has(zone.bed_uid))
+    // Archive any active zone (legacy or bed-sync) that isn't represented
+    // by a bed in the saved layout. Zones are no longer managed in the UI,
+    // so the map's beds are the source of truth.
+    const orphanZoneIds = zones
+      .filter((zone) => zone.is_active && !matchedZoneIds.has(zone.id))
       .map((zone) => zone.id);
 
-    if (staleSyncedZoneIds.length > 0) {
+    if (orphanZoneIds.length > 0) {
       const { error: archiveError } = await supabase
         .from("zones")
         .update({ is_active: false })
-        .in("id", staleSyncedZoneIds);
+        .in("id", orphanZoneIds);
       if (archiveError) {
-        console.error("Error archiving stale synced zones:", archiveError, {
+        console.error("Error archiving orphan zones:", archiveError, {
           farm_id,
-          count: staleSyncedZoneIds.length,
+          count: orphanZoneIds.length,
         });
         return Response.json(
           { error: `Zone sync failed: ${archiveError.message}` },
