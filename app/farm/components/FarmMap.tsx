@@ -279,9 +279,10 @@ type Props = {
   farmId?: string;
   onSelectBed?: (bedId: string, zoneId: string | null) => void;
   onAddCropToBed?: (bedId: string, zoneId: string | null) => void;
+  onBedsSaved?: () => void | Promise<void>;
 };
 
-export function FarmMap({ zones, crops, plants = [], fertilisations = [], compostEntries = [], mulchEntries = [], harvestEta = [], farmName, farmId, onSelectBed, onAddCropToBed }: Props) {
+export function FarmMap({ zones, crops, plants = [], fertilisations = [], compostEntries = [], mulchEntries = [], harvestEta = [], farmName, farmId, onSelectBed, onAddCropToBed, onBedsSaved }: Props) {
   const [hoveredBed, setHoveredBed] = useState<string | null>(null);
   const [selectedBed, setSelectedBed] = useState<string | null>(null);
 
@@ -472,6 +473,13 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
           console.error("[FarmMap] Failed to save to database:", await response.text());
         } else {
           console.log("[FarmMap] Saved layout to database");
+          if (onBedsSaved) {
+            try {
+              await onBedsSaved();
+            } catch (err) {
+              console.error("[FarmMap] onBedsSaved callback failed:", err);
+            }
+          }
         }
       } catch (err) {
         console.error("[FarmMap] Error saving to database:", err);

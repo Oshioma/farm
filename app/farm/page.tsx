@@ -2043,6 +2043,12 @@ export default function FarmPage() {
                   farmId={activeFarm?.id}
                   onSelectBed={handleMapBedSelection}
                   onAddCropToBed={handleAddCropFromMap}
+                  onBedsSaved={async () => {
+                    if (activeFarm?.id) {
+                      const zoneRows = await getZones(activeFarm.id);
+                      setZones(zoneRows);
+                    }
+                  }}
                 />
                 <p className="mt-2 text-xs text-zinc-400">
                   Click a bed to see details and quickly add crops.
