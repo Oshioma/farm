@@ -275,6 +275,30 @@ export default function FarmPage() {
     setHarvestEtaEntries(harvestEtaRows);
     setMembers(memberRows);
 
+    // Re-sync zones against the saved map layout: create zones for beds
+    // missing them, archive zones that no longer match any bed. Without
+    // this, legacy rows and partially-synced maps leave the crop dropdown
+    // out of step with the map.
+    fetch(`/api/farm-map/cleanup-orphan-zones`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ farm_id: farmId }),
+    })
+      .then(async (res) => {
+        if (!res.ok) return;
+        const result = await res.json();
+        const changed = (result?.archived ?? 0) + (result?.created ?? 0);
+        if (changed > 0) {
+          console.log(
+            `[Farm] Zone sync: created ${result.created}, archived ${result.archived}`,
+            result.archived_names
+          );
+          const freshZones = await getZones(farmId);
+          setZones(freshZones);
+        }
+      })
+      .catch((err) => console.error("[Farm] Zone sync failed:", err));
+
     // Fetch current user's role on this farm
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
