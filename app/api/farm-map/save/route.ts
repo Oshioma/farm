@@ -122,22 +122,10 @@ export async function POST(request: Request) {
     }
 
     const zones = existingZones ?? [];
-    const zoneByBedUid = new Map<string, {
-      id: string;
-      name: string;
-      code: string | null;
-      bed_uid: string | null;
-      source: string | null;
-      is_active: boolean | null;
-    }>();
-    const zoneByCode = new Map<string, {
-      id: string;
-      name: string;
-      code: string | null;
-      bed_uid: string | null;
-      source: string | null;
-      is_active: boolean | null;
-    }>();
+    type ZoneRow = (typeof zones)[number];
+    const zoneByBedUid = new Map<string, ZoneRow>();
+    const zoneByCode = new Map<string, ZoneRow>();
+    const zoneByName = new Map<string, ZoneRow>();
 
     for (const zone of zones) {
       if (zone.bed_uid) {
@@ -152,6 +140,15 @@ export async function POST(request: Request) {
         const existingByCode = zoneByCode.get(zone.code.toUpperCase());
         if (!existingByCode || !existingByCode.is_active) {
           zoneByCode.set(zone.code.toUpperCase(), zone);
+        }
+      }
+      // Track by name (active or archived) so we can resurrect an archived
+      // zone whose name collides with an incoming bed, instead of hitting
+      // the (farm_id, name) unique constraint on insert.
+      if (zone.name) {
+        const existingByName = zoneByName.get(zone.name);
+        if (!existingByName || (!existingByName.is_active && !!zone.is_active)) {
+          zoneByName.set(zone.name, zone);
         }
       }
     }
@@ -171,7 +168,10 @@ export async function POST(request: Request) {
         ...(typeof bed.rotate === "number" ? { rotate: bed.rotate } : {}),
       };
 
-      const matched = zoneByBedUid.get(bedUid) || zoneByCode.get(bedCode);
+      const matched =
+        zoneByBedUid.get(bedUid) ||
+        zoneByCode.get(bedCode) ||
+        zoneByName.get(bedName);
 
       if (matched) {
         matchedZoneIds.add(matched.id);
