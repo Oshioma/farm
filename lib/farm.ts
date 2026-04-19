@@ -446,6 +446,69 @@ export async function getAssets(farmId: string): Promise<Asset[]> {
   return (data ?? []) as Asset[];
 }
 
+export type Want = {
+  id: string;
+  farm_id: string;
+  name: string;
+  price: number | null;
+  notes: string | null;
+  created_at: string | null;
+};
+
+export async function getWants(farmId: string): Promise<Want[]> {
+  const { data, error } = await supabase
+    .from("wants")
+    .select("id, farm_id, name, price, notes, created_at")
+    .eq("farm_id", farmId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(`getWants failed: ${error.message}`);
+  return (data ?? []) as Want[];
+}
+
+export type WantWithFarm = Want & { farm_name: string };
+
+export async function getOtherFarmsWants(currentFarmId: string): Promise<WantWithFarm[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: memberships, error: membersError } = await supabase
+    .from("farm_members")
+    .select("farm_id")
+    .eq("profile_id", user.id);
+  if (membersError) throw new Error(`getOtherFarmsWants failed: ${membersError.message}`);
+
+  const farmIds = (memberships ?? [])
+    .map((m: { farm_id: string }) => m.farm_id)
+    .filter((id: string) => id !== currentFarmId);
+  if (!farmIds.length) return [];
+
+  const { data: farmsData, error: farmsErr } = await supabase
+    .from("farms")
+    .select("id, name")
+    .in("id", farmIds)
+    .eq("is_active", true);
+  if (farmsErr) throw new Error(`getOtherFarmsWants failed: ${farmsErr.message}`);
+
+  const farmNameMap = new Map<string, string>();
+  for (const f of farmsData ?? []) farmNameMap.set(f.id, f.name);
+
+  const visibleIds = Array.from(farmNameMap.keys());
+  if (!visibleIds.length) return [];
+
+  const { data, error } = await supabase
+    .from("wants")
+    .select("id, farm_id, name, price, notes, created_at")
+    .in("farm_id", visibleIds)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(`getOtherFarmsWants failed: ${error.message}`);
+
+  return ((data ?? []) as Want[]).map((w) => ({
+    ...w,
+    farm_name: farmNameMap.get(w.farm_id) ?? "",
+  }));
+}
+
 export type Sale = {
   id: string;
   farm_id: string;
