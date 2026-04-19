@@ -319,6 +319,13 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
   useEffect(() => {
     if (!farmName) return;
 
+    // Clear stale edit state from the previous farm so an in-progress edit
+    // can't be saved against the newly-selected farm before its layout
+    // finishes loading.
+    setEditBeds([]);
+    setEditLandmarks([]);
+    setCustomBg(undefined);
+
     const loadLayout = async () => {
       // Only try database if we have a valid farmId
       if (farmId && farmId !== "undefined") {

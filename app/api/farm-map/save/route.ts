@@ -45,6 +45,18 @@ export async function POST(request: Request) {
       );
     }
 
+    // Refuse to overwrite a saved layout with an empty beds array. Use the
+    // dedicated /api/farm-map/reset-layout endpoint to explicitly clear a
+    // layout — this guard protects against races where a farm switch leaves
+    // stale state that would otherwise wipe the incoming farm's map.
+    if (normalizedBeds.length === 0) {
+      console.warn("Refusing to save empty beds for farm:", farm_id);
+      return Response.json(
+        { error: "Refusing to save an empty layout. Use /api/farm-map/reset-layout to clear intentionally." },
+        { status: 400 }
+      );
+    }
+
     const supabase = getSupabaseAdmin();
 
     // Check if layout exists
