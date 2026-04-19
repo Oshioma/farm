@@ -802,6 +802,9 @@ export default function FarmPage() {
   }
 
   async function handleDeleteCrop(id: string) {
+    const crop = crops.find((c) => c.id === id);
+    const label = crop ? `"${crop.crop_name}"` : "this crop";
+    if (!window.confirm(`Delete ${label}? This can't be undone from the UI.`)) return;
     try {
       setDeletingCropId(id);
       const { error: err } = await supabase.from("crops").update({ is_active: false }).eq("id", id);
