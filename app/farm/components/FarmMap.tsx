@@ -441,6 +441,36 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
     setEditingLabelIdx(null);
   }
 
+  async function persistBedsToDatabase(beds: BedDef[], landmarks: LandmarkDef[], bg?: string) {
+    if (!farmId || farmId === "undefined") return;
+    try {
+      const response = await fetch(`/api/farm-map/save`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          farm_id: farmId,
+          beds,
+          landmarks,
+          background_image: bg,
+        }),
+      });
+      if (!response.ok) {
+        console.error("[FarmMap] Failed to save to database:", await response.text());
+        return;
+      }
+      console.log("[FarmMap] Saved layout to database");
+      if (onBedsSaved) {
+        try {
+          await onBedsSaved();
+        } catch (err) {
+          console.error("[FarmMap] onBedsSaved callback failed:", err);
+        }
+      }
+    } catch (err) {
+      console.error("[FarmMap] Error saving to database:", err);
+    }
+  }
+
   // Save edits
   async function saveEdit() {
     if (saving) return;
@@ -456,35 +486,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
     setEditMode(false);
     setEditingLabelIdx(null);
 
-    // Also save to database so it syncs across devices
-    if (farmId && farmId !== "undefined") {
-      try {
-        const response = await fetch(`/api/farm-map/save`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            farm_id: farmId,
-            beds: bedsToSave,
-            landmarks: editLandmarks,
-            background_image: customBg,
-          }),
-        });
-        if (!response.ok) {
-          console.error("[FarmMap] Failed to save to database:", await response.text());
-        } else {
-          console.log("[FarmMap] Saved layout to database");
-          if (onBedsSaved) {
-            try {
-              await onBedsSaved();
-            } catch (err) {
-              console.error("[FarmMap] onBedsSaved callback failed:", err);
-            }
-          }
-        }
-      } catch (err) {
-        console.error("[FarmMap] Error saving to database:", err);
-      }
-    }
+    await persistBedsToDatabase(bedsToSave, editLandmarks, customBg);
 
     setSaving(false);
   }
@@ -605,22 +607,32 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
   }, []);
 
   // ── Add new bed ──
-  function addBed() {
+  async function addBed() {
     if (!newBedLabel.trim()) return;
     const id = newBedLabel.trim().toUpperCase().replace(/\s+/g, "");
     if (editBeds.find((b) => b.id === id)) return;
-    setEditBeds((prev) => [
-      ...prev,
+    const nextBeds = [
+      ...editBeds,
       { id, label: newBedLabel.trim(), bed_uid: randomBedUid(), x: 100, y: 100, w: 80, h: 30 },
-    ]);
+    ];
+    setEditBeds(nextBeds);
     setNewBedLabel("");
     setAddingBed(false);
+    if (farmName) {
+      saveCustomLayout(farmName, nextBeds, editLandmarks, customBg);
+    }
+    await persistBedsToDatabase(nextBeds, editLandmarks, customBg);
   }
 
   // ── Delete bed ──
-  function deleteBed(bedId: string) {
-    setEditBeds((prev) => prev.filter((b) => b.id !== bedId));
+  async function deleteBed(bedId: string) {
+    const nextBeds = editBeds.filter((b) => b.id !== bedId);
+    setEditBeds(nextBeds);
     if (selectedBed === bedId) setSelectedBed(null);
+    if (farmName) {
+      saveCustomLayout(farmName, nextBeds, editLandmarks, customBg);
+    }
+    await persistBedsToDatabase(nextBeds, editLandmarks, customBg);
   }
 
   // ── Add new text label ──
