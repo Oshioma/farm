@@ -20,10 +20,12 @@ import {
   getMulch,
   getPlants,
   getHarvestEta,
+  getWants,
+  getOtherFarmsWants,
   saveActiveFarmId,
   getActiveFarmId,
 } from "@/lib/farm";
-import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, FertilisationEntry, CompostEntry, MulchEntry, Plant, HarvestEtaEntry, FarmMember } from "@/lib/farm";
+import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, FertilisationEntry, CompostEntry, MulchEntry, Plant, HarvestEtaEntry, FarmMember, Want, WantWithFarm } from "@/lib/farm";
 import { formatDate, formatMoney, badgeClass } from "@/app/farm/utils";
 import { CropForm } from "@/app/farm/components/CropForm";
 import { TaskForm } from "@/app/farm/components/TaskForm";
@@ -32,6 +34,8 @@ import { ExpenseForm } from "@/app/farm/components/ExpenseForm";
 import { AssetForm } from "@/app/farm/components/AssetForm";
 import { PestForm } from "@/app/farm/components/PestForm";
 import { SaleForm } from "@/app/farm/components/SaleForm";
+import { WantForm } from "@/app/farm/components/WantForm";
+import type { WantFormData } from "@/app/farm/components/WantForm";
 import { FarmMap } from "@/app/farm/components/FarmMap";
 import { Plus, X } from "lucide-react";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
@@ -66,12 +70,17 @@ export default function FarmPage() {
   const [harvestEtaEntries, setHarvestEtaEntries] = useState<HarvestEtaEntry[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
   const [members, setMembers] = useState<FarmMember[]>([]);
+  const [wants, setWants] = useState<Want[]>([]);
+  const [otherFarmsWants, setOtherFarmsWants] = useState<WantWithFarm[]>([]);
 
   const [activeFarmId, setActiveFarmId] = useState<string>("");
   const hasLoadedInitialFarm = React.useRef(false);
-  const [activeForm, setActiveForm] = useState<"crop" | "task" | "harvest" | "expense" | "asset" | "pest" | "sale" | null>(null);
+  const [activeForm, setActiveForm] = useState<"crop" | "task" | "harvest" | "expense" | "asset" | "pest" | "sale" | "want" | null>(null);
   const [showExpenses, setShowExpenses] = useState(false);
   const [showAssets, setShowAssets] = useState(false);
+  const [showWants, setShowWants] = useState(true);
+  const [deletingWantId, setDeletingWantId] = useState<string | null>(null);
+  const [convertingWantId, setConvertingWantId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingFarm, setEditingFarm] = useState(false);
   const [farmEditForm, setFarmEditForm] = useState({ name: "", location: "", size_acres: "" });
@@ -241,7 +250,7 @@ export default function FarmPage() {
     // Pre-warm auth session so parallel requests don't fight over the
     // Supabase auth lock (navigator.locks with steal: true).
     await supabase.auth.getSession();
-    const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows, pestRows, saleRows, fertilisationRows, compostRows, mulchRows, plantRows, harvestEtaRows, memberRows] = await Promise.all([
+    const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows, pestRows, saleRows, fertilisationRows, compostRows, mulchRows, plantRows, harvestEtaRows, memberRows, wantRows, otherWantRows] = await Promise.all([
       getZones(farmId),
       getCrops(farmId),
       getTasks(farmId),
@@ -256,6 +265,8 @@ export default function FarmPage() {
       getPlants(farmId),
       getHarvestEta(farmId, currentYear),
       getMembers(farmId),
+      getWants(farmId).catch(() => [] as Want[]),
+      getOtherFarmsWants(farmId).catch(() => [] as WantWithFarm[]),
     ]);
 
     console.log(`[Farm] Loaded ${cropRows.length} crops:`, cropRows.map(c => ({ id: c.id, name: c.crop_name, status: c.status, zones: c.zone_ids })));
@@ -274,6 +285,8 @@ export default function FarmPage() {
     setPlants(plantRows);
     setHarvestEtaEntries(harvestEtaRows);
     setMembers(memberRows);
+    setWants(wantRows);
+    setOtherFarmsWants(otherWantRows);
 
     // Re-sync zones against the saved map layout: create zones for beds
     // missing them, archive zones that no longer match any bed. Without
@@ -1093,6 +1106,90 @@ export default function FarmPage() {
     }
   }
 
+  async function handleAddWant(data: WantFormData): Promise<boolean> {
+    if (!activeFarmId) return false;
+    try {
+      setError("");
+      const name = data.name.trim();
+      if (!name) throw new Error("Want name is required.");
+
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error: insertError } = await supabase.from("wants").insert({
+        farm_id: activeFarmId,
+        name,
+        price: data.price ? Number(data.price) : null,
+        notes: data.notes.trim() || null,
+        created_by: user?.id ?? null,
+      });
+      if (insertError) throw insertError;
+
+      await supabase.from("activities").insert({
+        farm_id: activeFarmId,
+        type: "want_added",
+        title: `${name} added to wants`,
+        meta: data.price ? `Price: ${data.price}` : null,
+      });
+
+      await loadFarmData(activeFarmId);
+      return true;
+    } catch (err) {
+      setError(errMsg(err, "Failed to add want"));
+      return false;
+    }
+  }
+
+  async function handleDeleteWant(id: string): Promise<void> {
+    try {
+      setDeletingWantId(id);
+      setError("");
+      const { error: deleteError } = await supabase.from("wants").delete().eq("id", id);
+      if (deleteError) throw deleteError;
+      if (activeFarmId) await loadFarmData(activeFarmId);
+    } catch (err) {
+      setError(errMsg(err, "Failed to delete want"));
+    } finally {
+      setDeletingWantId(null);
+    }
+  }
+
+  async function handleConvertWantToAsset(want: Want | WantWithFarm): Promise<void> {
+    if (!activeFarmId) return;
+    try {
+      setConvertingWantId(want.id);
+      setError("");
+
+      const { error: insertError } = await supabase.from("assets").insert({
+        farm_id: activeFarmId,
+        name: want.name,
+        category: "equipment",
+        purchase_date: null,
+        purchase_price: want.price ?? null,
+        paid_by: null,
+        condition: "good",
+        notes: want.notes ?? null,
+      });
+      if (insertError) throw insertError;
+
+      // Remove the want once converted. For other farms' wants the user may
+      // not have delete permission; ignore errors in that case.
+      const { error: deleteError } = await supabase.from("wants").delete().eq("id", want.id);
+      if (deleteError) console.warn("Want delete after convert failed:", deleteError.message);
+
+      await supabase.from("activities").insert({
+        farm_id: activeFarmId,
+        type: "asset_logged",
+        title: `${want.name} logged (from want)`,
+        meta: want.price != null ? `Price: ${want.price}` : null,
+      });
+
+      await loadFarmData(activeFarmId);
+    } catch (err) {
+      setError(errMsg(err, "Failed to convert want to asset"));
+    } finally {
+      setConvertingWantId(null);
+    }
+  }
+
   async function uploadPestImage(file: File): Promise<string> {
     const ext = file.name.split(".").pop() ?? "jpg";
     const path = `${activeFarmId}/${Date.now()}.${ext}`;
@@ -1624,6 +1721,7 @@ export default function FarmPage() {
               {(
                 [
                   { key: "crop", label: "+ Crop" },
+                  { key: "want", label: "+ Want" },
                   { key: "task", label: "+ Task" },
                   { key: "harvest", label: "+ Harvest" },
                   { key: "pest", label: "+ Pest" },
@@ -1646,7 +1744,7 @@ export default function FarmPage() {
               ))}
             </div>
 
-            {activeForm && ["crop", "task", "harvest", "expense", "asset", "pest", "sale"].includes(activeForm) ? (
+            {activeForm && ["crop", "task", "harvest", "expense", "asset", "pest", "sale", "want"].includes(activeForm) ? (
               <div className="mb-6 max-w-sm">
                 {activeForm === "crop" && (
                   <CropForm
@@ -1724,6 +1822,15 @@ export default function FarmPage() {
                     crops={crops}
                     onSubmit={async (data) => {
                       const ok = await handleLogSale(data);
+                      if (ok) setActiveForm(null);
+                      return ok;
+                    }}
+                  />
+                )}
+                {activeForm === "want" && (
+                  <WantForm
+                    onSubmit={async (data) => {
+                      const ok = await handleAddWant(data);
                       if (ok) setActiveForm(null);
                       return ok;
                     }}
@@ -2435,6 +2542,56 @@ export default function FarmPage() {
                 <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                   <div className="flex items-center justify-between gap-4">
                     <div>
+                      <h2 className="text-xl font-semibold">Other farms' wants</h2>
+                      <p className="mt-1 text-sm text-zinc-500">
+                        Wishlists from the other farms you belong to. Read-only — click “Add as asset” to log one for this farm.
+                      </p>
+                    </div>
+                    <span className="text-sm text-zinc-500">{otherFarmsWants.length} across other farms</span>
+                  </div>
+
+                  {otherFarmsWants.length === 0 ? (
+                    <div className="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-6 text-sm text-zinc-400">
+                      No wants from other farms you belong to.
+                    </div>
+                  ) : (
+                    <div className="mt-5 space-y-2">
+                      {otherFarmsWants.map((want) => (
+                        <div
+                          key={want.id}
+                          className="flex items-start justify-between gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-zinc-400"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-medium text-zinc-500">{want.name}</span>
+                              <span className="rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[11px] font-medium text-zinc-400">
+                                {want.farm_name}
+                              </span>
+                            </div>
+                            {want.notes && <p className="mt-0.5 text-sm">{want.notes}</p>}
+                            <p className="mt-1 text-sm font-semibold text-zinc-500">
+                              {want.price != null ? formatMoney(want.price) : <span className="font-normal">Price TBC</span>}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 items-center">
+                            <button
+                              onClick={() => handleConvertWantToAsset(want)}
+                              disabled={convertingWantId === want.id}
+                              className="rounded-xl border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-60"
+                              title={`Log "${want.name}" as an asset on this farm`}
+                            >
+                              {convertingWantId === want.id ? "Adding…" : "Add as asset"}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
                       <h2 className="text-xl font-semibold">New plants added</h2>
                       <p className="mt-1 text-sm text-zinc-500">
                         Recently added to the plants gallery.
@@ -2708,7 +2865,7 @@ export default function FarmPage() {
                 )}
 
                 {showExpenses ? (
-                <div className="mt-5 space-y-2">
+                <div className="mt-5 space-y-2" id="expenses-list">
                   {expenses.length === 0 ? (
                     <div className="rounded-2xl border border-zinc-200 px-4 py-6 text-sm text-zinc-500">No expenses yet.</div>
                   ) : (
@@ -2794,6 +2951,78 @@ export default function FarmPage() {
                     ))
                   )}
                 </div>
+                ) : null}
+              </div>
+
+              <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <button
+                  onClick={() => setShowWants((v) => !v)}
+                  className="flex w-full items-center justify-between gap-4 text-left"
+                >
+                  <div>
+                    <h2 className="text-xl font-semibold">Wants</h2>
+                    <p className="mt-1 text-sm text-zinc-500">{wants.length} on the wishlist</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setActiveForm(activeForm === "want" ? null : "want"); }}
+                      className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+                    >
+                      {activeForm === "want" ? "Cancel" : "+ Add want"}
+                    </button>
+                    <span className="text-sm text-zinc-500">{showWants ? "Hide" : "Show"}</span>
+                  </div>
+                </button>
+
+                {activeForm === "want" && (
+                  <div className="mt-5 max-w-sm">
+                    <WantForm
+                      onSubmit={async (data) => {
+                        const ok = await handleAddWant(data);
+                        if (ok) setActiveForm(null);
+                        return ok;
+                      }}
+                    />
+                  </div>
+                )}
+
+                {showWants ? (
+                  <div className="mt-5 space-y-2">
+                    {wants.length === 0 ? (
+                      <div className="rounded-2xl border border-zinc-200 px-4 py-6 text-sm text-zinc-500">
+                        Nothing on the wishlist yet. Add something you want.
+                      </div>
+                    ) : (
+                      wants.map((want) => (
+                        <div key={want.id} className="flex items-start justify-between gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium">{want.name}</div>
+                            {want.notes && <p className="mt-0.5 text-sm text-zinc-500">{want.notes}</p>}
+                            <p className="mt-1 text-sm font-semibold">
+                              {want.price != null ? formatMoney(want.price) : <span className="font-normal text-zinc-400">Price TBC</span>}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <button
+                              onClick={() => handleConvertWantToAsset(want)}
+                              disabled={convertingWantId === want.id}
+                              className="rounded-xl border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
+                              title="Log as an asset and remove from wants"
+                            >
+                              {convertingWantId === want.id ? "Adding…" : "Add as asset"}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteWant(want.id)}
+                              disabled={deletingWantId === want.id}
+                              className="rounded-xl border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+                            >
+                              {deletingWantId === want.id ? "…" : "Delete"}
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 ) : null}
               </div>
             </section>
