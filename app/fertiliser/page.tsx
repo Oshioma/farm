@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { FlaskConical } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getFarms, getFertilisations, getZones } from "@/lib/farm";
@@ -42,7 +42,6 @@ export default function FertiliserPage() {
   const [editForm, setEditForm] = useState(blank);
   const [savingEditId, setSavingEditId] = useState<string | null>(null);
   const router = useRouter();
-  const searchParams = useSearchParams();
   const quickAddHandledRef = useRef(false);
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
 
@@ -76,6 +75,8 @@ export default function FertiliserPage() {
 
   useEffect(() => {
     if (quickAddHandledRef.current) return;
+    if (typeof window === "undefined") return;
+    const searchParams = new URLSearchParams(window.location.search);
     const quickAddRequested = searchParams.get("quickAdd") === "1";
     if (!quickAddRequested || !activeFarmId || loading) return;
 
@@ -119,7 +120,7 @@ export default function FertiliserPage() {
       const query = nextUrl.searchParams.toString();
       router.replace(`${nextUrl.pathname}${query ? `?${query}` : ""}${nextUrl.hash}`, { scroll: false });
     }
-  }, [activeFarmId, loading, router, searchParams, zones]);
+  }, [activeFarmId, loading, router, zones]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
