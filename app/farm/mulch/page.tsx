@@ -81,11 +81,10 @@ export default function MulchPage() {
 
     const requestedZoneId = params.get("zoneId")?.trim() ?? "";
     const requestedBed = params.get("bed")?.trim().toUpperCase() ?? "";
-    let preselectedZoneId = "";
+    let preselectedZoneId = requestedZoneId;
 
-    if (requestedZoneId && zones.some((zone) => zone.id === requestedZoneId)) {
-      preselectedZoneId = requestedZoneId;
-    } else if (requestedBed) {
+    if (!preselectedZoneId && requestedBed) {
+      if (zones.length === 0) return;
       preselectedZoneId = zones.find((zone) => {
         const code = (zone.code ?? "").toUpperCase();
         const name = zone.name.toUpperCase();

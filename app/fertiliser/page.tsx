@@ -82,11 +82,9 @@ export default function FertiliserPage() {
 
     const requestedZoneId = searchParams.get("zoneId")?.trim() ?? "";
     const requestedBed = searchParams.get("bed")?.trim().toUpperCase() ?? "";
-    let preselectedZoneId = "";
-
-    if (requestedZoneId && zones.some((zone) => zone.id === requestedZoneId)) {
-      preselectedZoneId = requestedZoneId;
-    } else if (requestedBed) {
+    let preselectedZoneId = requestedZoneId;
+    if (!preselectedZoneId && requestedBed) {
+      if (zones.length === 0) return;
       preselectedZoneId = zones.find((zone) => {
         const code = (zone.code ?? "").toUpperCase();
         const name = zone.name.toUpperCase();
