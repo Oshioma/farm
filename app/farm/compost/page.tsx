@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getFarms, getCompost, getZones } from "@/lib/farm";
 import type { Farm, CompostEntry, Zone } from "@/lib/farm";
@@ -36,7 +36,6 @@ export default function CompostPage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
-  const searchParams = useSearchParams();
   const quickAddHandledRef = useRef(false);
   const normalizedZoneSearch = zoneSearch.trim().toLowerCase();
   const filteredZones = zones.filter((z) =>
@@ -75,11 +74,13 @@ export default function CompostPage() {
 
   useEffect(() => {
     if (quickAddHandledRef.current) return;
-    const quickAddRequested = searchParams.get("quickAdd") === "1";
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const quickAddRequested = params.get("quickAdd") === "1";
     if (!quickAddRequested || !activeFarmId || loading) return;
 
-    const requestedZoneId = searchParams.get("zoneId")?.trim() ?? "";
-    const requestedBed = searchParams.get("bed")?.trim().toUpperCase() ?? "";
+    const requestedZoneId = params.get("zoneId")?.trim() ?? "";
+    const requestedBed = params.get("bed")?.trim().toUpperCase() ?? "";
     let preselectedZoneId = "";
 
     if (requestedZoneId && zones.some((zone) => zone.id === requestedZoneId)) {
@@ -119,7 +120,7 @@ export default function CompostPage() {
       const query = nextUrl.searchParams.toString();
       router.replace(`${nextUrl.pathname}${query ? `?${query}` : ""}${nextUrl.hash}`, { scroll: false });
     }
-  }, [activeFarmId, loading, router, searchParams, zones]);
+  }, [activeFarmId, loading, router, zones]);
 
   async function handleSave() {
     if (!activeFarmId) return;
