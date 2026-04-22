@@ -2185,7 +2185,7 @@ export default function FarmPage() {
                   }}
                 />
                 <p className="mt-2 text-xs text-zinc-400">
-                  Click a bed to see details and quickly add crops.
+                  Click a bed to see details, add crops, or quickly log fertiliser, compost, and mulch.
                 </p>
               </div>
             </section>
