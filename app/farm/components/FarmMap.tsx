@@ -787,6 +787,16 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
   const selectedMulch = selected ? getMulchForZone(selected.id) : [];
   const selectedHarvestEta = selectedBed ? getHarvestEtaForBed(selectedBed) : undefined;
 
+  function buildQuickActionHref(path: string): string {
+    const params = new URLSearchParams();
+    if (farmId) params.set("farmId", farmId);
+    params.set("quickAdd", "1");
+    if (selectedBed) params.set("bed", selectedBed);
+    if (selected?.id) params.set("zoneId", selected.id);
+    const query = params.toString();
+    return query ? `${path}?${query}` : path;
+  }
+
   // Check if this is a new/unknown farm with no layout
   const isBlankFarm = baseLayout.beds.length === 0 && editBeds.length === 0 && !customBg;
 
@@ -1486,6 +1496,31 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
               >
                 + Add crop to {selectedBed}
               </button>
+              <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 p-2.5">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                  Quick add action
+                </div>
+                <div className="mt-2 space-y-1.5">
+                  <Link
+                    href={buildQuickActionHref("/fertiliser")}
+                    className="block rounded-lg border border-amber-200 bg-amber-100 px-2.5 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-200"
+                  >
+                    + Fertiliser
+                  </Link>
+                  <Link
+                    href={buildQuickActionHref("/farm/compost")}
+                    className="block rounded-lg border border-emerald-200 bg-emerald-100 px-2.5 py-1.5 text-xs font-medium text-emerald-900 hover:bg-emerald-200"
+                  >
+                    + Compost
+                  </Link>
+                  <Link
+                    href={buildQuickActionHref("/farm/mulch")}
+                    className="block rounded-lg border border-orange-200 bg-orange-100 px-2.5 py-1.5 text-xs font-medium text-orange-900 hover:bg-orange-200"
+                  >
+                    + Mulch
+                  </Link>
+                </div>
+              </div>
             </div>
           ) : !editMode ? (
             <div className="rounded-2xl border border-dashed border-zinc-200 p-4 text-center text-xs text-zinc-400">

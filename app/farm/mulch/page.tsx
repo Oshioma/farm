@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getFarms, getMulch, getZones } from "@/lib/farm";
 import type { Farm, MulchEntry, Zone } from "@/lib/farm";
@@ -36,6 +36,8 @@ export default function MulchPage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const quickAddHandledRef = useRef(false);
   const normalizedZoneSearch = zoneSearch.trim().toLowerCase();
   const filteredZones = zones.filter((z) =>
     z.name.toLowerCase().includes(normalizedZoneSearch)
@@ -70,6 +72,54 @@ export default function MulchPage() {
       .catch((err) => setError(errMsg(err, "Failed to load")))
       .finally(() => setLoading(false));
   }, [activeFarmId]);
+
+  useEffect(() => {
+    if (quickAddHandledRef.current) return;
+    const quickAddRequested = searchParams.get("quickAdd") === "1";
+    if (!quickAddRequested || !activeFarmId || loading) return;
+
+    const requestedZoneId = searchParams.get("zoneId")?.trim() ?? "";
+    const requestedBed = searchParams.get("bed")?.trim().toUpperCase() ?? "";
+    let preselectedZoneId = "";
+
+    if (requestedZoneId && zones.some((zone) => zone.id === requestedZoneId)) {
+      preselectedZoneId = requestedZoneId;
+    } else if (requestedBed) {
+      preselectedZoneId = zones.find((zone) => {
+        const code = (zone.code ?? "").toUpperCase();
+        const name = zone.name.toUpperCase();
+        return (
+          code === requestedBed ||
+          name === requestedBed ||
+          code.replace(/^ROW\s*/i, "") === requestedBed ||
+          name.replace(/^ROW\s*/i, "") === requestedBed
+        );
+      })?.id ?? "";
+    }
+
+    const today = new Date();
+    const localIsoDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000)
+      .toISOString()
+      .slice(0, 10);
+
+    setZoneSearch("");
+    setForm({
+      ...blankForm,
+      date: localIsoDate,
+      zone_ids: preselectedZoneId ? [preselectedZoneId] : [],
+    });
+    setModal("new");
+    quickAddHandledRef.current = true;
+
+    if (typeof window !== "undefined") {
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.delete("quickAdd");
+      nextUrl.searchParams.delete("zoneId");
+      nextUrl.searchParams.delete("bed");
+      const query = nextUrl.searchParams.toString();
+      router.replace(`${nextUrl.pathname}${query ? `?${query}` : ""}${nextUrl.hash}`, { scroll: false });
+    }
+  }, [activeFarmId, loading, router, searchParams, zones]);
 
   async function handleSave() {
     if (!activeFarmId) return;
