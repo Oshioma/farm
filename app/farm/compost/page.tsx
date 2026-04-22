@@ -83,9 +83,10 @@ export default function CompostPage() {
     const requestedBed = params.get("bed")?.trim().toUpperCase() ?? "";
     let preselectedZoneId = "";
 
-    if (requestedZoneId && zones.some((zone) => zone.id === requestedZoneId)) {
+    if (requestedZoneId) {
       preselectedZoneId = requestedZoneId;
     } else if (requestedBed) {
+      if (zones.length === 0) return;
       preselectedZoneId = zones.find((zone) => {
         const code = (zone.code ?? "").toUpperCase();
         const name = zone.name.toUpperCase();
