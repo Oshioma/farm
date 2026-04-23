@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 function SignUpInner() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
@@ -17,27 +18,48 @@ function SignUpInner() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setError("");
 
-    const emailRedirectTo = `${window.location.origin}${redirectTo}`;
-    const { error: authError, data } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo },
-    });
-
-    if (authError) {
-      setError(authError.message);
-      setLoading(false);
+    if (password !== confirmPassword) {
+      setError("Passwords do not match. Please re-enter them.");
       return;
     }
 
-    // If email confirmation is disabled in Supabase, the session is set immediately
-    if (data.session) {
-      router.push(redirectTo);
-    } else {
-      setDone(true);
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters long.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const emailRedirectTo = `${window.location.origin}${redirectTo}`;
+      const { error: authError, data } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo },
+      });
+
+      if (authError) {
+        setError(authError.message);
+        setLoading(false);
+        return;
+      }
+
+      // If email confirmation is disabled in Supabase, the session is set immediately
+      if (data.session) {
+        router.push(redirectTo);
+      } else {
+        setLoading(false);
+        setDone(true);
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong. Please try again."
+      );
+      setLoading(false);
     }
   }
 
@@ -50,7 +72,7 @@ function SignUpInner() {
           </p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">Check your email</h1>
           <p className="mt-3 text-sm text-zinc-600">
-            We sent a confirmation link to <strong>{email}</strong>. Click it — it will bring you straight back to accept the invite.
+            We sent a confirmation link to <strong>{email}</strong>. Click it to activate your account and sign in.
           </p>
           <Link
             href={`/login?redirectTo=${encodeURIComponent(redirectTo)}`}
@@ -80,8 +102,9 @@ function SignUpInner() {
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
-              <label className="mb-2 block text-sm font-medium">Email</label>
+              <label htmlFor="email" className="mb-2 block text-sm font-medium">Email</label>
               <input
+                id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -93,8 +116,9 @@ function SignUpInner() {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium">Password</label>
+              <label htmlFor="password" className="mb-2 block text-sm font-medium">Password</label>
               <input
+                id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -103,6 +127,22 @@ function SignUpInner() {
                 required
                 minLength={6}
                 autoComplete="new-password"
+              />
+              <p className="mt-1 text-xs text-zinc-400">Minimum 6 characters</p>
+            </div>
+
+            <div>
+              <label htmlFor="confirmPassword" className="mb-2 block text-sm font-medium">Confirm password</label>
+              <input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                placeholder="••••••••"
+                required
+                minLength={6}
+                autoComplete="off"
               />
             </div>
 
