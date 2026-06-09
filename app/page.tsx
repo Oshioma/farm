@@ -41,12 +41,18 @@ export default function HomePage() {
           </ul>
         </div>
 
-        <div className="mt-8">
+        <div className="mt-8 flex flex-wrap gap-3">
           <Link
             href="/farm"
             className="inline-flex items-center justify-center rounded-2xl bg-zinc-900 px-7 py-4 text-base font-semibold text-white shadow-[0_12px_30px_-12px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
           >
             Open Farm Manager
+          </Link>
+          <Link
+            href="/lunar-planner"
+            className="inline-flex items-center justify-center rounded-2xl border border-indigo-200 bg-white px-7 py-4 text-base font-semibold text-indigo-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+          >
+            Lunar Farming Planner
           </Link>
         </div>
       </section>

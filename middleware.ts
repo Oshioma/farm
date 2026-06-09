@@ -26,7 +26,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Protected routes — check auth
-  const protectedPaths = ["/farm", "/plants", "/admin"];
+  const protectedPaths = ["/farm", "/plants", "/admin", "/lunar-planner"];
   const isProtected = protectedPaths.some(
     (p) => pathname === p || pathname.startsWith(p + "/")
   );
@@ -70,5 +70,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/farm/:path*", "/plants/:path*", "/admin/:path*", "/reset-password", "/auth/confirm"],
+  matcher: ["/farm/:path*", "/plants/:path*", "/admin/:path*", "/lunar-planner/:path*", "/reset-password", "/auth/confirm"],
 };
