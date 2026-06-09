@@ -664,19 +664,21 @@ export default function LunarPlannerPage() {
                   {dateISO ? (
                     <button
                       onClick={() => openDay(dateISO)}
-                      className="mt-1 text-left text-sm text-zinc-500 hover:underline"
+                      className="mt-1 block text-left text-sm text-zinc-500 hover:underline"
                     >
                       {formatDayLabel(fromISODate(dateISO), { weekday: true })}
                     </button>
                   ) : (
                     <p className="mt-1 text-sm text-zinc-400">No suitable day soon</p>
                   )}
-                  <span
-                    className={`mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${theme.badge}`}
-                  >
-                    <span>{PHASE_MOON_EMOJI[tpl.phase]}</span>
-                    {tpl.phase}
-                  </span>
+                  <div className="mt-2">
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${theme.badge}`}
+                    >
+                      <span aria-hidden>{PHASE_MOON_EMOJI[tpl.phase]}</span>
+                      {tpl.phase}
+                    </span>
+                  </div>
                   <ul className="mt-3 space-y-1 text-xs text-zinc-600">
                     {tpl.tasks.map((t) => (
                       <li key={t} className="flex gap-1.5">
