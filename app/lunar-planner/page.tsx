@@ -22,31 +22,39 @@ import {
   Trash2,
   CircleDot,
   Plus,
-  X,
   Pencil,
   Check,
   ChevronLeft,
   ChevronRight,
-  CalendarDays,
   BookOpen,
-  ScrollText,
+  Bell,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import {
   MOON_PHASES,
   TASK_CATEGORIES,
   REFERENCE_GUIDE,
-  TRADITIONAL_WISDOM,
+  REFERENCE_NOTE,
   PHASE_GUIDANCE,
+  PHASE_HEADLINE,
   PHASE_THEME,
+  PHASE_ICONS,
+  PHASE_MOON_EMOJI,
+  BIODYNAMIC_ICONS,
+  RECOMMENDATION_TEMPLATES,
+  isAdvisory,
   toISODate,
   fromISODate,
   addDays,
   addMonths,
   startOfMonth,
   formatDayLabel,
-  approxMoonPhase,
+  calcMoonPhase,
+  moonAgeFraction,
+  fractionDistance,
   type MoonPhase,
+  type BiodynamicIconKey,
 } from "./lunar-data";
 
 // ---------------------------------------------------------------------------
@@ -57,7 +65,9 @@ type ViewMode = "1day" | "7day" | "30day";
 interface LunarDay {
   id: string;
   date: string;
-  moon_phase: string | null;
+  calculated_moon_phase: string | null;
+  manual_moon_phase: string | null;
+  moon_phase_override: boolean | null;
   notes: string | null;
 }
 
@@ -70,6 +80,9 @@ interface LunarTask {
   crop_or_activity: string | null;
   notes: string | null;
   status: string | null;
+  reminder_date: string | null;
+  reminder_note: string | null;
+  reminder_status: string | null;
 }
 
 interface TaskForm {
@@ -78,6 +91,9 @@ interface TaskForm {
   crop_or_activity: string;
   notes: string;
   status: string;
+  reminder_date: string;
+  reminder_note: string;
+  reminder_status: string;
 }
 
 const BLANK_TASK: TaskForm = {
@@ -86,7 +102,15 @@ const BLANK_TASK: TaskForm = {
   crop_or_activity: "",
   notes: "",
   status: "planned",
+  reminder_date: "",
+  reminder_note: "",
+  reminder_status: "pending",
 };
+
+const TASK_SELECT =
+  "id, lunar_day_id, date, title, category, crop_or_activity, notes, status, reminder_date, reminder_note, reminder_status";
+const DAY_SELECT =
+  "id, date, calculated_moon_phase, manual_moon_phase, moon_phase_override, notes";
 
 // Icon per task category.
 const CATEGORY_ICON: Record<string, LucideIcon> = {
@@ -118,6 +142,12 @@ function isMoonPhase(v: string | null | undefined): v is MoonPhase {
   return !!v && (MOON_PHASES as readonly string[]).includes(v);
 }
 
+// Emoji + label for a biodynamic icon key, with phase-aware moon glyph.
+function iconFor(key: BiodynamicIconKey, phase: MoonPhase) {
+  const base = BIODYNAMIC_ICONS[key];
+  return key === "moon" ? { emoji: PHASE_MOON_EMOJI[phase], label: phase } : base;
+}
+
 export default function LunarPlannerPage() {
   const router = useRouter();
   const [userId, setUserId] = useState<string>("");
@@ -129,6 +159,7 @@ export default function LunarPlannerPage() {
 
   const [days, setDays] = useState<Record<string, LunarDay>>({});
   const [tasks, setTasks] = useState<LunarTask[]>([]);
+  const [dueReminders, setDueReminders] = useState<LunarTask[]>([]);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [savingNoteFor, setSavingNoteFor] = useState<string | null>(null);
 
@@ -136,7 +167,7 @@ export default function LunarPlannerPage() {
   const [taskForm, setTaskForm] = useState<TaskForm>(BLANK_TASK);
   const [savingTask, setSavingTask] = useState(false);
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
-  const [showWisdom, setShowWisdom] = useState(false);
+  const [busyReminderId, setBusyReminderId] = useState<string | null>(null);
 
   const todayISO = toISODate(new Date());
   const anchor = useMemo(() => fromISODate(anchorISO), [anchorISO]);
@@ -152,52 +183,53 @@ export default function LunarPlannerPage() {
       const dates = Array.from({ length: 7 }, (_, i) => toISODate(addDays(anchor, i)));
       return { rangeStart: dates[0], rangeEnd: dates[6], visibleDates: dates };
     }
-    // 30day month view — full calendar month containing the anchor
     const first = startOfMonth(anchor);
     const next = addMonths(first, 1);
     const dates: string[] = [];
-    for (let d = new Date(first); d < next; d = addDays(d, 1)) {
-      dates.push(toISODate(d));
-    }
-    return {
-      rangeStart: dates[0],
-      rangeEnd: dates[dates.length - 1],
-      visibleDates: dates,
-    };
+    for (let d = new Date(first); d < next; d = addDays(d, 1)) dates.push(toISODate(d));
+    return { rangeStart: dates[0], rangeEnd: dates[dates.length - 1], visibleDates: dates };
   }, [view, anchor, anchorISO]);
 
   // -------------------------------------------------------------------------
   // Data loading
   // -------------------------------------------------------------------------
-  const loadRange = useCallback(
-    async (uid: string, start: string, end: string) => {
-      const [dayRes, taskRes] = await Promise.all([
-        supabase
-          .from("lunar_days")
-          .select("id, date, moon_phase, notes")
-          .eq("user_id", uid)
-          .gte("date", start)
-          .lte("date", end),
-        supabase
-          .from("lunar_tasks")
-          .select("id, lunar_day_id, date, title, category, crop_or_activity, notes, status")
-          .eq("user_id", uid)
-          .gte("date", start)
-          .lte("date", end)
-          .order("created_at", { ascending: true }),
-      ]);
-      if (dayRes.error) throw dayRes.error;
-      if (taskRes.error) throw taskRes.error;
+  const loadRange = useCallback(async (uid: string, start: string, end: string) => {
+    const [dayRes, taskRes] = await Promise.all([
+      supabase
+        .from("lunar_days")
+        .select(DAY_SELECT)
+        .eq("user_id", uid)
+        .gte("date", start)
+        .lte("date", end),
+      supabase
+        .from("lunar_tasks")
+        .select(TASK_SELECT)
+        .eq("user_id", uid)
+        .gte("date", start)
+        .lte("date", end)
+        .order("created_at", { ascending: true }),
+    ]);
+    if (dayRes.error) throw dayRes.error;
+    if (taskRes.error) throw taskRes.error;
+    const dayMap: Record<string, LunarDay> = {};
+    for (const d of (dayRes.data ?? []) as LunarDay[]) dayMap[d.date] = d;
+    setDays(dayMap);
+    setTasks((taskRes.data ?? []) as LunarTask[]);
+  }, []);
 
-      const dayMap: Record<string, LunarDay> = {};
-      for (const d of (dayRes.data ?? []) as LunarDay[]) dayMap[d.date] = d;
-      setDays(dayMap);
-      setTasks((taskRes.data ?? []) as LunarTask[]);
-    },
-    []
-  );
+  const loadReminders = useCallback(async (uid: string) => {
+    const { data, error: e } = await supabase
+      .from("lunar_tasks")
+      .select(TASK_SELECT)
+      .eq("user_id", uid)
+      .eq("reminder_status", "pending")
+      .not("reminder_date", "is", null)
+      .lte("reminder_date", toISODate(new Date()))
+      .order("reminder_date", { ascending: true });
+    if (e) throw e;
+    setDueReminders((data ?? []) as LunarTask[]);
+  }, []);
 
-  // Resolve the current user once.
   useEffect(() => {
     (async () => {
       try {
@@ -216,7 +248,6 @@ export default function LunarPlannerPage() {
     })();
   }, [router]);
 
-  // Reload whenever the user or the visible range changes.
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
@@ -224,7 +255,7 @@ export default function LunarPlannerPage() {
       try {
         setLoading(true);
         setError("");
-        await loadRange(userId, rangeStart, rangeEnd);
+        await Promise.all([loadRange(userId, rangeStart, rangeEnd), loadReminders(userId)]);
       } catch (err) {
         if (!cancelled) setError(errMsg(err, "Failed to load planner"));
       } finally {
@@ -234,36 +265,57 @@ export default function LunarPlannerPage() {
     return () => {
       cancelled = true;
     };
-  }, [userId, rangeStart, rangeEnd, loadRange]);
+  }, [userId, rangeStart, rangeEnd, loadRange, loadReminders]);
 
   async function refresh() {
     if (!userId) return;
     try {
-      await loadRange(userId, rangeStart, rangeEnd);
+      await Promise.all([loadRange(userId, rangeStart, rangeEnd), loadReminders(userId)]);
     } catch (err) {
       setError(errMsg(err, "Failed to refresh"));
     }
   }
 
   // -------------------------------------------------------------------------
-  // Phase resolution + helpers
+  // Phase resolution — calculated by default, manual override when enabled
   // -------------------------------------------------------------------------
   const resolvedPhase = useCallback(
-    (dateISO: string): MoonPhase => {
-      const saved = days[dateISO]?.moon_phase;
-      if (isMoonPhase(saved)) return saved;
-      return approxMoonPhase(fromISODate(dateISO));
+    (dateISO: string): { phase: MoonPhase; overridden: boolean } => {
+      const day = days[dateISO];
+      if (day?.moon_phase_override && isMoonPhase(day.manual_moon_phase)) {
+        return { phase: day.manual_moon_phase, overridden: true };
+      }
+      return { phase: calcMoonPhase(fromISODate(dateISO)), overridden: false };
     },
     [days]
   );
 
   const tasksByDate = useMemo(() => {
     const map: Record<string, LunarTask[]> = {};
-    for (const t of tasks) {
-      (map[t.date] ??= []).push(t);
-    }
+    for (const t of tasks) (map[t.date] ??= []).push(t);
     return map;
   }, [tasks]);
+
+  // -------------------------------------------------------------------------
+  // Best Next 3 Days — scan the next 30 days using calculated phases
+  // -------------------------------------------------------------------------
+  const bestDays = useMemo(() => {
+    const start = fromISODate(todayISO);
+    return RECOMMENDATION_TEMPLATES.map((tpl) => {
+      let bestISO = "";
+      let bestDist = Infinity;
+      for (let i = 1; i <= 30; i++) {
+        const d = addDays(start, i);
+        if (calcMoonPhase(d) !== tpl.phase) continue;
+        const dist = fractionDistance(moonAgeFraction(d), tpl.centre);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestISO = toISODate(d);
+        }
+      }
+      return { tpl, dateISO: bestISO };
+    });
+  }, [todayISO]);
 
   // Ensure a lunar_days row exists for a date, returning its id.
   async function ensureDay(dateISO: string, patch?: Partial<LunarDay>): Promise<string> {
@@ -271,13 +323,16 @@ export default function LunarPlannerPage() {
     const payload: Record<string, unknown> = {
       user_id: userId,
       date: dateISO,
-      moon_phase: patch?.moon_phase ?? existing?.moon_phase ?? resolvedPhase(dateISO),
+      calculated_moon_phase: calcMoonPhase(fromISODate(dateISO)),
+      manual_moon_phase: patch?.manual_moon_phase ?? existing?.manual_moon_phase ?? null,
+      moon_phase_override:
+        patch?.moon_phase_override ?? existing?.moon_phase_override ?? false,
       notes: patch?.notes ?? existing?.notes ?? null,
     };
     const { data, error: e } = await supabase
       .from("lunar_days")
       .upsert(payload, { onConflict: "user_id,date" })
-      .select("id, date, moon_phase, notes")
+      .select(DAY_SELECT)
       .single();
     if (e) throw e;
     const row = data as LunarDay;
@@ -285,10 +340,26 @@ export default function LunarPlannerPage() {
     return row.id;
   }
 
-  async function handleChangePhase(dateISO: string, phase: MoonPhase) {
+  async function handleToggleOverride(dateISO: string, enabled: boolean) {
     try {
       setError("");
-      await ensureDay(dateISO, { moon_phase: phase });
+      const current = resolvedPhase(dateISO).phase;
+      await ensureDay(dateISO, {
+        moon_phase_override: enabled,
+        // Seed the manual value from the calculated phase when first enabling.
+        manual_moon_phase: enabled
+          ? days[dateISO]?.manual_moon_phase ?? current
+          : days[dateISO]?.manual_moon_phase ?? null,
+      });
+    } catch (err) {
+      setError(errMsg(err, "Failed to update moon phase"));
+    }
+  }
+
+  async function handleChangeManualPhase(dateISO: string, phase: MoonPhase) {
+    try {
+      setError("");
+      await ensureDay(dateISO, { moon_phase_override: true, manual_moon_phase: phase });
     } catch (err) {
       setError(errMsg(err, "Failed to update moon phase"));
     }
@@ -325,6 +396,9 @@ export default function LunarPlannerPage() {
       crop_or_activity: task.crop_or_activity ?? "",
       notes: task.notes ?? "",
       status: task.status ?? "planned",
+      reminder_date: task.reminder_date ?? "",
+      reminder_note: task.reminder_note ?? "",
+      reminder_status: task.reminder_status ?? "pending",
     });
     setTaskModal({ date: task.date, taskId: task.id });
   }
@@ -345,6 +419,9 @@ export default function LunarPlannerPage() {
         crop_or_activity: taskForm.crop_or_activity.trim() || null,
         notes: taskForm.notes.trim() || null,
         status: taskForm.status || "planned",
+        reminder_date: taskForm.reminder_date || null,
+        reminder_note: taskForm.reminder_note.trim() || null,
+        reminder_status: taskForm.reminder_date ? taskForm.reminder_status || "pending" : "pending",
       };
       if (taskModal.taskId) {
         const { error: e } = await supabase
@@ -396,10 +473,31 @@ export default function LunarPlannerPage() {
       const { error: e } = await supabase.from("lunar_tasks").delete().eq("id", task.id);
       if (e) throw e;
       setTasks((prev) => prev.filter((t) => t.id !== task.id));
+      setDueReminders((prev) => prev.filter((t) => t.id !== task.id));
     } catch (err) {
       setError(errMsg(err, "Failed to delete task"));
     } finally {
       setBusyTaskId(null);
+    }
+  }
+
+  async function handleSetReminderStatus(task: LunarTask, status: "done" | "skipped") {
+    try {
+      setBusyReminderId(task.id);
+      setError("");
+      const { error: e } = await supabase
+        .from("lunar_tasks")
+        .update({ reminder_status: status })
+        .eq("id", task.id);
+      if (e) throw e;
+      setDueReminders((prev) => prev.filter((t) => t.id !== task.id));
+      setTasks((prev) =>
+        prev.map((t) => (t.id === task.id ? { ...t, reminder_status: status } : t))
+      );
+    } catch (err) {
+      setError(errMsg(err, "Failed to update reminder"));
+    } finally {
+      setBusyReminderId(null);
     }
   }
 
@@ -416,7 +514,11 @@ export default function LunarPlannerPage() {
     setAnchorISO(toISODate(new Date()));
   }
 
-  // Heading describing the current period.
+  function openDay(dateISO: string) {
+    setAnchorISO(dateISO);
+    setView("1day");
+  }
+
   const periodLabel = useMemo(() => {
     if (view === "1day") return formatDayLabel(anchor, { weekday: true, year: true });
     if (view === "7day") {
@@ -470,7 +572,7 @@ export default function LunarPlannerPage() {
           </div>
         </header>
 
-        {/* 1. Lunar Farming Guide — permanent reference */}
+        {/* Lunar Farming Guide — permanent reference */}
         <section className="mb-6 rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-6 shadow-sm">
           <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-indigo-900">
             <BookOpen className="h-5 w-5" />
@@ -480,12 +582,9 @@ export default function LunarPlannerPage() {
             {REFERENCE_GUIDE.map(({ phase, summary }) => {
               const theme = PHASE_THEME[phase];
               return (
-                <div
-                  key={phase}
-                  className={`rounded-2xl border ${theme.ring} bg-white/80 p-4`}
-                >
+                <div key={phase} className={`rounded-2xl border ${theme.ring} bg-white/80 p-4`}>
                   <div className="mb-1.5 flex items-center gap-2">
-                    <span className={`h-2.5 w-2.5 rounded-full ${theme.dot}`} />
+                    <span>{PHASE_MOON_EMOJI[phase]}</span>
                     <span className="font-semibold">{phase}</span>
                   </div>
                   <p className="text-sm leading-relaxed text-zinc-600">{summary}</p>
@@ -493,44 +592,103 @@ export default function LunarPlannerPage() {
               );
             })}
           </div>
+          <p className="mt-4 rounded-2xl bg-indigo-50 px-4 py-3 text-sm italic leading-relaxed text-indigo-800">
+            {REFERENCE_NOTE}
+          </p>
         </section>
 
-        {/* 2. Traditional Lunar Farming Wisdom */}
-        <section className="mb-6 rounded-3xl border border-amber-200 bg-amber-50/40 p-6 shadow-sm">
-          <button
-            onClick={() => setShowWisdom((v) => !v)}
-            className="flex w-full items-center justify-between gap-2 text-left"
-          >
-            <h2 className="flex items-center gap-2 text-lg font-semibold text-amber-900">
-              <ScrollText className="h-5 w-5" />
-              Traditional Lunar Farming Wisdom
+        {/* Reminders due today */}
+        {dueReminders.length > 0 && (
+          <section className="mb-6 rounded-3xl border border-rose-200 bg-rose-50/60 p-5 shadow-sm">
+            <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold text-rose-900">
+              <Bell className="h-5 w-5" />
+              Reminders due today
+              <span className="rounded-full bg-rose-200 px-2 py-0.5 text-xs font-semibold text-rose-800">
+                {dueReminders.length}
+              </span>
             </h2>
-            <span className="rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-medium text-amber-800">
-              {showWisdom ? "Hide" : "Show"} 10 tips
-            </span>
-          </button>
-          {showWisdom && (
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {TRADITIONAL_WISDOM.map((w, i) => (
-                <div
-                  key={w.title}
-                  className="rounded-2xl border border-amber-100 bg-white p-4 shadow-sm"
+            <ul className="space-y-2">
+              {dueReminders.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex flex-col gap-2 rounded-2xl border border-rose-100 bg-white p-3 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <h3 className="mb-2 font-semibold text-zinc-800">
-                    {i + 1}. {w.title}
-                  </h3>
-                  <ul className="space-y-1 text-sm leading-relaxed text-zinc-600">
-                    {w.lines.map((line, j) => (
-                      <li key={j} className="flex gap-2">
-                        <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
-                        <span>{line}</span>
+                  <div className="min-w-0">
+                    <button
+                      onClick={() => openDay(r.date)}
+                      className="text-left font-medium text-zinc-800 hover:underline"
+                    >
+                      {r.reminder_note?.trim() || r.title}
+                    </button>
+                    <p className="text-xs text-zinc-500">
+                      {r.title}
+                      {r.reminder_date && (
+                        <> · due {formatDayLabel(fromISODate(r.reminder_date), { short: true })}</>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      onClick={() => handleSetReminderStatus(r, "done")}
+                      disabled={busyReminderId === r.id}
+                      className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      Done
+                    </button>
+                    <button
+                      onClick={() => handleSetReminderStatus(r, "skipped")}
+                      disabled={busyReminderId === r.id}
+                      className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-50"
+                    >
+                      Skip
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* Best Next 3 Days */}
+        <section className="mb-6 rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm">
+          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-emerald-900">
+            <Sparkles className="h-5 w-5" />
+            Best Next 3 Days
+          </h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {bestDays.map(({ tpl, dateISO }) => {
+              const theme = PHASE_THEME[tpl.phase];
+              return (
+                <div key={tpl.key} className={`rounded-2xl border ${theme.ring} bg-white p-4 shadow-sm`}>
+                  <p className="text-sm font-semibold text-zinc-800">{tpl.title}</p>
+                  {dateISO ? (
+                    <button
+                      onClick={() => openDay(dateISO)}
+                      className="mt-1 text-left text-sm text-zinc-500 hover:underline"
+                    >
+                      {formatDayLabel(fromISODate(dateISO), { weekday: true })}
+                    </button>
+                  ) : (
+                    <p className="mt-1 text-sm text-zinc-400">No suitable day soon</p>
+                  )}
+                  <span
+                    className={`mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${theme.badge}`}
+                  >
+                    <span>{PHASE_MOON_EMOJI[tpl.phase]}</span>
+                    {tpl.phase}
+                  </span>
+                  <ul className="mt-3 space-y-1 text-xs text-zinc-600">
+                    {tpl.tasks.map((t) => (
+                      <li key={t} className="flex gap-1.5">
+                        <span className={`mt-1.5 h-1 w-1 shrink-0 rounded-full ${theme.dot}`} />
+                        <span>{t}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
-              ))}
-            </div>
-          )}
+              );
+            })}
+          </div>
         </section>
 
         {error && (
@@ -539,7 +697,7 @@ export default function LunarPlannerPage() {
           </div>
         )}
 
-        {/* 3 + 8. View switch & navigation */}
+        {/* View switch & navigation */}
         <div className="mb-5 flex flex-col gap-3 rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div className="inline-flex rounded-full border border-zinc-200 bg-zinc-50 p-1">
             {(
@@ -553,9 +711,7 @@ export default function LunarPlannerPage() {
                 key={mode}
                 onClick={() => setView(mode)}
                 className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
-                  view === mode
-                    ? "bg-zinc-900 text-white shadow-sm"
-                    : "text-zinc-600 hover:text-zinc-900"
+                  view === mode ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:text-zinc-900"
                 }`}
               >
                 {label}
@@ -600,14 +756,10 @@ export default function LunarPlannerPage() {
         ) : view === "30day" ? (
           <MonthGrid
             dates={visibleDates}
-            anchor={anchor}
             todayISO={todayISO}
             resolvedPhase={resolvedPhase}
             tasksByDate={tasksByDate}
-            onOpenDay={(d) => {
-              setAnchorISO(d);
-              setView("1day");
-            }}
+            onOpenDay={openDay}
             onAddTask={openAddTask}
           />
         ) : (
@@ -618,29 +770,31 @@ export default function LunarPlannerPage() {
                 : "grid grid-cols-1 gap-4"
             }
           >
-            {visibleDates.map((dateISO) => (
-              <DayCard
-                key={dateISO}
-                dateISO={dateISO}
-                large={view === "1day"}
-                isToday={dateISO === todayISO}
-                phase={resolvedPhase(dateISO)}
-                savedPhase={days[dateISO]?.moon_phase ?? null}
-                tasks={tasksByDate[dateISO] ?? []}
-                noteValue={noteDrafts[dateISO] ?? days[dateISO]?.notes ?? ""}
-                savingNote={savingNoteFor === dateISO}
-                busyTaskId={busyTaskId}
-                onChangePhase={(p) => handleChangePhase(dateISO, p)}
-                onNoteChange={(v) =>
-                  setNoteDrafts((prev) => ({ ...prev, [dateISO]: v }))
-                }
-                onNoteBlur={() => handleSaveNotes(dateISO)}
-                onAddTask={() => openAddTask(dateISO)}
-                onEditTask={openEditTask}
-                onToggleDone={handleToggleDone}
-                onDeleteTask={handleDeleteTask}
-              />
-            ))}
+            {visibleDates.map((dateISO) => {
+              const { phase, overridden } = resolvedPhase(dateISO);
+              return (
+                <DayCard
+                  key={dateISO}
+                  dateISO={dateISO}
+                  large={view === "1day"}
+                  isToday={dateISO === todayISO}
+                  phase={phase}
+                  overridden={overridden}
+                  tasks={tasksByDate[dateISO] ?? []}
+                  noteValue={noteDrafts[dateISO] ?? days[dateISO]?.notes ?? ""}
+                  savingNote={savingNoteFor === dateISO}
+                  busyTaskId={busyTaskId}
+                  onToggleOverride={(en) => handleToggleOverride(dateISO, en)}
+                  onChangeManualPhase={(p) => handleChangeManualPhase(dateISO, p)}
+                  onNoteChange={(v) => setNoteDrafts((prev) => ({ ...prev, [dateISO]: v }))}
+                  onNoteBlur={() => handleSaveNotes(dateISO)}
+                  onAddTask={() => openAddTask(dateISO)}
+                  onEditTask={openEditTask}
+                  onToggleDone={handleToggleDone}
+                  onDeleteTask={handleDeleteTask}
+                />
+              );
+            })}
           </div>
         )}
       </div>
@@ -668,9 +822,7 @@ export default function LunarPlannerPage() {
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">
-                    Category
-                  </label>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Category</label>
                   <select
                     className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                     value={taskForm.category}
@@ -702,19 +854,69 @@ export default function LunarPlannerPage() {
                 <input
                   className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                   value={taskForm.crop_or_activity}
-                  onChange={(e) =>
-                    setTaskForm((p) => ({ ...p, crop_or_activity: e.target.value }))
-                  }
+                  onChange={(e) => setTaskForm((p) => ({ ...p, crop_or_activity: e.target.value }))}
                   placeholder="Ginger, turmeric…"
                 />
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-zinc-600">Notes</label>
                 <textarea
-                  className="min-h-[70px] w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                  className="min-h-[60px] w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                   value={taskForm.notes}
                   onChange={(e) => setTaskForm((p) => ({ ...p, notes: e.target.value }))}
                 />
+              </div>
+
+              {/* Reminder */}
+              <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+                <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  <Bell className="h-3.5 w-3.5" /> Reminder (optional)
+                </p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-zinc-600">
+                      Remind me on
+                    </label>
+                    <input
+                      type="date"
+                      className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                      value={taskForm.reminder_date}
+                      onChange={(e) =>
+                        setTaskForm((p) => ({ ...p, reminder_date: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-zinc-600">
+                      Reminder status
+                    </label>
+                    <select
+                      className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900 disabled:bg-zinc-100 disabled:text-zinc-400"
+                      value={taskForm.reminder_status}
+                      disabled={!taskForm.reminder_date}
+                      onChange={(e) =>
+                        setTaskForm((p) => ({ ...p, reminder_status: e.target.value }))
+                      }
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="done">Done</option>
+                      <option value="skipped">Skipped</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">
+                    Reminder note
+                  </label>
+                  <input
+                    className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                    value={taskForm.reminder_note}
+                    onChange={(e) =>
+                      setTaskForm((p) => ({ ...p, reminder_note: e.target.value }))
+                    }
+                    placeholder="Check ginger bed, water seedlings…"
+                  />
+                </div>
               </div>
             </div>
             <div className="mt-5 flex gap-2 border-t border-zinc-100 pt-4">
@@ -740,6 +942,60 @@ export default function LunarPlannerPage() {
 }
 
 // ---------------------------------------------------------------------------
+// Biodynamic icon row
+// ---------------------------------------------------------------------------
+function IconRow({ phase, max }: { phase: MoonPhase; max?: number }) {
+  const keys = max ? PHASE_ICONS[phase].slice(0, max) : PHASE_ICONS[phase];
+  return (
+    <div className="flex flex-wrap gap-1">
+      {keys.map((k) => {
+        const ic = iconFor(k, phase);
+        return (
+          <span
+            key={k}
+            title={ic.label}
+            className="inline-flex h-6 items-center rounded-full bg-zinc-100 px-1.5 text-sm leading-none"
+          >
+            <span aria-hidden>{ic.emoji}</span>
+            <span className="sr-only">{ic.label}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Today's Lunar Guidance block
+// ---------------------------------------------------------------------------
+function GuidanceBlock({ phase, theme }: { phase: MoonPhase; theme: typeof PHASE_THEME[MoonPhase] }) {
+  return (
+    <div className={`rounded-2xl ${theme.chip} px-3 py-2.5`}>
+      <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide">
+        <Moon className="h-3.5 w-3.5" /> Today&apos;s Lunar Guidance
+      </p>
+      <ul className="space-y-0.5 text-xs leading-snug">
+        {PHASE_GUIDANCE[phase].map((g, i) => {
+          const advisory = isAdvisory(g);
+          return (
+            <li key={i} className={`flex gap-1.5 ${advisory ? "opacity-70" : ""}`}>
+              <span
+                className={`mt-1 shrink-0 ${
+                  advisory ? "text-rose-500" : ""
+                }`}
+              >
+                {advisory ? "⚠" : <span className={`inline-block h-1 w-1 rounded-full ${theme.dot}`} />}
+              </span>
+              <span className={advisory ? "italic" : ""}>{g}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Day card (1-day + 7-day views)
 // ---------------------------------------------------------------------------
 interface DayCardProps {
@@ -747,12 +1003,13 @@ interface DayCardProps {
   large: boolean;
   isToday: boolean;
   phase: MoonPhase;
-  savedPhase: string | null;
+  overridden: boolean;
   tasks: LunarTask[];
   noteValue: string;
   savingNote: boolean;
   busyTaskId: string | null;
-  onChangePhase: (p: MoonPhase) => void;
+  onToggleOverride: (enabled: boolean) => void;
+  onChangeManualPhase: (p: MoonPhase) => void;
   onNoteChange: (v: string) => void;
   onNoteBlur: () => void;
   onAddTask: () => void;
@@ -767,12 +1024,13 @@ function DayCard(props: DayCardProps) {
     large,
     isToday,
     phase,
-    savedPhase,
+    overridden,
     tasks,
     noteValue,
     savingNote,
     busyTaskId,
-    onChangePhase,
+    onToggleOverride,
+    onChangeManualPhase,
     onNoteChange,
     onNoteBlur,
     onAddTask,
@@ -782,7 +1040,9 @@ function DayCard(props: DayCardProps) {
   } = props;
   const theme = PHASE_THEME[phase];
   const date = fromISODate(dateISO);
-  const guidance = PHASE_GUIDANCE[phase];
+  const dayReminders = tasks.filter(
+    (t) => t.reminder_date && t.reminder_status === "pending"
+  );
 
   return (
     <div
@@ -807,31 +1067,51 @@ function DayCard(props: DayCardProps) {
             {date.toLocaleDateString("en-GB", { weekday: "long" })}
           </p>
         </div>
-        <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${theme.badge}`}
-        >
-          <Moon className="h-3.5 w-3.5" />
-          {phase}
-        </span>
+        <div className="text-right">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${theme.badge}`}
+          >
+            <span aria-hidden>{PHASE_MOON_EMOJI[phase]}</span>
+            {phase}
+          </span>
+          <p className="mt-1 text-[10px] text-zinc-400">
+            {overridden ? "Manual override" : "Automatically calculated"}
+          </p>
+        </div>
       </div>
 
-      {/* Manual moon phase entry */}
+      {/* Biodynamic icons */}
       <div className="mb-3">
-        <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-zinc-400">
-          Moon phase {savedPhase ? "" : "(auto)"}
-        </label>
-        <select
-          value={phase}
-          onChange={(e) => onChangePhase(e.target.value as MoonPhase)}
-          className="w-full rounded-xl border border-zinc-300 px-3 py-1.5 text-sm outline-none focus:border-zinc-900"
-        >
-          {MOON_PHASES.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
+        <IconRow phase={phase} />
       </div>
+
+      {/* Manual moon phase override — editable in 1-day view */}
+      {large && (
+        <div className="mb-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+          <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
+            <input
+              type="checkbox"
+              checked={overridden}
+              onChange={(e) => onToggleOverride(e.target.checked)}
+              className="rounded border-zinc-300"
+            />
+            Override moon phase
+          </label>
+          {overridden && (
+            <select
+              value={phase}
+              onChange={(e) => onChangeManualPhase(e.target.value as MoonPhase)}
+              className="mt-2 w-full rounded-xl border border-zinc-300 px-3 py-1.5 text-sm outline-none focus:border-zinc-900"
+            >
+              {MOON_PHASES.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
 
       {/* Tasks */}
       <div className="mb-3">
@@ -859,7 +1139,7 @@ function DayCard(props: DayCardProps) {
               return (
                 <li
                   key={t.id}
-                  className={`group flex items-start gap-2 rounded-xl border px-2.5 py-2 text-sm transition ${
+                  className={`flex items-start gap-2 rounded-xl border px-2.5 py-2 text-sm transition ${
                     done ? "border-emerald-100 bg-emerald-50/60" : "border-zinc-100 bg-zinc-50"
                   }`}
                 >
@@ -893,10 +1173,14 @@ function DayCard(props: DayCardProps) {
                         </span>
                       )}
                       {t.crop_or_activity && <span>· {t.crop_or_activity}</span>}
+                      {t.reminder_date && t.reminder_status === "pending" && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-1.5 py-0.5 text-rose-600 ring-1 ring-rose-100">
+                          <Bell className="h-3 w-3" />
+                          {formatDayLabel(fromISODate(t.reminder_date), { short: true })}
+                        </span>
+                      )}
                     </div>
-                    {t.notes && (
-                      <p className="mt-1 text-[11px] leading-snug text-zinc-500">{t.notes}</p>
-                    )}
+                    {t.notes && <p className="mt-1 text-[11px] leading-snug text-zinc-500">{t.notes}</p>}
                   </div>
                   <div className="flex shrink-0 items-center gap-0.5">
                     <button
@@ -923,8 +1207,38 @@ function DayCard(props: DayCardProps) {
         )}
       </div>
 
-      {/* Notes */}
+      {/* Today's Lunar Guidance — always shown */}
       <div className="mb-3">
+        <GuidanceBlock phase={phase} theme={theme} />
+      </div>
+
+      {/* Reminders (1-day view) */}
+      {large && dayReminders.length > 0 && (
+        <div className="mb-3 rounded-2xl border border-rose-100 bg-rose-50/50 px-3 py-2.5">
+          <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-rose-700">
+            <Bell className="h-3.5 w-3.5" /> Reminders
+          </p>
+          <ul className="space-y-1 text-xs text-zinc-600">
+            {dayReminders.map((t) => (
+              <li key={t.id} className="flex gap-1.5">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-rose-400" />
+                <span>
+                  {t.reminder_note?.trim() || t.title}
+                  {t.reminder_date && (
+                    <span className="text-zinc-400">
+                      {" "}
+                      · {formatDayLabel(fromISODate(t.reminder_date), { short: true })}
+                    </span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Notes */}
+      <div className="mt-auto">
         <label className="mb-1 flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-zinc-400">
           Notes {savingNote && <span className="text-zinc-300">saving…</span>}
         </label>
@@ -938,21 +1252,6 @@ function DayCard(props: DayCardProps) {
           }`}
         />
       </div>
-
-      {/* Daily lunar guidance */}
-      <div className={`mt-auto rounded-2xl ${theme.chip} px-3 py-2.5`}>
-        <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide">
-          <Moon className="h-3.5 w-3.5" /> Traditional guidance
-        </p>
-        <ul className="space-y-0.5 text-xs leading-snug">
-          {guidance.map((g, i) => (
-            <li key={i} className="flex gap-1.5">
-              <span className={`mt-1.5 h-1 w-1 shrink-0 rounded-full ${theme.dot}`} />
-              <span>{g}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
     </div>
   );
 }
@@ -962,9 +1261,8 @@ function DayCard(props: DayCardProps) {
 // ---------------------------------------------------------------------------
 interface MonthGridProps {
   dates: string[];
-  anchor: Date;
   todayISO: string;
-  resolvedPhase: (d: string) => MoonPhase;
+  resolvedPhase: (d: string) => { phase: MoonPhase; overridden: boolean };
   tasksByDate: Record<string, LunarTask[]>;
   onOpenDay: (d: string) => void;
   onAddTask: (d: string) => void;
@@ -974,7 +1272,6 @@ const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function MonthGrid(props: MonthGridProps) {
   const { dates, todayISO, resolvedPhase, tasksByDate, onOpenDay, onAddTask } = props;
-  // Leading blanks so the first day lands under the right weekday (Mon-start).
   const firstDate = fromISODate(dates[0]);
   const leadingBlanks = (firstDate.getDay() + 6) % 7;
 
@@ -992,21 +1289,20 @@ function MonthGrid(props: MonthGridProps) {
       </div>
       <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
         {Array.from({ length: leadingBlanks }).map((_, i) => (
-          <div key={`blank-${i}`} className="min-h-[64px]" />
+          <div key={`blank-${i}`} className="min-h-[72px]" />
         ))}
         {dates.map((dateISO) => {
           const date = fromISODate(dateISO);
-          const phase = resolvedPhase(dateISO);
+          const { phase } = resolvedPhase(dateISO);
           const theme = PHASE_THEME[phase];
           const dayTasks = tasksByDate[dateISO] ?? [];
-          const doneCount = dayTasks.filter((t) => t.status === "done").length;
           const isToday = dateISO === todayISO;
           return (
             <div
               key={dateISO}
-              className={`group relative flex min-h-[64px] flex-col rounded-xl border p-1.5 transition sm:min-h-[88px] sm:p-2 ${
+              className={`group relative flex min-h-[72px] flex-col rounded-xl border p-1.5 transition sm:min-h-[104px] sm:p-2 ${
                 isToday ? "border-emerald-400 ring-1 ring-emerald-200" : theme.ring
-              } bg-white hover:shadow-sm`}
+              } ${theme.soft} hover:shadow-sm`}
             >
               <button
                 onClick={() => onOpenDay(dateISO)}
@@ -1020,37 +1316,26 @@ function MonthGrid(props: MonthGridProps) {
                 >
                   {date.getDate()}
                 </span>
-                <span
-                  className={`h-2 w-2 rounded-full ${theme.dot}`}
-                  title={phase}
-                />
+                <span aria-hidden className="text-sm leading-none">
+                  {PHASE_MOON_EMOJI[phase]}
+                </span>
               </button>
               <button
                 onClick={() => onOpenDay(dateISO)}
-                className="mt-1 flex-1 space-y-0.5 overflow-hidden text-left"
+                className="mt-1 flex flex-1 flex-col text-left"
+                title={phase}
               >
-                {dayTasks.slice(0, 2).map((t) => (
-                  <p
-                    key={t.id}
-                    className={`truncate rounded px-1 text-[10px] leading-tight sm:text-[11px] ${
-                      t.status === "done"
-                        ? "text-zinc-300 line-through"
-                        : `${theme.chip}`
-                    }`}
-                  >
-                    {t.title}
-                  </p>
-                ))}
-                {dayTasks.length > 2 && (
-                  <p className="px-1 text-[10px] text-zinc-400">
-                    +{dayTasks.length - 2} more
-                  </p>
-                )}
+                <p className="hidden text-[10px] font-medium leading-tight text-zinc-500 sm:block">
+                  {PHASE_HEADLINE[phase]}
+                </p>
+                <div className="mt-1 hidden sm:block">
+                  <IconRow phase={phase} max={4} />
+                </div>
               </button>
               <div className="mt-1 flex items-center justify-between">
                 {dayTasks.length > 0 ? (
-                  <span className="text-[9px] font-medium text-zinc-400 sm:text-[10px]">
-                    {doneCount}/{dayTasks.length}
+                  <span className="rounded-full bg-white/80 px-1.5 text-[9px] font-medium text-zinc-500 ring-1 ring-zinc-200 sm:text-[10px]">
+                    {dayTasks.length} task{dayTasks.length > 1 ? "s" : ""}
                   </span>
                 ) : (
                   <span />
@@ -1058,7 +1343,7 @@ function MonthGrid(props: MonthGridProps) {
                 <button
                   onClick={() => onAddTask(dateISO)}
                   aria-label="Add task"
-                  className="rounded-md p-0.5 text-zinc-300 opacity-0 transition hover:bg-zinc-100 hover:text-zinc-700 group-hover:opacity-100"
+                  className="rounded-md p-0.5 text-zinc-400 opacity-0 transition hover:bg-white hover:text-zinc-700 group-hover:opacity-100"
                 >
                   <Plus className="h-3.5 w-3.5" />
                 </button>
