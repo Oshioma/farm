@@ -1,5 +1,6 @@
 // Static reference content and helpers for the Lunar Farming Planner.
-// Kept separate from the page component so the guidance copy is easy to edit.
+// Moon phases are calculated automatically; guidance, biodynamic icons and
+// recommendations are all derived from the calculated (or overridden) phase.
 
 export const MOON_PHASES = [
   "New Moon",
@@ -33,8 +34,11 @@ export type TaskCategory = (typeof TASK_CATEGORIES)[number];
 export const TASK_STATUSES = ["planned", "done"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
+export const REMINDER_STATUSES = ["pending", "done", "skipped"] as const;
+export type ReminderStatus = (typeof REMINDER_STATUSES)[number];
+
 // ---------------------------------------------------------------------------
-// 1. Lunar Farming Guide — permanent reference panel
+// Lunar Farming Guide — permanent reference panel
 // ---------------------------------------------------------------------------
 export const REFERENCE_GUIDE: { phase: MoonPhase; summary: string }[] = [
   {
@@ -59,160 +63,188 @@ export const REFERENCE_GUIDE: { phase: MoonPhase; summary: string }[] = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// 2. Traditional Lunar Farming Wisdom — 10 permanent advice points
-// ---------------------------------------------------------------------------
-export const TRADITIONAL_WISDOM: { title: string; lines: string[] }[] = [
-  {
-    title: "Seed Soaking Timing",
-    lines: [
-      "Traditionally, seeds were soaked during waxing phases to encourage vigorous upward growth.",
-      "Use waxing moon for leafy greens and above-ground crops.",
-      "Use waning moon for root crop seeds.",
-    ],
-  },
-  {
-    title: "Sap Flow Awareness",
-    lines: [
-      "Traditional farmers believed sap rises during waxing moons and lowers during waning moons.",
-      "Use waxing moon for grafting and propagation.",
-      "Use waning moon for pruning and cutting wood.",
-    ],
-  },
-  {
-    title: "Harvest Storage Timing",
-    lines: [
-      "Crops intended for long storage were traditionally harvested during waning moons.",
-      "Use waning moon for onions, garlic, ginger, turmeric and drying crops.",
-      "Use full moon harvests more for immediate eating.",
-    ],
-  },
-  {
-    title: "Medicinal Herb Timing",
-    lines: [
-      "Traditional herbalists harvested plant parts according to moon phase.",
-      "Use waxing moon for leaves and flowers.",
-      "Use waning moon for roots, bark and medicinal tubers.",
-    ],
-  },
-  {
-    title: "Compost Activation",
-    lines: [
-      "Biodynamic and traditional farming calendars often favour full moon periods for compost activity.",
-      "Use full moon for turning compost.",
-      "Use waning moon for applying mature compost to soil.",
-    ],
-  },
-  {
-    title: "Watering Rhythm",
-    lines: [
-      "Traditional systems suggest soil may hold more moisture around the full moon.",
-      "Use full moon for lighter watering.",
-      "Use waning moon for deeper watering where needed.",
-    ],
-  },
-  {
-    title: "Pest and Weed Control",
-    lines: [
-      "Waning moon periods were traditionally used for suppression and clearing tasks.",
-      "Use waning moon for weeding, pest control, clearing invasive plants and reducing unwanted growth.",
-    ],
-  },
-  {
-    title: "Fruit Tree Care",
-    lines: [
-      "Old orchard systems often timed pruning and grafting with lunar rhythm.",
-      "Use waxing moon for grafting.",
-      "Use waning moon for heavy pruning.",
-      "Avoid heavy pruning during strong sap-rise periods.",
-    ],
-  },
-  {
-    title: "Animal Husbandry",
-    lines: [
-      "Traditional farms sometimes aligned livestock care with lunar cycles.",
-      "Use waxing moon for breeding-related planning.",
-      "Use waning moon for hoof trimming, deworming and general livestock maintenance.",
-    ],
-  },
-  {
-    title: "Soil Disturbance",
-    lines: [
-      "Traditional lunar systems often recommend different levels of soil disturbance by phase.",
-      "Use new moon for observation and planning.",
-      "Use full moon for lighter soil work.",
-      "Use waning moon for deeper cultivation, bed restructuring and clearing.",
-    ],
-  },
-];
+export const REFERENCE_NOTE =
+  "Moon phases are automatically estimated for farm planning. Manual override is available if you want to adjust based on local observation or a preferred lunar calendar.";
 
 // ---------------------------------------------------------------------------
-// 7. Daily lunar guidance — derived automatically from the selected phase
+// Daily lunar guidance — the traditional wisdom, now surfaced per phase inside
+// each calendar day instead of as a separate static tips section.
+// Lines beginning with "Avoid" / "Sap flow" / "Moisture" are advisories.
 // ---------------------------------------------------------------------------
 export const PHASE_GUIDANCE: Record<MoonPhase, string[]> = {
   "New Moon": [
     "Good for planning",
-    "Good for soil preparation",
+    "Good for observing the land",
     "Good for seed selection",
     "Good for compost planning",
+    "Good for light soil preparation",
     "Avoid overloading the day with heavy planting",
   ],
   "Waxing Moon": [
+    "Good for seed soaking",
     "Good for leafy greens",
     "Good for above-ground crops",
-    "Good for seed soaking",
-    "Good for propagation and grafting",
-    "Good for encouraging growth",
+    "Good for grafting",
+    "Good for propagation",
+    "Good for medicinal leaves and flowers",
+    "Sap flow is traditionally considered stronger",
+    "Avoid heavy pruning",
   ],
   "Full Moon": [
     "Good for transplanting",
     "Good for feeding plants",
-    "Good for compost turning",
-    "Good for light watering",
+    "Good for turning compost",
+    "Good for lighter watering",
     "Good for harvesting crops for immediate use",
+    "Moisture retention may be stronger",
+    "Avoid deep soil disturbance",
   ],
   "Waning Moon": [
-    "Good for root crops and tubers",
+    "Strong for root planting",
+    "Good for ginger, turmeric, onions, garlic and tubers",
     "Good for pruning",
-    "Good for weeding and pest control",
+    "Good for weeding",
+    "Good for pest control",
     "Good for applying mature compost",
     "Good for harvesting storage crops",
     "Good for cutting and processing wood",
+    "Good for medicinal roots and bark",
     "Good for deeper soil work",
-    "Good for livestock maintenance",
+    "Good for livestock maintenance such as hoof trimming and deworming",
+    "Avoid transplanting delicate seedlings",
   ],
+};
+
+// Returns true for advisory / caution lines so the UI can de-emphasise them.
+export function isAdvisory(line: string): boolean {
+  return /^(avoid|sap flow|moisture)/i.test(line);
+}
+
+// Short headline used in compact (month) cards.
+export const PHASE_HEADLINE: Record<MoonPhase, string> = {
+  "New Moon": "Plan & prepare",
+  "Waxing Moon": "Sow & grow upward",
+  "Full Moon": "Transplant & feed",
+  "Waning Moon": "Roots, pruning & harvest",
+};
+
+// ---------------------------------------------------------------------------
+// Biodynamic icons (emoji) shown on each day, generated from the phase.
+// ---------------------------------------------------------------------------
+export const BIODYNAMIC_ICONS = {
+  planting: { emoji: "🌱", label: "Planting" },
+  pruning: { emoji: "✂️", label: "Pruning" },
+  watering: { emoji: "💧", label: "Watering" },
+  moon: { emoji: "🌕", label: "Moon phase" },
+  compost: { emoji: "♻️", label: "Compost" },
+  wood: { emoji: "🪵", label: "Wood processing" },
+  livestock: { emoji: "🐓", label: "Livestock" },
+  harvesting: { emoji: "🧺", label: "Harvesting" },
+  root: { emoji: "🥔", label: "Root crops" },
+  medicinal: { emoji: "🌿", label: "Medicinal herbs" },
+  pest: { emoji: "🐛", label: "Pest control" },
+  fruitTrees: { emoji: "🌳", label: "Fruit trees" },
+  soil: { emoji: "🌾", label: "Soil work" },
+  seedSoaking: { emoji: "🫘", label: "Seed soaking" },
+} as const;
+
+export type BiodynamicIconKey = keyof typeof BIODYNAMIC_ICONS;
+
+// Which biodynamic icons apply to each phase (the first is always the moon).
+export const PHASE_ICONS: Record<MoonPhase, BiodynamicIconKey[]> = {
+  "New Moon": ["moon", "soil", "compost", "seedSoaking"],
+  "Waxing Moon": ["moon", "planting", "seedSoaking", "medicinal", "fruitTrees"],
+  "Full Moon": ["moon", "planting", "harvesting", "compost", "watering"],
+  "Waning Moon": [
+    "moon",
+    "root",
+    "pruning",
+    "harvesting",
+    "wood",
+    "pest",
+    "medicinal",
+    "soil",
+    "livestock",
+  ],
+};
+
+// Phase-specific moon glyph for the "moon" biodynamic icon and badges.
+export const PHASE_MOON_EMOJI: Record<MoonPhase, string> = {
+  "New Moon": "🌑",
+  "Waxing Moon": "🌒",
+  "Full Moon": "🌕",
+  "Waning Moon": "🌘",
 };
 
 // Short colour theme per phase, used to tint cards and badges.
 export const PHASE_THEME: Record<
   MoonPhase,
-  { badge: string; ring: string; chip: string; dot: string }
+  { badge: string; ring: string; chip: string; dot: string; soft: string }
 > = {
   "New Moon": {
     badge: "bg-slate-800 text-slate-100",
     ring: "border-slate-200",
     chip: "bg-slate-100 text-slate-700",
     dot: "bg-slate-800",
+    soft: "bg-slate-50",
   },
   "Waxing Moon": {
     badge: "bg-emerald-600 text-white",
     ring: "border-emerald-200",
     chip: "bg-emerald-50 text-emerald-700",
     dot: "bg-emerald-500",
+    soft: "bg-emerald-50/60",
   },
   "Full Moon": {
     badge: "bg-amber-500 text-white",
     ring: "border-amber-200",
     chip: "bg-amber-50 text-amber-700",
     dot: "bg-amber-400",
+    soft: "bg-amber-50/60",
   },
   "Waning Moon": {
     badge: "bg-indigo-600 text-white",
     ring: "border-indigo-200",
     chip: "bg-indigo-50 text-indigo-700",
     dot: "bg-indigo-500",
+    soft: "bg-indigo-50/60",
   },
 };
+
+// ---------------------------------------------------------------------------
+// "Best Next 3 Days" recommendation templates.
+// ---------------------------------------------------------------------------
+export interface RecommendationTemplate {
+  key: "root" | "leafy" | "compost";
+  title: string;
+  phase: MoonPhase;
+  centre: number; // ideal moon-age fraction for this phase
+  tasks: string[];
+}
+
+export const RECOMMENDATION_TEMPLATES: RecommendationTemplate[] = [
+  {
+    key: "root",
+    title: "Best for Root Crops",
+    phase: "Waning Moon",
+    centre: 0.75,
+    tasks: ["Plant ginger", "Plant turmeric", "Apply compost", "Weed beds"],
+  },
+  {
+    key: "leafy",
+    title: "Best for Leafy Growth",
+    phase: "Waxing Moon",
+    centre: 0.25,
+    tasks: ["Plant spinach", "Plant herbs", "Soak seeds", "Propagate cuttings"],
+  },
+  {
+    key: "compost",
+    title: "Best for Compost & Feeding",
+    phase: "Full Moon",
+    centre: 0.5,
+    tasks: ["Turn compost", "Feed plants", "Light watering", "Harvest fresh produce"],
+  },
+];
 
 // ---------------------------------------------------------------------------
 // Date helpers (all local-date based, no timezone surprises)
@@ -262,12 +294,12 @@ export function formatDayLabel(
 }
 
 // ---------------------------------------------------------------------------
-// Approximate moon-phase calculation. Phases are manually editable in the UI;
-// this only supplies a sensible default label when a day has no saved phase.
-// Based on the mean synodic month measured from a known new moon.
+// Automatic moon-phase calculation.
+//   Synodic month length: 29.53058867 days
+//   Known reference new moon: 2000-01-06 18:14 UTC
+//   Current date difference modulo lunar cycle
 // ---------------------------------------------------------------------------
-const SYNODIC_MONTH = 29.53058867;
-// Reference new moon: 2000-01-06 18:14 UTC.
+export const SYNODIC_MONTH = 29.53058867;
 const KNOWN_NEW_MOON = Date.UTC(2000, 0, 6, 18, 14, 0);
 
 // Fractional age of the moon (0 = new, 0.5 = full) for a given local date.
@@ -281,10 +313,16 @@ export function moonAgeFraction(d: Date): number {
 
 // Map the continuous cycle onto the four named phases, with each cardinal
 // phase occupying a quarter-cycle window centred on its exact moment.
-export function approxMoonPhase(d: Date): MoonPhase {
+export function calcMoonPhase(d: Date): MoonPhase {
   const f = moonAgeFraction(d);
   if (f < 0.125 || f >= 0.875) return "New Moon";
   if (f < 0.375) return "Waxing Moon";
   if (f < 0.625) return "Full Moon";
   return "Waning Moon";
+}
+
+// Circular distance between two moon-age fractions (0..0.5).
+export function fractionDistance(a: number, b: number): number {
+  const diff = Math.abs(a - b) % 1;
+  return Math.min(diff, 1 - diff);
 }
