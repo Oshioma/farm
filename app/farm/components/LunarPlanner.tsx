@@ -585,8 +585,115 @@ export default function LunarPlanner({ embedded = false }: Props) {
           </header>
         )}
 
+        {error && (
+          <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {error}
+          </div>
+        )}
+
+        {/* View switch & navigation */}
+        <div className="mb-5 flex flex-col gap-3 rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="inline-flex rounded-full border border-zinc-200 bg-zinc-50 p-1">
+            {(
+              [
+                ["1day", "1 Day"],
+                ["7day", "7 Day"],
+                ["30day", "Month"],
+              ] as [ViewMode, string][]
+            ).map(([mode, label]) => (
+              <button
+                key={mode}
+                onClick={() => setView(mode)}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                  view === mode ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:text-zinc-900"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="mr-1 hidden text-sm font-medium text-zinc-600 sm:inline">
+              {periodLabel}
+            </span>
+            <button
+              onClick={() => navigate(-1)}
+              aria-label="Previous period"
+              className="rounded-full border border-zinc-200 p-2 text-zinc-600 transition hover:bg-zinc-100"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              onClick={goToday}
+              className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+            >
+              Today
+            </button>
+            <button
+              onClick={() => navigate(1)}
+              aria-label="Next period"
+              className="rounded-full border border-zinc-200 p-2 text-zinc-600 transition hover:bg-zinc-100"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <p className="mb-4 text-sm font-medium text-zinc-500 sm:hidden">{periodLabel}</p>
+
+        {/* Day cards / month grid */}
+        {loading ? (
+          <div className="rounded-3xl border border-zinc-200 bg-white p-8 text-sm text-zinc-500 shadow-sm">
+            Loading…
+          </div>
+        ) : view === "30day" ? (
+          <MonthGrid
+            dates={visibleDates}
+            todayISO={todayISO}
+            resolvedPhase={resolvedPhase}
+            tasksByDate={tasksByDate}
+            onOpenDay={openDay}
+            onAddTask={openAddTask}
+          />
+        ) : (
+          <div
+            className={
+              view === "7day"
+                ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                : "grid grid-cols-1 gap-4"
+            }
+          >
+            {visibleDates.map((dateISO) => {
+              const { phase, overridden } = resolvedPhase(dateISO);
+              return (
+                <DayCard
+                  key={dateISO}
+                  dateISO={dateISO}
+                  large={view === "1day"}
+                  isToday={dateISO === todayISO}
+                  phase={phase}
+                  overridden={overridden}
+                  tasks={tasksByDate[dateISO] ?? []}
+                  noteValue={noteDrafts[dateISO] ?? days[dateISO]?.notes ?? ""}
+                  savingNote={savingNoteFor === dateISO}
+                  busyTaskId={busyTaskId}
+                  onToggleOverride={(en) => handleToggleOverride(dateISO, en)}
+                  onChangeManualPhase={(p) => handleChangeManualPhase(dateISO, p)}
+                  onNoteChange={(v) => setNoteDrafts((prev) => ({ ...prev, [dateISO]: v }))}
+                  onNoteBlur={() => handleSaveNotes(dateISO)}
+                  onAddTask={() => openAddTask(dateISO)}
+                  onEditTask={openEditTask}
+                  onToggleDone={handleToggleDone}
+                  onDeleteTask={handleDeleteTask}
+                />
+              );
+            })}
+          </div>
+        )}
+
         {/* Lunar Farming Guide — permanent reference */}
-        <section className="mb-6 rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-6 shadow-sm">
+        <section className="mb-6 mt-6 rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-6 shadow-sm">
           <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-indigo-900">
             <BookOpen className="h-5 w-5" />
             Lunar Farming Guide
@@ -705,113 +812,6 @@ export default function LunarPlanner({ embedded = false }: Props) {
             })}
           </div>
         </section>
-
-        {error && (
-          <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {error}
-          </div>
-        )}
-
-        {/* View switch & navigation */}
-        <div className="mb-5 flex flex-col gap-3 rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <div className="inline-flex rounded-full border border-zinc-200 bg-zinc-50 p-1">
-            {(
-              [
-                ["1day", "1 Day"],
-                ["7day", "7 Day"],
-                ["30day", "Month"],
-              ] as [ViewMode, string][]
-            ).map(([mode, label]) => (
-              <button
-                key={mode}
-                onClick={() => setView(mode)}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
-                  view === mode ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:text-zinc-900"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="mr-1 hidden text-sm font-medium text-zinc-600 sm:inline">
-              {periodLabel}
-            </span>
-            <button
-              onClick={() => navigate(-1)}
-              aria-label="Previous period"
-              className="rounded-full border border-zinc-200 p-2 text-zinc-600 transition hover:bg-zinc-100"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              onClick={goToday}
-              className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-            >
-              Today
-            </button>
-            <button
-              onClick={() => navigate(1)}
-              aria-label="Next period"
-              className="rounded-full border border-zinc-200 p-2 text-zinc-600 transition hover:bg-zinc-100"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        <p className="mb-4 text-sm font-medium text-zinc-500 sm:hidden">{periodLabel}</p>
-
-        {/* Day cards / month grid */}
-        {loading ? (
-          <div className="rounded-3xl border border-zinc-200 bg-white p-8 text-sm text-zinc-500 shadow-sm">
-            Loading…
-          </div>
-        ) : view === "30day" ? (
-          <MonthGrid
-            dates={visibleDates}
-            todayISO={todayISO}
-            resolvedPhase={resolvedPhase}
-            tasksByDate={tasksByDate}
-            onOpenDay={openDay}
-            onAddTask={openAddTask}
-          />
-        ) : (
-          <div
-            className={
-              view === "7day"
-                ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                : "grid grid-cols-1 gap-4"
-            }
-          >
-            {visibleDates.map((dateISO) => {
-              const { phase, overridden } = resolvedPhase(dateISO);
-              return (
-                <DayCard
-                  key={dateISO}
-                  dateISO={dateISO}
-                  large={view === "1day"}
-                  isToday={dateISO === todayISO}
-                  phase={phase}
-                  overridden={overridden}
-                  tasks={tasksByDate[dateISO] ?? []}
-                  noteValue={noteDrafts[dateISO] ?? days[dateISO]?.notes ?? ""}
-                  savingNote={savingNoteFor === dateISO}
-                  busyTaskId={busyTaskId}
-                  onToggleOverride={(en) => handleToggleOverride(dateISO, en)}
-                  onChangeManualPhase={(p) => handleChangeManualPhase(dateISO, p)}
-                  onNoteChange={(v) => setNoteDrafts((prev) => ({ ...prev, [dateISO]: v }))}
-                  onNoteBlur={() => handleSaveNotes(dateISO)}
-                  onAddTask={() => openAddTask(dateISO)}
-                  onEditTask={openEditTask}
-                  onToggleDone={handleToggleDone}
-                  onDeleteTask={handleDeleteTask}
-                />
-              );
-            })}
-          </div>
-        )}
       </div>
 
       {/* Task modal */}
