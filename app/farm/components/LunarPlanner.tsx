@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import type { FarmMember } from "@/lib/farm";
+import { ExpandableText } from "@/app/farm/components/ExpandableText";
 import {
   Moon,
   Sprout,
@@ -83,6 +85,7 @@ interface LunarTask {
   reminder_date: string | null;
   reminder_note: string | null;
   reminder_status: string | null;
+  assigned_to: string | null;
 }
 
 interface TaskForm {
@@ -94,6 +97,7 @@ interface TaskForm {
   reminder_date: string;
   reminder_note: string;
   reminder_status: string;
+  assigned_to: string;
 }
 
 const BLANK_TASK: TaskForm = {
@@ -105,10 +109,11 @@ const BLANK_TASK: TaskForm = {
   reminder_date: "",
   reminder_note: "",
   reminder_status: "pending",
+  assigned_to: "",
 };
 
 const TASK_SELECT =
-  "id, lunar_day_id, date, title, category, crop_or_activity, notes, status, reminder_date, reminder_note, reminder_status";
+  "id, lunar_day_id, date, title, category, crop_or_activity, notes, status, reminder_date, reminder_note, reminder_status, assigned_to";
 const DAY_SELECT =
   "id, date, calculated_moon_phase, manual_moon_phase, moon_phase_override, notes";
 
@@ -152,12 +157,18 @@ type Props = {
   // When true, renders as a section embedded in another page (no page
   // chrome / auth redirect of its own) instead of a standalone full page.
   embedded?: boolean;
+  // When provided, the Tasks view becomes a shared team task list scoped to
+  // this farm (visible/assignable to any farm member) instead of a personal,
+  // user-only list.
+  farmId?: string;
+  members?: FarmMember[];
 };
 
-export default function LunarPlanner({ embedded = false }: Props) {
+export default function LunarPlanner({ embedded = false, farmId, members }: Props) {
   const router = useRouter();
   const [userId, setUserId] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<"tasks" | "lunar">("tasks");
   const [error, setError] = useState("");
 
   const [view, setView] = useState<ViewMode>("7day");
@@ -200,6 +211,14 @@ export default function LunarPlanner({ embedded = false }: Props) {
   // Data loading
   // -------------------------------------------------------------------------
   const loadRange = useCallback(async (uid: string, start: string, end: string) => {
+    let taskQuery = supabase
+      .from("lunar_tasks")
+      .select(TASK_SELECT)
+      .gte("date", start)
+      .lte("date", end)
+      .order("created_at", { ascending: true });
+    taskQuery = farmId ? taskQuery.eq("farm_id", farmId) : taskQuery.eq("user_id", uid);
+
     const [dayRes, taskRes] = await Promise.all([
       supabase
         .from("lunar_days")
@@ -207,13 +226,7 @@ export default function LunarPlanner({ embedded = false }: Props) {
         .eq("user_id", uid)
         .gte("date", start)
         .lte("date", end),
-      supabase
-        .from("lunar_tasks")
-        .select(TASK_SELECT)
-        .eq("user_id", uid)
-        .gte("date", start)
-        .lte("date", end)
-        .order("created_at", { ascending: true }),
+      taskQuery,
     ]);
     if (dayRes.error) throw dayRes.error;
     if (taskRes.error) throw taskRes.error;
@@ -221,20 +234,21 @@ export default function LunarPlanner({ embedded = false }: Props) {
     for (const d of (dayRes.data ?? []) as LunarDay[]) dayMap[d.date] = d;
     setDays(dayMap);
     setTasks((taskRes.data ?? []) as LunarTask[]);
-  }, []);
+  }, [farmId]);
 
   const loadReminders = useCallback(async (uid: string) => {
-    const { data, error: e } = await supabase
+    let query = supabase
       .from("lunar_tasks")
       .select(TASK_SELECT)
-      .eq("user_id", uid)
       .eq("reminder_status", "pending")
       .not("reminder_date", "is", null)
       .lte("reminder_date", toISODate(new Date()))
       .order("reminder_date", { ascending: true });
+    query = farmId ? query.eq("farm_id", farmId) : query.eq("user_id", uid);
+    const { data, error: e } = await query;
     if (e) throw e;
     setDueReminders((data ?? []) as LunarTask[]);
-  }, []);
+  }, [farmId]);
 
   useEffect(() => {
     (async () => {
@@ -301,6 +315,12 @@ export default function LunarPlanner({ embedded = false }: Props) {
     for (const t of tasks) (map[t.date] ??= []).push(t);
     return map;
   }, [tasks]);
+
+  const memberEmailMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const m of members ?? []) map[m.profile_id] = m.user_email ?? m.profile_id;
+    return map;
+  }, [members]);
 
   // -------------------------------------------------------------------------
   // Best Next 3 Days — scan the next 30 days using calculated phases
@@ -405,6 +425,7 @@ export default function LunarPlanner({ embedded = false }: Props) {
       reminder_date: task.reminder_date ?? "",
       reminder_note: task.reminder_note ?? "",
       reminder_status: task.reminder_status ?? "pending",
+      assigned_to: task.assigned_to ?? "",
     });
     setTaskModal({ date: task.date, taskId: task.id });
   }
@@ -428,6 +449,7 @@ export default function LunarPlanner({ embedded = false }: Props) {
         reminder_date: taskForm.reminder_date || null,
         reminder_note: taskForm.reminder_note.trim() || null,
         reminder_status: taskForm.reminder_date ? taskForm.reminder_status || "pending" : "pending",
+        assigned_to: taskForm.assigned_to || null,
       };
       if (taskModal.taskId) {
         const { error: e } = await supabase
@@ -440,6 +462,7 @@ export default function LunarPlanner({ embedded = false }: Props) {
         const { error: e } = await supabase.from("lunar_tasks").insert({
           ...payload,
           user_id: userId,
+          farm_id: farmId ?? null,
           lunar_day_id: dayId,
           date: taskModal.date,
         });
@@ -544,10 +567,29 @@ export default function LunarPlanner({ embedded = false }: Props) {
     <main className={embedded ? "" : "min-h-screen bg-stone-50 text-zinc-900"}>
       <div className={embedded ? "" : "mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8"}>
         {embedded ? (
-          <div className="mb-4 flex items-center gap-2">
-            <Moon className="h-5 w-5 text-indigo-500" />
-            <h2 className="text-xl font-semibold">Lunar Farming Planner</h2>
-            <span className="text-sm text-zinc-500">Plan farm goals by the rhythm of the moon.</span>
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <Moon className="h-5 w-5 shrink-0 text-indigo-500" />
+            <div className="inline-flex rounded-full border border-zinc-200 bg-zinc-50 p-1">
+              {(
+                [
+                  ["tasks", "Planner"],
+                  ["lunar", "Lunar Farming Planner"],
+                ] as [typeof tab, string][]
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setTab(key)}
+                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                    tab === key ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:text-zinc-900"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {tab === "lunar" && (
+              <span className="text-sm text-zinc-500">Plan farm goals by the rhythm of the moon.</span>
+            )}
           </div>
         ) : (
           <header className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
@@ -556,13 +598,32 @@ export default function LunarPlanner({ embedded = false }: Props) {
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
                   Shamba Online
                 </p>
-                <h1 className="mt-1 flex items-center gap-2 text-3xl font-semibold tracking-tight">
-                  <Moon className="h-7 w-7 text-indigo-500" />
-                  Lunar Farming Planner
-                </h1>
-                <p className="mt-1 text-sm text-zinc-500">
-                  Plan farm tasks by the rhythm of the moon.
-                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <Moon className="h-6 w-6 shrink-0 text-indigo-500" />
+                  <div className="inline-flex rounded-full border border-zinc-200 bg-zinc-50 p-1">
+                    {(
+                      [
+                        ["tasks", "Planner"],
+                        ["lunar", "Lunar Farming Planner"],
+                      ] as [typeof tab, string][]
+                    ).map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => setTab(key)}
+                        className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                          tab === key ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:text-zinc-900"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {tab === "lunar" && (
+                  <p className="mt-2 text-sm text-zinc-500">
+                    Plan farm tasks by the rhythm of the moon.
+                  </p>
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Link
@@ -655,6 +716,7 @@ export default function LunarPlanner({ embedded = false }: Props) {
             tasksByDate={tasksByDate}
             onOpenDay={openDay}
             onAddTask={openAddTask}
+            showLunar={tab === "lunar"}
           />
         ) : (
           <div
@@ -686,36 +748,40 @@ export default function LunarPlanner({ embedded = false }: Props) {
                   onEditTask={openEditTask}
                   onToggleDone={handleToggleDone}
                   onDeleteTask={handleDeleteTask}
+                  showLunar={tab === "lunar"}
+                  memberEmailMap={memberEmailMap}
                 />
               );
             })}
           </div>
         )}
 
-        {/* Lunar Farming Guide — permanent reference */}
-        <section className="mb-6 mt-6 rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-6 shadow-sm">
-          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-indigo-900">
-            <BookOpen className="h-5 w-5" />
-            Lunar Farming Guide
-          </h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {REFERENCE_GUIDE.map(({ phase, summary }) => {
-              const theme = PHASE_THEME[phase];
-              return (
-                <div key={phase} className={`rounded-2xl border ${theme.ring} bg-white/80 p-4`}>
-                  <div className="mb-1.5 flex items-center gap-2">
-                    <span>{PHASE_MOON_EMOJI[phase]}</span>
-                    <span className="font-semibold">{phase}</span>
+        {/* Lunar Farming Guide — permanent reference, lunar mode only */}
+        {tab === "lunar" && (
+          <section className="mb-6 mt-6 rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-6 shadow-sm">
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-indigo-900">
+              <BookOpen className="h-5 w-5" />
+              Lunar Farming Guide
+            </h2>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {REFERENCE_GUIDE.map(({ phase, summary }) => {
+                const theme = PHASE_THEME[phase];
+                return (
+                  <div key={phase} className={`rounded-2xl border ${theme.ring} bg-white/80 p-4`}>
+                    <div className="mb-1.5 flex items-center gap-2">
+                      <span>{PHASE_MOON_EMOJI[phase]}</span>
+                      <span className="font-semibold">{phase}</span>
+                    </div>
+                    <p className="text-sm leading-relaxed text-zinc-600">{summary}</p>
                   </div>
-                  <p className="text-sm leading-relaxed text-zinc-600">{summary}</p>
-                </div>
-              );
-            })}
-          </div>
-          <p className="mt-4 rounded-2xl bg-indigo-50 px-4 py-3 text-sm italic leading-relaxed text-indigo-800">
-            {REFERENCE_NOTE}
-          </p>
-        </section>
+                );
+              })}
+            </div>
+            <p className="mt-4 rounded-2xl bg-indigo-50 px-4 py-3 text-sm italic leading-relaxed text-indigo-800">
+              {REFERENCE_NOTE}
+            </p>
+          </section>
+        )}
 
         {/* Reminders due today */}
         {dueReminders.length > 0 && (
@@ -769,49 +835,51 @@ export default function LunarPlanner({ embedded = false }: Props) {
           </section>
         )}
 
-        {/* Best Next 3 Days */}
-        <section className="mb-6 rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm">
-          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-emerald-900">
-            <Sparkles className="h-5 w-5" />
-            Best Next 3 Days
-          </h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {bestDays.map(({ tpl, dateISO }) => {
-              const theme = PHASE_THEME[tpl.phase];
-              return (
-                <div key={tpl.key} className={`rounded-2xl border ${theme.ring} bg-white p-4 shadow-sm`}>
-                  <p className="text-sm font-semibold text-zinc-800">{tpl.title}</p>
-                  {dateISO ? (
-                    <button
-                      onClick={() => openDay(dateISO)}
-                      className="mt-1 block text-left text-sm text-zinc-500 hover:underline"
-                    >
-                      {formatDayLabel(fromISODate(dateISO), { weekday: true })}
-                    </button>
-                  ) : (
-                    <p className="mt-1 text-sm text-zinc-400">No suitable day soon</p>
-                  )}
-                  <div className="mt-2">
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${theme.badge}`}
-                    >
-                      <span aria-hidden>{PHASE_MOON_EMOJI[tpl.phase]}</span>
-                      {tpl.phase}
-                    </span>
+        {/* Best Next 3 Days — lunar mode only */}
+        {tab === "lunar" && (
+          <section className="mb-6 rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm">
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-emerald-900">
+              <Sparkles className="h-5 w-5" />
+              Best Next 3 Days
+            </h2>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {bestDays.map(({ tpl, dateISO }) => {
+                const theme = PHASE_THEME[tpl.phase];
+                return (
+                  <div key={tpl.key} className={`rounded-2xl border ${theme.ring} bg-white p-4 shadow-sm`}>
+                    <p className="text-sm font-semibold text-zinc-800">{tpl.title}</p>
+                    {dateISO ? (
+                      <button
+                        onClick={() => openDay(dateISO)}
+                        className="mt-1 block text-left text-sm text-zinc-500 hover:underline"
+                      >
+                        {formatDayLabel(fromISODate(dateISO), { weekday: true })}
+                      </button>
+                    ) : (
+                      <p className="mt-1 text-sm text-zinc-400">No suitable day soon</p>
+                    )}
+                    <div className="mt-2">
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${theme.badge}`}
+                      >
+                        <span aria-hidden>{PHASE_MOON_EMOJI[tpl.phase]}</span>
+                        {tpl.phase}
+                      </span>
+                    </div>
+                    <ul className="mt-3 space-y-1 text-xs text-zinc-600">
+                      {tpl.tasks.map((t) => (
+                        <li key={t} className="flex gap-1.5">
+                          <span className={`mt-1.5 h-1 w-1 shrink-0 rounded-full ${theme.dot}`} />
+                          <span>{t}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <ul className="mt-3 space-y-1 text-xs text-zinc-600">
-                    {tpl.tasks.map((t) => (
-                      <li key={t} className="flex gap-1.5">
-                        <span className={`mt-1.5 h-1 w-1 shrink-0 rounded-full ${theme.dot}`} />
-                        <span>{t}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+                );
+              })}
+            </div>
+          </section>
+        )}
       </div>
 
       {/* Task modal */}
@@ -873,6 +941,23 @@ export default function LunarPlanner({ embedded = false }: Props) {
                   placeholder="Ginger, turmeric…"
                 />
               </div>
+              {members && members.length > 0 && (
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Assign to</label>
+                  <select
+                    className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                    value={taskForm.assigned_to}
+                    onChange={(e) => setTaskForm((p) => ({ ...p, assigned_to: e.target.value }))}
+                  >
+                    <option value="">Unassigned</option>
+                    {members.map((m) => (
+                      <option key={m.profile_id} value={m.profile_id}>
+                        {m.user_email ?? m.profile_id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-zinc-600">Notes</label>
                 <textarea
@@ -1031,6 +1116,8 @@ interface DayCardProps {
   onEditTask: (t: LunarTask) => void;
   onToggleDone: (t: LunarTask) => void;
   onDeleteTask: (t: LunarTask) => void;
+  showLunar: boolean;
+  memberEmailMap: Record<string, string>;
 }
 
 function DayCard(props: DayCardProps) {
@@ -1052,6 +1139,8 @@ function DayCard(props: DayCardProps) {
     onEditTask,
     onToggleDone,
     onDeleteTask,
+    showLunar,
+    memberEmailMap,
   } = props;
   const theme = PHASE_THEME[phase];
   const date = fromISODate(dateISO);
@@ -1082,26 +1171,30 @@ function DayCard(props: DayCardProps) {
             {date.toLocaleDateString("en-GB", { weekday: "long" })}
           </p>
         </div>
-        <div className="text-right">
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${theme.badge}`}
-          >
-            <span aria-hidden>{PHASE_MOON_EMOJI[phase]}</span>
-            {phase}
-          </span>
-          <p className="mt-1 text-[10px] text-zinc-400">
-            {overridden ? "Manual override" : "Automatically calculated"}
-          </p>
-        </div>
+        {showLunar && (
+          <div className="text-right">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${theme.badge}`}
+            >
+              <span aria-hidden>{PHASE_MOON_EMOJI[phase]}</span>
+              {phase}
+            </span>
+            <p className="mt-1 text-[10px] text-zinc-400">
+              {overridden ? "Manual override" : "Automatically calculated"}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Biodynamic icons */}
-      <div className="mb-3">
-        <IconRow phase={phase} />
-      </div>
+      {showLunar && (
+        <div className="mb-3">
+          <IconRow phase={phase} />
+        </div>
+      )}
 
       {/* Manual moon phase override — editable in 1-day view */}
-      {large && (
+      {showLunar && large && (
         <div className="mb-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
           <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
             <input
@@ -1194,8 +1287,15 @@ function DayCard(props: DayCardProps) {
                           {formatDayLabel(fromISODate(t.reminder_date), { short: true })}
                         </span>
                       )}
+                      {t.assigned_to && (
+                        <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-indigo-600 ring-1 ring-indigo-100">
+                          {memberEmailMap[t.assigned_to] ?? "Assigned"}
+                        </span>
+                      )}
                     </div>
-                    {t.notes && <p className="mt-1 text-[11px] leading-snug text-zinc-500">{t.notes}</p>}
+                    {t.notes && (
+                      <ExpandableText text={t.notes} className="mt-1 text-[11px] leading-snug text-zinc-500" />
+                    )}
                   </div>
                   <div className="flex shrink-0 items-center gap-0.5">
                     <button
@@ -1222,10 +1322,12 @@ function DayCard(props: DayCardProps) {
         )}
       </div>
 
-      {/* Today's Lunar Guidance — always shown */}
-      <div className="mb-3">
-        <GuidanceBlock phase={phase} theme={theme} />
-      </div>
+      {/* Today's Lunar Guidance — lunar mode only */}
+      {showLunar && (
+        <div className="mb-3">
+          <GuidanceBlock phase={phase} theme={theme} />
+        </div>
+      )}
 
       {/* Reminders (1-day view) */}
       {large && dayReminders.length > 0 && (
@@ -1281,12 +1383,13 @@ interface MonthGridProps {
   tasksByDate: Record<string, LunarTask[]>;
   onOpenDay: (d: string) => void;
   onAddTask: (d: string) => void;
+  showLunar: boolean;
 }
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function MonthGrid(props: MonthGridProps) {
-  const { dates, todayISO, resolvedPhase, tasksByDate, onOpenDay, onAddTask } = props;
+  const { dates, todayISO, resolvedPhase, tasksByDate, onOpenDay, onAddTask, showLunar } = props;
   const firstDate = fromISODate(dates[0]);
   const leadingBlanks = (firstDate.getDay() + 6) % 7;
 
@@ -1316,13 +1419,17 @@ function MonthGrid(props: MonthGridProps) {
             <div
               key={dateISO}
               className={`group relative flex min-h-[72px] flex-col rounded-xl border p-1.5 transition sm:min-h-[104px] sm:p-2 ${
-                isToday ? "border-emerald-400 ring-1 ring-emerald-200" : theme.ring
-              } ${theme.soft} hover:shadow-sm`}
+                isToday
+                  ? "border-emerald-400 ring-1 ring-emerald-200"
+                  : showLunar
+                  ? theme.ring
+                  : "border-zinc-200"
+              } ${showLunar ? theme.soft : ""} hover:shadow-sm`}
             >
               <button
                 onClick={() => onOpenDay(dateISO)}
                 className="flex items-center justify-between text-left"
-                title={`${phase} — open day`}
+                title={showLunar ? `${phase} — open day` : "Open day"}
               >
                 <span
                   className={`text-xs font-semibold sm:text-sm ${
@@ -1331,22 +1438,27 @@ function MonthGrid(props: MonthGridProps) {
                 >
                   {date.getDate()}
                 </span>
-                <span aria-hidden className="text-sm leading-none">
-                  {PHASE_MOON_EMOJI[phase]}
-                </span>
+                {showLunar && (
+                  <span aria-hidden className="text-sm leading-none">
+                    {PHASE_MOON_EMOJI[phase]}
+                  </span>
+                )}
               </button>
-              <button
-                onClick={() => onOpenDay(dateISO)}
-                className="mt-1 flex flex-1 flex-col text-left"
-                title={phase}
-              >
-                <p className="hidden text-[10px] font-medium leading-tight text-zinc-500 sm:block">
-                  {PHASE_HEADLINE[phase]}
-                </p>
-                <div className="mt-1 hidden sm:block">
-                  <IconRow phase={phase} max={4} />
-                </div>
-              </button>
+              {showLunar && (
+                <button
+                  onClick={() => onOpenDay(dateISO)}
+                  className="mt-1 flex flex-1 flex-col text-left"
+                  title={phase}
+                >
+                  <p className="hidden text-[10px] font-medium leading-tight text-zinc-500 sm:block">
+                    {PHASE_HEADLINE[phase]}
+                  </p>
+                  <div className="mt-1 hidden sm:block">
+                    <IconRow phase={phase} max={4} />
+                  </div>
+                </button>
+              )}
+              {!showLunar && <div className="flex-1" />}
               <div className="mt-1 flex items-center justify-between">
                 {dayTasks.length > 0 ? (
                   <span className="rounded-full bg-white/80 px-1.5 text-[9px] font-medium text-zinc-500 ring-1 ring-zinc-200 sm:text-[10px]">

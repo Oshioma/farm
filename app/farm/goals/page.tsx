@@ -15,6 +15,7 @@ import { formatDate, badgeClass } from "@/app/farm/utils";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { TaskForm } from "@/app/farm/components/TaskForm";
 import type { TaskFormData } from "@/app/farm/components/TaskForm";
+import { ExpandableText } from "@/app/farm/components/ExpandableText";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -507,7 +508,7 @@ export default function WorkerGoalsPage() {
                       ) : null}
 
                       {task.description && (
-                        <p className="mt-2 text-sm text-zinc-500">{task.description}</p>
+                        <ExpandableText text={task.description} className="mt-2 text-sm text-zinc-500" />
                       )}
 
                       <div className="mt-4 flex flex-wrap gap-2">
