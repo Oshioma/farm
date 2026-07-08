@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { getFarms, getWorkHours } from "@/lib/farm";
 import type { Farm, WorkHoursEntry } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { WORKERS } from "@/lib/workers";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -21,9 +22,10 @@ function fmt(d: string | null) {
   return `${day}/${m}/${y}`;
 }
 
-const WORKERS = ["Ally", "Hamed", "Elena", "Osh", "Nelly", "Warren", "Amy", "Ruben"];
-
 const blankForm = { date: "", worker_name: "", hours: "", role: "operational", notes: "" };
+
+type QuickRow = { worker_name: string; hours: string; notes: string };
+const blankQuickRow: QuickRow = { worker_name: "", hours: "", notes: "" };
 
 export default function WorkHoursPage() {
   const [farms, setFarms] = useState<Farm[]>([]);
@@ -39,12 +41,11 @@ export default function WorkHoursPage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // Quick add (multiple workers for one day)
+  // Quick add (multiple people's work for one day, each with their own hours + description)
   const [quickMode, setQuickMode] = useState(false);
   const [quickDate, setQuickDate] = useState("");
   const [quickRole, setQuickRole] = useState("operational");
-  const [quickNotes, setQuickNotes] = useState("");
-  const [quickHours, setQuickHours] = useState<Record<string, string>>({});
+  const [quickRows, setQuickRows] = useState<QuickRow[]>([{ ...blankQuickRow }]);
   const [quickSaving, setQuickSaving] = useState(false);
 
   const router = useRouter();
@@ -113,15 +114,15 @@ export default function WorkHoursPage() {
 
   async function handleQuickSave() {
     if (!activeFarmId || !quickDate) return;
-    const rows = Object.entries(quickHours)
-      .filter(([, h]) => h && Number(h) > 0)
-      .map(([name, h]) => ({
+    const rows = quickRows
+      .filter((r) => r.worker_name.trim() && Number(r.hours) > 0)
+      .map((r) => ({
         farm_id: activeFarmId,
         date: quickDate,
-        worker_name: name,
-        hours: Number(h),
+        worker_name: r.worker_name.trim(),
+        hours: Number(r.hours),
         role: quickRole,
-        notes: quickNotes.trim() || null,
+        notes: r.notes.trim() || null,
       }));
     if (rows.length === 0) return;
     try {
@@ -130,14 +131,25 @@ export default function WorkHoursPage() {
       const { error: e } = await supabase.from("work_hours").insert(rows);
       if (e) throw e;
       await loadEntries(activeFarmId);
-      setQuickHours({});
-      setQuickNotes("");
+      setQuickRows([{ ...blankQuickRow }]);
       setQuickMode(false);
     } catch (err) {
       setError(errMsg(err, "Failed to save"));
     } finally {
       setQuickSaving(false);
     }
+  }
+
+  function updateQuickRow(index: number, patch: Partial<QuickRow>) {
+    setQuickRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  }
+
+  function addQuickRow() {
+    setQuickRows((prev) => [...prev, { ...blankQuickRow }]);
+  }
+
+  function removeQuickRow(index: number) {
+    setQuickRows((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev));
   }
 
   async function handleDelete(id: string) {
@@ -258,11 +270,11 @@ export default function WorkHoursPage() {
           </div>
         </div>
 
-        {/* Quick add form — log an entire day at once */}
+        {/* Quick add form — log an entire day's work for multiple people at once */}
         {quickMode && (
           <div className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
             <h2 className="text-base font-semibold">Log a day</h2>
-            <p className="mt-1 text-sm text-zinc-500">Enter hours for each worker who was on site.</p>
+            <p className="mt-1 text-sm text-zinc-500">Add a line per person with their hours and what they did, then save once.</p>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-zinc-600">Date</label>
@@ -276,33 +288,73 @@ export default function WorkHoursPage() {
                 </select>
               </div>
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
-              {WORKERS.map((w) => (
-                <div key={w}>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">{w}</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    className={inp}
-                    placeholder="0"
-                    value={quickHours[w] ?? ""}
-                    onChange={(e) => setQuickHours((p) => ({ ...p, [w]: e.target.value }))}
-                  />
+
+            <div className="mt-4 space-y-3">
+              {quickRows.map((row, i) => (
+                <div key={i} className="grid grid-cols-1 gap-2 rounded-2xl border border-zinc-100 bg-zinc-50 p-3 sm:grid-cols-[1fr_100px_2fr_auto] sm:items-start">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600 sm:hidden">Worker</label>
+                    <input
+                      className={inp}
+                      list="quick-row-workers"
+                      value={row.worker_name}
+                      onChange={(e) => updateQuickRow(i, { worker_name: e.target.value })}
+                      placeholder="Name"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600 sm:hidden">Hours</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      className={inp}
+                      placeholder="Hours"
+                      value={row.hours}
+                      onChange={(e) => updateQuickRow(i, { hours: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600 sm:hidden">Description</label>
+                    <input
+                      className={inp}
+                      value={row.notes}
+                      onChange={(e) => updateQuickRow(i, { notes: e.target.value })}
+                      placeholder="What did they do…"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeQuickRow(i)}
+                    disabled={quickRows.length === 1}
+                    className="rounded-xl border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Remove
+                  </button>
                 </div>
               ))}
+              <datalist id="quick-row-workers">
+                {WORKERS.map((w) => <option key={w} value={w} />)}
+              </datalist>
             </div>
-            <div className="mt-3">
-              <label className="mb-1.5 block text-xs font-medium text-zinc-600">Notes</label>
-              <input className={inp} value={quickNotes} onChange={(e) => setQuickNotes(e.target.value)} placeholder="What was done today…" />
-            </div>
+
             <button
-              onClick={handleQuickSave}
-              disabled={quickSaving || !quickDate}
-              className="mt-4 rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60"
+              type="button"
+              onClick={addQuickRow}
+              className="mt-3 rounded-full border border-zinc-200 px-4 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100"
             >
-              {quickSaving ? "Saving..." : "Save day"}
+              + Add person
             </button>
+
+            <div>
+              <button
+                onClick={handleQuickSave}
+                disabled={quickSaving || !quickDate}
+                className="mt-4 rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60"
+              >
+                {quickSaving ? "Saving..." : "Save day"}
+              </button>
+            </div>
           </div>
         )}
 

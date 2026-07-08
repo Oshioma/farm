@@ -16,6 +16,7 @@ import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { TaskForm } from "@/app/farm/components/TaskForm";
 import type { TaskFormData } from "@/app/farm/components/TaskForm";
 import { ExpandableText } from "@/app/farm/components/ExpandableText";
+import { LogHoursModal } from "@/app/farm/components/LogHoursModal";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -41,6 +42,8 @@ export default function WorkerGoalsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+  const [hoursPromptTask, setHoursPromptTask] = useState<Task | null>(null);
+  const [loggingHours, setLoggingHours] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "today" | "overdue">("all");
   const [groupBy, setGroupBy] = useState<"none" | "assignee">("assignee");
@@ -242,7 +245,7 @@ export default function WorkerGoalsPage() {
     }
   }
 
-  async function handleComplete(task: Task) {
+  async function completeTaskNow(task: Task) {
     if (!activeFarmId) return;
     try {
       setCompletingTaskId(task.id);
@@ -268,6 +271,40 @@ export default function WorkerGoalsPage() {
     } finally {
       setCompletingTaskId(null);
     }
+  }
+
+  function handleComplete(task: Task) {
+    setHoursPromptTask(task);
+  }
+
+  async function handleLogHoursAndComplete(data: { hours: number; workerName: string; notes: string }) {
+    if (!activeFarmId || !hoursPromptTask) return;
+    try {
+      setLoggingHours(true);
+      setError("");
+      const { error: insertError } = await supabase.from("work_hours").insert({
+        farm_id: activeFarmId,
+        date: new Date().toISOString().slice(0, 10),
+        worker_name: data.workerName,
+        hours: data.hours,
+        role: "operational",
+        notes: data.notes || null,
+      });
+      if (insertError) throw insertError;
+      await completeTaskNow(hoursPromptTask);
+      setHoursPromptTask(null);
+    } catch (err) {
+      setError(errMsg(err, "Failed to log hours"));
+    } finally {
+      setLoggingHours(false);
+    }
+  }
+
+  async function handleSkipHoursAndComplete() {
+    if (!hoursPromptTask) return;
+    const task = hoursPromptTask;
+    setHoursPromptTask(null);
+    await completeTaskNow(task);
   }
 
   async function handleStartTask(task: Task) {
@@ -578,6 +615,19 @@ export default function WorkerGoalsPage() {
           </>
         )}
       </div>
+
+      {hoursPromptTask && (
+        <LogHoursModal
+          taskTitle={hoursPromptTask.title}
+          defaultWorkerName={
+            hoursPromptTask.assigned_to ? memberEmailMap[hoursPromptTask.assigned_to] ?? "" : ""
+          }
+          saving={loggingHours}
+          onConfirm={handleLogHoursAndComplete}
+          onSkip={handleSkipHoursAndComplete}
+          onClose={() => setHoursPromptTask(null)}
+        />
+      )}
     </main>
   );
 }
