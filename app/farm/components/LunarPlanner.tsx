@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import type { FarmMember } from "@/lib/farm";
 import { ExpandableText } from "@/app/farm/components/ExpandableText";
+import { LogHoursModal } from "@/app/farm/components/LogHoursModal";
 import {
   Moon,
   Sprout,
@@ -185,6 +186,8 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
   const [savingTask, setSavingTask] = useState(false);
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
   const [busyReminderId, setBusyReminderId] = useState<string | null>(null);
+  const [hoursPromptTask, setHoursPromptTask] = useState<LunarTask | null>(null);
+  const [loggingHours, setLoggingHours] = useState(false);
 
   const todayISO = toISODate(new Date());
   const anchor = useMemo(() => fromISODate(anchorISO), [anchorISO]);
@@ -477,11 +480,10 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
     }
   }
 
-  async function handleToggleDone(task: LunarTask) {
+  async function setTaskStatus(task: LunarTask, next: string) {
     try {
       setBusyTaskId(task.id);
       setError("");
-      const next = task.status === "done" ? "planned" : "done";
       const { error: e } = await supabase
         .from("lunar_tasks")
         .update({ status: next })
@@ -493,6 +495,47 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
     } finally {
       setBusyTaskId(null);
     }
+  }
+
+  function handleToggleDone(task: LunarTask) {
+    if (task.status === "done") {
+      setTaskStatus(task, "planned");
+    } else if (farmId) {
+      // Only prompt for hours when there's a farm to attribute them to.
+      setHoursPromptTask(task);
+    } else {
+      setTaskStatus(task, "done");
+    }
+  }
+
+  async function handleLogHoursAndComplete(data: { hours: number; workerName: string; notes: string }) {
+    if (!farmId || !hoursPromptTask) return;
+    try {
+      setLoggingHours(true);
+      setError("");
+      const { error: insertError } = await supabase.from("work_hours").insert({
+        farm_id: farmId,
+        date: toISODate(new Date()),
+        worker_name: data.workerName,
+        hours: data.hours,
+        role: "operational",
+        notes: data.notes || null,
+      });
+      if (insertError) throw insertError;
+      await setTaskStatus(hoursPromptTask, "done");
+      setHoursPromptTask(null);
+    } catch (err) {
+      setError(errMsg(err, "Failed to log hours"));
+    } finally {
+      setLoggingHours(false);
+    }
+  }
+
+  async function handleSkipHoursAndComplete() {
+    if (!hoursPromptTask) return;
+    const task = hoursPromptTask;
+    setHoursPromptTask(null);
+    await setTaskStatus(task, "done");
   }
 
   async function handleDeleteTask(task: LunarTask) {
@@ -1036,6 +1079,19 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
             </div>
           </div>
         </div>
+      )}
+
+      {hoursPromptTask && (
+        <LogHoursModal
+          taskTitle={hoursPromptTask.title}
+          defaultWorkerName={
+            hoursPromptTask.assigned_to ? memberEmailMap[hoursPromptTask.assigned_to] ?? "" : ""
+          }
+          saving={loggingHours}
+          onConfirm={handleLogHoursAndComplete}
+          onSkip={handleSkipHoursAndComplete}
+          onClose={() => setHoursPromptTask(null)}
+        />
       )}
     </main>
   );
