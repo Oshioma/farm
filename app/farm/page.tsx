@@ -38,6 +38,7 @@ import { WantForm } from "@/app/farm/components/WantForm";
 import type { WantFormData } from "@/app/farm/components/WantForm";
 import { FarmMap } from "@/app/farm/components/FarmMap";
 import LunarPlanner from "@/app/farm/components/LunarPlanner";
+import { LogHoursModal } from "@/app/farm/components/LogHoursModal";
 import { ExpandableText } from "@/app/farm/components/ExpandableText";
 import { Plus, Settings, X } from "lucide-react";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
@@ -90,6 +91,8 @@ export default function FarmPage() {
   const [savingFarm, setSavingFarm] = useState(false);
   const router = useRouter();
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+  const [hoursPromptTask, setHoursPromptTask] = useState<Task | null>(null);
+  const [loggingHours, setLoggingHours] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTaskForm, setEditingTaskForm] = useState<TaskFormData | null>(null);
   const [editingCropId, setEditingCropId] = useState<string | null>(null);
@@ -889,7 +892,7 @@ export default function FarmPage() {
     }
   }
 
-  async function handleCompleteTask(task: Task) {
+  async function completeTaskNow(task: Task) {
     if (!activeFarmId) return;
     try {
       setCompletingTaskId(task.id);
@@ -916,6 +919,40 @@ export default function FarmPage() {
     } finally {
       setCompletingTaskId(null);
     }
+  }
+
+  function handleCompleteTask(task: Task) {
+    setHoursPromptTask(task);
+  }
+
+  async function handleLogHoursAndComplete(data: { hours: number; workerName: string; notes: string }) {
+    if (!activeFarmId || !hoursPromptTask) return;
+    try {
+      setLoggingHours(true);
+      setError("");
+      const { error: insertError } = await supabase.from("work_hours").insert({
+        farm_id: activeFarmId,
+        date: new Date().toISOString().slice(0, 10),
+        worker_name: data.workerName,
+        hours: data.hours,
+        role: "operational",
+        notes: data.notes || null,
+      });
+      if (insertError) throw insertError;
+      await completeTaskNow(hoursPromptTask);
+      setHoursPromptTask(null);
+    } catch (err) {
+      setError(errMsg(err, "Failed to log hours"));
+    } finally {
+      setLoggingHours(false);
+    }
+  }
+
+  async function handleSkipHoursAndComplete() {
+    if (!hoursPromptTask) return;
+    const task = hoursPromptTask;
+    setHoursPromptTask(null);
+    await completeTaskNow(task);
   }
 
   async function handleUpdateTask(id: string, data: TaskFormData): Promise<boolean> {
@@ -3089,6 +3126,19 @@ export default function FarmPage() {
         ) : null}
 
       </div>
+
+      {hoursPromptTask && (
+        <LogHoursModal
+          taskTitle={hoursPromptTask.title}
+          defaultWorkerName={
+            hoursPromptTask.assigned_to ? memberEmailMap[hoursPromptTask.assigned_to] ?? "" : ""
+          }
+          saving={loggingHours}
+          onConfirm={handleLogHoursAndComplete}
+          onSkip={handleSkipHoursAndComplete}
+          onClose={() => setHoursPromptTask(null)}
+        />
+      )}
     </main>
   );
 }

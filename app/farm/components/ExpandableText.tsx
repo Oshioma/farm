@@ -23,7 +23,7 @@ export function ExpandableText({ text, className = "" }: Props) {
 
   return (
     <div className={className}>
-      <p ref={ref} className={expanded ? "whitespace-pre-wrap" : "line-clamp-2"}>
+      <p ref={ref} className={`whitespace-pre-wrap ${expanded ? "" : "line-clamp-2"}`}>
         {text}
       </p>
       {(isClamped || expanded) && (
