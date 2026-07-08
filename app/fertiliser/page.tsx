@@ -25,6 +25,7 @@ const blank = {
   bin_colour: "",
   zone_ids: [] as string[],
   notes: "",
+  next_fertilise_date: "",
 };
 
 export default function FertiliserPage() {
@@ -145,6 +146,26 @@ export default function FertiliserPage() {
 
       const { error: err } = await supabase.from("fertilisations").insert(entry);
       if (err) throw err;
+
+      if (form.next_fertilise_date) {
+        const bedNames = zoneIds
+          .map((id) => zones.find((z) => z.id === id)?.name)
+          .filter(Boolean)
+          .join(", ");
+        const { error: taskErr } = await supabase.from("tasks").insert({
+          farm_id: activeFarmId,
+          title: form.fertiliser.trim() ? `Fertilise: ${form.fertiliser.trim()}` : "Fertilise",
+          description: bedNames ? `Beds: ${bedNames}` : null,
+          status: "todo",
+          priority: "medium",
+          due_date: form.next_fertilise_date,
+          zone_id: zoneIds[0] || null,
+          goal_timeframe: "month",
+          proof_required: false,
+        });
+        if (taskErr) throw taskErr;
+      }
+
       setForm(blank);
       setShowForm(false);
       await loadEntries(activeFarmId);
@@ -205,6 +226,7 @@ export default function FertiliserPage() {
       bin_colour: entry.bin_colour ?? "",
       zone_ids: entry.zone_ids?.length ? entry.zone_ids : entry.zone_id ? [entry.zone_id] : [],
       notes: entry.notes ?? "",
+      next_fertilise_date: "",
     });
   }
 
@@ -337,6 +359,17 @@ export default function FertiliserPage() {
                       ))
                     )}
                   </div>
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium">
+                    Next time to fertilise <span className="font-normal text-zinc-400">(optional)</span>
+                  </label>
+                  <input type="date" value={form.next_fertilise_date}
+                    onChange={(e) => setForm((p) => ({ ...p, next_fertilise_date: e.target.value }))}
+                    className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900" />
+                  <p className="mt-1.5 text-xs text-zinc-400">
+                    Adds a goal on this date so you get reminded to fertilise again.
+                  </p>
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium">Notes <span className="font-normal text-zinc-400">(optional)</span></label>
