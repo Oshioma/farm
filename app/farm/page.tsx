@@ -37,6 +37,7 @@ import { SaleForm } from "@/app/farm/components/SaleForm";
 import { WantForm } from "@/app/farm/components/WantForm";
 import type { WantFormData } from "@/app/farm/components/WantForm";
 import { FarmMap } from "@/app/farm/components/FarmMap";
+import LunarPlanner from "@/app/farm/components/LunarPlanner";
 import { Plus, Settings, X } from "lucide-react";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
 import type { CropFormData } from "@/app/farm/components/CropForm";
@@ -139,9 +140,9 @@ export default function FarmPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const withFarmContext = (path: string) =>
     activeFarmId ? `${path}?farmId=${encodeURIComponent(activeFarmId)}` : path;
-  const workerTasksHref = activeFarmId
-    ? `/farm/tasks?farmId=${encodeURIComponent(activeFarmId)}`
-    : "/farm/tasks";
+  const workerGoalsHref = activeFarmId
+    ? `/farm/goals?farmId=${encodeURIComponent(activeFarmId)}`
+    : "/farm/goals";
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -447,14 +448,20 @@ export default function FarmPage() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const tasksToday = tasks.filter(
+  // The dashboard's quick view only surfaces month goals - year and 3-year
+  // goals are browsed on the dedicated Goals page instead.
+  const monthGoals = tasks.filter((task) => (task.goal_timeframe ?? "month") === "month");
+  const yearGoals = tasks.filter((task) => task.goal_timeframe === "year");
+  const threeYearGoals = tasks.filter((task) => task.goal_timeframe === "3year");
+
+  const tasksToday = monthGoals.filter(
     (task) =>
       task.due_date === today &&
       task.status !== "done" &&
       task.status !== "cancelled"
   );
 
-  const openTasks = tasks.filter(
+  const openTasks = monthGoals.filter(
     (task) => task.status === "todo" || task.status === "in_progress"
   );
 
@@ -490,7 +497,7 @@ export default function FarmPage() {
     // Add current user's tasks first if they exist
     if (myTasksKey && myTasks.length > 0) {
       groups.push({
-        label: "My tasks",
+        label: "My goals",
         key: myTasksKey,
         tasks: myTasks,
         isCurrentUser: true
@@ -530,7 +537,7 @@ export default function FarmPage() {
     }
   }, [groupedOpenTasks, expandAllTasks]);
 
-  const completedTasks = tasks.filter(
+  const completedTasks = monthGoals.filter(
     (task) => task.status === "done" || task.status === "cancelled"
   );
 
@@ -849,7 +856,7 @@ export default function FarmPage() {
     try {
       setError("");
       const title = data.title.trim();
-      if (!title) throw new Error("Task title is required.");
+      if (!title) throw new Error("Goal title is required.");
 
       const { error: insertError } = await supabase.from("tasks").insert({
         farm_id: activeFarmId,
@@ -862,6 +869,7 @@ export default function FarmPage() {
         priority: data.priority,
         due_date: data.due_date || null,
         proof_required: data.proof_required,
+        goal_timeframe: data.goal_timeframe,
       });
       if (insertError) throw insertError;
 
@@ -869,13 +877,13 @@ export default function FarmPage() {
         farm_id: activeFarmId,
         type: "task_created",
         title: `${title} created`,
-        meta: data.due_date ? `Due ${data.due_date}` : "Task added",
+        meta: data.due_date ? `Due ${data.due_date}` : "Goal added",
       });
 
       await loadFarmData(activeFarmId);
       return true;
     } catch (err) {
-      setError(errMsg(err, "Failed to create task"));
+      setError(errMsg(err, "Failed to create goal"));
       return false;
     }
   }
@@ -898,12 +906,12 @@ export default function FarmPage() {
         title: `${task.title} completed`,
         meta: task.crop?.[0]?.crop_name
           ? `Linked to ${task.crop[0].crop_name}`
-          : "Task marked done",
+          : "Goal marked done",
       });
 
       await loadFarmData(activeFarmId);
     } catch (err) {
-      setError(errMsg(err, "Failed to complete task"));
+      setError(errMsg(err, "Failed to complete goal"));
     } finally {
       setCompletingTaskId(null);
     }
@@ -915,7 +923,7 @@ export default function FarmPage() {
       setSavingTaskId(id);
       setError("");
       const title = data.title.trim();
-      if (!title) throw new Error("Task title is required.");
+      if (!title) throw new Error("Goal title is required.");
 
       const { error: updateError } = await supabase
         .from("tasks")
@@ -929,6 +937,7 @@ export default function FarmPage() {
           priority: data.priority,
           due_date: data.due_date || null,
           proof_required: data.proof_required,
+          goal_timeframe: data.goal_timeframe,
         })
         .eq("id", id);
       if (updateError) throw updateError;
@@ -938,7 +947,7 @@ export default function FarmPage() {
       setEditingTaskForm(null);
       return true;
     } catch (err) {
-      setError(errMsg(err, "Failed to update task"));
+      setError(errMsg(err, "Failed to update goal"));
       return false;
     } finally {
       setSavingTaskId(null);
@@ -1511,6 +1520,7 @@ export default function FarmPage() {
               { href: withFarmContext("/farm/compost"), label: "Compost" },
               { href: "#crops", label: "Crops" },
               { href: withFarmContext("/fertiliser"), label: "Fertiliser" },
+              { href: workerGoalsHref, label: "Goals" },
               { href: withFarmContext("/farm/harvest-eta"), label: "Harvest" },
               { href: withFarmContext("/farm/harvest-logs"), label: "Harvest logs" },
               { href: withFarmContext("/income-prediction"), label: "Income prediction" },
@@ -1521,7 +1531,6 @@ export default function FarmPage() {
               { href: withFarmContext("/farm/seedlings"), label: "Seedlings" },
               { href: withFarmContext("/farm/soil-tests"), label: "Soil tests" },
               { href: withFarmContext("/farm/systems"), label: "Systems" },
-              { href: workerTasksHref, label: "Tasks" },
               { href: withFarmContext("/farm/trees"), label: "Trees" },
               { href: withFarmContext("/farm/work-hours"), label: "Work hours" },
             ].map(({ href, label }) => (
@@ -1859,17 +1868,19 @@ export default function FarmPage() {
               </div>
             ) : null}
 
+            <LunarPlanner embedded />
+
             <section className="mb-6 grid gap-4 sm:grid-cols-3">
               <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
-                  Tasks today
+                  Goals today
                 </p>
                 <p className="mt-3 text-3xl font-semibold">{tasksToday.length}</p>
               </div>
 
               <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
-                  Open tasks
+                  Open goals
                 </p>
                 <p className="mt-3 text-3xl font-semibold">{openTasks.length}</p>
               </div>
@@ -1885,9 +1896,9 @@ export default function FarmPage() {
             <section className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-semibold">Open tasks</h2>
+                  <h2 className="text-xl font-semibold">Open goals</h2>
                   <p className="mt-1 text-sm text-zinc-500">
-                    All todo and in-progress tasks, due soonest first.
+                    All todo and in-progress month goals, due soonest first.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1904,10 +1915,10 @@ export default function FarmPage() {
                     onClick={() => setActiveForm(activeForm === "task" ? null : "task")}
                     className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
                   >
-                    {activeForm === "task" ? "Cancel" : "+ New task"}
+                    {activeForm === "task" ? "Cancel" : "+ New goal"}
                   </button>
                   <Link
-                    href={workerTasksHref}
+                    href={workerGoalsHref}
                     className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
                   >
                     Worker view
@@ -1942,7 +1953,7 @@ export default function FarmPage() {
                               value={editingTaskForm.title}
                               onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, title: e.target.value } : prev)}
                               className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
-                              placeholder="Task title"
+                              placeholder="Goal title"
                             />
                             <textarea
                               value={editingTaskForm.description}
@@ -1972,6 +1983,15 @@ export default function FarmPage() {
                                 <option value="urgent">urgent</option>
                               </select>
                             </div>
+                            <select
+                              value={editingTaskForm.goal_timeframe}
+                              onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, goal_timeframe: e.target.value as typeof prev.goal_timeframe } : prev)}
+                              className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                            >
+                              <option value="month">Month goal</option>
+                              <option value="year">Year goal</option>
+                              <option value="3year">3-year goal</option>
+                            </select>
                             <div className="grid grid-cols-2 gap-2">
                               <select
                                 value={editingTaskForm.zone_id}
@@ -1986,7 +2006,7 @@ export default function FarmPage() {
                                 onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, crop_id: e.target.value } : prev)}
                                 className="rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                               >
-                                <option value="">General task</option>
+                                <option value="">General goal</option>
                                 {crops.map((c) => <option key={c.id} value={c.id}>{c.crop_name}{c.variety ? ` · ${c.variety}` : ""}</option>)}
                               </select>
                             </div>
@@ -2054,7 +2074,7 @@ export default function FarmPage() {
                             <div className="mt-2 text-sm text-zinc-600">
                               {task.zone?.[0]?.name ?? "No bed"}
                               <span className="mx-2">·</span>
-                              {task.crop?.[0]?.crop_name ?? "General task"}
+                              {task.crop?.[0]?.crop_name ?? "General goal"}
                               <span className="mx-2">·</span>
                               {formatDate(task.due_date)}
                             </div>
@@ -2088,6 +2108,7 @@ export default function FarmPage() {
                                     priority: task.priority ?? "medium",
                                     due_date: task.due_date ?? "",
                                     proof_required: task.proof_required ?? false,
+                                    goal_timeframe: task.goal_timeframe ?? "month",
                                   });
                                 }}
                                 disabled={isCompleting || isDeleting}
@@ -2115,13 +2136,30 @@ export default function FarmPage() {
               </div>
             </section>
 
+            <section className="mb-6 rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-semibold">Longer-term goals</h2>
+                  <p className="mt-1 text-sm text-zinc-500">
+                    {yearGoals.length} year goal{yearGoals.length === 1 ? "" : "s"} · {threeYearGoals.length} 3-year goal{threeYearGoals.length === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <Link
+                  href={workerGoalsHref}
+                  className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+                >
+                  View year & 3-year goals
+                </Link>
+              </div>
+            </section>
+
             <section className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
               <button
                 onClick={() => setShowCompleted((v) => !v)}
                 className="flex w-full items-center justify-between gap-4 text-left"
               >
                 <div>
-                  <h2 className="text-xl font-semibold">Completed tasks</h2>
+                  <h2 className="text-xl font-semibold">Completed goals</h2>
                   <p className="mt-1 text-sm text-zinc-500">{completedTasks.length} done or cancelled</p>
                 </div>
                 <span className="text-sm text-zinc-500">{showCompleted ? "Hide" : "Show"}</span>
@@ -2150,7 +2188,7 @@ export default function FarmPage() {
                           <div className="mt-2 text-sm text-zinc-400">
                             {task.zone?.[0]?.name ?? "No bed"}
                             <span className="mx-2">·</span>
-                            {task.crop?.[0]?.crop_name ?? "General task"}
+                            {task.crop?.[0]?.crop_name ?? "General goal"}
                             <span className="mx-2">·</span>
                             {formatDate(task.due_date)}
                           </div>

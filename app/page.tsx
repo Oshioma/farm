@@ -48,12 +48,6 @@ export default function HomePage() {
           >
             Open Farm Manager
           </Link>
-          <Link
-            href="/lunar-planner"
-            className="inline-flex items-center justify-center rounded-2xl border border-indigo-200 bg-white px-7 py-4 text-base font-semibold text-indigo-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-          >
-            Lunar Farming Planner
-          </Link>
         </div>
       </section>
     </main>

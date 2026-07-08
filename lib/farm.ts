@@ -136,6 +136,8 @@ export type Crop = {
   zone_ids?: string[];
 };
 
+export type GoalTimeframe = "month" | "year" | "3year";
+
 export type Task = {
   id: string;
   title: string;
@@ -148,6 +150,7 @@ export type Task = {
   zone_id: string | null;
   crop_id: string | null;
   assigned_to: string | null;
+  goal_timeframe: GoalTimeframe;
   crop: { crop_name: string }[] | null;
   zone: { name: string }[] | null;
 };
@@ -319,6 +322,7 @@ export async function getTasks(farmId: string): Promise<Task[]> {
           zone_id,
           crop_id,
           assigned_to,
+          goal_timeframe,
           crop:crops(crop_name),
           zone:zones(name)
         `
