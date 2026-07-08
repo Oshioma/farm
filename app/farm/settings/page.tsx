@@ -98,7 +98,7 @@ export default function SettingsPage() {
       }> = [
         {
           table: "tasks",
-          fields: ["title", "description", "status", "priority", "due_date", "due_time", "assigned_to", "created_at"],
+          fields: ["title", "description", "status", "priority", "goal_timeframe", "due_date", "due_time", "assigned_to", "created_at"],
         },
         {
           table: "harvests",

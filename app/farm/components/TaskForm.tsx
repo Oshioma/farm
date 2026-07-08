@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Zone, Crop, FarmMember } from "@/lib/farm";
+import type { Zone, Crop, FarmMember, GoalTimeframe } from "@/lib/farm";
 
 export type TaskFormData = {
   title: string;
@@ -13,6 +13,7 @@ export type TaskFormData = {
   priority: string;
   due_date: string;
   proof_required: boolean;
+  goal_timeframe: GoalTimeframe;
 };
 
 const blank: TaskFormData = {
@@ -25,6 +26,7 @@ const blank: TaskFormData = {
   priority: "medium",
   due_date: "",
   proof_required: false,
+  goal_timeframe: "month",
 };
 
 type Props = {
@@ -32,11 +34,20 @@ type Props = {
   crops: Crop[];
   members: FarmMember[];
   defaultZoneId: string;
+  defaultTimeframe?: GoalTimeframe;
   onSubmit: (data: TaskFormData) => Promise<boolean>;
 };
 
-export function TaskForm({ zones, crops, members, defaultZoneId, onSubmit }: Props) {
-  const [form, setForm] = useState<TaskFormData>(blank);
+function yearOf(dueDate: string, fallback: number): number {
+  const y = dueDate ? parseInt(dueDate.slice(0, 4), 10) : NaN;
+  return Number.isFinite(y) ? y : fallback;
+}
+
+const currentYear = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: 9 }, (_, i) => currentYear - 1 + i);
+
+export function TaskForm({ zones, crops, members, defaultZoneId, defaultTimeframe, onSubmit }: Props) {
+  const [form, setForm] = useState<TaskFormData>({ ...blank, goal_timeframe: defaultTimeframe ?? "month" });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -50,13 +61,13 @@ export function TaskForm({ zones, crops, members, defaultZoneId, onSubmit }: Pro
     setSaving(true);
     const ok = await onSubmit(form);
     setSaving(false);
-    if (ok) setForm({ ...blank, zone_id: defaultZoneId });
+    if (ok) setForm({ ...blank, zone_id: defaultZoneId, goal_timeframe: defaultTimeframe ?? "month" });
   }
 
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
       <div className="mb-5">
-        <h2 className="text-xl font-semibold">Create task</h2>
+        <h2 className="text-xl font-semibold">Create goal</h2>
         <p className="mt-1 text-sm text-zinc-500">
           Add what needs doing and link it to a crop if relevant.
         </p>
@@ -64,7 +75,7 @@ export function TaskForm({ zones, crops, members, defaultZoneId, onSubmit }: Pro
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="mb-2 block text-sm font-medium">Task title</label>
+          <label className="mb-2 block text-sm font-medium">Goal title</label>
           <input
             type="text"
             value={form.title}
@@ -73,6 +84,32 @@ export function TaskForm({ zones, crops, members, defaultZoneId, onSubmit }: Pro
             placeholder="Stake tomato rows"
             required
           />
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium">Timeframe</label>
+          <div className="grid grid-cols-3 gap-2">
+            {(
+              [
+                { key: "month", label: "Month" },
+                { key: "year", label: "Year" },
+                { key: "3year", label: "3-Year" },
+              ] as const
+            ).map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setForm((prev) => ({ ...prev, goal_timeframe: key }))}
+                className={`rounded-2xl px-4 py-2.5 text-sm font-medium transition ${
+                  form.goal_timeframe === key
+                    ? "bg-zinc-900 text-white"
+                    : "border border-zinc-300 text-zinc-700 hover:bg-zinc-100"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div>
@@ -108,7 +145,7 @@ export function TaskForm({ zones, crops, members, defaultZoneId, onSubmit }: Pro
             onChange={(e) => setForm((prev) => ({ ...prev, crop_id: e.target.value }))}
             className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
           >
-            <option value="">General task</option>
+            <option value="">General goal</option>
             {crops.map((crop) => (
               <option key={crop.id} value={crop.id}>
                 {crop.crop_name}
@@ -163,15 +200,43 @@ export function TaskForm({ zones, crops, members, defaultZoneId, onSubmit }: Pro
           </div>
         </div>
 
-        <div>
-          <label className="mb-2 block text-sm font-medium">Due date</label>
-          <input
-            type="date"
-            value={form.due_date}
-            onChange={(e) => setForm((prev) => ({ ...prev, due_date: e.target.value }))}
-            className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-          />
-        </div>
+        {form.goal_timeframe === "month" ? (
+          <div>
+            <label className="mb-2 block text-sm font-medium">Due date</label>
+            <input
+              type="date"
+              value={form.due_date}
+              onChange={(e) => setForm((prev) => ({ ...prev, due_date: e.target.value }))}
+              className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+            />
+          </div>
+        ) : form.goal_timeframe === "year" ? (
+          <div>
+            <label className="mb-2 block text-sm font-medium">Target year</label>
+            <select
+              value={yearOf(form.due_date, currentYear)}
+              onChange={(e) => setForm((prev) => ({ ...prev, due_date: `${e.target.value}-01-01` }))}
+              className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+            >
+              {YEAR_OPTIONS.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div>
+            <label className="mb-2 block text-sm font-medium">3-year window</label>
+            <select
+              value={yearOf(form.due_date, currentYear)}
+              onChange={(e) => setForm((prev) => ({ ...prev, due_date: `${e.target.value}-01-01` }))}
+              className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+            >
+              {YEAR_OPTIONS.map((y) => (
+                <option key={y} value={y}>{y} – {y + 2}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <label className="flex items-center gap-3 rounded-2xl border border-zinc-300 px-4 py-3 text-sm">
           <input
@@ -189,7 +254,7 @@ export function TaskForm({ zones, crops, members, defaultZoneId, onSubmit }: Pro
           disabled={saving || !form.title.trim()}
           className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {saving ? "Creating task..." : "Create task"}
+          {saving ? "Creating goal..." : "Create goal"}
         </button>
       </form>
     </div>

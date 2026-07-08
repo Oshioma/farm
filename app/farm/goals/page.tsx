@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import {
@@ -10,9 +10,11 @@ import {
   getTasks,
   getMembers,
 } from "@/lib/farm";
-import type { Farm, Zone, Crop, Task, FarmMember } from "@/lib/farm";
+import type { Farm, Zone, Crop, Task, FarmMember, GoalTimeframe } from "@/lib/farm";
 import { formatDate, badgeClass } from "@/app/farm/utils";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { TaskForm } from "@/app/farm/components/TaskForm";
+import type { TaskFormData } from "@/app/farm/components/TaskForm";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -21,7 +23,14 @@ function errMsg(err: unknown, fallback: string): string {
   return fallback;
 }
 
-export default function WorkerTasksPage() {
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+const now = new Date();
+
+export default function WorkerGoalsPage() {
   const [farms, setFarms] = useState<Farm[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
   const [crops, setCrops] = useState<Crop[]>([]);
@@ -31,10 +40,21 @@ export default function WorkerTasksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "today" | "overdue">("all");
   const [groupBy, setGroupBy] = useState<"none" | "assignee">("assignee");
+  const [showCreateForm, setShowCreateForm] = useState(false);
+
+  const [timeframeTab, setTimeframeTab] = useState<GoalTimeframe>("month");
+  const [monthCursor, setMonthCursor] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
+  const [yearCursor, setYearCursor] = useState(now.getFullYear());
+  const [threeYearStart, setThreeYearStart] = useState(now.getFullYear());
 
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const activeFarmIdRef = useRef(activeFarmId);
+  useEffect(() => {
+    activeFarmIdRef.current = activeFarmId;
+  }, [activeFarmId]);
 
   useEffect(() => {
     (async () => {
@@ -48,6 +68,12 @@ export default function WorkerTasksPage() {
       }
     })();
   }, []);
+
+  async function reloadTasks(farmId: string) {
+    const taskRows = await getTasks(farmId);
+    if (activeFarmIdRef.current !== farmId) return;
+    setTasks(taskRows);
+  }
 
   useEffect(() => {
     if (!activeFarmId) return;
@@ -68,7 +94,7 @@ export default function WorkerTasksPage() {
         setTasks(taskRows);
         setMembers(memberRows);
       } catch (err) {
-        if (!cancelled) setError(errMsg(err, "Failed to load tasks"));
+        if (!cancelled) setError(errMsg(err, "Failed to load goals"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -85,14 +111,54 @@ export default function WorkerTasksPage() {
 
   const today = new Date().toISOString().slice(0, 10);
 
+  function navigatePeriod(direction: -1 | 1) {
+    if (timeframeTab === "month") {
+      setMonthCursor((prev) => {
+        let month = prev.month + direction;
+        let year = prev.year;
+        if (month > 12) { month = 1; year += 1; }
+        if (month < 1) { month = 12; year -= 1; }
+        return { year, month };
+      });
+    } else if (timeframeTab === "year") {
+      setYearCursor((prev) => prev + direction);
+    } else {
+      setThreeYearStart((prev) => prev + direction * 3);
+    }
+  }
+
+  const periodLabel =
+    timeframeTab === "month"
+      ? `${MONTH_NAMES[monthCursor.month - 1]} ${monthCursor.year}`
+      : timeframeTab === "year"
+      ? `${yearCursor}`
+      : `${threeYearStart} – ${threeYearStart + 2}`;
+
+  const periodTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      const tf = task.goal_timeframe ?? "month";
+      if (tf !== timeframeTab) return false;
+      if (!task.due_date) return false;
+      const year = parseInt(task.due_date.slice(0, 4), 10);
+      if (timeframeTab === "month") {
+        const month = parseInt(task.due_date.slice(5, 7), 10);
+        return year === monthCursor.year && month === monthCursor.month;
+      }
+      if (timeframeTab === "year") return year === yearCursor;
+      return year >= threeYearStart && year <= threeYearStart + 2;
+    });
+  }, [tasks, timeframeTab, monthCursor, yearCursor, threeYearStart]);
+
   const openTasks = useMemo(() => {
-    const open = tasks.filter(
+    const open = periodTasks.filter(
       (t) => t.status === "todo" || t.status === "in_progress"
     );
-    if (filter === "today") return open.filter((t) => t.due_date === today);
-    if (filter === "overdue") return open.filter((t) => t.due_date && t.due_date < today);
+    if (timeframeTab === "month") {
+      if (filter === "today") return open.filter((t) => t.due_date === today);
+      if (filter === "overdue") return open.filter((t) => t.due_date && t.due_date < today);
+    }
     return open;
-  }, [tasks, filter, today]);
+  }, [periodTasks, filter, today, timeframeTab]);
 
   const memberEmailMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -126,9 +192,54 @@ export default function WorkerTasksPage() {
     return groups;
   }, [openTasks, groupBy, memberEmailMap]);
 
-  const completedTasks = tasks.filter(
+  const completedTasks = periodTasks.filter(
     (t) => t.status === "done" || t.status === "cancelled"
   );
+
+  async function handleCreateGoal(data: TaskFormData): Promise<boolean> {
+    if (!activeFarmId) return false;
+    try {
+      setError("");
+      const title = data.title.trim();
+      if (!title) throw new Error("Goal title is required.");
+
+      const { error: insertError } = await supabase.from("tasks").insert({
+        farm_id: activeFarmId,
+        zone_id: data.zone_id || null,
+        crop_id: data.crop_id || null,
+        assigned_to: data.assigned_to || null,
+        title,
+        description: data.description.trim() || null,
+        status: data.status,
+        priority: data.priority,
+        due_date: data.due_date || null,
+        proof_required: data.proof_required,
+        goal_timeframe: data.goal_timeframe,
+      });
+      if (insertError) throw insertError;
+
+      await reloadTasks(activeFarmId);
+      return true;
+    } catch (err) {
+      setError(errMsg(err, "Failed to create goal"));
+      return false;
+    }
+  }
+
+  async function handleDeleteGoal(id: string) {
+    if (!activeFarmId) return;
+    try {
+      setDeletingId(id);
+      setError("");
+      const { error: deleteError } = await supabase.from("tasks").delete().eq("id", id);
+      if (deleteError) throw deleteError;
+      await reloadTasks(activeFarmId);
+    } catch (err) {
+      setError(errMsg(err, "Failed to delete goal"));
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   async function handleComplete(task: Task) {
     if (!activeFarmId) return;
@@ -147,13 +258,12 @@ export default function WorkerTasksPage() {
         title: `${task.title} completed`,
         meta: task.crop?.[0]?.crop_name
           ? `Linked to ${task.crop[0].crop_name}`
-          : "Task marked done",
+          : "Goal marked done",
       });
 
-      const taskRows = await getTasks(activeFarmId);
-      setTasks(taskRows);
+      await reloadTasks(activeFarmId);
     } catch (err) {
-      setError(errMsg(err, "Failed to complete task"));
+      setError(errMsg(err, "Failed to complete goal"));
     } finally {
       setCompletingTaskId(null);
     }
@@ -168,10 +278,9 @@ export default function WorkerTasksPage() {
         .update({ status: "in_progress" })
         .eq("id", task.id);
       if (updateError) throw updateError;
-      const taskRows = await getTasks(activeFarmId);
-      setTasks(taskRows);
+      await reloadTasks(activeFarmId);
     } catch (err) {
-      setError(errMsg(err, "Failed to start task"));
+      setError(errMsg(err, "Failed to start goal"));
     }
   }
 
@@ -182,10 +291,10 @@ export default function WorkerTasksPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                Worker Task View
+                Worker Goal View
               </p>
               <h1 className="mt-2 text-2xl font-semibold tracking-tight">
-                {activeFarm?.name ?? "Tasks"}
+                {activeFarm?.name ?? "Goals"}
               </h1>
             </div>
             <Link
@@ -227,27 +336,71 @@ export default function WorkerTasksPage() {
 
         {activeFarm && (
           <>
+            <div className="mb-4 grid grid-cols-3 gap-2">
+              {(
+                [
+                  { key: "month", label: "Month" },
+                  { key: "year", label: "Year" },
+                  { key: "3year", label: "3-Year" },
+                ] as const
+              ).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setTimeframeTab(key)}
+                  className={`rounded-2xl px-4 py-2.5 text-sm font-medium transition ${
+                    timeframeTab === key
+                      ? "bg-zinc-900 text-white"
+                      : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="mb-4 flex items-center justify-between gap-4 rounded-2xl border border-zinc-200 bg-white p-3">
+              <button
+                onClick={() => navigatePeriod(-1)}
+                aria-label="Previous period"
+                className="rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100"
+              >
+                ‹
+              </button>
+              <span className="text-sm font-semibold">{periodLabel}</span>
+              <button
+                onClick={() => navigatePeriod(1)}
+                aria-label="Next period"
+                className="rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100"
+              >
+                ›
+              </button>
+            </div>
+
             <div className="mb-4 flex flex-wrap items-center gap-2">
-                {(
-                  [
-                    { key: "all", label: `All open (${tasks.filter((t) => t.status === "todo" || t.status === "in_progress").length})` },
-                    { key: "today", label: `Due today (${tasks.filter((t) => t.due_date === today && t.status !== "done" && t.status !== "cancelled").length})` },
-                    { key: "overdue", label: `Overdue (${tasks.filter((t) => t.due_date && t.due_date < today && t.status !== "done" && t.status !== "cancelled").length})` },
-                  ] as const
-                ).map(({ key, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => setFilter(key)}
-                    className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                      filter === key
-                        ? "bg-zinc-900 text-white"
-                        : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-                <span className="mx-1 text-zinc-300">|</span>
+                {timeframeTab === "month" && (
+                  <>
+                    {(
+                      [
+                        { key: "all", label: `All open (${periodTasks.filter((t) => t.status === "todo" || t.status === "in_progress").length})` },
+                        { key: "today", label: `Due today (${periodTasks.filter((t) => t.due_date === today && t.status !== "done" && t.status !== "cancelled").length})` },
+                        { key: "overdue", label: `Overdue (${periodTasks.filter((t) => t.due_date && t.due_date < today && t.status !== "done" && t.status !== "cancelled").length})` },
+                      ] as const
+                    ).map(({ key, label }) => (
+                      <button
+                        key={key}
+                        onClick={() => setFilter(key)}
+                        className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                          filter === key
+                            ? "bg-zinc-900 text-white"
+                            : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                    <span className="mx-1 text-zinc-300">|</span>
+                  </>
+                )}
                 <button
                   onClick={() => setGroupBy(groupBy === "assignee" ? "none" : "assignee")}
                   className={`rounded-full px-4 py-2 text-sm font-medium transition ${
@@ -258,12 +411,36 @@ export default function WorkerTasksPage() {
                 >
                   Group by person
                 </button>
+                <button
+                  onClick={() => setShowCreateForm((v) => !v)}
+                  className="ml-auto rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
+                >
+                  {showCreateForm ? "Cancel" : "+ New goal"}
+                </button>
             </div>
+
+            {showCreateForm && (
+              <div className="mb-6">
+                <TaskForm
+                  key={timeframeTab}
+                  zones={zones}
+                  crops={crops}
+                  members={members}
+                  defaultZoneId=""
+                  defaultTimeframe={timeframeTab}
+                  onSubmit={async (data) => {
+                    const ok = await handleCreateGoal(data);
+                    if (ok) setShowCreateForm(false);
+                    return ok;
+                  }}
+                />
+              </div>
+            )}
 
             <div className="space-y-6">
               {openTasks.length === 0 ? (
                 <div className="rounded-3xl border border-zinc-200 bg-white p-8 text-center text-sm text-zinc-500">
-                  No tasks match this filter.
+                  No goals match this view.
                 </div>
               ) : (
                 groupedOpenTasks.map((group) => (
@@ -277,15 +454,16 @@ export default function WorkerTasksPage() {
                     <div className="space-y-3">
                 {group.tasks.map((task) => {
                   const isCompleting = completingTaskId === task.id;
+                  const isDeleting = deletingId === task.id;
                   const isToday = task.due_date === today;
                   const isOverdue = task.due_date ? task.due_date < today : false;
                   return (
                     <div
                       key={task.id}
                       className={`rounded-2xl border bg-white p-4 shadow-sm ${
-                        isOverdue
+                        timeframeTab === "month" && isOverdue
                           ? "border-rose-200"
-                          : isToday
+                          : timeframeTab === "month" && isToday
                           ? "border-amber-200"
                           : "border-zinc-200"
                       }`}
@@ -297,12 +475,12 @@ export default function WorkerTasksPage() {
                         <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
                           {task.priority}
                         </span>
-                        {isToday && (
+                        {timeframeTab === "month" && isToday && (
                           <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
                             today
                           </span>
                         )}
-                        {isOverdue && (
+                        {timeframeTab === "month" && isOverdue && (
                           <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700">
                             overdue
                           </span>
@@ -319,7 +497,7 @@ export default function WorkerTasksPage() {
                       <div className="mt-2 text-sm text-zinc-600">
                         {task.zone?.[0]?.name ?? "No zone"}
                         <span className="mx-2">·</span>
-                        {task.crop?.[0]?.crop_name ?? "General task"}
+                        {task.crop?.[0]?.crop_name ?? "General goal"}
                         <span className="mx-2">·</span>
                         {formatDate(task.due_date)}
                       </div>
@@ -338,7 +516,7 @@ export default function WorkerTasksPage() {
                             onClick={() => handleStartTask(task)}
                             className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
                           >
-                            Start task
+                            Start goal
                           </button>
                         )}
                         <button
@@ -347,6 +525,13 @@ export default function WorkerTasksPage() {
                           className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-60"
                         >
                           {isCompleting ? "Completing..." : "Mark done"}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteGoal(task.id)}
+                          disabled={isDeleting}
+                          className="rounded-2xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
+                        >
+                          {isDeleting ? "Deleting..." : "Delete"}
                         </button>
                       </div>
                     </div>
@@ -380,7 +565,7 @@ export default function WorkerTasksPage() {
                       <div className="mt-1 text-sm text-zinc-400">
                         {task.zone?.[0]?.name ?? "No zone"}
                         <span className="mx-2">·</span>
-                        {task.crop?.[0]?.crop_name ?? "General task"}
+                        {task.crop?.[0]?.crop_name ?? "General goal"}
                         <span className="mx-2">·</span>
                         {formatDate(task.due_date)}
                       </div>

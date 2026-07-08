@@ -11,6 +11,16 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+
+  async redirects() {
+    return [
+      {
+        source: "/farm/tasks",
+        destination: "/farm/goals",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
