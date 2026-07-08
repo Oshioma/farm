@@ -37,7 +37,7 @@ import { SaleForm } from "@/app/farm/components/SaleForm";
 import { WantForm } from "@/app/farm/components/WantForm";
 import type { WantFormData } from "@/app/farm/components/WantForm";
 import { FarmMap } from "@/app/farm/components/FarmMap";
-import { Plus, X } from "lucide-react";
+import { Plus, Settings, X } from "lucide-react";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
 import type { CropFormData } from "@/app/farm/components/CropForm";
 import type { TaskFormData } from "@/app/farm/components/TaskForm";
@@ -75,6 +75,7 @@ export default function FarmPage() {
 
   const [activeFarmId, setActiveFarmId] = useState<string>("");
   const hasLoadedInitialFarm = React.useRef(false);
+  const latestFarmIdRef = React.useRef("");
   const [activeForm, setActiveForm] = useState<"crop" | "task" | "harvest" | "expense" | "asset" | "pest" | "sale" | "want" | null>(null);
   const [showExpenses, setShowExpenses] = useState(false);
   const [showAssets, setShowAssets] = useState(false);
@@ -247,6 +248,9 @@ export default function FarmPage() {
   async function loadFarmData(farmId: string) {
     const currentYear = new Date().getFullYear();
     console.log(`[Farm] Loading farm data for ${farmId} at ${new Date().toISOString()}`);
+    // Track this as the most recently requested farm so a slower, older
+    // request can't overwrite state after the user has switched farms.
+    latestFarmIdRef.current = farmId;
     // Pre-warm auth session so parallel requests don't fight over the
     // Supabase auth lock (navigator.locks with steal: true).
     await supabase.auth.getSession();
@@ -268,6 +272,12 @@ export default function FarmPage() {
       getWants(farmId).catch(() => [] as Want[]),
       getOtherFarmsWants(farmId).catch(() => [] as WantWithFarm[]),
     ]);
+
+    if (latestFarmIdRef.current !== farmId) {
+      // A newer farm was selected while this request was in flight - discard
+      // this stale response instead of overwriting the newer farm's data.
+      return;
+    }
 
     console.log(`[Farm] Loaded ${cropRows.length} crops:`, cropRows.map(c => ({ id: c.id, name: c.crop_name, status: c.status, zones: c.zone_ids })));
 
@@ -298,8 +308,9 @@ export default function FarmPage() {
       body: JSON.stringify({ farm_id: farmId }),
     })
       .then(async (res) => {
-        if (!res.ok) return;
+        if (!res.ok || latestFarmIdRef.current !== farmId) return;
         const result = await res.json();
+        if (latestFarmIdRef.current !== farmId) return;
         const changed = (result?.archived ?? 0) + (result?.created ?? 0);
         if (changed > 0) {
           console.log(
@@ -307,6 +318,7 @@ export default function FarmPage() {
             result.archived_names
           );
           const freshZones = await getZones(farmId);
+          if (latestFarmIdRef.current !== farmId) return;
           setZones(freshZones);
         }
       })
@@ -314,6 +326,7 @@ export default function FarmPage() {
 
     // Fetch current user's role on this farm
     const { data: { user } } = await supabase.auth.getUser();
+    if (latestFarmIdRef.current !== farmId) return;
     if (user) {
       const { data: membership } = await supabase
         .from("farm_members")
@@ -321,6 +334,7 @@ export default function FarmPage() {
         .eq("farm_id", farmId)
         .eq("profile_id", user.id)
         .single();
+      if (latestFarmIdRef.current !== farmId) return;
       setUserRoleOnFarm(membership?.role_on_farm ?? null);
     }
     setDeleteFarmStep(0);
@@ -1337,7 +1351,14 @@ export default function FarmPage() {
   return (
     <main className="min-h-screen bg-stone-50 text-zinc-900">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <header className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <header className="relative mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <Link
+            href={withFarmContext("/farm/settings")}
+            aria-label="Settings"
+            className="absolute right-4 top-4 rounded-full border border-zinc-200 bg-white p-2 text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900"
+          >
+            <Settings className="h-5 w-5" />
+          </Link>
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
@@ -1486,24 +1507,23 @@ export default function FarmPage() {
         <nav className="mb-6 rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
           <div className="flex flex-wrap items-center gap-1.5 text-sm">
             {[
+              { href: withFarmContext("/companion"), label: "Companion planting" },
+              { href: withFarmContext("/farm/compost"), label: "Compost" },
+              { href: "#crops", label: "Crops" },
+              { href: withFarmContext("/fertiliser"), label: "Fertiliser" },
               { href: withFarmContext("/farm/harvest-eta"), label: "Harvest" },
               { href: withFarmContext("/farm/harvest-logs"), label: "Harvest logs" },
-              { href: "#crops", label: "Crops" },
-              { href: workerTasksHref, label: "Tasks" },
-              { href: "#map", label: "Map" },
-              { href: withFarmContext("/farm/trees"), label: "Trees" },
-              { href: withFarmContext("/farm/planting-plan"), label: "Planting plan" },
-              { href: withFarmContext("/farm/seedlings"), label: "Seedlings" },
-              { href: withFarmContext("/plants"), label: "Plants" },
-              { href: withFarmContext("/fertiliser"), label: "Fertiliser" },
-              { href: withFarmContext("/farm/compost"), label: "Compost" },
-              { href: withFarmContext("/farm/mulch"), label: "Mulch" },
-              { href: withFarmContext("/farm/soil-tests"), label: "Soil tests" },
-              { href: withFarmContext("/farm/work-hours"), label: "Work hours" },
-              { href: withFarmContext("/farm/systems"), label: "Systems" },
-              { href: withFarmContext("/companion"), label: "Companion planting" },
               { href: withFarmContext("/income-prediction"), label: "Income prediction" },
-              { href: withFarmContext("/farm/settings"), label: "Settings" },
+              { href: "#map", label: "Map" },
+              { href: withFarmContext("/farm/mulch"), label: "Mulch" },
+              { href: withFarmContext("/farm/planting-plan"), label: "Planting plan" },
+              { href: withFarmContext("/plants"), label: "Plants" },
+              { href: withFarmContext("/farm/seedlings"), label: "Seedlings" },
+              { href: withFarmContext("/farm/soil-tests"), label: "Soil tests" },
+              { href: withFarmContext("/farm/systems"), label: "Systems" },
+              { href: workerTasksHref, label: "Tasks" },
+              { href: withFarmContext("/farm/trees"), label: "Trees" },
+              { href: withFarmContext("/farm/work-hours"), label: "Work hours" },
             ].map(({ href, label }) => (
               <Link
                 key={href}

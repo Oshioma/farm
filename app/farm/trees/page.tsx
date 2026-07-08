@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -57,8 +57,14 @@ export default function TreeRegistryPage() {
     preferredFarmName: "top land",
   });
 
+  const activeFarmIdRef = useRef(activeFarmId);
+  useEffect(() => {
+    activeFarmIdRef.current = activeFarmId;
+  }, [activeFarmId]);
+
   async function load(farmId: string) {
     const rows = await getTreeRegistry(farmId);
+    if (activeFarmIdRef.current !== farmId) return;
     setTrees(rows);
   }
 

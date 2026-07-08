@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Sprout } from "lucide-react";
@@ -41,9 +41,14 @@ export default function CompanionPage() {
   const router = useRouter();
 
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const activeFarmIdRef = useRef(activeFarmId);
+  useEffect(() => {
+    activeFarmIdRef.current = activeFarmId;
+  }, [activeFarmId]);
 
   async function loadEntries(farmId: string) {
     const rows = await getCompanionPlanting(farmId);
+    if (activeFarmIdRef.current !== farmId) return;
     setEntries(rows);
   }
 

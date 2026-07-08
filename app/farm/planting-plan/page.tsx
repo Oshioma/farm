@@ -84,12 +84,16 @@ export default function PlantingPlanPage() {
 
   useEffect(() => {
     if (!activeFarmId) return;
+    let cancelled = false;
     setLoading(true);
     setError("");
     getPlantingPlan(activeFarmId)
-      .then(setEntries)
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load planting plan"))
-      .finally(() => setLoading(false));
+      .then((rows) => { if (!cancelled) setEntries(rows); })
+      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load planting plan"); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => {
+      cancelled = true;
+    };
   }, [activeFarmId]);
 
   async function reload() {

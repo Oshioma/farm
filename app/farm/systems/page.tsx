@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Plus, X, FileText, ChevronDown, ChevronUp, Search } from "lucide-react";
@@ -83,6 +83,10 @@ export default function SystemsPage() {
 
   const router = useRouter();
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const activeFarmIdRef = useRef(activeFarmId);
+  useEffect(() => {
+    activeFarmIdRef.current = activeFarmId;
+  }, [activeFarmId]);
 
   async function loadDocs(farmId: string) {
     const { data, error: e } = await supabase
@@ -91,6 +95,7 @@ export default function SystemsPage() {
       .eq("farm_id", farmId)
       .order("title");
     if (e) throw new Error(e.message);
+    if (activeFarmIdRef.current !== farmId) return;
     setDocs((data ?? []) as SystemDoc[]);
   }
 

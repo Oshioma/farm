@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -49,9 +49,14 @@ export default function WorkHoursPage() {
 
   const router = useRouter();
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const activeFarmIdRef = useRef(activeFarmId);
+  useEffect(() => {
+    activeFarmIdRef.current = activeFarmId;
+  }, [activeFarmId]);
 
   async function loadEntries(farmId: string) {
     const rows = await getWorkHours(farmId);
+    if (activeFarmIdRef.current !== farmId) return;
     setEntries(rows);
   }
 

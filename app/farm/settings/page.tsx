@@ -46,17 +46,22 @@ export default function SettingsPage() {
   // Get user role
   useEffect(() => {
     if (!activeFarmId) return;
+    let cancelled = false;
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user || cancelled) return;
       const { data: membership } = await supabase
         .from("farm_members")
         .select("role_on_farm")
         .eq("farm_id", activeFarmId)
         .eq("profile_id", user.id)
         .single();
+      if (cancelled) return;
       setUserRole(membership?.role_on_farm ?? null);
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [activeFarmId]);
 
   async function handleDeleteFarm() {
