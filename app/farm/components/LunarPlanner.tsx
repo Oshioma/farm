@@ -572,7 +572,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
             <div className="inline-flex rounded-full border border-zinc-200 bg-zinc-50 p-1">
               {(
                 [
-                  ["tasks", "Tasks"],
+                  ["tasks", "Planner"],
                   ["lunar", "Lunar Farming Planner"],
                 ] as [typeof tab, string][]
               ).map(([key, label]) => (
@@ -603,7 +603,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
                   <div className="inline-flex rounded-full border border-zinc-200 bg-zinc-50 p-1">
                     {(
                       [
-                        ["tasks", "Tasks"],
+                        ["tasks", "Planner"],
                         ["lunar", "Lunar Farming Planner"],
                       ] as [typeof tab, string][]
                     ).map(([key, label]) => (
