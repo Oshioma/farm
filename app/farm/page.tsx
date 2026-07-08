@@ -38,6 +38,7 @@ import { WantForm } from "@/app/farm/components/WantForm";
 import type { WantFormData } from "@/app/farm/components/WantForm";
 import { FarmMap } from "@/app/farm/components/FarmMap";
 import LunarPlanner from "@/app/farm/components/LunarPlanner";
+import { ExpandableText } from "@/app/farm/components/ExpandableText";
 import { Plus, Settings, X } from "lucide-react";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
 import type { CropFormData } from "@/app/farm/components/CropForm";
@@ -1868,7 +1869,7 @@ export default function FarmPage() {
               </div>
             ) : null}
 
-            <LunarPlanner embedded />
+            <LunarPlanner embedded farmId={activeFarmId} members={members} />
 
             <section className="mb-6 grid gap-4 sm:grid-cols-3">
               <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
@@ -2084,7 +2085,7 @@ export default function FarmPage() {
                             ) : null}
 
                             {task.description ? (
-                              <p className="mt-2 text-sm text-zinc-500">{task.description}</p>
+                              <ExpandableText text={task.description} className="mt-2 text-sm text-zinc-500" />
                             ) : null}
 
                             <div className="mt-4 flex flex-wrap gap-2">
@@ -2194,7 +2195,7 @@ export default function FarmPage() {
                           </div>
 
                           {task.description ? (
-                            <p className="mt-2 text-sm text-zinc-400">{task.description}</p>
+                            <ExpandableText text={task.description} className="mt-2 text-sm text-zinc-400" />
                           ) : null}
 
                           <div className="mt-3">
