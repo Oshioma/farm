@@ -70,6 +70,28 @@ function getBustParam(): string {
   return `_bust=${Date.now()}`;
 }
 
+// Reconstructs the full list of zone ids for a row that supports being
+// logged against multiple beds: zone_id is the primary bed, extra_zone_ids
+// is a JSON array of any additional beds.
+function withZoneIds<T extends { zone_id: string | null; extra_zone_ids?: string | null; zone_ids?: string[] }>(
+  rows: T[]
+): T[] {
+  for (const row of rows) {
+    const ids: string[] = [];
+    if (row.zone_id) ids.push(row.zone_id);
+    if (row.extra_zone_ids) {
+      try {
+        const extra = JSON.parse(row.extra_zone_ids) as string[];
+        for (const eid of extra) {
+          if (eid && !ids.includes(eid)) ids.push(eid);
+        }
+      } catch { /* ignore bad JSON */ }
+    }
+    row.zone_ids = ids;
+  }
+  return rows;
+}
+
 export async function saveActiveFarmId(farmId: string): Promise<void> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -280,21 +302,7 @@ export async function getCrops(farmId: string): Promise<Crop[]> {
       if (error) throw new Error(`getCrops failed: ${error.message}`);
 
       const crops = (data ?? []) as Crop[];
-
-      // Build zone_ids from zone_id + extra_zone_ids JSON column
-      for (const crop of crops) {
-        const ids: string[] = [];
-        if (crop.zone_id) ids.push(crop.zone_id);
-        if (crop.extra_zone_ids) {
-          try {
-            const extra = JSON.parse(crop.extra_zone_ids) as string[];
-            for (const eid of extra) {
-              if (eid && !ids.includes(eid)) ids.push(eid);
-            }
-          } catch { /* ignore bad JSON */ }
-        }
-        crop.zone_ids = ids;
-      }
+      withZoneIds(crops);
 
       return crops;
     },
@@ -576,19 +584,7 @@ export async function getPlants(farmId: string): Promise<Plant[]> {
   if (error) throw new Error(`getPlants failed: ${error.message}`);
 
   const plants = (data ?? []) as Plant[];
-  for (const plant of plants) {
-    const ids: string[] = [];
-    if (plant.zone_id) ids.push(plant.zone_id);
-    if (plant.extra_zone_ids) {
-      try {
-        const extra = JSON.parse(plant.extra_zone_ids) as string[];
-        for (const eid of extra) {
-          if (eid && !ids.includes(eid)) ids.push(eid);
-        }
-      } catch { /* ignore bad JSON */ }
-    }
-    plant.zone_ids = ids;
-  }
+  withZoneIds(plants);
 
   return plants;
 }
@@ -707,6 +703,8 @@ export type CompostEntry = {
   materials_used: string | null;
   place: string | null;
   zone_id: string | null;
+  extra_zone_ids: string | null;
+  zone_ids?: string[];
   zone: { name: string }[] | null;
   notes: string | null;
   created_at: string | null;
@@ -715,12 +713,12 @@ export type CompostEntry = {
 export async function getCompost(farmId: string): Promise<CompostEntry[]> {
   const { data, error } = await supabase
     .from("compost")
-    .select("id, farm_id, compost_type, date, ready_to_use_date, materials_used, place, zone_id, zone:zones(name), notes, created_at")
+    .select("id, farm_id, compost_type, date, ready_to_use_date, materials_used, place, zone_id, extra_zone_ids, zone:zones(name), notes, created_at")
     .eq("farm_id", farmId)
     .order("date", { ascending: true });
 
   if (error) throw new Error(`getCompost failed: ${error.message}`);
-  return (data ?? []) as CompostEntry[];
+  return withZoneIds((data ?? []) as CompostEntry[]);
 }
 
 export type MulchEntry = {
@@ -730,6 +728,8 @@ export type MulchEntry = {
   date: string | null;
   source: string | null;
   zone_id: string | null;
+  extra_zone_ids: string | null;
+  zone_ids?: string[];
   zone: { name: string }[] | null;
   notes: string | null;
   created_at: string | null;
@@ -738,12 +738,12 @@ export type MulchEntry = {
 export async function getMulch(farmId: string): Promise<MulchEntry[]> {
   const { data, error } = await supabase
     .from("mulch")
-    .select("id, farm_id, mulch_type, date, source, zone_id, zone:zones(name), notes, created_at")
+    .select("id, farm_id, mulch_type, date, source, zone_id, extra_zone_ids, zone:zones(name), notes, created_at")
     .eq("farm_id", farmId)
     .order("date", { ascending: false });
 
   if (error) throw new Error(`getMulch failed: ${error.message}`);
-  return (data ?? []) as MulchEntry[];
+  return withZoneIds((data ?? []) as MulchEntry[]);
 }
 
 export type SeedCollectionEntry = {
@@ -776,6 +776,8 @@ export type FertilisationEntry = {
   bin_colour: string | null;
   plants: string | null;
   zone_id: string | null;
+  extra_zone_ids: string | null;
+  zone_ids?: string[];
   zone: { name: string }[] | null;
   notes: string | null;
   created_at: string | null;
@@ -784,12 +786,12 @@ export type FertilisationEntry = {
 export async function getFertilisations(farmId: string): Promise<FertilisationEntry[]> {
   const { data, error } = await supabase
     .from("fertilisations")
-    .select("id, farm_id, date, fertiliser, ready_to_use, bin_colour, plants, zone_id, zone:zones(name), notes, created_at")
+    .select("id, farm_id, date, fertiliser, ready_to_use, bin_colour, plants, zone_id, extra_zone_ids, zone:zones(name), notes, created_at")
     .eq("farm_id", farmId)
     .order("date", { ascending: false });
 
   if (error) throw new Error(`getFertilisations failed: ${error.message}`);
-  return (data ?? []) as FertilisationEntry[];
+  return withZoneIds((data ?? []) as FertilisationEntry[]);
 }
 
 export type IncomePredictionRow = {

@@ -132,27 +132,18 @@ export default function FertiliserPage() {
     setError("");
     try {
       const zoneIds = form.zone_ids.filter(Boolean);
-      const entries = zoneIds.length > 0
-        ? zoneIds.map(zid => ({
-            farm_id: activeFarmId,
-            date: form.date,
-            fertiliser: form.fertiliser.trim(),
-            ready_to_use: form.ready_to_use || null,
-            bin_colour: form.bin_colour || null,
-            zone_id: zid,
-            notes: form.notes.trim() || null,
-          }))
-        : [{
-            farm_id: activeFarmId,
-            date: form.date,
-            fertiliser: form.fertiliser.trim(),
-            ready_to_use: form.ready_to_use || null,
-            bin_colour: form.bin_colour || null,
-            zone_id: null,
-            notes: form.notes.trim() || null,
-          }];
+      const entry = {
+        farm_id: activeFarmId,
+        date: form.date,
+        fertiliser: form.fertiliser.trim(),
+        ready_to_use: form.ready_to_use || null,
+        bin_colour: form.bin_colour || null,
+        zone_id: zoneIds[0] || null,
+        extra_zone_ids: zoneIds.length > 1 ? JSON.stringify(zoneIds.slice(1)) : null,
+        notes: form.notes.trim() || null,
+      };
 
-      const { error: err } = await supabase.from("fertilisations").insert(entries);
+      const { error: err } = await supabase.from("fertilisations").insert(entry);
       if (err) throw err;
       setForm(blank);
       setShowForm(false);
@@ -178,28 +169,15 @@ export default function FertiliserPage() {
 
       const zoneIds = editForm.zone_ids.filter(Boolean);
 
-      // Update the original entry with the first zone (or null)
       const { error: updateErr } = await supabase
         .from("fertilisations")
         .update({
           ...basePayload,
           zone_id: zoneIds[0] || null,
+          extra_zone_ids: zoneIds.length > 1 ? JSON.stringify(zoneIds.slice(1)) : null,
         })
         .eq("id", id);
       if (updateErr) throw updateErr;
-
-      // Create new entries for additional zones
-      if (zoneIds.length > 1) {
-        const additionalEntries = zoneIds.slice(1).map(zoneId => ({
-          farm_id: activeFarmId,
-          ...basePayload,
-          zone_id: zoneId,
-        }));
-        const { error: insertErr } = await supabase
-          .from("fertilisations")
-          .insert(additionalEntries);
-        if (insertErr) throw insertErr;
-      }
 
       setEditingId(null);
       await loadEntries(activeFarmId);
@@ -225,7 +203,7 @@ export default function FertiliserPage() {
       fertiliser: entry.fertiliser ?? "",
       ready_to_use: entry.ready_to_use ?? "",
       bin_colour: entry.bin_colour ?? "",
-      zone_ids: entry.zone_id ? [entry.zone_id] : [],
+      zone_ids: entry.zone_ids?.length ? entry.zone_ids : entry.zone_id ? [entry.zone_id] : [],
       notes: entry.notes ?? "",
     });
   }
@@ -234,6 +212,14 @@ export default function FertiliserPage() {
     if (!d) return "—";
     const [y, m, day] = d.split("-");
     return `${day}/${m}/${y}`;
+  }
+
+  function zoneNamesFor(entry: FertilisationEntry): string {
+    const ids = entry.zone_ids?.length ? entry.zone_ids : entry.zone_id ? [entry.zone_id] : [];
+    if (ids.length === 0) return "—";
+    return ids
+      .map((id) => zones.find((z) => z.id === id)?.name ?? "Unknown zone")
+      .join(", ");
   }
 
   const activeFarm = farms.find((f) => f.id === activeFarmId);
@@ -478,7 +464,7 @@ export default function FertiliserPage() {
                           </span>
                         ) : "—"}
                       </td>
-                      <td className="px-5 py-4 text-zinc-600">{entry.zone?.[0]?.name || (entry.zone_id ? zones.find((z) => z.id === entry.zone_id)?.name ?? "Unknown zone" : "—")}</td>
+                      <td className="px-5 py-4 text-zinc-600">{zoneNamesFor(entry)}</td>
                       <td className="px-5 py-4 text-zinc-500">{entry.notes ?? "—"}</td>
                       <td className="px-5 py-4">
                         <div className="flex gap-2">

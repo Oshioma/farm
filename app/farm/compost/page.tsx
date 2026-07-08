@@ -144,28 +144,17 @@ export default function CompostPage() {
       };
 
       const zoneIds = form.zone_ids.filter(Boolean);
+      const zonePayload = {
+        zone_id: zoneIds[0] || null,
+        extra_zone_ids: zoneIds.length > 1 ? JSON.stringify(zoneIds.slice(1)) : null,
+      };
 
       if (modal === "new") {
-        const entries = zoneIds.length > 0
-          ? zoneIds.map(zid => ({ ...basePayload, zone_id: zid }))
-          : [{ ...basePayload, zone_id: null }];
-
-        const { error: e } = await supabase.from("compost").insert(entries);
+        const { error: e } = await supabase.from("compost").insert({ ...basePayload, ...zonePayload });
         if (e) throw e;
       } else if (modal) {
-        // Update the original entry with the first zone (or null)
-        const { error: e } = await supabase.from("compost").update({ ...basePayload, zone_id: zoneIds[0] || null }).eq("id", (modal as CompostEntry).id);
+        const { error: e } = await supabase.from("compost").update({ ...basePayload, ...zonePayload }).eq("id", (modal as CompostEntry).id);
         if (e) throw e;
-
-        // Create new entries for additional zones
-        if (zoneIds.length > 1) {
-          const additionalEntries = zoneIds.slice(1).map(zid => ({
-            ...basePayload,
-            zone_id: zid,
-          }));
-          const { error: e2 } = await supabase.from("compost").insert(additionalEntries);
-          if (e2) throw e2;
-        }
       }
       await loadEntries(activeFarmId);
       setModal(null);
@@ -197,7 +186,7 @@ export default function CompostPage() {
       ready_to_use_date: entry.ready_to_use_date ?? "",
       materials_used: entry.materials_used ?? "",
       place: entry.place ?? "",
-      zone_ids: entry.zone_id ? [entry.zone_id] : [],
+      zone_ids: entry.zone_ids?.length ? entry.zone_ids : entry.zone_id ? [entry.zone_id] : [],
       notes: entry.notes ?? "",
     });
     setModal(entry);
@@ -207,6 +196,12 @@ export default function CompostPage() {
     setZoneSearch("");
     setForm(blankForm);
     setModal("new");
+  }
+
+  function zoneNamesFor(entry: CompostEntry) {
+    const ids = entry.zone_ids?.length ? entry.zone_ids : entry.zone_id ? [entry.zone_id] : [];
+    if (ids.length === 0) return <span className="text-zinc-300">—</span>;
+    return ids.map((id) => zones.find((z) => z.id === id)?.name ?? "Unknown zone").join(", ");
   }
 
   const activeFarm = farms.find((f) => f.id === activeFarmId);
@@ -295,7 +290,7 @@ export default function CompostPage() {
                       <td className="px-4 py-3 whitespace-nowrap text-zinc-700">{fmt(row.ready_to_use_date)}</td>
                       <td className="px-4 py-3 text-zinc-600">{row.materials_used ?? <span className="text-zinc-300">—</span>}</td>
                       <td className="px-4 py-3 text-zinc-600 whitespace-nowrap">{row.place ?? <span className="text-zinc-300">—</span>}</td>
-                      <td className="px-4 py-3 text-zinc-600 whitespace-nowrap">{row.zone?.[0]?.name || (row.zone_id ? zones.find((z) => z.id === row.zone_id)?.name ?? "Unknown zone" : <span className="text-zinc-300">—</span>)}</td>
+                      <td className="px-4 py-3 text-zinc-600 whitespace-nowrap">{zoneNamesFor(row)}</td>
                       <td className="px-4 py-3 text-zinc-500 max-w-[180px]">{row.notes ?? <span className="text-zinc-300">—</span>}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex gap-1">
