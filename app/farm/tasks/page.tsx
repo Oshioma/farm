@@ -51,6 +51,7 @@ export default function WorkerTasksPage() {
 
   useEffect(() => {
     if (!activeFarmId) return;
+    let cancelled = false;
     (async () => {
       try {
         setLoading(true);
@@ -61,16 +62,20 @@ export default function WorkerTasksPage() {
           getTasks(activeFarmId),
           getMembers(activeFarmId),
         ]);
+        if (cancelled) return;
         setZones(zoneRows);
         setCrops(cropRows);
         setTasks(taskRows);
         setMembers(memberRows);
       } catch (err) {
-        setError(errMsg(err, "Failed to load tasks"));
+        if (!cancelled) setError(errMsg(err, "Failed to load tasks"));
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [activeFarmId]);
 
   const activeFarm = useMemo(

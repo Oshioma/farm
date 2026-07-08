@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TrendingUp } from "lucide-react";
@@ -99,9 +99,14 @@ export default function IncomePredictionPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const activeFarmIdRef = useRef(activeFarmId);
+  useEffect(() => {
+    activeFarmIdRef.current = activeFarmId;
+  }, [activeFarmId]);
 
   async function loadRows(farmId: string) {
     const data = await getIncomePrediction(farmId);
+    if (activeFarmIdRef.current !== farmId) return;
     setRows(data);
   }
 

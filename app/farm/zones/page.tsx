@@ -50,6 +50,7 @@ export default function ZonesPage() {
 
   useEffect(() => {
     if (!activeFarmId) return;
+    let cancelled = false;
     (async () => {
       try {
         setLoading(true);
@@ -58,14 +59,18 @@ export default function ZonesPage() {
           getZones(activeFarmId),
           getCrops(activeFarmId),
         ]);
+        if (cancelled) return;
         setZones(zoneRows);
         setCrops(cropRows);
       } catch (err) {
-        setError(errMsg(err, "Failed to load zones"));
+        if (!cancelled) setError(errMsg(err, "Failed to load zones"));
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [activeFarmId]);
 
   const activeFarm = useMemo(

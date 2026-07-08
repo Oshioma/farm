@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { getFarms } from "@/lib/farm";
@@ -44,6 +44,10 @@ export default function InvitePage() {
   const [inviteSuccess, setInviteSuccess] = useState("");
 
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const activeFarmIdRef = useRef(activeFarmId);
+  useEffect(() => {
+    activeFarmIdRef.current = activeFarmId;
+  }, [activeFarmId]);
 
   async function loadData(farmId: string) {
     const [membersRes, { data: requestRows }] = await Promise.all([
@@ -60,6 +64,7 @@ export default function InvitePage() {
         .eq("status", "pending")
         .order("created_at", { ascending: true }),
     ]);
+    if (activeFarmIdRef.current !== farmId) return;
     setMembers((membersRes.members ?? []) as Member[]);
     setJoinRequests((requestRows ?? []) as JoinRequest[]);
   }

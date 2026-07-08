@@ -45,6 +45,10 @@ export default function PlantsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const activeFarmIdRef = useRef(activeFarmId);
+  useEffect(() => {
+    activeFarmIdRef.current = activeFarmId;
+  }, [activeFarmId]);
 
   async function loadFarms() {
     const farmRows = await getFarms();
@@ -53,11 +57,13 @@ export default function PlantsPage() {
 
   async function loadPlants(farmId: string) {
     const rows = await getPlants(farmId);
+    if (activeFarmIdRef.current !== farmId) return;
     setPlants(rows);
   }
 
   async function loadZones(farmId: string) {
     const rows = await getZones(farmId);
+    if (activeFarmIdRef.current !== farmId) return;
     setZones(rows);
   }
 

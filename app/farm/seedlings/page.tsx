@@ -108,12 +108,20 @@ export default function SeedlingsPage() {
 
   useEffect(() => {
     if (!activeFarmId) return;
+    let cancelled = false;
     setLoading(true);
     setError("");
     Promise.all([getSeedlings(activeFarmId), getSeedCollection(activeFarmId)])
-      .then(([s, seeds]) => { setEntries(s); setSeedEntries(seeds); })
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load data"))
-      .finally(() => setLoading(false));
+      .then(([s, seeds]) => {
+        if (cancelled) return;
+        setEntries(s);
+        setSeedEntries(seeds);
+      })
+      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load data"); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => {
+      cancelled = true;
+    };
   }, [activeFarmId]);
 
   // Load trays from the seedling map layout so the dropdown knows what's available.

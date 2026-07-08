@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -103,9 +103,14 @@ export default function HarvestEtaPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const activeFarmIdRef = useRef(activeFarmId);
+  useEffect(() => {
+    activeFarmIdRef.current = activeFarmId;
+  }, [activeFarmId]);
 
   async function loadEntries(farmId: string, yr: number) {
     const [rows, zoneRows, cropRows] = await Promise.all([getHarvestEta(farmId, yr), getZones(farmId), getCrops(farmId)]);
+    if (activeFarmIdRef.current !== farmId) return;
     setEntries(rows);
     setZones(zoneRows);
     setCrops(cropRows);

@@ -69,18 +69,24 @@ export default function HarvestLogsPage() {
 
   useEffect(() => {
     if (!activeFarmId) return;
+    let cancelled = false;
     (async () => {
       try {
         setLoading(true);
         setError("");
         const logs = await getHarvestLogs(activeFarmId);
+        if (cancelled) return;
         setHarvestLogs(logs);
       } catch (err) {
-        setError(errMsg(err, "Failed to load harvest logs"));
+        if (!cancelled) setError(errMsg(err, "Failed to load harvest logs"));
       } finally {
+        if (cancelled) return;
         setLoading(false);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [activeFarmId]);
 
   async function handleSignOut() {

@@ -326,12 +326,15 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
     setEditLandmarks([]);
     setCustomBg(undefined);
 
+    let cancelled = false;
+
     const loadLayout = async () => {
       // Only try database if we have a valid farmId
       if (farmId && farmId !== "undefined") {
         try {
           const response = await fetch(`/api/farm-map/load?farm_id=${farmId}`);
           const result = await response.json();
+          if (cancelled) return;
 
           // Only use database data if it has actual beds (don't overwrite with empty arrays)
           if (response.ok && result.data && result.data.beds && result.data.beds.length > 0) {
@@ -345,6 +348,8 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
           console.error("[FarmMap] Failed to load from database:", err);
         }
       }
+
+      if (cancelled) return;
 
       // Fall back to localStorage
       const saved = loadCustomLayout(farmName);
@@ -366,6 +371,10 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
     setSelectedBed(null);
 
     loadLayout();
+
+    return () => {
+      cancelled = true;
+    };
   }, [farmName, farmId]);
 
   // Load seedling map trays + seedlings so the seedling-zone side panel can

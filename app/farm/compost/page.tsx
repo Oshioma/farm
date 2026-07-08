@@ -43,9 +43,14 @@ export default function CompostPage() {
   );
 
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const activeFarmIdRef = useRef(activeFarmId);
+  useEffect(() => {
+    activeFarmIdRef.current = activeFarmId;
+  }, [activeFarmId]);
 
   async function loadEntries(farmId: string) {
     const [rows, zoneRows] = await Promise.all([getCompost(farmId), getZones(farmId)]);
+    if (activeFarmIdRef.current !== farmId) return;
     setEntries(rows);
     setZones(zoneRows);
   }
