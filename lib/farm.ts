@@ -841,13 +841,15 @@ export type SeedlingEntry = {
   yields: string | null;
   row_location: string | null;
   notes: string | null;
+  transplanted: boolean | null;
+  transplanted_at: string | null;
   created_at: string | null;
 };
 
 export async function getSeedlings(farmId: string): Promise<SeedlingEntry[]> {
   const { data, error } = await supabase
     .from("seedlings")
-    .select("id, farm_id, type, date, plant, variety, quantity, germination, germination_date, healthy_seedlings, successional_sowing, yields, row_location, notes, created_at")
+    .select("id, farm_id, type, date, plant, variety, quantity, germination, germination_date, healthy_seedlings, successional_sowing, yields, row_location, notes, transplanted, transplanted_at, created_at")
     .eq("farm_id", farmId)
     .order("date", { ascending: true });
 
