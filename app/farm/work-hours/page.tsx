@@ -22,6 +22,11 @@ function fmt(d: string | null) {
   return `${day}/${m}/${y}`;
 }
 
+function formatMonthLabel(monthKey: string): string {
+  const [y, m] = monthKey.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleString("en-US", { month: "long", year: "numeric" });
+}
+
 const blankForm = { date: "", worker_name: "", hours: "", role: "operational", notes: "" };
 
 type QuickRow = { worker_name: string; hours: string; notes: string };
@@ -181,10 +186,9 @@ export default function WorkHoursPage() {
     return entries.filter((e) => e.role === roleFilter);
   }, [entries, roleFilter]);
 
-  // Summary: total hours per worker
-  const summary = useMemo(() => {
+  function summarise(rows: WorkHoursEntry[]) {
     const map = new Map<string, { operational: number; manager: number }>();
-    for (const e of entries) {
+    for (const e of rows) {
       const cur = map.get(e.worker_name) ?? { operational: 0, manager: 0 };
       if (e.role === "manager") cur.manager += e.hours;
       else cur.operational += e.hours;
@@ -193,7 +197,37 @@ export default function WorkHoursPage() {
     return Array.from(map.entries())
       .map(([name, totals]) => ({ name, ...totals, total: totals.operational + totals.manager }))
       .sort((a, b) => b.total - a.total);
+  }
+
+  // Months with logged hours, most recent first, for the summary month picker.
+  const availableMonths = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of entries) {
+      if (e.date) set.add(e.date.slice(0, 7));
+    }
+    return Array.from(set).sort((a, b) => b.localeCompare(a));
   }, [entries]);
+
+  const [summaryMonth, setSummaryMonth] = useState<"all" | string>("all");
+
+  // Default the summary to the most recent month with logged hours whenever
+  // the active farm changes, so it opens on a useful monthly view rather
+  // than an empty or all-time one; only once per farm switch.
+  const defaultedMonthFarmRef = useRef<string>("");
+  useEffect(() => {
+    if (!activeFarmId || defaultedMonthFarmRef.current === activeFarmId) return;
+    if (availableMonths.length === 0) return;
+    defaultedMonthFarmRef.current = activeFarmId;
+    setSummaryMonth(availableMonths[0]);
+  }, [activeFarmId, availableMonths]);
+
+  const summaryRows = useMemo(() => {
+    if (summaryMonth === "all") return entries;
+    return entries.filter((e) => e.date?.slice(0, 7) === summaryMonth);
+  }, [entries, summaryMonth]);
+
+  // Summary: total hours per worker, for the selected month (or all time)
+  const summary = useMemo(() => summarise(summaryRows), [summaryRows]);
 
   const totalAllHours = summary.reduce((s, r) => s + r.total, 0);
   const activeFarm = farms.find((f) => f.id === activeFarmId);
@@ -363,6 +397,21 @@ export default function WorkHoursPage() {
         ) : tab === "summary" ? (
           /* ── Summary view ── */
           <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3">
+              <span className="text-sm font-medium text-zinc-600">
+                {summaryMonth === "all" ? "All time" : formatMonthLabel(summaryMonth)}
+              </span>
+              <select
+                value={summaryMonth}
+                onChange={(e) => setSummaryMonth(e.target.value)}
+                className="rounded-xl border border-zinc-300 px-3 py-1.5 text-sm outline-none focus:border-zinc-900"
+              >
+                <option value="all">All time</option>
+                {availableMonths.map((m) => (
+                  <option key={m} value={m}>{formatMonthLabel(m)}</option>
+                ))}
+              </select>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -374,20 +423,30 @@ export default function WorkHoursPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {summary.map((row) => (
-                    <tr key={row.name} className="border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50">
-                      <td className="px-4 py-3 font-medium">{row.name}</td>
-                      <td className="px-4 py-3 text-right text-zinc-600">{row.operational || "—"}</td>
-                      <td className="px-4 py-3 text-right text-zinc-600">{row.manager || "—"}</td>
-                      <td className="px-4 py-3 text-right font-semibold">{row.total}</td>
+                  {summary.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-6 text-center text-zinc-400">
+                        No hours logged {summaryMonth === "all" ? "yet" : `in ${formatMonthLabel(summaryMonth)}`}.
+                      </td>
                     </tr>
-                  ))}
-                  <tr className="bg-zinc-50 font-semibold">
-                    <td className="px-4 py-3">Total</td>
-                    <td className="px-4 py-3 text-right">{summary.reduce((s, r) => s + r.operational, 0)}</td>
-                    <td className="px-4 py-3 text-right">{summary.reduce((s, r) => s + r.manager, 0)}</td>
-                    <td className="px-4 py-3 text-right">{totalAllHours}</td>
-                  </tr>
+                  ) : (
+                    summary.map((row) => (
+                      <tr key={row.name} className="border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50">
+                        <td className="px-4 py-3 font-medium">{row.name}</td>
+                        <td className="px-4 py-3 text-right text-zinc-600">{row.operational || "—"}</td>
+                        <td className="px-4 py-3 text-right text-zinc-600">{row.manager || "—"}</td>
+                        <td className="px-4 py-3 text-right font-semibold">{row.total}</td>
+                      </tr>
+                    ))
+                  )}
+                  {summary.length > 0 && (
+                    <tr className="bg-zinc-50 font-semibold">
+                      <td className="px-4 py-3">Total</td>
+                      <td className="px-4 py-3 text-right">{summary.reduce((s, r) => s + r.operational, 0)}</td>
+                      <td className="px-4 py-3 text-right">{summary.reduce((s, r) => s + r.manager, 0)}</td>
+                      <td className="px-4 py-3 text-right">{totalAllHours}</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
