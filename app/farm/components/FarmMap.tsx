@@ -726,19 +726,19 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
 
   function getFertilisationsForZone(zoneId: string): FertilisationEntry[] {
     return fertilisations
-      .filter((f) => f.zone_id === zoneId)
+      .filter((f) => f.zone_ids?.includes(zoneId) || f.zone_id === zoneId)
       .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   }
 
   function getCompostForZone(zoneId: string): CompostEntry[] {
     return compostEntries
-      .filter((c) => c.zone_id === zoneId)
+      .filter((c) => c.zone_ids?.includes(zoneId) || c.zone_id === zoneId)
       .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   }
 
   function getMulchForZone(zoneId: string): MulchEntry[] {
     return mulchEntries
-      .filter((m) => m.zone_id === zoneId)
+      .filter((m) => m.zone_ids?.includes(zoneId) || m.zone_id === zoneId)
       .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   }
 

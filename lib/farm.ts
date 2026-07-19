@@ -375,29 +375,36 @@ export async function getActivities(farmId: string): Promise<Activity[]> {
 }
 
 export async function getExpenses(farmId: string): Promise<Expense[]> {
-  const { data, error } = await supabase
-    .from("expenses")
-    .select(
-      `
-      id,
-      category,
-      amount,
-      notes,
-      vendor_name,
-      expense_date,
-      created_at,
-      crop_id,
-      zone_id,
-      crop:crops(crop_name),
-      zone:zones(name)
-    `
-    )
-    .eq("farm_id", farmId)
-    .order("expense_date", { ascending: false })
-    .limit(20);
+  return withCacheFallback(
+    `expenses_${farmId}`,
+    "expenses",
+    async () => {
+      const { data, error } = await supabase
+        .from("expenses")
+        .select(
+          `
+          id,
+          category,
+          amount,
+          notes,
+          vendor_name,
+          expense_date,
+          created_at,
+          crop_id,
+          zone_id,
+          crop:crops(crop_name),
+          zone:zones(name)
+        `
+        )
+        .eq("farm_id", farmId)
+        .order("expense_date", { ascending: false })
+        .limit(20);
 
-  if (error) throw new Error(`getExpenses failed: ${error.message}`);
-  return (data ?? []) as Expense[];
+      if (error) throw new Error(`getExpenses failed: ${error.message}`);
+      return (data ?? []) as Expense[];
+    },
+    farmId
+  );
 }
 
 export type CompanionEntry = {
@@ -834,13 +841,15 @@ export type SeedlingEntry = {
   yields: string | null;
   row_location: string | null;
   notes: string | null;
+  transplanted: boolean | null;
+  transplanted_at: string | null;
   created_at: string | null;
 };
 
 export async function getSeedlings(farmId: string): Promise<SeedlingEntry[]> {
   const { data, error } = await supabase
     .from("seedlings")
-    .select("id, farm_id, type, date, plant, variety, quantity, germination, germination_date, healthy_seedlings, successional_sowing, yields, row_location, notes, created_at")
+    .select("id, farm_id, type, date, plant, variety, quantity, germination, germination_date, healthy_seedlings, successional_sowing, yields, row_location, notes, transplanted, transplanted_at, created_at")
     .eq("farm_id", farmId)
     .order("date", { ascending: true });
 
