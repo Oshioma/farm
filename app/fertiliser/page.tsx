@@ -7,6 +7,7 @@ import { FlaskConical } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getFarms, getFertilisations, getZones } from "@/lib/farm";
 import type { Farm, FertilisationEntry, Zone } from "@/lib/farm";
+import { createLunarTask } from "@/lib/lunarTasks";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 
 function errMsg(err: unknown, fallback: string): string {
@@ -152,18 +153,13 @@ export default function FertiliserPage() {
           .map((id) => zones.find((z) => z.id === id)?.name)
           .filter(Boolean)
           .join(", ");
-        const { error: taskErr } = await supabase.from("tasks").insert({
-          farm_id: activeFarmId,
+        await createLunarTask({
+          farmId: activeFarmId,
+          date: form.next_fertilise_date,
           title: form.fertiliser.trim() ? `Fertilise: ${form.fertiliser.trim()}` : "Fertilise",
-          description: bedNames ? `Beds: ${bedNames}` : null,
-          status: "todo",
-          priority: "medium",
-          due_date: form.next_fertilise_date,
-          zone_id: zoneIds[0] || null,
-          goal_timeframe: "month",
-          proof_required: false,
+          category: "Fertilising",
+          cropOrActivity: bedNames || null,
         });
-        if (taskErr) throw taskErr;
       }
 
       setForm(blank);

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getFarms, getSeedlings, getSeedCollection, getZones } from "@/lib/farm";
 import type { Farm, SeedlingEntry, SeedCollectionEntry, Zone } from "@/lib/farm";
+import { createLunarTask } from "@/lib/lunarTasks";
 import { SeedlingMap } from "../components/SeedlingMap";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 
@@ -24,6 +25,7 @@ type FormData = {
   yields: string;
   row_location: string;
   notes: string;
+  next_sowing_date: string;
 };
 
 const blank = (type: string): FormData => ({
@@ -39,6 +41,7 @@ const blank = (type: string): FormData => ({
   yields: "",
   row_location: "",
   notes: "",
+  next_sowing_date: "",
 });
 
 function entryToForm(e: SeedlingEntry): FormData {
@@ -55,6 +58,7 @@ function entryToForm(e: SeedlingEntry): FormData {
     yields: e.yields ?? "",
     row_location: e.row_location ?? "",
     notes: e.notes ?? "",
+    next_sowing_date: "",
   };
 }
 
@@ -273,6 +277,16 @@ export default function SeedlingsPage() {
       } else if (modal) {
         const { error: e } = await supabase.from("seedlings").update(payload).eq("id", (modal as SeedlingEntry).id);
         if (e) throw e;
+      }
+
+      if (form.type === "nursery" && form.next_sowing_date) {
+        await createLunarTask({
+          farmId: activeFarmId,
+          date: form.next_sowing_date,
+          title: `Sow: ${form.plant.trim()}`,
+          category: "Planting",
+          cropOrActivity: form.row_location.trim() || null,
+        });
       }
 
       await reload();
@@ -497,6 +511,16 @@ export default function SeedlingsPage() {
                   <input type="date" className={inp} value={form.germination_date} onChange={(e) => setForm((p) => ({ ...p, germination_date: e.target.value }))} />
                 </Field>
               </div>
+              {form.type === "nursery" && (
+                <div>
+                  <Field label="Next succession sowing date">
+                    <input type="date" className={inp} value={form.next_sowing_date} onChange={(e) => setForm((p) => ({ ...p, next_sowing_date: e.target.value }))} />
+                  </Field>
+                  <p className="mt-1.5 text-xs text-zinc-400">
+                    Adds a task on this date to the Planner so you get reminded to sow again.
+                  </p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Healthy seedlings">
                   <input className={inp} value={form.healthy_seedlings} onChange={(e) => setForm((p) => ({ ...p, healthy_seedlings: e.target.value }))} placeholder="8, All, None…" />
