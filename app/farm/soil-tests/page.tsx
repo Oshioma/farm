@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { getFarms, getSoilTests } from "@/lib/farm";
 import type { Farm, SoilTestEntry } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { useFarmRole } from "@/hooks/useFarmRole";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -36,6 +37,7 @@ export default function SoilTestsPage() {
   const router = useRouter();
 
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const { isManager } = useFarmRole(activeFarmId);
   const activeFarmIdRef = useRef(activeFarmId);
   useEffect(() => {
     activeFarmIdRef.current = activeFarmId;
@@ -175,12 +177,14 @@ export default function SoilTestsPage() {
 
         <div className="mb-4 flex items-center justify-between">
           <span className="text-sm text-zinc-500">{entries.length} entries</span>
-          <button
-            onClick={openAdd}
-            className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
-          >
-            + Add soil test
-          </button>
+          {isManager && (
+            <button
+              onClick={openAdd}
+              className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
+            >
+              + Add soil test
+            </button>
+          )}
         </div>
 
         {loading ? (
@@ -212,12 +216,14 @@ export default function SoilTestsPage() {
                       <td className="px-4 py-3 text-zinc-600">{row.result ?? <span className="text-zinc-300">&mdash;</span>}</td>
                       <td className="px-4 py-3 text-zinc-500 max-w-[220px]">{row.notes ?? <span className="text-zinc-300">&mdash;</span>}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="flex gap-1">
-                          <button onClick={() => openEdit(row)} className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">Edit</button>
-                          <button onClick={() => handleDelete(row.id)} disabled={deletingId === row.id} className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">
-                            {deletingId === row.id ? "\u2026" : "Delete"}
-                          </button>
-                        </div>
+                        {isManager && (
+                          <div className="flex gap-1">
+                            <button onClick={() => openEdit(row)} className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">Edit</button>
+                            <button onClick={() => handleDelete(row.id)} disabled={deletingId === row.id} className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">
+                              {deletingId === row.id ? "\u2026" : "Delete"}
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -229,7 +235,7 @@ export default function SoilTestsPage() {
       </div>
 
       {/* Modal */}
-      {modal !== null && (
+      {isManager && modal !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-lg rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl">
             <h2 className="mb-5 text-lg font-semibold">
