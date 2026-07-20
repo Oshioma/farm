@@ -13,6 +13,7 @@ import {
 import type { Farm, Zone, Crop, Task, FarmMember, GoalTimeframe } from "@/lib/farm";
 import { formatDate, badgeClass } from "@/app/farm/utils";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { useFarmRole } from "@/hooks/useFarmRole";
 import { TaskForm } from "@/app/farm/components/TaskForm";
 import type { TaskFormData } from "@/app/farm/components/TaskForm";
 import { ExpandableText } from "@/app/farm/components/ExpandableText";
@@ -61,6 +62,7 @@ export default function WorkerGoalsPage() {
   const [threeYearStart, setThreeYearStart] = useState(now.getFullYear());
 
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const { isManager } = useFarmRole(activeFarmId);
   const activeFarmIdRef = useRef(activeFarmId);
   useEffect(() => {
     activeFarmIdRef.current = activeFarmId;
@@ -540,12 +542,14 @@ export default function WorkerGoalsPage() {
                 >
                   Group by person
                 </button>
-                <button
-                  onClick={() => setShowCreateForm((v) => !v)}
-                  className="ml-auto rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
-                >
-                  {showCreateForm ? "Cancel" : "+ New goal"}
-                </button>
+                {isManager && (
+                  <button
+                    onClick={() => setShowCreateForm((v) => !v)}
+                    className="ml-auto rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
+                  >
+                    {showCreateForm ? "Cancel" : "+ New goal"}
+                  </button>
+                )}
             </div>
 
             {showCreateForm && (
@@ -643,9 +647,9 @@ export default function WorkerGoalsPage() {
                         <ExpandableText text={task.description} className="mt-2 text-sm text-zinc-500" />
                       )}
 
-                      {canAct ? (
+                      {canAct || isManager ? (
                         <div className="mt-4 flex flex-wrap gap-2">
-                          {task.status === "todo" && (
+                          {(canAct || isManager) && task.status === "todo" && (
                             <button
                               onClick={() => handleStartTask(task)}
                               className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
@@ -653,26 +657,33 @@ export default function WorkerGoalsPage() {
                               Start goal
                             </button>
                           )}
-                          <button
-                            onClick={() => handleComplete(task)}
-                            disabled={isCompleting}
-                            className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-60"
-                          >
-                            {isCompleting ? "Completing..." : "Mark done"}
-                          </button>
-                          <button
-                            onClick={() => setEditingGoal(task)}
-                            className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteGoal(task.id)}
-                            disabled={isDeleting}
-                            className="rounded-2xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
-                          >
-                            {isDeleting ? "Deleting..." : "Delete"}
-                          </button>
+                          {(canAct || isManager) && (
+                            <button
+                              onClick={() => handleComplete(task)}
+                              disabled={isCompleting}
+                              className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-60"
+                            >
+                              {isCompleting ? "Completing..." : "Mark done"}
+                            </button>
+                          )}
+                          {/* Editing and deleting goals is a manager action. */}
+                          {isManager && (
+                            <button
+                              onClick={() => setEditingGoal(task)}
+                              className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+                            >
+                              Edit
+                            </button>
+                          )}
+                          {isManager && (
+                            <button
+                              onClick={() => handleDeleteGoal(task.id)}
+                              disabled={isDeleting}
+                              className="rounded-2xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
+                            >
+                              {isDeleting ? "Deleting..." : "Delete"}
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <p className="mt-4 text-xs text-zinc-400">
