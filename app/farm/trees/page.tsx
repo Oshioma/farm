@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { getFarms, getTreeRegistry } from "@/lib/farm";
 import type { Farm, TreeEntry } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { useFarmRole } from "@/hooks/useFarmRole";
 
 type FormData = {
   tree_name: string;
@@ -56,6 +57,7 @@ export default function TreeRegistryPage() {
     setActiveFarmId,
     preferredFarmName: "top land",
   });
+  const { isManager } = useFarmRole(activeFarmId);
 
   const activeFarmIdRef = useRef(activeFarmId);
   useEffect(() => {
@@ -207,12 +209,14 @@ export default function TreeRegistryPage() {
                   {trees.length} species · {totalTrees} trees total
                 </p>
               </div>
-              <button
-                onClick={openAdd}
-                className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-              >
-                + Add tree
-              </button>
+              {isManager && (
+                <button
+                  onClick={openAdd}
+                  className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+                >
+                  + Add tree
+                </button>
+              )}
             </div>
 
             <div className="mt-6 overflow-x-auto">
@@ -247,6 +251,7 @@ export default function TreeRegistryPage() {
                           ) : "—"}
                         </td>
                         <td className="py-3 text-right">
+                          {isManager && (
                           <div className="flex items-center justify-end gap-2">
                             {confirmDeleteId === tree.id ? (
                               <>
@@ -282,6 +287,7 @@ export default function TreeRegistryPage() {
                               </>
                             )}
                           </div>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -294,7 +300,7 @@ export default function TreeRegistryPage() {
       </div>
 
       {/* Modal */}
-      {showModal && (
+      {isManager && showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
             <h2 className="mb-5 text-xl font-semibold">

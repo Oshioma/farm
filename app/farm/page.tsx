@@ -2619,6 +2619,7 @@ export default function FarmPage() {
                   </div>
                 </div>
 
+                {isManager && (
                 <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                   <button
                     onClick={() => setShowAssets((v) => !v)}
@@ -2685,6 +2686,7 @@ export default function FarmPage() {
                   </div>
                   ) : null}
                 </div>
+                )}
 
                 <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                   <div className="flex items-center justify-between gap-4">
@@ -2838,6 +2840,7 @@ export default function FarmPage() {
               <ActivityFeed activities={activities} />
             </div>
 
+            {isManager && (
             <section className="mt-6 space-y-6">
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
@@ -3173,6 +3176,7 @@ export default function FarmPage() {
                 )}
               </div>
             </section>
+            )}
           </>
         ) : null}
 

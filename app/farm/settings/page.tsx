@@ -9,6 +9,7 @@ import type { Farm } from "@/lib/farm";
 import { downloadCsvFile, toFileSlug } from "@/app/farm/utils";
 import { Download } from "lucide-react";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { ManagerOnly } from "@/components/ManagerOnly";
 
 type CsvValue = string | number | boolean | null | undefined;
 
@@ -181,6 +182,11 @@ export default function SettingsPage() {
         <p className="text-zinc-500">Loading…</p>
       </div>
     );
+  }
+
+  const isManager = userRole === "owner" || userRole === "manager";
+  if (activeFarmId && !isManager) {
+    return <ManagerOnly title="Settings — managers only" />;
   }
 
   return (

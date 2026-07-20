@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { getFarms, getPlantingPlan } from "@/lib/farm";
 import type { Farm, PlantingPlanEntry } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { useFarmRole } from "@/hooks/useFarmRole";
 
 /* ── Types ────────────────────────────────────────────────── */
 
@@ -69,6 +70,7 @@ export default function PlantingPlanPage() {
     setActiveFarmId,
     preferredFarmName: "top land",
   });
+  const { isManager } = useFarmRole(activeFarmId);
 
   useEffect(() => {
     async function load() {
@@ -232,25 +234,27 @@ export default function PlantingPlanPage() {
               </button>
             ))}
           </div>
-          <button
-            onClick={openAdd}
-            className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
-          >
-            + Add entry
-          </button>
+          {isManager && (
+            <button
+              onClick={openAdd}
+              className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
+            >
+              + Add entry
+            </button>
+          )}
         </div>
 
         {loading ? (
           <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">Loading...</div>
         ) : tab === "tree" ? (
-          <TreesTable trees={trees} expandedId={expandedId} setExpandedId={setExpandedId} onEdit={openEdit} onDelete={handleDelete} deletingId={deletingId} />
+          <TreesTable trees={trees} expandedId={expandedId} setExpandedId={setExpandedId} onEdit={openEdit} onDelete={handleDelete} deletingId={deletingId} isManager={isManager} />
         ) : (
-          <SupportCards support={support} expandedId={expandedId} setExpandedId={setExpandedId} onEdit={openEdit} onDelete={handleDelete} deletingId={deletingId} />
+          <SupportCards support={support} expandedId={expandedId} setExpandedId={setExpandedId} onEdit={openEdit} onDelete={handleDelete} deletingId={deletingId} isManager={isManager} />
         )}
       </div>
 
       {/* Modal */}
-      {modalEntry !== null && (
+      {modalEntry !== null && isManager && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-lg rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl">
             <h2 className="text-lg font-semibold mb-5">
@@ -348,7 +352,7 @@ function roleColor(role: string | null) {
 /* ── Trees table ─────────────────────────────────────────── */
 
 function TreesTable({
-  trees, expandedId, setExpandedId, onEdit, onDelete, deletingId,
+  trees, expandedId, setExpandedId, onEdit, onDelete, deletingId, isManager,
 }: {
   trees: PlantingPlanEntry[];
   expandedId: string | null;
@@ -356,6 +360,7 @@ function TreesTable({
   onEdit: (entry: PlantingPlanEntry) => void;
   onDelete: (id: string) => void;
   deletingId: string | null;
+  isManager: boolean;
 }) {
   if (trees.length === 0) {
     return <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">No trees added yet.</div>;
@@ -408,21 +413,23 @@ function TreesTable({
                       : <span className="text-zinc-300">—</span>}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => onEdit(entry)}
-                        className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => onDelete(entry.id)}
-                        disabled={isDeleting}
-                        className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
-                      >
-                        {isDeleting ? "…" : "Delete"}
-                      </button>
-                    </div>
+                    {isManager && (
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => onEdit(entry)}
+                          className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => onDelete(entry.id)}
+                          disabled={isDeleting}
+                          className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                        >
+                          {isDeleting ? "…" : "Delete"}
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               );
@@ -437,7 +444,7 @@ function TreesTable({
 /* ── Support species cards ───────────────────────────────── */
 
 function SupportCards({
-  support, expandedId, setExpandedId, onEdit, onDelete, deletingId,
+  support, expandedId, setExpandedId, onEdit, onDelete, deletingId, isManager,
 }: {
   support: PlantingPlanEntry[];
   expandedId: string | null;
@@ -445,6 +452,7 @@ function SupportCards({
   onEdit: (entry: PlantingPlanEntry) => void;
   onDelete: (id: string) => void;
   deletingId: string | null;
+  isManager: boolean;
 }) {
   if (support.length === 0) {
     return <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">No support species added yet.</div>;
@@ -495,21 +503,23 @@ function SupportCards({
               </>
             )}
 
-            <div className="mt-4 flex gap-2 pt-3 border-t border-zinc-100">
-              <button
-                onClick={() => onEdit(entry)}
-                className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100"
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => onDelete(entry.id)}
-                disabled={isDeleting}
-                className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
-              >
-                {isDeleting ? "Deleting..." : "Delete"}
-              </button>
-            </div>
+            {isManager && (
+              <div className="mt-4 flex gap-2 pt-3 border-t border-zinc-100">
+                <button
+                  onClick={() => onEdit(entry)}
+                  className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => onDelete(entry.id)}
+                  disabled={isDeleting}
+                  className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                >
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            )}
           </div>
         );
       })}

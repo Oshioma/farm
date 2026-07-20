@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { getFarms, getPlants, getZones } from "@/lib/farm";
 import type { Farm, Plant, Zone } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { useFarmRole } from "@/hooks/useFarmRole";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -45,6 +46,7 @@ export default function PlantsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const { isManager } = useFarmRole(activeFarmId);
   const activeFarmIdRef = useRef(activeFarmId);
   useEffect(() => {
     activeFarmIdRef.current = activeFarmId;
@@ -478,25 +480,27 @@ export default function PlantsPage() {
                 key={plant.id}
                 className="group relative overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm"
               >
-                {/* Delete button */}
-                <div className="absolute right-2 top-2 z-10 opacity-0 transition group-hover:opacity-100">
-                  {confirmDeleteId === plant.id ? (
-                    <button
-                      onClick={() => handleDelete(plant.id)}
-                      disabled={deletingId === plant.id}
-                      className="rounded-full bg-rose-600 px-2 py-1 text-xs font-medium text-white shadow hover:bg-rose-700 disabled:opacity-60"
-                    >
-                      {deletingId === plant.id ? "…" : "Confirm"}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setConfirmDeleteId(plant.id)}
-                      className="rounded-full bg-white/90 p-1.5 shadow hover:bg-white"
-                    >
-                      <X size={14} className="text-red-500" />
-                    </button>
-                  )}
-                </div>
+                {/* Delete button (managers only) */}
+                {isManager && (
+                  <div className="absolute right-2 top-2 z-10 opacity-0 transition group-hover:opacity-100">
+                    {confirmDeleteId === plant.id ? (
+                      <button
+                        onClick={() => handleDelete(plant.id)}
+                        disabled={deletingId === plant.id}
+                        className="rounded-full bg-rose-600 px-2 py-1 text-xs font-medium text-white shadow hover:bg-rose-700 disabled:opacity-60"
+                      >
+                        {deletingId === plant.id ? "…" : "Confirm"}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDeleteId(plant.id)}
+                        className="rounded-full bg-white/90 p-1.5 shadow hover:bg-white"
+                      >
+                        <X size={14} className="text-red-500" />
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 {/* Image / placeholder */}
                 <button onClick={() => openEdit(plant)} className="w-full text-left">

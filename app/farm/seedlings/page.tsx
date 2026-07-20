@@ -9,6 +9,7 @@ import type { Farm, SeedlingEntry, SeedCollectionEntry, Zone } from "@/lib/farm"
 import { createLunarTask } from "@/lib/lunarTasks";
 import { SeedlingMap } from "../components/SeedlingMap";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { useFarmRole } from "@/hooks/useFarmRole";
 
 /* ── Types ────────────────────────────────────────────────── */
 
@@ -108,6 +109,8 @@ export default function SeedlingsPage() {
     setActiveFarmId,
     preferredFarmName: "top land",
   });
+
+  const { isManager } = useFarmRole(activeFarmId);
 
   useEffect(() => {
     getFarms()
@@ -451,6 +454,7 @@ export default function SeedlingsPage() {
               onDelete={handleDelete}
               deletingId={deletingId}
               onTransplant={openTransplant}
+              isManager={isManager}
             />
           </div>
         ) : tab === "field" ? (
@@ -461,6 +465,7 @@ export default function SeedlingsPage() {
             onEdit={openEdit}
             onDelete={handleDelete}
             deletingId={deletingId}
+            isManager={isManager}
           />
         ) : tab === "seeds" ? (
           <SeedCollectionTable
@@ -468,6 +473,7 @@ export default function SeedlingsPage() {
             onEdit={(e) => { setSeedForm({ plant: e.plant, distance: e.distance ?? "", notes: e.notes ?? "", notes2: e.notes2 ?? "" }); setSeedModal(e); }}
             onDelete={handleSeedDelete}
             deletingId={seedDeletingId}
+            isManager={isManager}
           />
         ) : null}
       </div>
@@ -713,7 +719,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 type Col = "date" | "plant" | "variety" | "quantity" | "germination" | "germination_date" | "healthy_seedlings" | "successional_sowing" | "yields" | "row_location" | "notes";
 
 function SeedlingTable({
-  rows, columns, headers, onEdit, onDelete, deletingId, onTransplant,
+  rows, columns, headers, onEdit, onDelete, deletingId, onTransplant, isManager,
 }: {
   rows: SeedlingEntry[];
   columns: Col[];
@@ -722,6 +728,7 @@ function SeedlingTable({
   onDelete: (id: string) => void;
   deletingId: string | null;
   onTransplant?: (e: SeedlingEntry) => void;
+  isManager: boolean;
 }) {
   if (rows.length === 0) {
     return (
@@ -791,13 +798,15 @@ function SeedlingTable({
                     >
                       Edit
                     </button>
-                    <button
-                      onClick={() => onDelete(row.id)}
-                      disabled={deletingId === row.id}
-                      className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
-                    >
-                      {deletingId === row.id ? "…" : "Delete"}
-                    </button>
+                    {isManager && (
+                      <button
+                        onClick={() => onDelete(row.id)}
+                        disabled={deletingId === row.id}
+                        className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                      >
+                        {deletingId === row.id ? "…" : "Delete"}
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -812,12 +821,13 @@ function SeedlingTable({
 /* ── Seed collection table ───────────────────────────────── */
 
 function SeedCollectionTable({
-  rows, onEdit, onDelete, deletingId,
+  rows, onEdit, onDelete, deletingId, isManager,
 }: {
   rows: SeedCollectionEntry[];
   onEdit: (e: SeedCollectionEntry) => void;
   onDelete: (id: string) => void;
   deletingId: string | null;
+  isManager: boolean;
 }) {
   if (rows.length === 0) {
     return (
@@ -849,9 +859,11 @@ function SeedCollectionTable({
                 <td className="px-4 py-3 whitespace-nowrap">
                   <div className="flex gap-1">
                     <button onClick={() => onEdit(row)} className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">Edit</button>
-                    <button onClick={() => onDelete(row.id)} disabled={deletingId === row.id} className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">
-                      {deletingId === row.id ? "…" : "Delete"}
-                    </button>
+                    {isManager && (
+                      <button onClick={() => onDelete(row.id)} disabled={deletingId === row.id} className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">
+                        {deletingId === row.id ? "…" : "Delete"}
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

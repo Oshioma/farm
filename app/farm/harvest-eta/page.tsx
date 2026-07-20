@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { getFarms, getHarvestEta, getZones, getCrops } from "@/lib/farm";
 import type { Farm, HarvestEtaEntry, Zone, Crop } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { useFarmRole } from "@/hooks/useFarmRole";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -103,6 +104,7 @@ export default function HarvestEtaPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const { isManager } = useFarmRole(activeFarmId);
   const activeFarmIdRef = useRef(activeFarmId);
   useEffect(() => {
     activeFarmIdRef.current = activeFarmId;
@@ -265,12 +267,14 @@ export default function HarvestEtaPage() {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-zinc-500">{entries.length} beds</span>
-            <button
-              onClick={openAdd}
-              className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
-            >
-              + Add bed
-            </button>
+            {isManager && (
+              <button
+                onClick={openAdd}
+                className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
+              >
+                + Add bed
+              </button>
+            )}
           </div>
         </div>
 
@@ -279,7 +283,7 @@ export default function HarvestEtaPage() {
           <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">Loading...</div>
         ) : entries.length === 0 ? (
           <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-center text-sm text-zinc-500">
-            No harvest ETA entries for {year}. Click &quot;+ Add bed&quot; to get started.
+            No harvest ETA entries for {year}.{isManager ? " Click “+ Add bed” to get started." : ""}
           </div>
         ) : (
           <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
@@ -334,12 +338,14 @@ export default function HarvestEtaPage() {
                       })}
                       <td className="px-3 py-2 text-zinc-500 max-w-[120px] truncate">{row.notes ?? <span className="text-zinc-300">—</span>}</td>
                       <td className="px-3 py-2 whitespace-nowrap">
-                        <div className="flex gap-1">
-                          <button onClick={() => openEdit(row)} className="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] font-medium text-zinc-600 transition hover:bg-zinc-100">Edit</button>
-                          <button onClick={() => handleDelete(row.id)} disabled={deletingId === row.id} className="rounded-lg border border-rose-200 px-2 py-1 text-[10px] font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">
-                            {deletingId === row.id ? "…" : "Del"}
-                          </button>
-                        </div>
+                        {isManager && (
+                          <div className="flex gap-1">
+                            <button onClick={() => openEdit(row)} className="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] font-medium text-zinc-600 transition hover:bg-zinc-100">Edit</button>
+                            <button onClick={() => handleDelete(row.id)} disabled={deletingId === row.id} className="rounded-lg border border-rose-200 px-2 py-1 text-[10px] font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">
+                              {deletingId === row.id ? "…" : "Del"}
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -357,7 +363,7 @@ export default function HarvestEtaPage() {
       </div>
 
       {/* Modal */}
-      {modal !== null && (
+      {isManager && modal !== null && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-8">
           <div className="w-full max-w-2xl rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl">
             <h2 className="mb-5 text-lg font-semibold">
