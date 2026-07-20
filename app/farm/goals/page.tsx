@@ -39,6 +39,7 @@ export default function WorkerGoalsPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<FarmMember[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
+  const [userId, setUserId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
@@ -46,6 +47,7 @@ export default function WorkerGoalsPage() {
   const [loggingHours, setLoggingHours] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "today" | "overdue">("all");
+  const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
   const [groupBy, setGroupBy] = useState<"none" | "assignee">("assignee");
   const [showCreateForm, setShowCreateForm] = useState(false);
 
@@ -63,7 +65,11 @@ export default function WorkerGoalsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const farmRows = await getFarms();
+        const [{ data: { user } }, farmRows] = await Promise.all([
+          supabase.auth.getUser(),
+          getFarms(),
+        ]);
+        if (user) setUserId(user.id);
         setFarms(farmRows);
       } catch (err) {
         setError(errMsg(err, "Failed to load farms"));
@@ -153,8 +159,16 @@ export default function WorkerGoalsPage() {
     });
   }, [tasks, timeframeTab, monthCursor, yearCursor, threeYearStart]);
 
+  // Narrow the period's goals to the chosen person (everyone / unassigned /
+  // a specific member) before splitting into open + completed.
+  const scopedTasks = useMemo(() => {
+    if (assigneeFilter === "all") return periodTasks;
+    if (assigneeFilter === "__unassigned__") return periodTasks.filter((t) => !t.assigned_to);
+    return periodTasks.filter((t) => t.assigned_to === assigneeFilter);
+  }, [periodTasks, assigneeFilter]);
+
   const openTasks = useMemo(() => {
-    const open = periodTasks.filter(
+    const open = scopedTasks.filter(
       (t) => t.status === "todo" || t.status === "in_progress"
     );
     if (timeframeTab === "month") {
@@ -162,7 +176,7 @@ export default function WorkerGoalsPage() {
       if (filter === "overdue") return open.filter((t) => t.due_date && t.due_date < today);
     }
     return open;
-  }, [periodTasks, filter, today, timeframeTab]);
+  }, [scopedTasks, filter, today, timeframeTab]);
 
   const memberEmailMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -196,7 +210,7 @@ export default function WorkerGoalsPage() {
     return groups;
   }, [openTasks, groupBy, memberEmailMap]);
 
-  const completedTasks = periodTasks.filter(
+  const completedTasks = scopedTasks.filter(
     (t) => t.status === "done" || t.status === "cancelled"
   );
 
@@ -419,9 +433,9 @@ export default function WorkerGoalsPage() {
                   <>
                     {(
                       [
-                        { key: "all", label: `All open (${periodTasks.filter((t) => t.status === "todo" || t.status === "in_progress").length})` },
-                        { key: "today", label: `Due today (${periodTasks.filter((t) => t.due_date === today && t.status !== "done" && t.status !== "cancelled").length})` },
-                        { key: "overdue", label: `Overdue (${periodTasks.filter((t) => t.due_date && t.due_date < today && t.status !== "done" && t.status !== "cancelled").length})` },
+                        { key: "all", label: `All open (${scopedTasks.filter((t) => t.status === "todo" || t.status === "in_progress").length})` },
+                        { key: "today", label: `Due today (${scopedTasks.filter((t) => t.due_date === today && t.status !== "done" && t.status !== "cancelled").length})` },
+                        { key: "overdue", label: `Overdue (${scopedTasks.filter((t) => t.due_date && t.due_date < today && t.status !== "done" && t.status !== "cancelled").length})` },
                       ] as const
                     ).map(({ key, label }) => (
                       <button
@@ -439,6 +453,20 @@ export default function WorkerGoalsPage() {
                     <span className="mx-1 text-zinc-300">|</span>
                   </>
                 )}
+                <select
+                  value={assigneeFilter}
+                  onChange={(e) => setAssigneeFilter(e.target.value)}
+                  aria-label="Filter goals by person"
+                  className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 outline-none transition hover:bg-zinc-100 focus:border-zinc-900"
+                >
+                  <option value="all">Everyone</option>
+                  <option value="__unassigned__">Unassigned</option>
+                  {members.map((m) => (
+                    <option key={m.profile_id} value={m.profile_id}>
+                      {m.user_email ?? m.profile_id}
+                    </option>
+                  ))}
+                </select>
                 <button
                   onClick={() => setGroupBy(groupBy === "assignee" ? "none" : "assignee")}
                   className={`rounded-full px-4 py-2 text-sm font-medium transition ${
@@ -495,6 +523,10 @@ export default function WorkerGoalsPage() {
                   const isDeleting = deletingId === task.id;
                   const isToday = task.due_date === today;
                   const isOverdue = task.due_date ? task.due_date < today : false;
+                  // Everyone can see every goal. You can act on your own goals
+                  // and on unassigned ("general") goals anyone may pick up;
+                  // goals assigned to someone else are read-only here.
+                  const canAct = !!userId && (task.assigned_to === userId || !task.assigned_to);
                   return (
                     <div
                       key={task.id}
@@ -548,30 +580,36 @@ export default function WorkerGoalsPage() {
                         <ExpandableText text={task.description} className="mt-2 text-sm text-zinc-500" />
                       )}
 
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {task.status === "todo" && (
+                      {canAct ? (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {task.status === "todo" && (
+                            <button
+                              onClick={() => handleStartTask(task)}
+                              className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
+                            >
+                              Start goal
+                            </button>
+                          )}
                           <button
-                            onClick={() => handleStartTask(task)}
-                            className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
+                            onClick={() => handleComplete(task)}
+                            disabled={isCompleting}
+                            className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-60"
                           >
-                            Start goal
+                            {isCompleting ? "Completing..." : "Mark done"}
                           </button>
-                        )}
-                        <button
-                          onClick={() => handleComplete(task)}
-                          disabled={isCompleting}
-                          className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-60"
-                        >
-                          {isCompleting ? "Completing..." : "Mark done"}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteGoal(task.id)}
-                          disabled={isDeleting}
-                          className="rounded-2xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
-                        >
-                          {isDeleting ? "Deleting..." : "Delete"}
-                        </button>
-                      </div>
+                          <button
+                            onClick={() => handleDeleteGoal(task.id)}
+                            disabled={isDeleting}
+                            className="rounded-2xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
+                          >
+                            {isDeleting ? "Deleting..." : "Delete"}
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="mt-4 text-xs text-zinc-400">
+                          Assigned to {task.assigned_to ? memberEmailMap[task.assigned_to] ?? "someone else" : "someone else"} — view only
+                        </p>
+                      )}
                     </div>
                   );
                 })}
