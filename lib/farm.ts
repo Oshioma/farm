@@ -787,13 +787,15 @@ export type FertilisationEntry = {
   zone_ids?: string[];
   zone: { name: string }[] | null;
   notes: string | null;
+  next_fertilise_date: string | null;
+  next_fertilise_task_id: string | null;
   created_at: string | null;
 };
 
 export async function getFertilisations(farmId: string): Promise<FertilisationEntry[]> {
   const { data, error } = await supabase
     .from("fertilisations")
-    .select("id, farm_id, date, fertiliser, ready_to_use, bin_colour, plants, zone_id, extra_zone_ids, zone:zones(name), notes, created_at")
+    .select("id, farm_id, date, fertiliser, ready_to_use, bin_colour, plants, zone_id, extra_zone_ids, zone:zones(name), notes, next_fertilise_date, next_fertilise_task_id, created_at")
     .eq("farm_id", farmId)
     .order("date", { ascending: false });
 

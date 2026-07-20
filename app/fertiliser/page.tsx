@@ -134,6 +134,32 @@ export default function FertiliserPage() {
     setError("");
     try {
       const zoneIds = form.zone_ids.filter(Boolean);
+      const bedNames = zoneIds
+        .map((id) => zones.find((z) => z.id === id)?.name)
+        .filter(Boolean)
+        .join(", ");
+
+      let nextTaskId: string | null = null;
+      if (form.next_fertilise_date) {
+        const { data: taskData, error: taskErr } = await supabase
+          .from("tasks")
+          .insert({
+            farm_id: activeFarmId,
+            title: form.fertiliser.trim() ? `Fertilise: ${form.fertiliser.trim()}` : "Fertilise",
+            description: bedNames ? `Beds: ${bedNames}` : null,
+            status: "todo",
+            priority: "medium",
+            due_date: form.next_fertilise_date,
+            zone_id: zoneIds[0] || null,
+            goal_timeframe: "month",
+            proof_required: false,
+          })
+          .select("id")
+          .single();
+        if (taskErr) throw taskErr;
+        nextTaskId = taskData.id;
+      }
+
       const entry = {
         farm_id: activeFarmId,
         date: form.date,
@@ -143,16 +169,16 @@ export default function FertiliserPage() {
         zone_id: zoneIds[0] || null,
         extra_zone_ids: zoneIds.length > 1 ? JSON.stringify(zoneIds.slice(1)) : null,
         notes: form.notes.trim() || null,
+        next_fertilise_date: form.next_fertilise_date || null,
+        next_fertilise_task_id: nextTaskId,
       };
 
       const { error: err } = await supabase.from("fertilisations").insert(entry);
       if (err) throw err;
 
+      // Also surface the next-fertilise date on the Lunar Planner (separate
+      // from the linked goal created above) so it appears in both places.
       if (form.next_fertilise_date) {
-        const bedNames = zoneIds
-          .map((id) => zones.find((z) => z.id === id)?.name)
-          .filter(Boolean)
-          .join(", ");
         await createLunarTask({
           farmId: activeFarmId,
           date: form.next_fertilise_date,
@@ -185,6 +211,52 @@ export default function FertiliserPage() {
       };
 
       const zoneIds = editForm.zone_ids.filter(Boolean);
+      const bedNames = zoneIds
+        .map((zid) => zones.find((z) => z.id === zid)?.name)
+        .filter(Boolean)
+        .join(", ");
+      const taskTitle = editForm.fertiliser.trim() ? `Fertilise: ${editForm.fertiliser.trim()}` : "Fertilise";
+      const newDate = editForm.next_fertilise_date || null;
+
+      const existing = entries.find((e) => e.id === id);
+      let nextTaskId = existing?.next_fertilise_task_id ?? null;
+
+      if (newDate && nextTaskId) {
+        // Keep the linked goal in sync instead of creating a duplicate.
+        const { error: taskErr } = await supabase
+          .from("tasks")
+          .update({
+            title: taskTitle,
+            description: bedNames ? `Beds: ${bedNames}` : null,
+            due_date: newDate,
+            zone_id: zoneIds[0] || null,
+          })
+          .eq("id", nextTaskId);
+        if (taskErr) throw taskErr;
+      } else if (newDate && !nextTaskId) {
+        const { data: taskData, error: taskErr } = await supabase
+          .from("tasks")
+          .insert({
+            farm_id: activeFarmId,
+            title: taskTitle,
+            description: bedNames ? `Beds: ${bedNames}` : null,
+            status: "todo",
+            priority: "medium",
+            due_date: newDate,
+            zone_id: zoneIds[0] || null,
+            goal_timeframe: "month",
+            proof_required: false,
+          })
+          .select("id")
+          .single();
+        if (taskErr) throw taskErr;
+        nextTaskId = taskData.id;
+      } else if (!newDate && nextTaskId) {
+        // Date was cleared - remove the reminder it created.
+        const { error: deleteErr } = await supabase.from("tasks").delete().eq("id", nextTaskId);
+        if (deleteErr) throw deleteErr;
+        nextTaskId = null;
+      }
 
       const { error: updateErr } = await supabase
         .from("fertilisations")
@@ -192,6 +264,8 @@ export default function FertiliserPage() {
           ...basePayload,
           zone_id: zoneIds[0] || null,
           extra_zone_ids: zoneIds.length > 1 ? JSON.stringify(zoneIds.slice(1)) : null,
+          next_fertilise_date: newDate,
+          next_fertilise_task_id: nextTaskId,
         })
         .eq("id", id);
       if (updateErr) throw updateErr;
@@ -222,7 +296,7 @@ export default function FertiliserPage() {
       bin_colour: entry.bin_colour ?? "",
       zone_ids: entry.zone_ids?.length ? entry.zone_ids : entry.zone_id ? [entry.zone_id] : [],
       notes: entry.notes ?? "",
-      next_fertilise_date: "",
+      next_fertilise_date: entry.next_fertilise_date ?? "",
     });
   }
 
@@ -405,6 +479,7 @@ export default function FertiliserPage() {
                   <th className="px-5 py-4">Date</th>
                   <th className="px-5 py-4">Fertiliser type</th>
                   <th className="px-5 py-4">Ready to use</th>
+                  <th className="px-5 py-4">Next fertilise</th>
                   <th className="px-5 py-4">Bin colour</th>
                   <th className="px-5 py-4">Zone / Bed</th>
                   <th className="px-5 py-4">Notes</th>
@@ -428,6 +503,11 @@ export default function FertiliserPage() {
                       <td className="px-3 py-2">
                         <input type="date" value={editForm.ready_to_use}
                           onChange={(e) => setEditForm((p) => ({ ...p, ready_to_use: e.target.value }))}
+                          className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input type="date" value={editForm.next_fertilise_date}
+                          onChange={(e) => setEditForm((p) => ({ ...p, next_fertilise_date: e.target.value }))}
                           className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
                       </td>
                       <td className="px-3 py-2">
@@ -484,6 +564,7 @@ export default function FertiliserPage() {
                       <td className="px-5 py-4 font-medium tabular-nums">{fmt(entry.date)}</td>
                       <td className="px-5 py-4 text-zinc-700">{entry.fertiliser ?? "—"}</td>
                       <td className="px-5 py-4 tabular-nums text-zinc-600">{fmt(entry.ready_to_use)}</td>
+                      <td className="px-5 py-4 tabular-nums text-zinc-600">{fmt(entry.next_fertilise_date)}</td>
                       <td className="px-5 py-4">
                         {entry.bin_colour ? (
                           <span className="inline-flex items-center gap-1.5">
