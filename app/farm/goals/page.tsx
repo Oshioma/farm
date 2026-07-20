@@ -51,7 +51,10 @@ export default function WorkerGoalsPage() {
   const [groupBy, setGroupBy] = useState<"none" | "assignee">("assignee");
   const [showCreateForm, setShowCreateForm] = useState(false);
 
-  const [timeframeTab, setTimeframeTab] = useState<GoalTimeframe>("month");
+  // "all" shows every goal in the farm regardless of timeframe/due-date; the
+  // other tabs narrow to a specific calendar period. Default to "all" so the
+  // whole team's goals are visible on open.
+  const [timeframeTab, setTimeframeTab] = useState<GoalTimeframe | "all">("all");
   const [monthCursor, setMonthCursor] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
   const [yearCursor, setYearCursor] = useState(now.getFullYear());
   const [threeYearStart, setThreeYearStart] = useState(now.getFullYear());
@@ -138,13 +141,18 @@ export default function WorkerGoalsPage() {
   }
 
   const periodLabel =
-    timeframeTab === "month"
+    timeframeTab === "all"
+      ? "All goals"
+      : timeframeTab === "month"
       ? `${MONTH_NAMES[monthCursor.month - 1]} ${monthCursor.year}`
       : timeframeTab === "year"
       ? `${yearCursor}`
       : `${threeYearStart} – ${threeYearStart + 2}`;
 
   const periodTasks = useMemo(() => {
+    // "All" view: every goal in the farm, including ones with no due date and
+    // any timeframe — nothing is hidden by the calendar filter.
+    if (timeframeTab === "all") return tasks;
     return tasks.filter((task) => {
       const tf = task.goal_timeframe ?? "month";
       if (tf !== timeframeTab) return false;
@@ -388,9 +396,10 @@ export default function WorkerGoalsPage() {
 
         {activeFarm && (
           <>
-            <div className="mb-4 grid grid-cols-3 gap-2">
+            <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {(
                 [
+                  { key: "all", label: "All" },
                   { key: "month", label: "Month" },
                   { key: "year", label: "Year" },
                   { key: "3year", label: "3-Year" },
@@ -411,21 +420,27 @@ export default function WorkerGoalsPage() {
             </div>
 
             <div className="mb-4 flex items-center justify-between gap-4 rounded-2xl border border-zinc-200 bg-white p-3">
-              <button
-                onClick={() => navigatePeriod(-1)}
-                aria-label="Previous period"
-                className="rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100"
-              >
-                ‹
-              </button>
-              <span className="text-sm font-semibold">{periodLabel}</span>
-              <button
-                onClick={() => navigatePeriod(1)}
-                aria-label="Next period"
-                className="rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100"
-              >
-                ›
-              </button>
+              {timeframeTab === "all" ? (
+                <span className="text-sm font-semibold">{periodLabel}</span>
+              ) : (
+                <>
+                  <button
+                    onClick={() => navigatePeriod(-1)}
+                    aria-label="Previous period"
+                    className="rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100"
+                  >
+                    ‹
+                  </button>
+                  <span className="text-sm font-semibold">{periodLabel}</span>
+                  <button
+                    onClick={() => navigatePeriod(1)}
+                    aria-label="Next period"
+                    className="rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100"
+                  >
+                    ›
+                  </button>
+                </>
+              )}
             </div>
 
             <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -493,7 +508,7 @@ export default function WorkerGoalsPage() {
                   crops={crops}
                   members={members}
                   defaultZoneId=""
-                  defaultTimeframe={timeframeTab}
+                  defaultTimeframe={timeframeTab === "all" ? "month" : timeframeTab}
                   onSubmit={async (data) => {
                     const ok = await handleCreateGoal(data);
                     if (ok) setShowCreateForm(false);
