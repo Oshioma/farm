@@ -17,12 +17,44 @@
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Farm members can view all farm tasks" ON tasks;
+DROP POLICY IF EXISTS "Farm members can update unassigned farm tasks" ON tasks;
+DROP POLICY IF EXISTS "Farm members can delete unassigned farm tasks" ON tasks;
 
 CREATE POLICY "Farm members can view all farm tasks"
   ON tasks
   FOR SELECT
   USING (
     farm_id IS NOT NULL AND EXISTS (
+      SELECT 1 FROM farm_members fm
+      WHERE fm.farm_id = tasks.farm_id AND fm.profile_id = auth.uid()
+    )
+  );
+
+-- Unassigned ("general") goals belong to no one in particular, so any farm
+-- member may pick them up: complete, start, or delete them. Goals ASSIGNED to
+-- a specific person stay editable only by that person (via the pre-existing
+-- owner-scoped policies), so this does not let members touch each other's work.
+CREATE POLICY "Farm members can update unassigned farm tasks"
+  ON tasks
+  FOR UPDATE
+  USING (
+    assigned_to IS NULL AND farm_id IS NOT NULL AND EXISTS (
+      SELECT 1 FROM farm_members fm
+      WHERE fm.farm_id = tasks.farm_id AND fm.profile_id = auth.uid()
+    )
+  )
+  WITH CHECK (
+    farm_id IS NOT NULL AND EXISTS (
+      SELECT 1 FROM farm_members fm
+      WHERE fm.farm_id = tasks.farm_id AND fm.profile_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Farm members can delete unassigned farm tasks"
+  ON tasks
+  FOR DELETE
+  USING (
+    assigned_to IS NULL AND farm_id IS NOT NULL AND EXISTS (
       SELECT 1 FROM farm_members fm
       WHERE fm.farm_id = tasks.farm_id AND fm.profile_id = auth.uid()
     )
