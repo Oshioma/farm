@@ -462,6 +462,8 @@ export default function FarmPage() {
   const longTermOpen = [...yearGoals, ...threeYearGoals].filter(
     (task) => task.status !== "done" && task.status !== "cancelled"
   );
+  // Managers (owner/manager) get financial + admin features; workers don't.
+  const isManager = userRoleOnFarm === "owner" || userRoleOnFarm === "manager";
 
   const tasksToday = monthGoals.filter(
     (task) =>
@@ -1566,7 +1568,7 @@ export default function FarmPage() {
               { href: workerGoalsHref, label: "Goals" },
               { href: withFarmContext("/farm/harvest-eta"), label: "Harvest" },
               { href: withFarmContext("/farm/harvest-logs"), label: "Harvest logs" },
-              { href: withFarmContext("/income-prediction"), label: "Income prediction" },
+              { href: withFarmContext("/income-prediction"), label: "Income prediction", managerOnly: true },
               { href: "#map", label: "Map" },
               { href: withFarmContext("/farm/mulch"), label: "Mulch" },
               { href: withFarmContext("/farm/planting-plan"), label: "Planting plan" },
@@ -1575,8 +1577,8 @@ export default function FarmPage() {
               { href: withFarmContext("/farm/soil-tests"), label: "Soil tests" },
               { href: withFarmContext("/farm/systems"), label: "Systems" },
               { href: withFarmContext("/farm/trees"), label: "Trees" },
-              { href: withFarmContext("/farm/work-hours"), label: "Work hours" },
-            ].map(({ href, label }) => (
+              { href: withFarmContext("/farm/work-hours"), label: "Work hours", managerOnly: true },
+            ].filter((item) => isManager || !item.managerOnly).map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}
@@ -1792,16 +1794,18 @@ export default function FarmPage() {
             <div className="mb-6 flex flex-wrap gap-2">
               {(
                 [
-                  { key: "crop", label: "+ Crop" },
+                  { key: "crop", label: "+ Crop", managerOnly: true },
                   { key: "want", label: "+ Want" },
-                  { key: "task", label: "+ Task" },
+                  { key: "task", label: "+ Task", managerOnly: true },
                   { key: "harvest", label: "+ Harvest" },
                   { key: "pest", label: "+ Pest" },
-                  { key: "sale", label: "+ Sale" },
-                  { key: "expense", label: "+ Expense" },
-                  { key: "asset", label: "+ Asset" },
+                  { key: "sale", label: "+ Sale", managerOnly: true },
+                  { key: "expense", label: "+ Expense", managerOnly: true },
+                  { key: "asset", label: "+ Asset", managerOnly: true },
                 ] as const
-              ).map(({ key, label }) => (
+              )
+                .filter((item) => isManager || !("managerOnly" in item && item.managerOnly))
+                .map(({ key, label }) => (
                 <button
                   key={key}
                   onClick={() => setActiveForm(activeForm === key ? null : key)}
