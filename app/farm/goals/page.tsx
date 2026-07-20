@@ -39,6 +39,7 @@ export default function WorkerGoalsPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<FarmMember[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
+  const [userId, setUserId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
@@ -64,7 +65,11 @@ export default function WorkerGoalsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const farmRows = await getFarms();
+        const [{ data: { user } }, farmRows] = await Promise.all([
+          supabase.auth.getUser(),
+          getFarms(),
+        ]);
+        if (user) setUserId(user.id);
         setFarms(farmRows);
       } catch (err) {
         setError(errMsg(err, "Failed to load farms"));
@@ -518,6 +523,9 @@ export default function WorkerGoalsPage() {
                   const isDeleting = deletingId === task.id;
                   const isToday = task.due_date === today;
                   const isOverdue = task.due_date ? task.due_date < today : false;
+                  // Everyone can see every goal, but you can only act on the
+                  // ones assigned to you — others' goals are read-only here.
+                  const isMine = !!userId && task.assigned_to === userId;
                   return (
                     <div
                       key={task.id}
@@ -571,30 +579,38 @@ export default function WorkerGoalsPage() {
                         <ExpandableText text={task.description} className="mt-2 text-sm text-zinc-500" />
                       )}
 
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {task.status === "todo" && (
+                      {isMine ? (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {task.status === "todo" && (
+                            <button
+                              onClick={() => handleStartTask(task)}
+                              className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
+                            >
+                              Start goal
+                            </button>
+                          )}
                           <button
-                            onClick={() => handleStartTask(task)}
-                            className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
+                            onClick={() => handleComplete(task)}
+                            disabled={isCompleting}
+                            className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-60"
                           >
-                            Start goal
+                            {isCompleting ? "Completing..." : "Mark done"}
                           </button>
-                        )}
-                        <button
-                          onClick={() => handleComplete(task)}
-                          disabled={isCompleting}
-                          className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-60"
-                        >
-                          {isCompleting ? "Completing..." : "Mark done"}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteGoal(task.id)}
-                          disabled={isDeleting}
-                          className="rounded-2xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
-                        >
-                          {isDeleting ? "Deleting..." : "Delete"}
-                        </button>
-                      </div>
+                          <button
+                            onClick={() => handleDeleteGoal(task.id)}
+                            disabled={isDeleting}
+                            className="rounded-2xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
+                          >
+                            {isDeleting ? "Deleting..." : "Delete"}
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="mt-4 text-xs text-zinc-400">
+                          {task.assigned_to
+                            ? `Assigned to ${memberEmailMap[task.assigned_to] ?? "someone else"} — view only`
+                            : "Unassigned — view only"}
+                        </p>
+                      )}
                     </div>
                   );
                 })}
