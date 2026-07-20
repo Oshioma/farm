@@ -7,6 +7,7 @@ import { FlaskConical } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getFarms, getFertilisations, getZones } from "@/lib/farm";
 import type { Farm, FertilisationEntry, Zone } from "@/lib/farm";
+import { createLunarTask } from "@/lib/lunarTasks";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 
 function errMsg(err: unknown, fallback: string): string {
@@ -133,13 +134,13 @@ export default function FertiliserPage() {
     setError("");
     try {
       const zoneIds = form.zone_ids.filter(Boolean);
+      const bedNames = zoneIds
+        .map((id) => zones.find((z) => z.id === id)?.name)
+        .filter(Boolean)
+        .join(", ");
 
       let nextTaskId: string | null = null;
       if (form.next_fertilise_date) {
-        const bedNames = zoneIds
-          .map((id) => zones.find((z) => z.id === id)?.name)
-          .filter(Boolean)
-          .join(", ");
         const { data: taskData, error: taskErr } = await supabase
           .from("tasks")
           .insert({
@@ -174,6 +175,18 @@ export default function FertiliserPage() {
 
       const { error: err } = await supabase.from("fertilisations").insert(entry);
       if (err) throw err;
+
+      // Also surface the next-fertilise date on the Lunar Planner (separate
+      // from the linked goal created above) so it appears in both places.
+      if (form.next_fertilise_date) {
+        await createLunarTask({
+          farmId: activeFarmId,
+          date: form.next_fertilise_date,
+          title: form.fertiliser.trim() ? `Fertilise: ${form.fertiliser.trim()}` : "Fertilise",
+          category: "Fertilising",
+          cropOrActivity: bedNames || null,
+        });
+      }
 
       setForm(blank);
       setShowForm(false);

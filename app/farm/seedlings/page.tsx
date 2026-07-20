@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { getFarms, getSeedlings, getSeedCollection } from "@/lib/farm";
-import type { Farm, SeedlingEntry, SeedCollectionEntry } from "@/lib/farm";
+import { getFarms, getSeedlings, getSeedCollection, getZones } from "@/lib/farm";
+import type { Farm, SeedlingEntry, SeedCollectionEntry, Zone } from "@/lib/farm";
+import { createLunarTask } from "@/lib/lunarTasks";
 import { SeedlingMap } from "../components/SeedlingMap";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 
@@ -24,6 +25,7 @@ type FormData = {
   yields: string;
   row_location: string;
   notes: string;
+  next_sowing_date: string;
 };
 
 const blank = (type: string): FormData => ({
@@ -39,6 +41,7 @@ const blank = (type: string): FormData => ({
   yields: "",
   row_location: "",
   notes: "",
+  next_sowing_date: "",
 });
 
 function entryToForm(e: SeedlingEntry): FormData {
@@ -55,6 +58,7 @@ function entryToForm(e: SeedlingEntry): FormData {
     yields: e.yields ?? "",
     row_location: e.row_location ?? "",
     notes: e.notes ?? "",
+    next_sowing_date: "",
   };
 }
 
@@ -78,6 +82,13 @@ export default function SeedlingsPage() {
   const [form, setForm] = useState<FormData>(blank("nursery"));
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Transplant (nursery start -> crop)
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [transplantModal, setTransplantModal] = useState<SeedlingEntry | null>(null);
+  const [transplantZoneIds, setTransplantZoneIds] = useState<string[]>([]);
+  const [transplantDate, setTransplantDate] = useState("");
+  const [transplanting, setTransplanting] = useState(false);
 
   // Seed collection
   const [seedEntries, setSeedEntries] = useState<SeedCollectionEntry[]>([]);
@@ -111,11 +122,12 @@ export default function SeedlingsPage() {
     let cancelled = false;
     setLoading(true);
     setError("");
-    Promise.all([getSeedlings(activeFarmId), getSeedCollection(activeFarmId)])
-      .then(([s, seeds]) => {
+    Promise.all([getSeedlings(activeFarmId), getSeedCollection(activeFarmId), getZones(activeFarmId)])
+      .then(([s, seeds, zoneRows]) => {
         if (cancelled) return;
         setEntries(s);
         setSeedEntries(seeds);
+        setZones(zoneRows);
       })
       .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load data"); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -172,6 +184,57 @@ export default function SeedlingsPage() {
     setEntries(s); setSeedEntries(seeds);
   }
 
+  function openTransplant(entry: SeedlingEntry) {
+    setError("");
+    setTransplantModal(entry);
+    setTransplantZoneIds([]);
+    const today = new Date();
+    setTransplantDate(new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().slice(0, 10));
+  }
+
+  async function handleTransplant() {
+    if (!transplantModal || !activeFarmId) return;
+    const zoneIds = transplantZoneIds.filter(Boolean);
+    if (zoneIds.length === 0) return;
+    try {
+      setTransplanting(true);
+      setError("");
+
+      const { error: cropErr } = await supabase.from("crops").insert({
+        farm_id: activeFarmId,
+        zone_id: zoneIds[0],
+        extra_zone_ids: zoneIds.length > 1 ? JSON.stringify(zoneIds.slice(1)) : null,
+        crop_name: transplantModal.plant,
+        variety: transplantModal.variety,
+        status: "planted",
+        planted_on: transplantDate || null,
+        notes: transplantModal.notes,
+        is_active: true,
+      });
+      if (cropErr) throw cropErr;
+
+      const { error: seedlingErr } = await supabase
+        .from("seedlings")
+        .update({ transplanted: true, transplanted_at: transplantDate || null })
+        .eq("id", transplantModal.id);
+      if (seedlingErr) throw seedlingErr;
+
+      await supabase.from("activities").insert({
+        farm_id: activeFarmId,
+        type: "crop_created",
+        title: `${transplantModal.plant} transplanted`,
+        meta: zoneIds.length > 1 ? `Transplanted to ${zoneIds.length} beds` : "Transplanted to bed",
+      });
+
+      await reload();
+      setTransplantModal(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to transplant");
+    } finally {
+      setTransplanting(false);
+    }
+  }
+
   function openAdd() {
     if (tab === "seeds") {
       setSeedForm({ plant: "", distance: "", notes: "", notes2: "" });
@@ -214,6 +277,16 @@ export default function SeedlingsPage() {
       } else if (modal) {
         const { error: e } = await supabase.from("seedlings").update(payload).eq("id", (modal as SeedlingEntry).id);
         if (e) throw e;
+      }
+
+      if (form.type === "nursery" && form.next_sowing_date) {
+        await createLunarTask({
+          farmId: activeFarmId,
+          date: form.next_sowing_date,
+          title: `Sow: ${form.plant.trim()}`,
+          category: "Planting",
+          cropOrActivity: form.row_location.trim() || null,
+        });
       }
 
       await reload();
@@ -280,6 +353,7 @@ export default function SeedlingsPage() {
   }
 
   const nursery = entries.filter((e) => e.type === "nursery");
+  const activeNurseryCount = nursery.filter((e) => !e.transplanted).length;
   const field = entries.filter((e) => e.type === "field");
   const activeFarm = farms.find((f) => f.id === activeFarmId);
 
@@ -332,7 +406,7 @@ export default function SeedlingsPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
             {([
-              { key: "nursery", label: "Nursery starts", count: nursery.length },
+              { key: "nursery", label: "Nursery starts", count: activeNurseryCount },
               { key: "field",   label: "Field plantings", count: field.length },
               { key: "seeds", label: "Seed collection", count: seedEntries.length },
             ] as const).map(({ key, label, count }) => (
@@ -376,6 +450,7 @@ export default function SeedlingsPage() {
               onEdit={openEdit}
               onDelete={handleDelete}
               deletingId={deletingId}
+              onTransplant={openTransplant}
             />
           </div>
         ) : tab === "field" ? (
@@ -436,6 +511,16 @@ export default function SeedlingsPage() {
                   <input type="date" className={inp} value={form.germination_date} onChange={(e) => setForm((p) => ({ ...p, germination_date: e.target.value }))} />
                 </Field>
               </div>
+              {form.type === "nursery" && (
+                <div>
+                  <Field label="Next succession sowing date">
+                    <input type="date" className={inp} value={form.next_sowing_date} onChange={(e) => setForm((p) => ({ ...p, next_sowing_date: e.target.value }))} />
+                  </Field>
+                  <p className="mt-1.5 text-xs text-zinc-400">
+                    Adds a task on this date to the Planner so you get reminded to sow again.
+                  </p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Healthy seedlings">
                   <input className={inp} value={form.healthy_seedlings} onChange={(e) => setForm((p) => ({ ...p, healthy_seedlings: e.target.value }))} placeholder="8, All, None…" />
@@ -551,6 +636,63 @@ export default function SeedlingsPage() {
           </div>
         </div>
       )}
+
+      {/* Transplant modal */}
+      {transplantModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl">
+            <h2 className="mb-1 text-lg font-semibold">Transplant — {transplantModal.plant}</h2>
+            <p className="mb-5 text-sm text-zinc-500">
+              Choose the bed(s) this is going into. It will be added to Crops on those beds.
+            </p>
+            <div className="space-y-4">
+              <Field label="Date transplanted">
+                <input type="date" className={inp} value={transplantDate} onChange={(e) => setTransplantDate(e.target.value)} />
+              </Field>
+              <Field label="Beds *">
+                <div className="max-h-56 space-y-2 overflow-y-auto rounded-2xl border border-zinc-300 p-3">
+                  {zones.length === 0 ? (
+                    <p className="text-sm text-zinc-400">No beds available</p>
+                  ) : (
+                    zones.map((z) => (
+                      <label key={z.id} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={transplantZoneIds.includes(z.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setTransplantZoneIds((p) => [...p, z.id]);
+                            } else {
+                              setTransplantZoneIds((p) => p.filter((id) => id !== z.id));
+                            }
+                          }}
+                          className="rounded border-zinc-300"
+                        />
+                        <span className="text-sm">{z.name}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </Field>
+            </div>
+            <div className="mt-5 flex gap-2">
+              <button
+                onClick={handleTransplant}
+                disabled={transplanting || transplantZoneIds.length === 0}
+                className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60"
+              >
+                {transplanting ? "Transplanting..." : "Transplant"}
+              </button>
+              <button
+                onClick={() => setTransplantModal(null)}
+                className="rounded-2xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -571,7 +713,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 type Col = "date" | "plant" | "variety" | "quantity" | "germination" | "germination_date" | "healthy_seedlings" | "successional_sowing" | "yields" | "row_location" | "notes";
 
 function SeedlingTable({
-  rows, columns, headers, onEdit, onDelete, deletingId,
+  rows, columns, headers, onEdit, onDelete, deletingId, onTransplant,
 }: {
   rows: SeedlingEntry[];
   columns: Col[];
@@ -579,6 +721,7 @@ function SeedlingTable({
   onEdit: (e: SeedlingEntry) => void;
   onDelete: (id: string) => void;
   deletingId: string | null;
+  onTransplant?: (e: SeedlingEntry) => void;
 }) {
   if (rows.length === 0) {
     return (
@@ -617,7 +760,7 @@ function SeedlingTable({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.id} className="border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50 align-top transition-colors">
+              <tr key={row.id} className={`border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50 align-top transition-colors ${row.transplanted ? "opacity-50" : ""}`}>
                 {columns.map((col) => (
                   <td
                     key={col}
@@ -627,7 +770,21 @@ function SeedlingTable({
                   </td>
                 ))}
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <div className="flex gap-1">
+                  <div className="flex items-center gap-1">
+                    {onTransplant && (
+                      row.transplanted ? (
+                        <span className="rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                          Transplanted{row.transplanted_at ? ` ${fmt(row.transplanted_at)}` : ""}
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => onTransplant(row)}
+                          className="rounded-lg border border-emerald-200 px-2.5 py-1 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50"
+                        >
+                          Transplant
+                        </button>
+                      )
+                    )}
                     <button
                       onClick={() => onEdit(row)}
                       className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100"

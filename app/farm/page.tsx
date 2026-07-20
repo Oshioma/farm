@@ -40,7 +40,7 @@ import { FarmMap } from "@/app/farm/components/FarmMap";
 import LunarPlanner from "@/app/farm/components/LunarPlanner";
 import { LogHoursModal } from "@/app/farm/components/LogHoursModal";
 import { ExpandableText } from "@/app/farm/components/ExpandableText";
-import { Plus, Settings, X } from "lucide-react";
+import { ArrowUp, Plus, Settings, X } from "lucide-react";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
 import type { CropFormData } from "@/app/farm/components/CropForm";
 import type { TaskFormData } from "@/app/farm/components/TaskForm";
@@ -3139,6 +3139,16 @@ export default function FarmPage() {
           onClose={() => setHoursPromptTask(null)}
         />
       )}
+
+      <button
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        aria-label="Scroll to top"
+        title="Back to top"
+        style={{ bottom: "max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem))" }}
+        className="fixed left-4 z-[60] flex h-11 w-11 items-center justify-center rounded-full bg-zinc-900 text-white shadow-lg transition hover:bg-zinc-800"
+      >
+        <ArrowUp size={18} />
+      </button>
     </main>
   );
 }
