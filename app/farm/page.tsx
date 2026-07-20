@@ -457,6 +457,11 @@ export default function FarmPage() {
   const monthGoals = tasks.filter((task) => (task.goal_timeframe ?? "month") === "month");
   const yearGoals = tasks.filter((task) => task.goal_timeframe === "year");
   const threeYearGoals = tasks.filter((task) => task.goal_timeframe === "3year");
+  // Open long-term goals to preview on the dashboard so they're visible from
+  // the home page (not just as a count) without opening the Goals page.
+  const longTermOpen = [...yearGoals, ...threeYearGoals].filter(
+    (task) => task.status !== "done" && task.status !== "cancelled"
+  );
 
   const tasksToday = monthGoals.filter(
     (task) =>
@@ -2189,6 +2194,48 @@ export default function FarmPage() {
                   View year & 3-year goals
                 </Link>
               </div>
+
+              {longTermOpen.length > 0 && (
+                <ul className="mt-4 space-y-2">
+                  {longTermOpen.slice(0, 6).map((task) => (
+                    <li
+                      key={task.id}
+                      className="flex flex-wrap items-center gap-2 rounded-2xl border border-zinc-100 bg-zinc-50 px-3 py-2.5"
+                    >
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          task.goal_timeframe === "year"
+                            ? "bg-indigo-100 text-indigo-700"
+                            : "bg-purple-100 text-purple-700"
+                        }`}
+                      >
+                        {task.goal_timeframe === "year" ? "Year" : "3-Year"}
+                      </span>
+                      <span className="min-w-0 flex-1 break-words text-sm font-medium text-zinc-800">
+                        {task.title}
+                      </span>
+                      {task.due_date && (
+                        <span className="text-xs text-zinc-400">
+                          {task.due_date.slice(0, 4)}
+                        </span>
+                      )}
+                      {task.assigned_to && (
+                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] text-indigo-600 ring-1 ring-indigo-100">
+                          {memberEmailMap[task.assigned_to] ?? "Assigned"}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                  {longTermOpen.length > 6 && (
+                    <li className="px-1 pt-1 text-xs text-zinc-500">
+                      + {longTermOpen.length - 6} more —{" "}
+                      <Link href={workerGoalsHref} className="font-medium text-zinc-700 underline">
+                        view all
+                      </Link>
+                    </li>
+                  )}
+                </ul>
+              )}
             </section>
 
             <section className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
