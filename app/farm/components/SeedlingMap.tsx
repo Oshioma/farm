@@ -48,6 +48,8 @@ type Props = {
   seedlings?: SeedlingEntry[];
   farmName?: string;
   farmId?: string;
+  // Only farm managers may edit/save the layout; workers view it read-only.
+  canEdit?: boolean;
 };
 
 type DragMode =
@@ -57,7 +59,7 @@ type DragMode =
   | { kind: "tray-resize"; id: string }
   | null;
 
-export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
+export function SeedlingMap({ seedlings = [], farmName, farmId, canEdit = true }: Props) {
   const [zones, setZones] = useState<ZoneDef[]>([]);
   const [trays, setTrays] = useState<TrayDef[]>([]);
   const [editMode, setEditMode] = useState(false);
@@ -390,10 +392,12 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
               </button>
             )}
           </>
-        ) : (
+        ) : canEdit ? (
           <button onClick={() => setEditMode(true)} className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800">
             Edit Map
           </button>
+        ) : (
+          <span className="text-xs font-medium text-zinc-400">View only</span>
         )}
       </div>
 
@@ -401,13 +405,19 @@ export function SeedlingMap({ seedlings = [], farmName, farmId }: Props) {
       {isBlank && !editMode && loaded && (
         <div className="mb-4 rounded-2xl border-2 border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
           <p className="text-lg font-semibold text-zinc-600">No seedling map yet</p>
-          <p className="mt-1 text-sm text-zinc-400">Click Edit Map to draw your seedling zones and add trays inside them.</p>
-          <button
-            onClick={() => setEditMode(true)}
-            className="mt-4 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-medium text-white hover:bg-emerald-700"
-          >
-            Start drawing
-          </button>
+          {canEdit ? (
+            <>
+              <p className="mt-1 text-sm text-zinc-400">Click Edit Map to draw your seedling zones and add trays inside them.</p>
+              <button
+                onClick={() => setEditMode(true)}
+                className="mt-4 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-medium text-white hover:bg-emerald-700"
+              >
+                Start drawing
+              </button>
+            </>
+          ) : (
+            <p className="mt-1 text-sm text-zinc-400">The seedling map hasn&apos;t been set up yet.</p>
+          )}
         </div>
       )}
 

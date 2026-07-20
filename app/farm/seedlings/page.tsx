@@ -444,6 +444,7 @@ export default function SeedlingsPage() {
                 seedlings={entries}
                 farmName={activeFarm?.name}
                 farmId={activeFarmId}
+                canEdit={isManager}
               />
             </div>
             <SeedlingTable
