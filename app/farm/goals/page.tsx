@@ -46,6 +46,7 @@ export default function WorkerGoalsPage() {
   const [loggingHours, setLoggingHours] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "today" | "overdue">("all");
+  const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
   const [groupBy, setGroupBy] = useState<"none" | "assignee">("assignee");
   const [showCreateForm, setShowCreateForm] = useState(false);
 
@@ -153,8 +154,16 @@ export default function WorkerGoalsPage() {
     });
   }, [tasks, timeframeTab, monthCursor, yearCursor, threeYearStart]);
 
+  // Narrow the period's goals to the chosen person (everyone / unassigned /
+  // a specific member) before splitting into open + completed.
+  const scopedTasks = useMemo(() => {
+    if (assigneeFilter === "all") return periodTasks;
+    if (assigneeFilter === "__unassigned__") return periodTasks.filter((t) => !t.assigned_to);
+    return periodTasks.filter((t) => t.assigned_to === assigneeFilter);
+  }, [periodTasks, assigneeFilter]);
+
   const openTasks = useMemo(() => {
-    const open = periodTasks.filter(
+    const open = scopedTasks.filter(
       (t) => t.status === "todo" || t.status === "in_progress"
     );
     if (timeframeTab === "month") {
@@ -162,7 +171,7 @@ export default function WorkerGoalsPage() {
       if (filter === "overdue") return open.filter((t) => t.due_date && t.due_date < today);
     }
     return open;
-  }, [periodTasks, filter, today, timeframeTab]);
+  }, [scopedTasks, filter, today, timeframeTab]);
 
   const memberEmailMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -196,7 +205,7 @@ export default function WorkerGoalsPage() {
     return groups;
   }, [openTasks, groupBy, memberEmailMap]);
 
-  const completedTasks = periodTasks.filter(
+  const completedTasks = scopedTasks.filter(
     (t) => t.status === "done" || t.status === "cancelled"
   );
 
@@ -419,9 +428,9 @@ export default function WorkerGoalsPage() {
                   <>
                     {(
                       [
-                        { key: "all", label: `All open (${periodTasks.filter((t) => t.status === "todo" || t.status === "in_progress").length})` },
-                        { key: "today", label: `Due today (${periodTasks.filter((t) => t.due_date === today && t.status !== "done" && t.status !== "cancelled").length})` },
-                        { key: "overdue", label: `Overdue (${periodTasks.filter((t) => t.due_date && t.due_date < today && t.status !== "done" && t.status !== "cancelled").length})` },
+                        { key: "all", label: `All open (${scopedTasks.filter((t) => t.status === "todo" || t.status === "in_progress").length})` },
+                        { key: "today", label: `Due today (${scopedTasks.filter((t) => t.due_date === today && t.status !== "done" && t.status !== "cancelled").length})` },
+                        { key: "overdue", label: `Overdue (${scopedTasks.filter((t) => t.due_date && t.due_date < today && t.status !== "done" && t.status !== "cancelled").length})` },
                       ] as const
                     ).map(({ key, label }) => (
                       <button
@@ -439,6 +448,20 @@ export default function WorkerGoalsPage() {
                     <span className="mx-1 text-zinc-300">|</span>
                   </>
                 )}
+                <select
+                  value={assigneeFilter}
+                  onChange={(e) => setAssigneeFilter(e.target.value)}
+                  aria-label="Filter goals by person"
+                  className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 outline-none transition hover:bg-zinc-100 focus:border-zinc-900"
+                >
+                  <option value="all">Everyone</option>
+                  <option value="__unassigned__">Unassigned</option>
+                  {members.map((m) => (
+                    <option key={m.profile_id} value={m.profile_id}>
+                      {m.user_email ?? m.profile_id}
+                    </option>
+                  ))}
+                </select>
                 <button
                   onClick={() => setGroupBy(groupBy === "assignee" ? "none" : "assignee")}
                   className={`rounded-full px-4 py-2 text-sm font-medium transition ${
