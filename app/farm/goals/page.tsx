@@ -523,9 +523,10 @@ export default function WorkerGoalsPage() {
                   const isDeleting = deletingId === task.id;
                   const isToday = task.due_date === today;
                   const isOverdue = task.due_date ? task.due_date < today : false;
-                  // Everyone can see every goal, but you can only act on the
-                  // ones assigned to you — others' goals are read-only here.
-                  const isMine = !!userId && task.assigned_to === userId;
+                  // Everyone can see every goal. You can act on your own goals
+                  // and on unassigned ("general") goals anyone may pick up;
+                  // goals assigned to someone else are read-only here.
+                  const canAct = !!userId && (task.assigned_to === userId || !task.assigned_to);
                   return (
                     <div
                       key={task.id}
@@ -579,7 +580,7 @@ export default function WorkerGoalsPage() {
                         <ExpandableText text={task.description} className="mt-2 text-sm text-zinc-500" />
                       )}
 
-                      {isMine ? (
+                      {canAct ? (
                         <div className="mt-4 flex flex-wrap gap-2">
                           {task.status === "todo" && (
                             <button
@@ -606,9 +607,7 @@ export default function WorkerGoalsPage() {
                         </div>
                       ) : (
                         <p className="mt-4 text-xs text-zinc-400">
-                          {task.assigned_to
-                            ? `Assigned to ${memberEmailMap[task.assigned_to] ?? "someone else"} — view only`
-                            : "Unassigned — view only"}
+                          Assigned to {task.assigned_to ? memberEmailMap[task.assigned_to] ?? "someone else" : "someone else"} — view only
                         </p>
                       )}
                     </div>
