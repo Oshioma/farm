@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Shamba Online">
   <defs>
     <linearGradient id="so-bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#22c55e"/>
-      <stop offset="1" stop-color="#15803d"/>
+      <stop offset="0" stop-color="#166534"/>
+      <stop offset="1" stop-color="#052e16"/>
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#so-bg)"/>
