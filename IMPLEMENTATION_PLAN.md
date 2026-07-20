@@ -145,6 +145,11 @@ LLM-backed implementation of the same interface later without touching the wizar
 - Growth Journey: per-member timeline fed by `record_timeline_event()` from journal
   entries, posts, and completed challenges, grouped by month; Annual Recap computed
   on demand from the same event log (streaks, top tags, most active month).
+- File uploads: a public Supabase Storage bucket (`community-uploads`, RLS-scoped by
+  uploader) backs a reusable drag-and-drop `FileUploader` component, wired into
+  Journal photo/video fields (with real thumbnails in the entry list), post image
+  attachments, community logo/banner (wizard + Settings), and member avatars +
+  photo/gallery profile fields via a new "Edit Profile" page (`[slug]/profile`).
 - Discussion-shaped spaces (discussion, blog, wiki, resources, Q&A, gallery, and every
   other type without a specialized view) get a working generic feed: post, comment,
   react.

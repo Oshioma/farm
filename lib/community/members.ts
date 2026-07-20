@@ -89,3 +89,12 @@ export async function updateMemberStatus(memberId: string, status: CommunityMemb
   if (error) throw error;
   return data;
 }
+
+export async function updateMyProfile(
+  memberId: string,
+  patch: Partial<Pick<CommunityMember, "display_name" | "avatar_url" | "bio">>
+): Promise<CommunityMember> {
+  const { data, error } = await supabase.from("community_members").update(patch).eq("id", memberId).select().single();
+  if (error) throw error;
+  return data;
+}

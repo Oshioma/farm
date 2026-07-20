@@ -5,6 +5,7 @@ import { useAdminContext } from "@/app/community/[slug]/admin/_lib/AdminContext"
 import { updateCommunity } from "@/lib/community/communities";
 import type { CommunityPrivacy } from "@/lib/community/types";
 import { Button, Card } from "@/app/community/_ui/primitives";
+import { FileUploader } from "@/app/community/_ui/FileUploader";
 import { DynamicIcon } from "@/lib/community/icon";
 
 const PRIVACY_OPTIONS: { value: CommunityPrivacy; label: string; icon: string }[] = [
@@ -61,22 +62,30 @@ export default function SettingsAdminPage() {
         </label>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <label className="block">
-            <span className="text-sm font-semibold text-zinc-800">Logo URL</span>
-            <input
-              value={form.logo_url}
-              onChange={(e) => setForm({ ...form, logo_url: e.target.value })}
-              className="mt-1.5 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-sm outline-none focus:border-zinc-900"
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm font-semibold text-zinc-800">Banner URL</span>
-            <input
-              value={form.banner_url}
-              onChange={(e) => setForm({ ...form, banner_url: e.target.value })}
-              className="mt-1.5 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-sm outline-none focus:border-zinc-900"
-            />
-          </label>
+          <div>
+            <span className="text-sm font-semibold text-zinc-800">Logo</span>
+            <div className="mt-1.5">
+              <FileUploader
+                scope={`${community.id}/logo`}
+                kind="image"
+                multiple={false}
+                value={form.logo_url ? [form.logo_url] : []}
+                onChange={(urls) => setForm({ ...form, logo_url: urls[0] ?? "" })}
+              />
+            </div>
+          </div>
+          <div>
+            <span className="text-sm font-semibold text-zinc-800">Banner</span>
+            <div className="mt-1.5">
+              <FileUploader
+                scope={`${community.id}/banner`}
+                kind="image"
+                multiple={false}
+                value={form.banner_url ? [form.banner_url] : []}
+                onChange={(urls) => setForm({ ...form, banner_url: urls[0] ?? "" })}
+              />
+            </div>
+          </div>
         </div>
 
         <div>

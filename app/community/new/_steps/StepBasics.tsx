@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { WizardState } from "@/app/community/new/_lib/state";
 import { slugify } from "@/lib/community/communities";
 import { Button, Card } from "@/app/community/_ui/primitives";
+import { FileUploader } from "@/app/community/_ui/FileUploader";
 import { DynamicIcon } from "@/lib/community/icon";
 import type { WizardPlanInput } from "@/lib/community/wizardTypes";
 
@@ -102,24 +103,30 @@ export function StepBasics({ state, update }: { state: WizardState; update: (pat
         </label>
 
         <div className="mt-5 grid gap-5 sm:grid-cols-2">
-          <label className="block">
-            <span className="text-sm font-semibold text-zinc-800">Logo URL</span>
-            <input
-              value={state.logoUrl}
-              onChange={(e) => update({ logoUrl: e.target.value })}
-              placeholder="https://…"
-              className="mt-1.5 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-sm outline-none focus:border-zinc-900"
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm font-semibold text-zinc-800">Banner URL</span>
-            <input
-              value={state.bannerUrl}
-              onChange={(e) => update({ bannerUrl: e.target.value })}
-              placeholder="https://…"
-              className="mt-1.5 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-sm outline-none focus:border-zinc-900"
-            />
-          </label>
+          <div>
+            <span className="text-sm font-semibold text-zinc-800">Logo</span>
+            <div className="mt-1.5">
+              <FileUploader
+                scope="onboarding/logo"
+                kind="image"
+                multiple={false}
+                value={state.logoUrl ? [state.logoUrl] : []}
+                onChange={(urls) => update({ logoUrl: urls[0] ?? "" })}
+              />
+            </div>
+          </div>
+          <div>
+            <span className="text-sm font-semibold text-zinc-800">Banner</span>
+            <div className="mt-1.5">
+              <FileUploader
+                scope="onboarding/banner"
+                kind="image"
+                multiple={false}
+                value={state.bannerUrl ? [state.bannerUrl] : []}
+                onChange={(urls) => update({ bannerUrl: urls[0] ?? "" })}
+              />
+            </div>
+          </div>
         </div>
       </Card>
 

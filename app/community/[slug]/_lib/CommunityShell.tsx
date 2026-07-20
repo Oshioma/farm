@@ -55,12 +55,24 @@ export function CommunityShell({ community, membership, children }: { community:
         </div>
         <span className="text-sm font-bold text-zinc-900">{community.name}</span>
       </Link>
-      {isAdmin && (
-        <Link href={`${base}/admin`} className="flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:border-zinc-900 hover:text-zinc-900">
-          <DynamicIcon name="settings" size={13} />
-          Admin
-        </Link>
-      )}
+      <div className="flex items-center gap-2">
+        {membership.avatar_url ? (
+          <Link href={`${base}/profile`} title="Edit Profile">
+            <img src={membership.avatar_url} alt="" className="h-7 w-7 rounded-full border border-zinc-200 object-cover" />
+          </Link>
+        ) : (
+          <Link href={`${base}/profile`} className="flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:border-zinc-900 hover:text-zinc-900">
+            <DynamicIcon name="user-round" size={13} />
+            Profile
+          </Link>
+        )}
+        {isAdmin && (
+          <Link href={`${base}/admin`} className="flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:border-zinc-900 hover:text-zinc-900">
+            <DynamicIcon name="settings" size={13} />
+            Admin
+          </Link>
+        )}
+      </div>
     </header>
   );
 

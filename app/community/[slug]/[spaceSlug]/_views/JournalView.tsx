@@ -5,7 +5,7 @@ import type { JournalFieldDef, Space } from "@/lib/community/types";
 import { createJournalEntry, getJournalFields, listJournalEntries } from "@/lib/community/journal";
 import type { SpaceItem } from "@/lib/community/types";
 import { Button, Card, EmptyState } from "@/app/community/_ui/primitives";
-import { DynamicIcon } from "@/lib/community/icon";
+import { FileUploader } from "@/app/community/_ui/FileUploader";
 
 export function JournalView({ space, memberId, communityId }: { space: Space; memberId: string; communityId: string }) {
   const [fields, setFields] = useState<JournalFieldDef[]>([]);
@@ -59,15 +59,31 @@ export function JournalView({ space, memberId, communityId }: { space: Space; me
           entries.map((entry) => (
             <Card key={entry.id} className="p-4">
               <p className="text-xs text-zinc-400">{new Date(entry.created_at).toLocaleString()}</p>
-              <div className="mt-1.5 space-y-1">
+              <div className="mt-1.5 space-y-1.5">
                 {fields
                   .filter((f) => entry.data[f.key] !== undefined && entry.data[f.key] !== "" && entry.data[f.key] !== null)
-                  .map((f) => (
-                    <p key={f.id} className="text-sm text-zinc-700">
-                      <span className="font-semibold text-zinc-500">{f.label}: </span>
-                      {String(entry.data[f.key])}
-                    </p>
-                  ))}
+                  .map((f) => {
+                    const entryValue = entry.data[f.key];
+                    if ((f.field_type === "photos" || f.field_type === "videos") && Array.isArray(entryValue)) {
+                      return (
+                        <div key={f.id} className="flex flex-wrap gap-2">
+                          {entryValue.map((url) =>
+                            f.field_type === "photos" ? (
+                              <img key={url as string} src={url as string} alt="" className="h-20 w-20 rounded-lg border border-zinc-200 object-cover" />
+                            ) : (
+                              <video key={url as string} src={url as string} controls className="h-20 w-32 rounded-lg border border-zinc-200 object-cover" />
+                            )
+                          )}
+                        </div>
+                      );
+                    }
+                    return (
+                      <p key={f.id} className="text-sm text-zinc-700">
+                        <span className="font-semibold text-zinc-500">{f.label}: </span>
+                        {String(entryValue)}
+                      </p>
+                    );
+                  })}
               </div>
             </Card>
           ))
@@ -145,14 +161,17 @@ function JournalFieldInput({ field, value, onChange }: { field: JournalFieldDef;
 
   if (field.field_type === "photos" || field.field_type === "videos") {
     return (
-      <label className="col-span-2 block">
+      <div className="col-span-2 block">
         {label}
-        <div className="mt-1 flex items-center gap-2 rounded-lg border border-dashed border-zinc-300 px-3 py-2 text-xs text-zinc-400">
-          <DynamicIcon name={field.field_type === "photos" ? "image" : "video"} size={14} />
-          Uploads aren&apos;t wired up yet — add a URL for now
+        <div className="mt-1">
+          <FileUploader
+            scope={`journal/${field.space_id}`}
+            kind={field.field_type === "photos" ? "image" : "video"}
+            value={(value as string[]) ?? []}
+            onChange={onChange}
+          />
         </div>
-        <input value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value)} placeholder="https://…" className="mt-1.5 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
-      </label>
+      </div>
     );
   }
 

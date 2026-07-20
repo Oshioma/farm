@@ -19,11 +19,19 @@ export async function createPost(
   spaceId: string,
   memberId: string,
   body: string,
-  title?: string
+  opts: { title?: string; images?: string[] } = {}
 ): Promise<SpaceItem> {
+  const { title, images } = opts;
   const { data, error } = await supabase
     .from("space_items")
-    .insert({ space_id: spaceId, member_id: memberId, item_type: "post", title: title ?? null, body })
+    .insert({
+      space_id: spaceId,
+      member_id: memberId,
+      item_type: "post",
+      title: title ?? null,
+      body,
+      data: images?.length ? { images } : {},
+    })
     .select()
     .single();
   if (error) throw error;

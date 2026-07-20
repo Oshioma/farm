@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import type { Space, SpaceComment, SpaceItem, SpaceReaction } from "@/lib/community/types";
 import { addComment, createPost, listComments, listReactions, listSpaceItems, toggleReaction } from "@/lib/community/spaceItems";
 import { Button, Card, EmptyState } from "@/app/community/_ui/primitives";
+import { FileUploader } from "@/app/community/_ui/FileUploader";
 import { DynamicIcon } from "@/lib/community/icon";
 
 export function PostsView({ space, memberId, communityId }: { space: Space; memberId: string; communityId: string }) {
   const [items, setItems] = useState<SpaceItem[] | null>(null);
   const [body, setBody] = useState("");
+  const [images, setImages] = useState<string[]>([]);
   const [posting, setPosting] = useState(false);
 
   useEffect(() => {
@@ -18,9 +20,10 @@ export function PostsView({ space, memberId, communityId }: { space: Space; memb
   async function submit() {
     if (!body.trim()) return;
     setPosting(true);
-    const created = await createPost(communityId, space.id, memberId, body.trim());
+    const created = await createPost(communityId, space.id, memberId, body.trim(), { images });
     setItems((prev) => [created, ...(prev ?? [])]);
     setBody("");
+    setImages([]);
     setPosting(false);
   }
 
@@ -34,6 +37,9 @@ export function PostsView({ space, memberId, communityId }: { space: Space; memb
           rows={3}
           className="w-full resize-none rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-900"
         />
+        <div className="mt-2">
+          <FileUploader scope={`space/${space.id}`} kind="image" value={images} onChange={setImages} maxFiles={6} label="Add photos" />
+        </div>
         <div className="mt-2 flex justify-end">
           <Button size="sm" onClick={submit} disabled={posting || !body.trim()}>
             Post
@@ -80,11 +86,19 @@ function PostCard({ item, memberId }: { item: SpaceItem; memberId: string }) {
   }
 
   const iReacted = reactions.some((r) => r.member_id === memberId);
+  const images = (item.data?.images as string[] | undefined) ?? [];
 
   return (
     <Card className="p-4">
       {item.title && <p className="text-sm font-bold text-zinc-900">{item.title}</p>}
       {item.body && <p className="whitespace-pre-wrap text-sm text-zinc-700">{item.body}</p>}
+      {images.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {images.map((url) => (
+            <img key={url} src={url} alt="" className="h-28 w-28 rounded-lg border border-zinc-200 object-cover" />
+          ))}
+        </div>
+      )}
       <div className="mt-3 flex items-center gap-4 text-xs text-zinc-500">
         <button type="button" onClick={react} className={`flex items-center gap-1.5 ${iReacted ? "font-semibold text-zinc-900" : ""}`}>
           <DynamicIcon name="heart" size={14} />
