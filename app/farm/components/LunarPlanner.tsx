@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -87,6 +87,7 @@ interface LunarTask {
   reminder_note: string | null;
   reminder_status: string | null;
   assigned_to: string | null;
+  carried_over_from: string | null;
 }
 
 interface TaskForm {
@@ -95,6 +96,7 @@ interface TaskForm {
   crop_or_activity: string;
   notes: string;
   status: string;
+  date: string;
   reminder_date: string;
   reminder_note: string;
   reminder_status: string;
@@ -107,6 +109,7 @@ const BLANK_TASK: TaskForm = {
   crop_or_activity: "",
   notes: "",
   status: "planned",
+  date: "",
   reminder_date: "",
   reminder_note: "",
   reminder_status: "pending",
@@ -114,7 +117,7 @@ const BLANK_TASK: TaskForm = {
 };
 
 const TASK_SELECT =
-  "id, lunar_day_id, date, title, category, crop_or_activity, notes, status, reminder_date, reminder_note, reminder_status, assigned_to";
+  "id, lunar_day_id, date, title, category, crop_or_activity, notes, status, reminder_date, reminder_note, reminder_status, assigned_to, carried_over_from";
 const DAY_SELECT =
   "id, date, calculated_moon_phase, manual_moon_phase, moon_phase_override, notes";
 
@@ -253,6 +256,37 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
     setDueReminders((data ?? []) as LunarTask[]);
   }, [farmId]);
 
+  // Roll any planned (not done) task whose scheduled day has already passed
+  // forward onto today, so overdue tasks stay visible instead of being
+  // stranded in the past. The first day it was originally scheduled for is
+  // preserved in carried_over_from (only set when still empty) so the UI can
+  // show a "task probably for <date>" hint.
+  const rollOverdueTasks = useCallback(async (uid: string) => {
+    const today = toISODate(new Date());
+    let query = supabase
+      .from("lunar_tasks")
+      .select("id, date, carried_over_from")
+      .lt("date", today)
+      .neq("status", "done");
+    query = farmId ? query.eq("farm_id", farmId) : query.eq("user_id", uid);
+    const { data, error: e } = await query;
+    if (e) throw e;
+    const overdue = (data ?? []) as {
+      id: string;
+      date: string;
+      carried_over_from: string | null;
+    }[];
+    if (overdue.length === 0) return;
+    await Promise.all(
+      overdue.map((t) =>
+        supabase
+          .from("lunar_tasks")
+          .update({ date: today, carried_over_from: t.carried_over_from ?? t.date })
+          .eq("id", t.id)
+      )
+    );
+  }, [farmId]);
+
   useEffect(() => {
     (async () => {
       try {
@@ -271,6 +305,10 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
     })();
   }, [router]);
 
+  // Roll overdue tasks forward at most once per mount, before the first load,
+  // so the moved tasks show up on today when the range is fetched.
+  const rolledOverRef = useRef(false);
+
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
@@ -278,6 +316,10 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
       try {
         setLoading(true);
         setError("");
+        if (!rolledOverRef.current) {
+          rolledOverRef.current = true;
+          await rollOverdueTasks(userId);
+        }
         await Promise.all([loadRange(userId, rangeStart, rangeEnd), loadReminders(userId)]);
       } catch (err) {
         if (!cancelled) setError(errMsg(err, "Failed to load planner"));
@@ -288,7 +330,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
     return () => {
       cancelled = true;
     };
-  }, [userId, rangeStart, rangeEnd, loadRange, loadReminders]);
+  }, [userId, rangeStart, rangeEnd, loadRange, loadReminders, rollOverdueTasks]);
 
   async function refresh() {
     if (!userId) return;
@@ -348,7 +390,19 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
 
   // Ensure a lunar_days row exists for a date, returning its id.
   async function ensureDay(dateISO: string, patch?: Partial<LunarDay>): Promise<string> {
-    const existing = days[dateISO];
+    // Prefer the locally loaded day, but fall back to a direct fetch for dates
+    // outside the visible range (e.g. when the date picker moves a task to a
+    // far-off day) so we never clobber that day's existing notes / override.
+    let existing = days[dateISO];
+    if (!existing) {
+      const { data: fetched } = await supabase
+        .from("lunar_days")
+        .select(DAY_SELECT)
+        .eq("user_id", userId)
+        .eq("date", dateISO)
+        .maybeSingle();
+      if (fetched) existing = fetched as LunarDay;
+    }
     const payload: Record<string, unknown> = {
       user_id: userId,
       date: dateISO,
@@ -414,7 +468,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
   // Task CRUD
   // -------------------------------------------------------------------------
   function openAddTask(dateISO: string) {
-    setTaskForm(BLANK_TASK);
+    setTaskForm({ ...BLANK_TASK, date: dateISO });
     setTaskModal({ date: dateISO });
   }
 
@@ -425,6 +479,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
       crop_or_activity: task.crop_or_activity ?? "",
       notes: task.notes ?? "",
       status: task.status ?? "planned",
+      date: task.date,
       reminder_date: task.reminder_date ?? "",
       reminder_note: task.reminder_note ?? "",
       reminder_status: task.reminder_status ?? "pending",
@@ -438,6 +493,11 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
     const title = taskForm.title.trim();
     if (!title) {
       setError("Task title is required.");
+      return;
+    }
+    const targetDate = taskForm.date || taskModal.date;
+    if (!targetDate) {
+      setError("Task date is required.");
       return;
     }
     try {
@@ -455,19 +515,30 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
         assigned_to: taskForm.assigned_to || null,
       };
       if (taskModal.taskId) {
+        // When the date is changed via the picker, re-home the task on the new
+        // day and clear the roll-over hint — the user has deliberately
+        // rescheduled it, so it's no longer "probably for" an earlier date.
+        const dateChanged = targetDate !== taskModal.date;
+        const datePatch = dateChanged
+          ? {
+              date: targetDate,
+              lunar_day_id: await ensureDay(targetDate),
+              carried_over_from: null,
+            }
+          : {};
         const { error: e } = await supabase
           .from("lunar_tasks")
-          .update(payload)
+          .update({ ...payload, ...datePatch })
           .eq("id", taskModal.taskId);
         if (e) throw e;
       } else {
-        const dayId = await ensureDay(taskModal.date);
+        const dayId = await ensureDay(targetDate);
         const { error: e } = await supabase.from("lunar_tasks").insert({
           ...payload,
           user_id: userId,
           farm_id: farmId ?? null,
           lunar_day_id: dayId,
-          date: taskModal.date,
+          date: targetDate,
         });
         if (e) throw e;
       }
@@ -933,7 +1004,10 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
               {taskModal.taskId ? "Edit task" : "Add task"}
             </h2>
             <p className="mb-5 text-sm text-zinc-500">
-              {formatDayLabel(fromISODate(taskModal.date), { weekday: true, year: true })}
+              {formatDayLabel(fromISODate(taskForm.date || taskModal.date), {
+                weekday: true,
+                year: true,
+              })}
             </p>
             <div className="space-y-3 overflow-y-auto pr-1">
               <div>
@@ -944,6 +1018,15 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
                   value={taskForm.title}
                   onChange={(e) => setTaskForm((p) => ({ ...p, title: e.target.value }))}
                   placeholder="Plant root tubers: ginger, turmeric"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Date</label>
+                <input
+                  type="date"
+                  className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                  value={taskForm.date}
+                  onChange={(e) => setTaskForm((p) => ({ ...p, date: e.target.value }))}
                 />
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1341,6 +1424,17 @@ function DayCard(props: DayCardProps) {
                         <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-1.5 py-0.5 text-rose-600 ring-1 ring-rose-100">
                           <Bell className="h-3 w-3" />
                           {formatDayLabel(fromISODate(t.reminder_date), { short: true })}
+                        </span>
+                      )}
+                      {t.carried_over_from && !done && (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-amber-700 ring-1 ring-amber-100"
+                          title={`Rolled over — originally scheduled for ${formatDayLabel(
+                            fromISODate(t.carried_over_from),
+                            { weekday: true, year: true }
+                          )}`}
+                        >
+                          ↪ probably for {formatDayLabel(fromISODate(t.carried_over_from), { short: true })}
                         </span>
                       )}
                       {t.assigned_to && (
