@@ -3,7 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 
 export const metadata: Metadata = {
-  title: "Farm Manager",
+  title: "Shamba Online",
   description: "Shamba farm task manager and crop tracker",
 };
 
