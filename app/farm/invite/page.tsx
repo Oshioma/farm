@@ -44,9 +44,11 @@ export default function InvitePage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviting, setInviting] = useState(false);
   const [inviteSuccess, setInviteSuccess] = useState("");
+  const [savingRoleId, setSavingRoleId] = useState<string | null>(null);
 
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
-  const { isManager, loading: roleLoading } = useFarmRole(activeFarmId);
+  const { role, isManager, loading: roleLoading } = useFarmRole(activeFarmId);
+  const isOwner = role === "owner";
   const activeFarmIdRef = useRef(activeFarmId);
   useEffect(() => {
     activeFarmIdRef.current = activeFarmId;
@@ -180,6 +182,25 @@ export default function InvitePage() {
       setError(errMsg(err, "Failed to remove member"));
     } finally {
       setRemovingId(null);
+    }
+  }
+
+  async function setMemberRole(id: string, newRole: string) {
+    setSavingRoleId(id);
+    setError("");
+    try {
+      const res = await fetch("/api/members/set-role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId: id, farmId: activeFarmId, role: newRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update role");
+      await loadData(activeFarmId);
+    } catch (err) {
+      setError(errMsg(err, "Failed to update role"));
+    } finally {
+      setSavingRoleId(null);
     }
   }
 
@@ -337,6 +358,19 @@ export default function InvitePage() {
                         <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
                           m.role_on_farm === "owner" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600"
                         }`}>{m.role_on_farm}</span>
+                        {isOwner && m.role_on_farm !== "owner" && (
+                          <select
+                            value={m.role_on_farm === "manager" ? "manager" : "worker"}
+                            disabled={savingRoleId === m.id}
+                            onChange={(e) => setMemberRole(m.id, e.target.value)}
+                            aria-label="Set member role"
+                            className="rounded-lg border border-zinc-300 px-2 py-1 text-xs outline-none focus:border-zinc-900 disabled:opacity-50"
+                          >
+                            <option value="worker">Worker</option>
+                            <option value="manager">Manager</option>
+                          </select>
+                        )}
+                        {savingRoleId === m.id && <span className="text-xs text-zinc-400">saving…</span>}
                         {!m.user_email && <span className="text-xs text-zinc-400">ID: {m.profile_id.slice(0, 8)}…</span>}
                       </div>
                     </div>
