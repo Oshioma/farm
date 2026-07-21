@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabase, getCurrentUser } from "@/lib/supabase";
 import {
   getFarms,
   getZones,
@@ -71,8 +71,8 @@ export default function WorkerGoalsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const [{ data: { user } }, farmRows] = await Promise.all([
-          supabase.auth.getUser(),
+        const [user, farmRows] = await Promise.all([
+          getCurrentUser(),
           getFarms(),
         ]);
         if (user) setUserId(user.id);

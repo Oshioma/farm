@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabase, getCurrentUser } from "@/lib/supabase";
 import {
   getFarms,
   getZones,
@@ -197,7 +197,7 @@ export default function FarmPage() {
     setCreatingFarm(true);
     setError("");
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCurrentUser();
       const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
       const { data: farm, error: farmErr } = await supabase
         .from("farms")
@@ -230,7 +230,7 @@ export default function FarmPage() {
 
   async function handleRequestJoin(farmId: string) {
     setRequestingId(farmId);
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     const { error: err } = await supabase.from("join_requests").upsert({
       farm_id: farmId,
       user_id: user?.id,
@@ -330,7 +330,7 @@ export default function FarmPage() {
       .catch((err) => console.error("[Farm] Zone sync failed:", err));
 
     // Fetch current user's role on this farm
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (latestFarmIdRef.current !== farmId) return;
     if (user) {
       const { data: membership } = await supabase
@@ -378,7 +378,7 @@ export default function FarmPage() {
 
   useEffect(() => {
     const init = async () => {
-      supabase.auth.getUser().then(({ data: { user } }) => {
+      getCurrentUser().then((user) => {
         if (user?.email) setUserEmail(user.email);
       });
 
@@ -1181,7 +1181,7 @@ export default function FarmPage() {
       const name = data.name.trim();
       if (!name) throw new Error("Want name is required.");
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCurrentUser();
       const { error: insertError } = await supabase.from("wants").insert({
         farm_id: activeFarmId,
         name,

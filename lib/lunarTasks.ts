@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, getCurrentUser } from "@/lib/supabase";
 import { calcMoonPhase, fromISODate } from "@/app/lunar-planner/lunar-data";
 
 type CreateLunarTaskParams = {
@@ -21,9 +21,7 @@ export async function createLunarTask({
   cropOrActivity,
   notes,
 }: CreateLunarTaskParams): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) throw new Error("Not signed in");
 
   const { data: dayRow, error: dayErr } = await supabase
