@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabase, getCurrentUser } from "@/lib/supabase";
 import type { FarmMember } from "@/lib/farm";
 import { ExpandableText } from "@/app/farm/components/ExpandableText";
 import { LogHoursModal } from "@/app/farm/components/LogHoursModal";
@@ -290,9 +290,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
   useEffect(() => {
     (async () => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const user = await getCurrentUser();
         if (!user) {
           router.push("/login");
           return;

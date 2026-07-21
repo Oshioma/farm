@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabase, getCurrentUser } from "@/lib/supabase";
 import { getFarms } from "@/lib/farm";
 import type { Farm } from "@/lib/farm";
 import { downloadCsvFile, toFileSlug } from "@/app/farm/utils";
@@ -49,7 +49,7 @@ export default function SettingsPage() {
     if (!activeFarmId) return;
     let cancelled = false;
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCurrentUser();
       if (!user || cancelled) return;
       const { data: membership } = await supabase
         .from("farm_members")

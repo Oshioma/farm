@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase, getCurrentUser } from "@/lib/supabase";
 
 // Roles that can manage a farm (financials, admin, structure, deletes).
 // "owner" is the farm creator; "manager" is reserved for a future non-owner
@@ -33,9 +33,7 @@ export function useFarmRole(farmId: string | null | undefined): FarmRoleState {
     setLoading(true);
     (async () => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const user = await getCurrentUser();
         if (!user) {
           if (!cancelled) {
             setRole(null);

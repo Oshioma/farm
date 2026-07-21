@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, getCurrentUser } from "@/lib/supabase";
 import {
   saveToCache,
   getFromCache,
@@ -94,7 +94,7 @@ function withZoneIds<T extends { zone_id: string | null; extra_zone_ids?: string
 
 export async function saveActiveFarmId(farmId: string): Promise<void> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) return;
 
     await supabase.auth.updateUser({
@@ -108,7 +108,7 @@ export async function saveActiveFarmId(farmId: string): Promise<void> {
 
 export async function getActiveFarmId(): Promise<string | null> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) return null;
 
     const farmId = (user.user_metadata?.last_active_farm_id as string) || null;
@@ -223,7 +223,7 @@ export async function getFarms(): Promise<Farm[]> {
     "farms_list",
     "farms",
     async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCurrentUser();
       if (!user) return [];
 
       const { data: members, error: membersError } = await supabase
@@ -488,7 +488,7 @@ export async function getWants(farmId: string): Promise<Want[]> {
 export type WantWithFarm = Want & { farm_name: string };
 
 export async function getOtherFarmsWants(currentFarmId: string): Promise<WantWithFarm[]> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) return [];
 
   const { data: memberships, error: membersError } = await supabase
