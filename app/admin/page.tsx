@@ -40,6 +40,7 @@ export default function AdminPage() {
   const [deletingFarmId, setDeletingFarmId] = useState<string | null>(null);
   const [confirmDeleteFarmId, setConfirmDeleteFarmId] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState("");
+  const [savingRoleId, setSavingRoleId] = useState<string | null>(null);
 
   async function loadData() {
     const res = await fetch("/api/admin/farms");
@@ -76,6 +77,27 @@ export default function AdminPage() {
       setError(err instanceof Error ? err.message : "Failed to delete user");
     } finally {
       setDeletingUserId(null);
+    }
+  }
+
+  async function setMemberRole(memberId: string, role: string) {
+    setSavingRoleId(memberId);
+    setError("");
+    setSuccessMsg("");
+    try {
+      const res = await fetch("/api/admin/set-member-role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId, role }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update role");
+      setSuccessMsg("Role updated");
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update role");
+    } finally {
+      setSavingRoleId(null);
     }
   }
 
@@ -399,6 +421,21 @@ export default function AdminPage() {
                                   >
                                     {m.role_on_farm}
                                   </span>
+                                  {m.role_on_farm !== "owner" && (
+                                    <select
+                                      value={m.role_on_farm === "manager" ? "manager" : "worker"}
+                                      disabled={savingRoleId === m.id}
+                                      onChange={(e) => setMemberRole(m.id, e.target.value)}
+                                      aria-label="Set member role"
+                                      className="rounded-lg border border-zinc-300 px-2 py-1 text-xs outline-none focus:border-zinc-900 disabled:opacity-50"
+                                    >
+                                      <option value="worker">Worker</option>
+                                      <option value="manager">Manager</option>
+                                    </select>
+                                  )}
+                                  {savingRoleId === m.id && (
+                                    <span className="text-xs text-zinc-400">saving…</span>
+                                  )}
                                   {m.profile_id === currentUserId && (
                                     <span className="text-xs text-zinc-400">(you)</span>
                                   )}
