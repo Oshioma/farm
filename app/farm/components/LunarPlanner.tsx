@@ -1403,10 +1403,10 @@ function DayCard(props: DayCardProps) {
                     <Check className="h-3.5 w-3.5" />
                   </button>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <Icon className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                    <div className="flex items-start gap-1.5">
+                      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-500" />
                       <span
-                        className={`truncate font-medium ${
+                        className={`font-medium break-words ${
                           done ? "text-zinc-400 line-through" : "text-zinc-800"
                         }`}
                       >

@@ -6,6 +6,8 @@ import { supabase } from "@/lib/supabase";
 import { getFarms } from "@/lib/farm";
 import type { Farm } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { useFarmRole } from "@/hooks/useFarmRole";
+import { ManagerOnly } from "@/components/ManagerOnly";
 
 type Member = {
   id: string;
@@ -44,6 +46,7 @@ export default function InvitePage() {
   const [inviteSuccess, setInviteSuccess] = useState("");
 
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const { isManager, loading: roleLoading } = useFarmRole(activeFarmId);
   const activeFarmIdRef = useRef(activeFarmId);
   useEffect(() => {
     activeFarmIdRef.current = activeFarmId;
@@ -205,6 +208,10 @@ export default function InvitePage() {
   }
 
   const activeFarm = farms.find((f) => f.id === activeFarmId);
+
+  if (activeFarmId && !roleLoading && !isManager) {
+    return <ManagerOnly title="Members — managers only" />;
+  }
 
   return (
     <main className="min-h-screen bg-stone-50 text-zinc-900">

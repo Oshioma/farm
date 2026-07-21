@@ -9,6 +9,7 @@ import { ZoneForm } from "@/app/farm/components/ZoneForm";
 import type { ZoneFormData } from "@/app/farm/components/ZoneForm";
 import { badgeClass } from "@/app/farm/utils";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { useFarmRole } from "@/hooks/useFarmRole";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -34,6 +35,7 @@ export default function ZonesPage() {
   const [savingZoneId, setSavingZoneId] = useState<string | null>(null);
 
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const { isManager } = useFarmRole(activeFarmId);
 
   useEffect(() => {
     (async () => {
@@ -247,7 +249,7 @@ export default function ZonesPage() {
         {activeFarm && (
           <div className="space-y-6">
             {/* Create Zone Form */}
-            {activeForm === "create" && (
+            {isManager && activeForm === "create" && (
               <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                 <div className="mb-4 flex items-center justify-between">
                   <h2 className="text-xl font-semibold">Add new zone</h2>
@@ -277,12 +279,14 @@ export default function ZonesPage() {
                     Manage all zones in {activeFarm.name}
                   </p>
                 </div>
-                <button
-                  onClick={() => setActiveForm(activeForm === "create" ? null : "create")}
-                  className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-                >
-                  {activeForm === "create" ? "Cancel" : "+ Add zone"}
-                </button>
+                {isManager && (
+                  <button
+                    onClick={() => setActiveForm(activeForm === "create" ? null : "create")}
+                    className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+                  >
+                    {activeForm === "create" ? "Cancel" : "+ Add zone"}
+                  </button>
+                )}
               </div>
 
               {zones.length === 0 ? (
@@ -306,7 +310,7 @@ export default function ZonesPage() {
                             : "border-zinc-200 bg-white hover:shadow-md"
                         } p-4`}
                       >
-                        {isEditing ? (
+                        {isEditing && isManager ? (
                           <div className="space-y-3">
                             <h3 className="text-sm font-semibold">Edit zone</h3>
                             <div>
@@ -421,12 +425,14 @@ export default function ZonesPage() {
                                     {zone.size_acres} ac
                                   </span>
                                 )}
-                                <button
-                                  onClick={() => startEditZone(zone.id)}
-                                  className="rounded-full border border-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100"
-                                >
-                                  Edit
-                                </button>
+                                {isManager && (
+                                  <button
+                                    onClick={() => startEditZone(zone.id)}
+                                    className="rounded-full border border-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100"
+                                  >
+                                    Edit
+                                  </button>
+                                )}
                               </div>
                             </div>
                             {zoneCrops.length > 0 ? (

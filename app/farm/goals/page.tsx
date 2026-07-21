@@ -13,6 +13,7 @@ import {
 import type { Farm, Zone, Crop, Task, FarmMember, GoalTimeframe } from "@/lib/farm";
 import { formatDate, badgeClass } from "@/app/farm/utils";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { useFarmRole } from "@/hooks/useFarmRole";
 import { TaskForm } from "@/app/farm/components/TaskForm";
 import type { TaskFormData } from "@/app/farm/components/TaskForm";
 import { ExpandableText } from "@/app/farm/components/ExpandableText";
@@ -50,6 +51,7 @@ export default function WorkerGoalsPage() {
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
   const [groupBy, setGroupBy] = useState<"none" | "assignee">("assignee");
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<Task | null>(null);
 
   // "all" shows every goal in the farm regardless of timeframe/due-date; the
   // other tabs narrow to a specific calendar period. Default to "all" so the
@@ -60,6 +62,7 @@ export default function WorkerGoalsPage() {
   const [threeYearStart, setThreeYearStart] = useState(now.getFullYear());
 
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const { isManager } = useFarmRole(activeFarmId);
   const activeFarmIdRef = useRef(activeFarmId);
   useEffect(() => {
     activeFarmIdRef.current = activeFarmId;
@@ -248,6 +251,53 @@ export default function WorkerGoalsPage() {
       return true;
     } catch (err) {
       setError(errMsg(err, "Failed to create goal"));
+      return false;
+    }
+  }
+
+  function goalToForm(t: Task): TaskFormData {
+    return {
+      title: t.title,
+      description: t.description ?? "",
+      zone_id: t.zone_id ?? "",
+      crop_id: t.crop_id ?? "",
+      assigned_to: t.assigned_to ?? "",
+      status: t.status ?? "todo",
+      priority: t.priority ?? "medium",
+      due_date: t.due_date ?? "",
+      proof_required: !!t.proof_required,
+      goal_timeframe: t.goal_timeframe ?? "month",
+    };
+  }
+
+  async function handleUpdateGoal(data: TaskFormData): Promise<boolean> {
+    if (!activeFarmId || !editingGoal) return false;
+    try {
+      setError("");
+      const title = data.title.trim();
+      if (!title) throw new Error("Goal title is required.");
+
+      const { error: updateError } = await supabase
+        .from("tasks")
+        .update({
+          zone_id: data.zone_id || null,
+          crop_id: data.crop_id || null,
+          assigned_to: data.assigned_to || null,
+          title,
+          description: data.description.trim() || null,
+          status: data.status,
+          priority: data.priority,
+          due_date: data.due_date || null,
+          proof_required: data.proof_required,
+          goal_timeframe: data.goal_timeframe,
+        })
+        .eq("id", editingGoal.id);
+      if (updateError) throw updateError;
+
+      await reloadTasks(activeFarmId);
+      return true;
+    } catch (err) {
+      setError(errMsg(err, "Failed to update goal"));
       return false;
     }
   }
@@ -492,12 +542,14 @@ export default function WorkerGoalsPage() {
                 >
                   Group by person
                 </button>
-                <button
-                  onClick={() => setShowCreateForm((v) => !v)}
-                  className="ml-auto rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
-                >
-                  {showCreateForm ? "Cancel" : "+ New goal"}
-                </button>
+                {isManager && (
+                  <button
+                    onClick={() => setShowCreateForm((v) => !v)}
+                    className="ml-auto rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
+                  >
+                    {showCreateForm ? "Cancel" : "+ New goal"}
+                  </button>
+                )}
             </div>
 
             {showCreateForm && (
@@ -595,9 +647,9 @@ export default function WorkerGoalsPage() {
                         <ExpandableText text={task.description} className="mt-2 text-sm text-zinc-500" />
                       )}
 
-                      {canAct ? (
+                      {canAct || isManager ? (
                         <div className="mt-4 flex flex-wrap gap-2">
-                          {task.status === "todo" && (
+                          {(canAct || isManager) && task.status === "todo" && (
                             <button
                               onClick={() => handleStartTask(task)}
                               className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
@@ -605,20 +657,33 @@ export default function WorkerGoalsPage() {
                               Start goal
                             </button>
                           )}
-                          <button
-                            onClick={() => handleComplete(task)}
-                            disabled={isCompleting}
-                            className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-60"
-                          >
-                            {isCompleting ? "Completing..." : "Mark done"}
-                          </button>
-                          <button
-                            onClick={() => handleDeleteGoal(task.id)}
-                            disabled={isDeleting}
-                            className="rounded-2xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
-                          >
-                            {isDeleting ? "Deleting..." : "Delete"}
-                          </button>
+                          {(canAct || isManager) && (
+                            <button
+                              onClick={() => handleComplete(task)}
+                              disabled={isCompleting}
+                              className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-60"
+                            >
+                              {isCompleting ? "Completing..." : "Mark done"}
+                            </button>
+                          )}
+                          {/* Editing and deleting goals is a manager action. */}
+                          {isManager && (
+                            <button
+                              onClick={() => setEditingGoal(task)}
+                              className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+                            >
+                              Edit
+                            </button>
+                          )}
+                          {isManager && (
+                            <button
+                              onClick={() => handleDeleteGoal(task.id)}
+                              disabled={isDeleting}
+                              className="rounded-2xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
+                            >
+                              {isDeleting ? "Deleting..." : "Delete"}
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <p className="mt-4 text-xs text-zinc-400">
@@ -680,6 +745,37 @@ export default function WorkerGoalsPage() {
           onSkip={handleSkipHoursAndComplete}
           onClose={() => setHoursPromptTask(null)}
         />
+      )}
+
+      {editingGoal && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-6 sm:items-center sm:py-10">
+          <div className="w-full max-w-lg">
+            <TaskForm
+              key={editingGoal.id}
+              zones={zones}
+              crops={crops}
+              members={members}
+              defaultZoneId=""
+              initial={goalToForm(editingGoal)}
+              heading="Edit goal"
+              subheading="Update this goal's details and save."
+              submitLabel="Save changes"
+              savingLabel="Saving..."
+              resetOnSuccess={false}
+              onSubmit={async (data) => {
+                const ok = await handleUpdateGoal(data);
+                if (ok) setEditingGoal(null);
+                return ok;
+              }}
+            />
+            <button
+              onClick={() => setEditingGoal(null)}
+              className="mt-3 w-full rounded-2xl border border-zinc-200 bg-white px-5 py-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
     </main>
   );

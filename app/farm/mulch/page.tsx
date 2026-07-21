@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { getFarms, getMulch, getZones } from "@/lib/farm";
 import type { Farm, MulchEntry, Zone } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { useFarmRole } from "@/hooks/useFarmRole";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -43,6 +44,7 @@ export default function MulchPage() {
   );
 
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const { isManager } = useFarmRole(activeFarmId);
   const activeFarmIdRef = useRef(activeFarmId);
   useEffect(() => {
     activeFarmIdRef.current = activeFarmId;
@@ -285,9 +287,11 @@ export default function MulchPage() {
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex gap-1">
                           <button onClick={() => openEdit(row)} className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">Edit</button>
-                          <button onClick={() => handleDelete(row.id)} disabled={deletingId === row.id} className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">
-                            {deletingId === row.id ? "…" : "Delete"}
-                          </button>
+                          {isManager && (
+                            <button onClick={() => handleDelete(row.id)} disabled={deletingId === row.id} className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">
+                              {deletingId === row.id ? "…" : "Delete"}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

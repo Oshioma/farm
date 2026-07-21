@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { getFarms } from "@/lib/farm";
 import type { Farm } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { useFarmRole } from "@/hooks/useFarmRole";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -83,6 +84,7 @@ export default function SystemsPage() {
 
   const router = useRouter();
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const { isManager } = useFarmRole(activeFarmId);
   const activeFarmIdRef = useRef(activeFarmId);
   useEffect(() => {
     activeFarmIdRef.current = activeFarmId;
@@ -323,21 +325,23 @@ export default function SystemsPage() {
                 className="rounded-full border border-zinc-200 bg-white py-2 pl-9 pr-4 text-sm outline-none focus:border-zinc-400"
               />
             </div>
-            <button
-              onClick={() => { if (showForm && !editingId) { resetForm(); } else { resetForm(); setShowForm(true); setForm((p) => ({ ...p, category: tab })); } }}
-              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
-                showForm && !editingId ? "bg-zinc-900 text-white" : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
-              }`}
-            >
-              <Plus size={15} />
-              Add {tab === "crop_guide" ? "crop guide" : "SOP"}
-            </button>
+            {isManager && (
+              <button
+                onClick={() => { if (showForm && !editingId) { resetForm(); } else { resetForm(); setShowForm(true); setForm((p) => ({ ...p, category: tab })); } }}
+                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
+                  showForm && !editingId ? "bg-zinc-900 text-white" : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
+                }`}
+              >
+                <Plus size={15} />
+                Add {tab === "crop_guide" ? "crop guide" : "SOP"}
+              </button>
+            )}
           </div>
         </div>
 
 
         {/* Create / Edit Form */}
-        {showForm && (
+        {isManager && showForm && (
           <div className="mb-6">
             <form onSubmit={editingId ? (e) => { e.preventDefault(); handleSaveEdit(editingId); } : handleAdd} className="max-w-2xl rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm space-y-4">
               <h2 className="text-lg font-semibold">{editingId ? "Edit Document" : `Add ${tab === "crop_guide" ? "Crop Guide" : "SOP"}`}</h2>
@@ -498,10 +502,14 @@ export default function SystemsPage() {
                               Open <ExternalLink size={12} />
                             </a>
                           )}
-                          <button onClick={() => startEdit(doc)} className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">Edit</button>
-                          <button onClick={() => handleDelete(doc.id)} disabled={deletingId === doc.id} className="rounded-xl border border-rose-200 px-3 py-1.5 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">
-                            {deletingId === doc.id ? "…" : "Del"}
-                          </button>
+                          {isManager && (
+                            <>
+                              <button onClick={() => startEdit(doc)} className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">Edit</button>
+                              <button onClick={() => handleDelete(doc.id)} disabled={deletingId === doc.id} className="rounded-xl border border-rose-200 px-3 py-1.5 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">
+                                {deletingId === doc.id ? "…" : "Del"}
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
 

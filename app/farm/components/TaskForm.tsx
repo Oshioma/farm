@@ -36,6 +36,14 @@ type Props = {
   defaultZoneId: string;
   defaultTimeframe?: GoalTimeframe;
   onSubmit: (data: TaskFormData) => Promise<boolean>;
+  // Edit mode: prefill the form, relabel it, and keep the values after a
+  // successful save instead of clearing (the parent closes the editor).
+  initial?: TaskFormData;
+  heading?: string;
+  subheading?: string;
+  submitLabel?: string;
+  savingLabel?: string;
+  resetOnSuccess?: boolean;
 };
 
 function yearOf(dueDate: string, fallback: number): number {
@@ -46,8 +54,23 @@ function yearOf(dueDate: string, fallback: number): number {
 const currentYear = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: 9 }, (_, i) => currentYear - 1 + i);
 
-export function TaskForm({ zones, crops, members, defaultZoneId, defaultTimeframe, onSubmit }: Props) {
-  const [form, setForm] = useState<TaskFormData>({ ...blank, goal_timeframe: defaultTimeframe ?? "month" });
+export function TaskForm({
+  zones,
+  crops,
+  members,
+  defaultZoneId,
+  defaultTimeframe,
+  onSubmit,
+  initial,
+  heading = "Create goal",
+  subheading = "Add what needs doing and link it to a crop if relevant.",
+  submitLabel = "Create goal",
+  savingLabel = "Creating goal...",
+  resetOnSuccess = true,
+}: Props) {
+  const [form, setForm] = useState<TaskFormData>(
+    initial ?? { ...blank, goal_timeframe: defaultTimeframe ?? "month" }
+  );
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -61,16 +84,16 @@ export function TaskForm({ zones, crops, members, defaultZoneId, defaultTimefram
     setSaving(true);
     const ok = await onSubmit(form);
     setSaving(false);
-    if (ok) setForm({ ...blank, zone_id: defaultZoneId, goal_timeframe: defaultTimeframe ?? "month" });
+    if (ok && resetOnSuccess) {
+      setForm({ ...blank, zone_id: defaultZoneId, goal_timeframe: defaultTimeframe ?? "month" });
+    }
   }
 
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
       <div className="mb-5">
-        <h2 className="text-xl font-semibold">Create goal</h2>
-        <p className="mt-1 text-sm text-zinc-500">
-          Add what needs doing and link it to a crop if relevant.
-        </p>
+        <h2 className="text-xl font-semibold">{heading}</h2>
+        <p className="mt-1 text-sm text-zinc-500">{subheading}</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -254,7 +277,7 @@ export function TaskForm({ zones, crops, members, defaultZoneId, defaultTimefram
           disabled={saving || !form.title.trim()}
           className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {saving ? "Creating goal..." : "Create goal"}
+          {saving ? savingLabel : submitLabel}
         </button>
       </form>
     </div>

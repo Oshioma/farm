@@ -7,6 +7,8 @@ import { supabase } from "@/lib/supabase";
 import { getFarms, getWorkHours } from "@/lib/farm";
 import type { Farm, WorkHoursEntry } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { useFarmRole } from "@/hooks/useFarmRole";
+import { ManagerOnly } from "@/components/ManagerOnly";
 import { WORKERS } from "@/lib/workers";
 
 function errMsg(err: unknown, fallback: string): string {
@@ -55,6 +57,7 @@ export default function WorkHoursPage() {
 
   const router = useRouter();
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const { isManager, loading: roleLoading } = useFarmRole(activeFarmId);
   const activeFarmIdRef = useRef(activeFarmId);
   useEffect(() => {
     activeFarmIdRef.current = activeFarmId;
@@ -232,6 +235,10 @@ export default function WorkHoursPage() {
   const totalAllHours = summary.reduce((s, r) => s + r.total, 0);
   const activeFarm = farms.find((f) => f.id === activeFarmId);
   const inp = "w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900";
+
+  if (activeFarmId && !roleLoading && !isManager) {
+    return <ManagerOnly title="Work hours — managers only" />;
+  }
 
   return (
     <main className="min-h-screen bg-stone-50 text-zinc-900">

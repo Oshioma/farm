@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { getFarms, getCompanionPlanting } from "@/lib/farm";
 import type { Farm, CompanionEntry } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { useFarmRole } from "@/hooks/useFarmRole";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -41,6 +42,7 @@ export default function CompanionPage() {
   const router = useRouter();
 
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const { isManager } = useFarmRole(activeFarmId);
   const activeFarmIdRef = useRef(activeFarmId);
   useEffect(() => {
     activeFarmIdRef.current = activeFarmId;
@@ -189,6 +191,7 @@ export default function CompanionPage() {
         )}
 
         {/* Add entry */}
+        {isManager && (
         <div className="mb-6">
           <button
             onClick={() => setShowForm((v) => !v)}
@@ -298,6 +301,7 @@ export default function CompanionPage() {
             </div>
           )}
         </div>
+        )}
 
         {/* Table */}
         {loading && entries.length === 0 ? (
@@ -323,7 +327,7 @@ export default function CompanionPage() {
               </thead>
               <tbody>
                 {entries.map((entry, i) => (
-                  editingId === entry.id ? (
+                  isManager && editingId === entry.id ? (
                     <tr key={entry.id} className="border-b border-zinc-100 bg-amber-50/40">
                       <td className="px-3 py-2">
                         <input type="date" value={editForm.date}
@@ -385,6 +389,7 @@ export default function CompanionPage() {
                       <td className="px-5 py-4 text-zinc-600">{entry.companion ?? "—"}</td>
                       <td className="px-5 py-4 text-zinc-500">{entry.notes ?? "—"}</td>
                       <td className="px-5 py-4">
+                        {isManager && (
                         <div className="flex gap-2">
                           <button
                             onClick={() => {
@@ -410,6 +415,7 @@ export default function CompanionPage() {
                             Delete
                           </button>
                         </div>
+                        )}
                       </td>
                     </tr>
                   )

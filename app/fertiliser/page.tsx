@@ -9,6 +9,7 @@ import { getFarms, getFertilisations, getZones } from "@/lib/farm";
 import type { Farm, FertilisationEntry, Zone } from "@/lib/farm";
 import { createLunarTask } from "@/lib/lunarTasks";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { useFarmRole } from "@/hooks/useFarmRole";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -46,6 +47,7 @@ export default function FertiliserPage() {
   const router = useRouter();
   const quickAddHandledRef = useRef(false);
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const { isManager } = useFarmRole(activeFarmId);
   const activeFarmIdRef = useRef(activeFarmId);
   useEffect(() => {
     activeFarmIdRef.current = activeFarmId;
@@ -582,10 +584,12 @@ export default function FertiliserPage() {
                             className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100">
                             Edit
                           </button>
-                          <button onClick={() => handleDelete(entry.id)} disabled={deletingId === entry.id}
-                            className="rounded-xl border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">
-                            Delete
-                          </button>
+                          {isManager && (
+                            <button onClick={() => handleDelete(entry.id)} disabled={deletingId === entry.id}
+                              className="rounded-xl border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">
+                              Delete
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

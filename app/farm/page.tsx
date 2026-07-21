@@ -457,6 +457,13 @@ export default function FarmPage() {
   const monthGoals = tasks.filter((task) => (task.goal_timeframe ?? "month") === "month");
   const yearGoals = tasks.filter((task) => task.goal_timeframe === "year");
   const threeYearGoals = tasks.filter((task) => task.goal_timeframe === "3year");
+  // Open long-term goals to preview on the dashboard so they're visible from
+  // the home page (not just as a count) without opening the Goals page.
+  const longTermOpen = [...yearGoals, ...threeYearGoals].filter(
+    (task) => task.status !== "done" && task.status !== "cancelled"
+  );
+  // Managers (owner/manager) get financial + admin features; workers don't.
+  const isManager = userRoleOnFarm === "owner" || userRoleOnFarm === "manager";
 
   const tasksToday = monthGoals.filter(
     (task) =>
@@ -1561,7 +1568,7 @@ export default function FarmPage() {
               { href: workerGoalsHref, label: "Goals" },
               { href: withFarmContext("/farm/harvest-eta"), label: "Harvest" },
               { href: withFarmContext("/farm/harvest-logs"), label: "Harvest logs" },
-              { href: withFarmContext("/income-prediction"), label: "Income prediction" },
+              { href: withFarmContext("/income-prediction"), label: "Income prediction", managerOnly: true },
               { href: "#map", label: "Map" },
               { href: withFarmContext("/farm/mulch"), label: "Mulch" },
               { href: withFarmContext("/farm/planting-plan"), label: "Planting plan" },
@@ -1570,8 +1577,8 @@ export default function FarmPage() {
               { href: withFarmContext("/farm/soil-tests"), label: "Soil tests" },
               { href: withFarmContext("/farm/systems"), label: "Systems" },
               { href: withFarmContext("/farm/trees"), label: "Trees" },
-              { href: withFarmContext("/farm/work-hours"), label: "Work hours" },
-            ].map(({ href, label }) => (
+              { href: withFarmContext("/farm/work-hours"), label: "Work hours", managerOnly: true },
+            ].filter((item) => isManager || !item.managerOnly).map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}
@@ -1787,16 +1794,18 @@ export default function FarmPage() {
             <div className="mb-6 flex flex-wrap gap-2">
               {(
                 [
-                  { key: "crop", label: "+ Crop" },
+                  { key: "crop", label: "+ Crop", managerOnly: true },
                   { key: "want", label: "+ Want" },
-                  { key: "task", label: "+ Task" },
+                  { key: "task", label: "+ Task", managerOnly: true },
                   { key: "harvest", label: "+ Harvest" },
                   { key: "pest", label: "+ Pest" },
-                  { key: "sale", label: "+ Sale" },
-                  { key: "expense", label: "+ Expense" },
-                  { key: "asset", label: "+ Asset" },
+                  { key: "sale", label: "+ Sale", managerOnly: true },
+                  { key: "expense", label: "+ Expense", managerOnly: true },
+                  { key: "asset", label: "+ Asset", managerOnly: true },
                 ] as const
-              ).map(({ key, label }) => (
+              )
+                .filter((item) => isManager || !("managerOnly" in item && item.managerOnly))
+                .map(({ key, label }) => (
                 <button
                   key={key}
                   onClick={() => setActiveForm(activeForm === key ? null : key)}
@@ -2189,6 +2198,48 @@ export default function FarmPage() {
                   View year & 3-year goals
                 </Link>
               </div>
+
+              {longTermOpen.length > 0 && (
+                <ul className="mt-4 space-y-2">
+                  {longTermOpen.slice(0, 6).map((task) => (
+                    <li
+                      key={task.id}
+                      className="flex flex-wrap items-center gap-2 rounded-2xl border border-zinc-100 bg-zinc-50 px-3 py-2.5"
+                    >
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          task.goal_timeframe === "year"
+                            ? "bg-indigo-100 text-indigo-700"
+                            : "bg-purple-100 text-purple-700"
+                        }`}
+                      >
+                        {task.goal_timeframe === "year" ? "Year" : "3-Year"}
+                      </span>
+                      <span className="min-w-0 flex-1 break-words text-sm font-medium text-zinc-800">
+                        {task.title}
+                      </span>
+                      {task.due_date && (
+                        <span className="text-xs text-zinc-400">
+                          {task.due_date.slice(0, 4)}
+                        </span>
+                      )}
+                      {task.assigned_to && (
+                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] text-indigo-600 ring-1 ring-indigo-100">
+                          {memberEmailMap[task.assigned_to] ?? "Assigned"}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                  {longTermOpen.length > 6 && (
+                    <li className="px-1 pt-1 text-xs text-zinc-500">
+                      + {longTermOpen.length - 6} more —{" "}
+                      <Link href={workerGoalsHref} className="font-medium text-zinc-700 underline">
+                        view all
+                      </Link>
+                    </li>
+                  )}
+                </ul>
+              )}
             </section>
 
             <section className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
@@ -2568,6 +2619,7 @@ export default function FarmPage() {
                   </div>
                 </div>
 
+                {isManager && (
                 <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                   <button
                     onClick={() => setShowAssets((v) => !v)}
@@ -2634,6 +2686,7 @@ export default function FarmPage() {
                   </div>
                   ) : null}
                 </div>
+                )}
 
                 <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                   <div className="flex items-center justify-between gap-4">
@@ -2787,6 +2840,7 @@ export default function FarmPage() {
               <ActivityFeed activities={activities} />
             </div>
 
+            {isManager && (
             <section className="mt-6 space-y-6">
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
@@ -3122,6 +3176,7 @@ export default function FarmPage() {
                 )}
               </div>
             </section>
+            )}
           </>
         ) : null}
 

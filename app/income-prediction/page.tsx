@@ -8,6 +8,8 @@ import { supabase } from "@/lib/supabase";
 import { getFarms, getIncomePrediction } from "@/lib/farm";
 import type { Farm, IncomePredictionRow } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { useFarmRole } from "@/hooks/useFarmRole";
+import { ManagerOnly } from "@/components/ManagerOnly";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -99,6 +101,7 @@ export default function IncomePredictionPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
+  const { isManager, loading: roleLoading } = useFarmRole(activeFarmId);
   const activeFarmIdRef = useRef(activeFarmId);
   useEffect(() => {
     activeFarmIdRef.current = activeFarmId;
@@ -198,6 +201,10 @@ export default function IncomePredictionPage() {
         className="w-full min-w-[60px] rounded-lg border border-zinc-300 px-2 py-1.5 text-xs outline-none focus:border-zinc-900"
       />
     );
+  }
+
+  if (activeFarmId && !roleLoading && !isManager) {
+    return <ManagerOnly title="Income prediction — managers only" />;
   }
 
   return (
