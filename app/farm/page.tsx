@@ -256,8 +256,9 @@ export default function FarmPage() {
     // Track this as the most recently requested farm so a slower, older
     // request can't overwrite state after the user has switched farms.
     latestFarmIdRef.current = farmId;
-    // Pre-warm auth session so parallel requests don't fight over the
-    // Supabase auth lock (navigator.locks with steal: true).
+    // Pre-warm the auth session so the parallel queries below share one
+    // already-resolved token instead of each triggering a refresh. Lock
+    // contention itself is handled by the in-memory auth lock in lib/supabase.
     await supabase.auth.getSession();
     const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows, pestRows, saleRows, fertilisationRows, compostRows, mulchRows, plantRows, harvestEtaRows, memberRows, wantRows, otherWantRows] = await Promise.all([
       getZones(farmId),
