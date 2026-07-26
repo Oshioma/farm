@@ -23,10 +23,24 @@ export const dynamic = "force-dynamic";
 //   Authorization: Bearer <RELATE_BRIDGE_SECRET>
 export async function GET(req: NextRequest) {
   const secret = process.env.RELATE_BRIDGE_SECRET;
+  const authHeader = req.headers.get("authorization");
 
   // Fail closed: if no secret is configured, the bridge is effectively off.
-  if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!secret || authHeader !== `Bearer ${secret}`) {
+    // Safe diagnostics (booleans only, never the secret) so a 401 explains
+    // itself in the caller's logs: distinguishes "secret not set here",
+    // "no Authorization header arrived" (e.g. stripped by a domain redirect),
+    // and "header arrived but didn't match".
+    return NextResponse.json(
+      {
+        error: "Unauthorized",
+        secretConfigured: Boolean(secret),
+        authHeaderReceived: Boolean(authHeader),
+        authSchemeOk: authHeader?.startsWith("Bearer ") ?? false,
+        secretMatched: Boolean(secret) && authHeader === `Bearer ${secret}`,
+      },
+      { status: 401 },
+    );
   }
 
   const email = req.nextUrl.searchParams.get("email")?.trim().toLowerCase();
