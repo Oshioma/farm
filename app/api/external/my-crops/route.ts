@@ -43,8 +43,8 @@ export async function GET(req: NextRequest) {
     if (!error) {
       userId = listData?.users?.find((u) => u.email?.toLowerCase() === email)?.id ?? null;
     }
-  } catch (e) {
-    console.error("my-crops: auth lookup failed", e);
+  } catch {
+    // Ignore auth-lookup failures — fall through with userId still null.
   }
 
   // 2) Find the user's farms — primarily by membership (profile_id), with
@@ -54,7 +54,6 @@ export async function GET(req: NextRequest) {
   if (userId) {
     const { data, error } = await supabase.from("farm_members").select("farm_id").eq("profile_id", userId);
     if (error) {
-      console.error("my-crops: farm_members by profile_id failed", error.message);
       return NextResponse.json({ error: "Lookup failed" }, { status: 500 });
     }
     for (const m of data ?? []) if (m.farm_id) farmIdSet.add(m.farm_id);
@@ -63,7 +62,6 @@ export async function GET(req: NextRequest) {
   {
     const { data, error } = await supabase.from("farm_members").select("farm_id").ilike("user_email", email);
     if (error) {
-      console.error("my-crops: farm_members by user_email failed", error.message);
       return NextResponse.json({ error: "Lookup failed" }, { status: 500 });
     }
     for (const m of data ?? []) if (m.farm_id) farmIdSet.add(m.farm_id);
@@ -71,7 +69,6 @@ export async function GET(req: NextRequest) {
 
   const farmIds = Array.from(farmIdSet);
   if (farmIds.length === 0) {
-    console.info(`my-crops: no farms matched for ${email} (userId=${userId ?? "none"})`);
     return NextResponse.json({ crops: [] });
   }
 
@@ -84,7 +81,6 @@ export async function GET(req: NextRequest) {
     .order("planted_on", { ascending: false });
 
   if (cropsError) {
-    console.error("my-crops: crops lookup failed", cropsError.message);
     return NextResponse.json({ error: "Lookup failed" }, { status: 500 });
   }
 
@@ -93,6 +89,5 @@ export async function GET(req: NextRequest) {
   const nameById = new Map((farms ?? []).map((f) => [f.id, f.name as string | null]));
 
   const shaped = (crops ?? []).map((c) => ({ ...c, farm_name: nameById.get(c.farm_id) ?? null }));
-  console.info(`my-crops: ${email} -> ${farmIds.length} farm(s), ${shaped.length} active crop(s)`);
   return NextResponse.json({ crops: shaped });
 }
