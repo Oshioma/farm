@@ -40,7 +40,7 @@ import { FarmMap } from "@/app/farm/components/FarmMap";
 import LunarPlanner from "@/app/farm/components/LunarPlanner";
 import { LogHoursModal } from "@/app/farm/components/LogHoursModal";
 import { ExpandableText } from "@/app/farm/components/ExpandableText";
-import { ArrowUp, Plus, Settings, X } from "lucide-react";
+import { ArrowUp, Images, Plus, Settings, X } from "lucide-react";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
 import type { CropFormData } from "@/app/farm/components/CropForm";
 import type { TaskFormData } from "@/app/farm/components/TaskForm";
@@ -2363,6 +2363,15 @@ export default function FarmPage() {
                             {expandAllCrops ? "Show less" : "Show all"}
                           </button>
                         )}
+                        <Link
+                          href={withFarmContext("/crops")}
+                          title="Open crops photo gallery"
+                          aria-label="Open crops photo gallery"
+                          className="flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100"
+                        >
+                          <Images size={14} />
+                          Gallery
+                        </Link>
                       </div>
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
