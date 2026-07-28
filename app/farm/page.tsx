@@ -110,6 +110,8 @@ export default function FarmPage() {
   const [cropMedicinalText, setCropMedicinalText] = useState("");
   const [savingCropNote, setSavingCropNote] = useState(false);
   const [expandAllCrops, setExpandAllCrops] = useState(false);
+  const [highlightCropId, setHighlightCropId] = useState<string | null>(null);
+  const deepLinkHandledRef = React.useRef(false);
   const [expandAllTasks, setExpandAllTasks] = useState(false);
   // No-farm state
   const [noFarmMode, setNoFarmMode] = useState<"idle" | "create" | "join">("idle");
@@ -850,6 +852,39 @@ export default function FarmPage() {
       setCropMedicinalText(crop.medicinal_properties ?? "");
     }
   }
+
+  // Deep link from the crops gallery: /farm#crop-<id> opens that crop's row,
+  // expands the list so it's visible, scrolls to it, and briefly highlights it.
+  useEffect(() => {
+    if (deepLinkHandledRef.current) return;
+    if (typeof window === "undefined" || crops.length === 0) return;
+
+    const match = window.location.hash.match(/^#crop-(.+)$/);
+    if (!match) return;
+
+    const cropId = match[1];
+    const target = crops.find((c) => c.id === cropId);
+    if (!target) return;
+
+    deepLinkHandledRef.current = true;
+    setExpandAllCrops(true);
+    setExpandedCropId(cropId);
+    setCropNoteText(target.notes ?? "");
+    setCropMedicinalText(target.medicinal_properties ?? "");
+    setHighlightCropId(cropId);
+
+    const scrollTimer = setTimeout(() => {
+      document
+        .getElementById(`crop-${cropId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 150);
+    const highlightTimer = setTimeout(() => setHighlightCropId(null), 2800);
+
+    return () => {
+      clearTimeout(scrollTimer);
+      clearTimeout(highlightTimer);
+    };
+  }, [crops]);
 
   function handleCropImageFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null;
@@ -2558,7 +2593,8 @@ export default function FarmPage() {
                                 </tr>
                               ) : (
                                 <React.Fragment key={crop.id}>
-                                <tr className={`border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50 transition-colors cursor-pointer ${expandedCropId === crop.id ? "bg-zinc-50" : ""}`}
+                                <tr id={`crop-${crop.id}`}
+                                    className={`scroll-mt-24 border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50 transition-colors cursor-pointer ${highlightCropId === crop.id ? "bg-emerald-50 ring-2 ring-inset ring-emerald-300" : expandedCropId === crop.id ? "bg-zinc-50" : ""}`}
                                     onClick={() => toggleExpandCrop(crop)}>
                                   <td className="px-4 py-4">
                                     <div className="flex items-center gap-3">

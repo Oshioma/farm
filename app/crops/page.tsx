@@ -436,7 +436,7 @@ export default function CropsGalleryPage() {
                         <p className="mt-2 line-clamp-3 text-[12px] text-white/80">{crop.notes}</p>
                       ) : null}
                       <Link
-                        href={`${withFarmContext("/farm")}#crops`}
+                        href={`${withFarmContext("/farm")}#crop-${crop.id}`}
                         className="mt-3 inline-flex items-center justify-center rounded-full bg-white px-3 py-1.5 text-[12px] font-medium text-zinc-900 hover:bg-zinc-100"
                       >
                         Open full details →
