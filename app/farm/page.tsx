@@ -42,6 +42,7 @@ import { LogHoursModal } from "@/app/farm/components/LogHoursModal";
 import { ExpandableText } from "@/app/farm/components/ExpandableText";
 import { ArrowUp, Images, Plus, Settings, X } from "lucide-react";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
+import NotificationBell from "@/components/NotificationBell";
 import type { CropFormData } from "@/app/farm/components/CropForm";
 import type { TaskFormData } from "@/app/farm/components/TaskForm";
 import type { HarvestFormData } from "@/app/farm/components/HarvestForm";
@@ -1572,6 +1573,7 @@ export default function FarmPage() {
               >
                 {isRefreshing ? "Refreshing..." : "Refresh"}
               </button>
+              <NotificationBell />
               {userEmail && (
                 <span className="text-sm text-zinc-500">{userEmail}</span>
               )}
