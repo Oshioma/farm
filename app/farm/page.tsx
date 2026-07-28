@@ -230,13 +230,40 @@ export default function FarmPage() {
 
   async function handleRequestJoin(farmId: string) {
     setRequestingId(farmId);
+    setError("");
     const user = await getCurrentUser();
-    const { error: err } = await supabase.from("join_requests").upsert({
-      farm_id: farmId,
-      user_id: user?.id,
-      user_email: user?.email,
-      status: "pending",
-    }, { onConflict: "farm_id,user_id" });
+    if (!user) {
+      setError("Please log in to request access.");
+      setRequestingId(null);
+      return;
+    }
+
+    // If a request already exists for this farm, don't re-write it. Re-upserting
+    // a row the requester doesn't own trips join_requests' RLS UPDATE policy
+    // ("new row violates row-level security policy (USING expression)"). A
+    // pending request is already sent, so just reflect that; otherwise re-open
+    // the existing row back to pending.
+    const { data: existing } = await supabase
+      .from("join_requests")
+      .select("id, status")
+      .eq("farm_id", farmId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (existing?.status === "pending") {
+      setRequestSent(farmId);
+      setRequestingId(null);
+      return;
+    }
+
+    const { error: err } = existing
+      ? await supabase.from("join_requests").update({ status: "pending" }).eq("id", existing.id)
+      : await supabase.from("join_requests").insert({
+          farm_id: farmId,
+          user_id: user.id,
+          user_email: user.email,
+          status: "pending",
+        });
     if (err) setError(errMsg(err, "Failed to send request"));
     else setRequestSent(farmId);
     setRequestingId(null);
