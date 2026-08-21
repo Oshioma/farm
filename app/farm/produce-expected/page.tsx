@@ -9,13 +9,17 @@ import {
   getHarvestEta,
   getZones,
   getCrops,
+  getCustomers,
+  getCustomerOrders,
   seasonMonths,
   harvestSeasonYear,
   harvestMonthKeyFor,
   parseYieldKg,
+  orderKg,
+  isStandingOrder,
   bedLabel,
 } from "@/lib/farm";
-import type { Farm, HarvestEtaEntry, Zone, Crop, SeasonMonth } from "@/lib/farm";
+import type { Farm, HarvestEtaEntry, Zone, Crop, SeasonMonth, Customer, CustomerOrder } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 
 function errMsg(err: unknown, fallback: string): string {
@@ -45,6 +49,16 @@ type Line = {
   unit: string | null;
 };
 
+/** One customer's claim on a month. */
+type Claim = {
+  id: string;
+  customer: string;
+  crop: string;
+  amount: string;
+  kg: number | null;
+  standing: boolean;
+};
+
 type MonthTotal = {
   month: SeasonMonth;
   expected: Line[];
@@ -53,6 +67,11 @@ type MonthTotal = {
   actualKg: number;
   /** Cells with something written that could not be read as a weight. */
   unconverted: Line[];
+  claims: Claim[];
+  orderedKg: number;
+  /** Expected minus ordered, never below zero. */
+  unsoldKg: number;
+  oversold: boolean;
 };
 
 function lineFor(entry: HarvestEtaEntry, raw: string, crops: Crop[], zones: Zone[], suffix: string): Line {
@@ -72,7 +91,25 @@ function lineFor(entry: HarvestEtaEntry, raw: string, crops: Crop[], zones: Zone
   return { id: `${entry.id}:${suffix}`, crop: cropName, beds, raw, kg: parsed.kg, isRange: parsed.isRange, unit: parsed.unit };
 }
 
-function buildMonths(months: SeasonMonth[], entries: HarvestEtaEntry[], crops: Crop[], zones: Zone[]): MonthTotal[] {
+function buildMonths(
+  months: SeasonMonth[],
+  entries: HarvestEtaEntry[],
+  crops: Crop[],
+  zones: Zone[],
+  orders: CustomerOrder[],
+  customers: Customer[]
+): MonthTotal[] {
+  /* What one crop is expected to give in one month, for turning a share into
+     kilos. Null when the sheet has nothing, or nothing readable as a weight. */
+  const expectedFor = (cropId: string | null, m: SeasonMonth): number | null => {
+    if (!cropId) return null;
+    const row = entries.find((e) => e.crop_id === cropId && e.year === m.season) as
+      | Record<string, unknown>
+      | undefined;
+    if (!row) return null;
+    return parseYieldKg((row[`${m.key}_expected`] as string | null) ?? "").kg;
+  };
+
   return months.map((month) => {
     const expected: Line[] = [];
     const actual: Line[] = [];
@@ -97,14 +134,39 @@ function buildMonths(months: SeasonMonth[], entries: HarvestEtaEntry[], crops: C
       }
     }
 
+    /* Orders placed on this month, plus standing orders on a crop that yields
+       in it — the same rule the customers page and the shop follow. */
+    const claims: Claim[] = [];
+    for (const o of orders) {
+      if (o.status === "cancelled") continue;
+      const dated = o.season === month.season && o.month_key === month.key;
+      const standing = isStandingOrder(o) && expectedFor(o.crop_id, month) !== null;
+      if (!dated && !standing) continue;
+      const crop = crops.find((c) => c.id === o.crop_id);
+      claims.push({
+        id: `${o.id}:${standing && !dated ? "s" : "d"}`,
+        customer: customers.find((c) => c.id === o.customer_id)?.name ?? "Unknown customer",
+        crop: crop ? crop.crop_name + (crop.variety ? ` · ${crop.variety}` : "") : "Any crop",
+        amount: o.quantity_kg !== null ? `${o.quantity_kg} kg` : `${o.share_pct}%`,
+        kg: orderKg(o, expectedFor(o.crop_id, month)),
+        standing: standing && !dated,
+      });
+    }
+
     const sum = (lines: Line[]) => lines.reduce((total, l) => total + (l.kg ?? 0), 0);
+    const expectedKg = sum(expected);
+    const orderedKg = claims.reduce((total, c) => total + (c.kg ?? 0), 0);
     return {
       month,
       expected: expected.sort((a, b) => (b.kg ?? 0) - (a.kg ?? 0)),
       actual: actual.sort((a, b) => (b.kg ?? 0) - (a.kg ?? 0)),
-      expectedKg: sum(expected),
+      expectedKg,
       actualKg: sum(actual),
       unconverted,
+      claims: claims.sort((a, b) => (b.kg ?? 0) - (a.kg ?? 0)),
+      orderedKg,
+      unsoldKg: Math.max(0, expectedKg - orderedKg),
+      oversold: orderedKg > expectedKg && expectedKg > 0,
     };
   });
 }
@@ -114,6 +176,8 @@ export default function ProduceExpectedPage() {
   const [zones, setZones] = useState<Zone[]>([]);
   const [crops, setCrops] = useState<Crop[]>([]);
   const [entries, setEntries] = useState<HarvestEtaEntry[]>([]);
+  const [orders, setOrders] = useState<CustomerOrder[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
   const [year, setYear] = useState(() => harvestSeasonYear());
   const [fromNow, setFromNow] = useState(true);
@@ -138,12 +202,22 @@ export default function ProduceExpectedPage() {
     if (!activeFarmId) return;
     const seasons = Array.from({ length: SEASON_SPAN }, (_, i) => year + i);
     setLoading(true);
-    Promise.all([getHarvestEta(activeFarmId, seasons), getZones(activeFarmId), getCrops(activeFarmId)])
-      .then(([rows, zoneRows, cropRows]) => {
+    Promise.all([
+      getHarvestEta(activeFarmId, seasons),
+      getZones(activeFarmId),
+      getCrops(activeFarmId),
+      /* Orders may not be readable yet (the customers tables are newer than
+         this page), and that should not stop the harvest totals showing. */
+      getCustomerOrders(activeFarmId).catch(() => [] as CustomerOrder[]),
+      getCustomers(activeFarmId).catch(() => [] as Customer[]),
+    ])
+      .then(([rows, zoneRows, cropRows, orderRows, customerRows]) => {
         if (activeFarmIdRef.current !== activeFarmId) return;
         setEntries(rows);
         setZones(zoneRows);
         setCrops(cropRows);
+        setOrders(orderRows);
+        setCustomers(customerRows);
       })
       .catch((err) => setError(errMsg(err, "Failed to load")))
       .finally(() => setLoading(false));
@@ -151,7 +225,10 @@ export default function ProduceExpectedPage() {
 
   const months = useMemo(() => seasonMonths(year, SEASON_SPAN), [year]);
   const lastMonth = months[months.length - 1];
-  const allTotals = useMemo(() => buildMonths(months, entries, crops, zones), [months, entries, crops, zones]);
+  const allTotals = useMemo(
+    () => buildMonths(months, entries, crops, zones, orders, customers),
+    [months, entries, crops, zones, orders, customers]
+  );
 
   /* "From this month" hides months already gone by, which is what you want when
      asking what is still coming. */
@@ -167,6 +244,9 @@ export default function ProduceExpectedPage() {
   const totalExpected = totals.reduce((sum, t) => sum + t.expectedKg, 0);
   const totalActual = totals.reduce((sum, t) => sum + t.actualKg, 0);
   const totalUnconverted = totals.reduce((sum, t) => sum + t.unconverted.length, 0);
+  const totalOrdered = totals.reduce((sum, t) => sum + t.orderedKg, 0);
+  const totalUnsold = totals.reduce((sum, t) => sum + t.unsoldKg, 0);
+  const oversoldMonths = totals.filter((t) => t.oversold).length;
   const peak = withProduce.reduce<MonthTotal | null>(
     (best, t) => (!best || t.expectedKg > best.expectedKg ? t : best),
     null
@@ -262,7 +342,7 @@ export default function ProduceExpectedPage() {
         </div>
 
         {/* Totals */}
-        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
           <div className="rounded-3xl border border-emerald-200 bg-emerald-50/60 p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Expected</p>
             <p className="mt-1 text-3xl font-semibold text-emerald-900">{fmtKg(totalExpected)}</p>
@@ -270,21 +350,26 @@ export default function ProduceExpectedPage() {
               across {withProduce.length} month{withProduce.length === 1 ? "" : "s"}
             </p>
           </div>
-          <div className="rounded-3xl border border-blue-200 bg-blue-50/60 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Recorded so far</p>
-            <p className="mt-1 text-3xl font-semibold text-blue-900">{fmtKg(totalActual)}</p>
-            <p className="mt-1 text-xs text-blue-700">
-              {totalExpected > 0 ? `${Math.round((totalActual / totalExpected) * 100)}% of expected` : "no expectation set"}
+          <div className="rounded-3xl border border-indigo-200 bg-indigo-50/60 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-700">Sold</p>
+            <p className="mt-1 text-3xl font-semibold text-indigo-900">{fmtKg(totalOrdered)}</p>
+            <p className="mt-1 text-xs text-indigo-700">
+              {totalExpected > 0 ? `${Math.round((totalOrdered / totalExpected) * 100)}% of expected` : "nothing ordered"}
             </p>
           </div>
-          <div className="rounded-3xl border border-zinc-200 bg-white p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">Biggest month</p>
-            <p className="mt-1 text-3xl font-semibold">
-              {peak && peak.expectedKg > 0 ? `${peak.month.label} ${String(peak.month.calendarYear).slice(-2)}` : "—"}
+          <div className="rounded-3xl border border-amber-200 bg-amber-50/60 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">Still to sell</p>
+            <p className="mt-1 text-3xl font-semibold text-amber-900">{fmtKg(totalUnsold)}</p>
+            <p className="mt-1 text-xs text-amber-700">
+              {oversoldMonths > 0
+                ? `${oversoldMonths} month${oversoldMonths === 1 ? "" : "s"} oversold`
+                : "expected minus ordered"}
             </p>
-            <p className="mt-1 text-xs text-zinc-500">
-              {peak && peak.expectedKg > 0 ? fmtKg(peak.expectedKg) : "nothing estimated yet"}
-            </p>
+          </div>
+          <div className="rounded-3xl border border-blue-200 bg-blue-50/60 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Picked so far</p>
+            <p className="mt-1 text-3xl font-semibold text-blue-900">{fmtKg(totalActual)}</p>
+            <p className="mt-1 text-xs text-blue-700">recorded as actual</p>
           </div>
         </div>
 
@@ -328,13 +413,33 @@ export default function ProduceExpectedPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-4">
+                      {t.orderedKg > 0 && (
+                        <span className="hidden w-32 sm:block" title={`${fmtKg(t.orderedKg)} of ${fmtKg(t.expectedKg)} sold`}>
+                          <span className="block h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+                            <span
+                              className={`block h-full ${t.oversold ? "bg-rose-500" : "bg-indigo-500"}`}
+                              style={{ width: `${Math.min(100, t.expectedKg > 0 ? (t.orderedKg / t.expectedKg) * 100 : 100)}%` }}
+                            />
+                          </span>
+                        </span>
+                      )}
                       {t.actualKg > 0 && (
                         <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
                           {fmtKg(t.actualKg)} actual
                         </span>
                       )}
-                      <span className={`text-sm font-semibold ${t.expectedKg > 0 ? "text-emerald-700" : "text-zinc-300"}`}>
-                        {t.expectedKg > 0 ? fmtKg(t.expectedKg) : "—"}
+                      <span className="text-right text-xs text-zinc-500">
+                        <span className={`block text-sm font-semibold ${t.expectedKg > 0 ? "text-emerald-700" : "text-zinc-300"}`}>
+                          {t.expectedKg > 0 ? fmtKg(t.expectedKg) : "—"}
+                        </span>
+                        {t.orderedKg > 0 && (
+                          <span className={t.oversold ? "text-rose-600" : "text-zinc-500"}>
+                            {fmtKg(t.orderedKg)} sold
+                            {t.oversold
+                              ? ` · ${fmtKg(t.orderedKg - t.expectedKg)} over`
+                              : ` · ${fmtKg(t.unsoldKg)} left`}
+                          </span>
+                        )}
                       </span>
                       {!isEmpty && <span className="text-xs text-zinc-400">{isOpen ? "▲" : "▼"}</span>}
                     </div>
@@ -379,6 +484,43 @@ export default function ProduceExpectedPage() {
                           ))}
                         </tbody>
                       </table>
+
+                      {t.claims.length > 0 && (
+                        <div className="mt-4 border-t border-zinc-200/70 pt-3">
+                          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                            Sold to
+                          </p>
+                          <table className="w-full text-xs">
+                            <tbody>
+                              {t.claims.map((c) => (
+                                <tr key={c.id} className="border-t border-zinc-200/70 first:border-t-0">
+                                  <td className="py-1.5 pr-3 font-medium">
+                                    {c.customer}
+                                    {c.standing && (
+                                      <span className="ml-1.5 rounded-full bg-zinc-200/70 px-1.5 py-0.5 text-[9px] font-medium text-zinc-600">
+                                        standing
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="py-1.5 pr-3 text-zinc-500">{c.crop}</td>
+                                  <td className="py-1.5 pr-3 text-zinc-500">{c.amount}</td>
+                                  <td className={`py-1.5 text-right font-medium ${c.kg === null ? "text-amber-700" : "text-indigo-700"}`}>
+                                    {c.kg === null ? "no estimate yet" : fmtKg(c.kg)}
+                                  </td>
+                                </tr>
+                              ))}
+                              <tr className="border-t border-zinc-300">
+                                <td className="py-1.5 pr-3 font-semibold" colSpan={3}>
+                                  {t.oversold ? "Oversold by" : "Still to sell"}
+                                </td>
+                                <td className={`py-1.5 text-right font-semibold ${t.oversold ? "text-rose-700" : "text-amber-700"}`}>
+                                  {fmtKg(t.oversold ? t.orderedKg - t.expectedKg : t.unsoldKg)}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -396,7 +538,8 @@ export default function ProduceExpectedPage() {
 
         <p className="mt-4 text-xs text-zinc-400">
           Totals read the Harvest ETA month cells. Plain numbers are treated as kilos; g, t and lb are converted;
-          a range like &ldquo;10-15kg&rdquo; counts as its midpoint.
+          a range like &ldquo;10-15kg&rdquo; counts as its midpoint. Sold figures come from customer orders — a
+          share is worked out against that month&rsquo;s estimate, so it moves as the estimate does.
         </p>
       </div>
     </main>
