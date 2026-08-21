@@ -1,0 +1,389 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,300;6..72,400;6..72,500&family=Karla:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; font-family: Karla, Helvetica, sans-serif; color: #1c1917; background: #faf7f2; }
+    a { color: #166534; text-decoration: none; }
+    a:hover { color: #052e16; }
+    h1, h2, h3 { margin: 0; font-family: Newsreader, Georgia, serif; font-weight: 400; }
+    p { margin: 0; }
+  </style>
+</helmet>
+
+<div style="background: #faf7f2; min-height: 100%;">
+
+  <!-- Top bar -->
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 20px 64px; border-bottom: 1px solid #e7e0d5;">
+    <div style="display: flex; align-items: baseline; gap: 12px;">
+      <span style="font-family: Newsreader, Georgia, serif; font-size: 24px; letter-spacing: -0.01em;">Top Land</span>
+      <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #a8a29e;">Shamba Online</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 28px;">
+      <a href="#" style="font-size: 14px; color: #57534e;">What&rsquo;s growing</a>
+      <a href="#" style="font-size: 14px; color: #57534e;">How it works</a>
+      <a href="#" style="font-size: 14px; color: #57534e;">Sign in</a>
+      <a href="#" style="display: inline-block; background: #166534; color: #ffffff; font-size: 14px; font-weight: 600; padding: 12px 22px; border-radius: 999px;">Reserve produce</a>
+    </div>
+  </div>
+
+  <!-- Hero -->
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 64px; align-items: center; padding: 72px 64px 64px;">
+    <div style="display: flex; flex-direction: column; gap: 24px; align-items: flex-start;">
+      <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #b45309;">Top Land &middot; [Region], Kenya</span>
+      <h1 style="font-size: 60px; line-height: 1.05; letter-spacing: -0.02em; text-wrap: pretty;">Claim your share before it is picked.</h1>
+      <p style="font-size: 18px; line-height: 1.6; color: #57534e; max-width: 46ch; text-wrap: pretty;">Everything on this page is already in the ground with a harvest date against it. Reserve a share of a bed, and collect it the week it comes out.</p>
+      <div style="display: flex; gap: 12px; padding-top: 8px;">
+        <a href="#" style="display: inline-block; background: #166534; color: #ffffff; font-size: 15px; font-weight: 600; padding: 15px 28px; border-radius: 999px;">See what&rsquo;s coming</a>
+        <a href="#" style="display: inline-block; border: 1px solid #d6cec1; color: #1c1917; font-size: 15px; font-weight: 600; padding: 15px 28px; border-radius: 999px;">How pre-ordering works</a>
+      </div>
+      <div style="display: flex; gap: 32px; padding-top: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <span style="font-family: Newsreader, Georgia, serif; font-size: 30px; color: #166534;">8</span>
+          <span style="font-size: 12px; color: #78716c;">crops with a harvest date</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <span style="font-family: Newsreader, Georgia, serif; font-size: 30px; color: #166534;">612 kg</span>
+          <span style="font-size: 12px; color: #78716c;">expected this season</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <span style="font-family: Newsreader, Georgia, serif; font-size: 30px; color: #b45309;">41%</span>
+          <span style="font-size: 12px; color: #78716c;">already reserved</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Illustrated beds -->
+    <div style="border-radius: 24px; background: #052e16; padding: 36px; overflow: hidden;">
+      <svg viewBox="0 0 520 420" width="100%" height="auto" role="img" aria-label="Illustration of planted beds">
+        <defs>
+          <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#134e2a"/>
+            <stop offset="100%" stop-color="#052e16"/>
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="520" height="420" fill="url(#sky)"/>
+        <circle cx="416" cy="86" r="42" fill="#b45309" opacity="0.85"/>
+        <g stroke="#3f8f5a" stroke-width="2" fill="none" opacity="0.55">
+          <path d="M0 250 C 130 226, 390 226, 520 250"/>
+          <path d="M0 286 C 130 262, 390 262, 520 286"/>
+          <path d="M0 322 C 130 298, 390 298, 520 322"/>
+          <path d="M0 358 C 130 334, 390 334, 520 358"/>
+        </g>
+        <g fill="#5fae76">
+          <circle cx="70" cy="246" r="9"/><circle cx="150" cy="240" r="9"/><circle cx="230" cy="238" r="9"/>
+          <circle cx="310" cy="240" r="9"/><circle cx="390" cy="244" r="9"/><circle cx="464" cy="248" r="9"/>
+        </g>
+        <g fill="#7cc78f">
+          <circle cx="42" cy="284" r="11"/><circle cx="134" cy="276" r="11"/><circle cx="226" cy="274" r="11"/>
+          <circle cx="318" cy="276" r="11"/><circle cx="408" cy="282" r="11"/>
+        </g>
+        <g fill="#b45309">
+          <circle cx="96" cy="320" r="13"/><circle cx="212" cy="312" r="13"/><circle cx="330" cy="314" r="13"/><circle cx="444" cy="322" r="13"/>
+        </g>
+        <g fill="#93c5a4">
+          <circle cx="60" cy="358" r="12"/><circle cx="180" cy="350" r="12"/><circle cx="300" cy="350" r="12"/><circle cx="420" cy="356" r="12"/>
+        </g>
+      </svg>
+      <div style="display: flex; align-items: center; gap: 10px; padding-top: 24px;">
+        <span style="width: 8px; height: 8px; border-radius: 999px; background: #7cc78f; display: inline-block;"></span>
+        <span style="font-size: 13px; color: #a7d3b4;">34 beds in production &middot; picked to order, never held in cold store</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Harvest calendar -->
+  <div style="padding: 8px 64px 24px;">
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding-bottom: 20px;">
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #a8a29e;">The season ahead</span>
+        <h2 style="font-size: 34px; letter-spacing: -0.01em;">What is coming, and when</h2>
+      </div>
+      <p style="font-size: 14px; color: #78716c; max-width: 38ch; text-align: right;">Weights are our own estimates from the field, updated as the crop grows.</p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px;">
+      <div style="border: 1px solid #166534; background: #ffffff; border-radius: 20px; padding: 20px;">
+        <p style="font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #166534;">Sep &rsquo;26</p>
+        <p style="font-family: Newsreader, Georgia, serif; font-size: 30px; padding-top: 8px;">168 kg</p>
+        <p style="font-size: 12px; color: #78716c; padding-top: 4px;">5 crops &middot; picking now</p>
+      </div>
+      <div style="border: 1px solid #e7e0d5; background: #ffffff; border-radius: 20px; padding: 20px;">
+        <p style="font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #a8a29e;">Oct &rsquo;26</p>
+        <p style="font-family: Newsreader, Georgia, serif; font-size: 30px; padding-top: 8px;">142 kg</p>
+        <p style="font-size: 12px; color: #78716c; padding-top: 4px;">4 crops</p>
+      </div>
+      <div style="border: 1px solid #e7e0d5; background: #ffffff; border-radius: 20px; padding: 20px;">
+        <p style="font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #a8a29e;">Nov &rsquo;26</p>
+        <p style="font-family: Newsreader, Georgia, serif; font-size: 30px; padding-top: 8px;">96 kg</p>
+        <p style="font-size: 12px; color: #78716c; padding-top: 4px;">3 crops</p>
+      </div>
+      <div style="border: 1px solid #e7e0d5; background: #ffffff; border-radius: 20px; padding: 20px;">
+        <p style="font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #a8a29e;">Dec &rsquo;26</p>
+        <p style="font-family: Newsreader, Georgia, serif; font-size: 30px; padding-top: 8px;">88 kg</p>
+        <p style="font-size: 12px; color: #78716c; padding-top: 4px;">3 crops</p>
+      </div>
+      <div style="border: 1px solid #e7e0d5; background: #ffffff; border-radius: 20px; padding: 20px;">
+        <p style="font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #a8a29e;">Jan &rsquo;27</p>
+        <p style="font-family: Newsreader, Georgia, serif; font-size: 30px; padding-top: 8px;">74 kg</p>
+        <p style="font-size: 12px; color: #78716c; padding-top: 4px;">2 crops</p>
+      </div>
+      <div style="border: 1px solid #e7e0d5; background: #ffffff; border-radius: 20px; padding: 20px;">
+        <p style="font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #a8a29e;">Feb &rsquo;27</p>
+        <p style="font-family: Newsreader, Georgia, serif; font-size: 30px; padding-top: 8px;">44 kg</p>
+        <p style="font-size: 12px; color: #78716c; padding-top: 4px;">2 crops</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Produce grid -->
+  <div style="padding: 40px 64px 24px;">
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding-bottom: 22px;">
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #a8a29e;">Open for pre-order</span>
+        <h2 style="font-size: 34px; letter-spacing: -0.01em;">Produce with a harvest date</h2>
+      </div>
+      <p style="font-size: 14px; color: #78716c; max-width: 42ch; text-align: right; text-wrap: pretty;">If a crop has no expected harvest against it, it is not listed here. Nothing is sold on a maybe.</p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px;">
+
+      <div style="display: flex; flex-direction: column; gap: 14px; background: #ffffff; border: 1px solid #e7e0d5; border-radius: 24px; padding: 22px;">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-family: Newsreader, Georgia, serif; font-size: 24px;">Tomatoes</span>
+            <span style="font-size: 13px; color: #78716c;">Roma &middot; bed TR1</span>
+          </div>
+          <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #166534; background: #ecfdf3; padding: 6px 10px; border-radius: 999px; white-space: nowrap;">Sep</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between;">
+            <span style="font-size: 13px; color: #57534e;">40 kg expected</span>
+            <span style="font-size: 13px; font-weight: 600; color: #b45309;">28 kg free</span>
+          </div>
+          <div style="height: 6px; border-radius: 999px; background: #f0e9dd; overflow: hidden;">
+            <div style="width: 30%; height: 100%; background: #166534;"></div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 2px;">
+          <span style="font-size: 14px; color: #1c1917;"><strong style="font-weight: 700;">KSh 120</strong> <span style="color: #a8a29e;">/ kg</span></span>
+          <a href="#" style="font-size: 13px; font-weight: 600; color: #166534; border: 1px solid #cfe6d7; padding: 9px 16px; border-radius: 999px;">Reserve</a>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px; background: #ffffff; border: 1px solid #e7e0d5; border-radius: 24px; padding: 22px;">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-family: Newsreader, Georgia, serif; font-size: 24px;">Sukuma wiki</span>
+            <span style="font-size: 13px; color: #78716c;">Collards &middot; beds TR2, TR3</span>
+          </div>
+          <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #166534; background: #ecfdf3; padding: 6px 10px; border-radius: 999px; white-space: nowrap;">Sep&ndash;Nov</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between;">
+            <span style="font-size: 13px; color: #57534e;">120 kg expected</span>
+            <span style="font-size: 13px; font-weight: 600; color: #b45309;">54 kg free</span>
+          </div>
+          <div style="height: 6px; border-radius: 999px; background: #f0e9dd; overflow: hidden;">
+            <div style="width: 55%; height: 100%; background: #166534;"></div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 2px;">
+          <span style="font-size: 14px; color: #1c1917;"><strong style="font-weight: 700;">KSh 60</strong> <span style="color: #a8a29e;">/ kg</span></span>
+          <a href="#" style="font-size: 13px; font-weight: 600; color: #166534; border: 1px solid #cfe6d7; padding: 9px 16px; border-radius: 999px;">Reserve</a>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px; background: #ffffff; border: 1px solid #e7e0d5; border-radius: 24px; padding: 22px;">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-family: Newsreader, Georgia, serif; font-size: 24px;">French beans</span>
+            <span style="font-size: 13px; color: #78716c;">Fine &middot; bed TR4</span>
+          </div>
+          <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #166534; background: #ecfdf3; padding: 6px 10px; border-radius: 999px; white-space: nowrap;">Oct</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between;">
+            <span style="font-size: 13px; color: #57534e;">72 kg expected</span>
+            <span style="font-size: 13px; font-weight: 600; color: #b45309;">72 kg free</span>
+          </div>
+          <div style="height: 6px; border-radius: 999px; background: #f0e9dd; overflow: hidden;">
+            <div style="width: 0%; height: 100%; background: #166534;"></div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 2px;">
+          <span style="font-size: 14px; color: #1c1917;"><strong style="font-weight: 700;">KSh 180</strong> <span style="color: #a8a29e;">/ kg</span></span>
+          <a href="#" style="font-size: 13px; font-weight: 600; color: #166534; border: 1px solid #cfe6d7; padding: 9px 16px; border-radius: 999px;">Reserve</a>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px; background: #ffffff; border: 1px solid #e7e0d5; border-radius: 24px; padding: 22px;">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-family: Newsreader, Georgia, serif; font-size: 24px;">Dhania</span>
+            <span style="font-size: 13px; color: #78716c;">Coriander &middot; bed R1</span>
+          </div>
+          <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #166534; background: #ecfdf3; padding: 6px 10px; border-radius: 999px; white-space: nowrap;">Sep&ndash;Oct</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between;">
+            <span style="font-size: 13px; color: #57534e;">24 kg expected</span>
+            <span style="font-size: 13px; font-weight: 600; color: #b45309;">9 kg free</span>
+          </div>
+          <div style="height: 6px; border-radius: 999px; background: #f0e9dd; overflow: hidden;">
+            <div style="width: 62%; height: 100%; background: #166534;"></div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 2px;">
+          <span style="font-size: 14px; color: #1c1917;"><strong style="font-weight: 700;">KSh 200</strong> <span style="color: #a8a29e;">/ kg</span></span>
+          <a href="#" style="font-size: 13px; font-weight: 600; color: #166534; border: 1px solid #cfe6d7; padding: 9px 16px; border-radius: 999px;">Reserve</a>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px; background: #ffffff; border: 1px solid #e7e0d5; border-radius: 24px; padding: 22px;">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-family: Newsreader, Georgia, serif; font-size: 24px;">Avocado</span>
+            <span style="font-size: 13px; color: #78716c;">Hass &middot; orchard</span>
+          </div>
+          <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #166534; background: #ecfdf3; padding: 6px 10px; border-radius: 999px; white-space: nowrap;">Oct&ndash;Dec</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between;">
+            <span style="font-size: 13px; color: #57534e;">160 kg expected</span>
+            <span style="font-size: 13px; font-weight: 600; color: #b45309;">96 kg free</span>
+          </div>
+          <div style="height: 6px; border-radius: 999px; background: #f0e9dd; overflow: hidden;">
+            <div style="width: 40%; height: 100%; background: #166534;"></div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 2px;">
+          <span style="font-size: 14px; color: #1c1917;"><strong style="font-weight: 700;">KSh 90</strong> <span style="color: #a8a29e;">/ kg</span></span>
+          <a href="#" style="font-size: 13px; font-weight: 600; color: #166534; border: 1px solid #cfe6d7; padding: 9px 16px; border-radius: 999px;">Reserve</a>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px; background: #ffffff; border: 1px solid #e7e0d5; border-radius: 24px; padding: 22px;">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-family: Newsreader, Georgia, serif; font-size: 24px;">Spring onions</span>
+            <span style="font-size: 13px; color: #78716c;">Bed R3</span>
+          </div>
+          <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #166534; background: #ecfdf3; padding: 6px 10px; border-radius: 999px; white-space: nowrap;">Nov</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between;">
+            <span style="font-size: 13px; color: #57534e;">36 kg expected</span>
+            <span style="font-size: 13px; font-weight: 600; color: #b45309;">30 kg free</span>
+          </div>
+          <div style="height: 6px; border-radius: 999px; background: #f0e9dd; overflow: hidden;">
+            <div style="width: 17%; height: 100%; background: #166534;"></div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 2px;">
+          <span style="font-size: 14px; color: #1c1917;"><strong style="font-weight: 700;">KSh 140</strong> <span style="color: #a8a29e;">/ kg</span></span>
+          <a href="#" style="font-size: 13px; font-weight: 600; color: #166534; border: 1px solid #cfe6d7; padding: 9px 16px; border-radius: 999px;">Reserve</a>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px; background: #ffffff; border: 1px solid #e7e0d5; border-radius: 24px; padding: 22px;">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-family: Newsreader, Georgia, serif; font-size: 24px;">Passion fruit</span>
+            <span style="font-size: 13px; color: #78716c;">Purple &middot; cloche CL2</span>
+          </div>
+          <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #166534; background: #ecfdf3; padding: 6px 10px; border-radius: 999px; white-space: nowrap;">Dec&ndash;Feb</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between;">
+            <span style="font-size: 13px; color: #57534e;">98 kg expected</span>
+            <span style="font-size: 13px; font-weight: 600; color: #b45309;">72 kg free</span>
+          </div>
+          <div style="height: 6px; border-radius: 999px; background: #f0e9dd; overflow: hidden;">
+            <div style="width: 27%; height: 100%; background: #166534;"></div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 2px;">
+          <span style="font-size: 14px; color: #1c1917;"><strong style="font-weight: 700;">KSh 160</strong> <span style="color: #a8a29e;">/ kg</span></span>
+          <a href="#" style="font-size: 13px; font-weight: 600; color: #166534; border: 1px solid #cfe6d7; padding: 9px 16px; border-radius: 999px;">Reserve</a>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px; background: #ffffff; border: 1px solid #e7e0d5; border-radius: 24px; padding: 22px;">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-family: Newsreader, Georgia, serif; font-size: 24px;">Baby spinach</span>
+            <span style="font-size: 13px; color: #78716c;">Cloche CL1</span>
+          </div>
+          <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #166534; background: #ecfdf3; padding: 6px 10px; border-radius: 999px; white-space: nowrap;">Sep&ndash;Jan</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between;">
+            <span style="font-size: 13px; color: #57534e;">62 kg expected</span>
+            <span style="font-size: 13px; font-weight: 600; color: #b45309;">18 kg free</span>
+          </div>
+          <div style="height: 6px; border-radius: 999px; background: #f0e9dd; overflow: hidden;">
+            <div style="width: 71%; height: 100%; background: #166534;"></div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 2px;">
+          <span style="font-size: 14px; color: #1c1917;"><strong style="font-weight: 700;">KSh 220</strong> <span style="color: #a8a29e;">/ kg</span></span>
+          <a href="#" style="font-size: 13px; font-weight: 600; color: #166534; border: 1px solid #cfe6d7; padding: 9px 16px; border-radius: 999px;">Reserve</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- How it works -->
+  <div style="padding: 48px 64px 8px;">
+    <div style="background: #ffffff; border: 1px solid #e7e0d5; border-radius: 28px; padding: 44px;">
+      <h2 style="font-size: 34px; letter-spacing: -0.01em; padding-bottom: 28px;">Three steps, no card needed</h2>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px;">
+        <div style="display: flex; flex-direction: column; gap: 12px; align-items: flex-start;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 7h18"/><path d="M6 7v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7"/><path d="M9 7V5a3 3 0 0 1 6 0v2"/>
+          </svg>
+          <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #a8a29e;">Step one</span>
+          <h3 style="font-size: 22px;">Reserve a share</h3>
+          <p style="font-size: 15px; line-height: 1.6; color: #57534e;">Pick a crop and say how much of that month&rsquo;s harvest you want &mdash; a share of the bed, or a number of kilos.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 12px; align-items: flex-start;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3v6"/><path d="M8 9c0-2 1.8-4 4-4s4 2 4 4"/><path d="M4 13h16l-1.5 7h-13z"/>
+          </svg>
+          <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #a8a29e;">Step two</span>
+          <h3 style="font-size: 22px;">We pick to your order</h3>
+          <p style="font-size: 15px; line-height: 1.6; color: #57534e;">You get a message the week it is ready with the real weight. Short of a good crop, we tell you early rather than late.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 12px; align-items: flex-start;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+          </svg>
+          <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #a8a29e;">Step three</span>
+          <h3 style="font-size: 22px;">Collect and settle</h3>
+          <p style="font-size: 15px; line-height: 1.6; color: #57534e;">Collect from [pickup point] on the agreed day and pay on collection. Nothing is charged when you reserve.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 48px; padding: 56px 64px 64px;">
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <span style="font-family: Newsreader, Georgia, serif; font-size: 22px;">Top Land</span>
+      <p style="font-size: 14px; color: #78716c; max-width: 34ch;">[Farm address] &middot; collection [days and hours]</p>
+      <p style="font-size: 14px; color: #78716c;">[+254 telephone] &middot; [email address]</p>
+    </div>
+    <p style="font-size: 13px; color: #a8a29e; max-width: 44ch; text-align: right; text-wrap: pretty;">Prices are per kilo and confirmed on the day at the weighed amount. Estimates move with the weather &mdash; we would rather tell you that than promise a number we cannot pick.</p>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>
