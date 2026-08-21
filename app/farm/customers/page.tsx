@@ -183,6 +183,19 @@ export default function CustomersPage() {
     return parseYieldKg((entry[`${key}_expected`] as string | null) ?? "").kg;
   }
 
+  /* A crop is sellable once the harvest ETA sheet says something is coming
+     from it. Text that is not a weight ("20 crates") still counts as an
+     expected harvest — it just cannot be turned into kilos. */
+  function cropHasExpectedHarvest(cropId: string): boolean {
+    return entries.some((e) => {
+      if (e.crop_id !== cropId) return false;
+      const row = e as unknown as Record<string, unknown>;
+      return months.some(
+        (m) => m.season === e.year && ((row[`${m.key}_expected`] as string | null) ?? "").trim() !== ""
+      );
+    });
+  }
+
   /** Every crop's expected total for a month, orders aside. */
   function monthExpectedKg(m: SeasonMonth): number {
     return entries
@@ -220,6 +233,15 @@ export default function CustomersPage() {
   }
 
   const liveOrders = useMemo(() => orders.filter((o) => o.status !== "cancelled"), [orders]);
+
+  /* Only crops with an expected harvest can be ordered — the same rule the
+     shopfront follows. A crop someone already holds an order against stays
+     listed even if its estimate has since gone, so the order can be undone. */
+  const orderableCrops = useMemo(() => {
+    const ordered = new Set(orders.map((o) => o.crop_id).filter(Boolean) as string[]);
+    return crops.filter((c) => ordered.has(c.id) || cropHasExpectedHarvest(c.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [crops, entries, orders, months]);
 
   const ordersByCustomer = useMemo(() => {
     const map = new Map<string, CustomerOrder[]>();
@@ -638,15 +660,20 @@ export default function CustomersPage() {
                                 Crops this customer takes
                               </p>
                               <p className="text-xs text-zinc-500">
-                                Ticking uses {c.default_share_pct ?? DEFAULT_SHARE}% — change it per crop below, or on
-                                the customer to change the default.
+                                Only crops with an expected harvest are listed. Ticking uses{" "}
+                                {c.default_share_pct ?? DEFAULT_SHARE}% — change it per crop below, or on the customer
+                                to change the default.
                               </p>
                             </div>
-                            {crops.length === 0 ? (
-                              <p className="text-sm text-zinc-400">No crops on this farm yet.</p>
+                            {orderableCrops.length === 0 ? (
+                              <p className="text-sm text-zinc-400">
+                                {crops.length === 0
+                                  ? "No crops on this farm yet."
+                                  : "No crop has an expected harvest in this window yet — add estimates on the Harvest ETA sheet and they will appear here."}
+                              </p>
                             ) : (
                               <div className="max-h-72 space-y-1 overflow-y-auto">
-                                {crops.map((crop) => {
+                                {orderableCrops.map((crop) => {
                                   const standing = standingFor(c.id, crop.id);
                                   const checked = !!standing;
                                   const draftKey = `${c.id}:${crop.id}`;
@@ -979,7 +1006,7 @@ export default function CustomersPage() {
               <Field label="Crop">
                 <select className={inp} value={orderForm.crop_id} onChange={(e) => setOrderForm((p) => ({ ...p, crop_id: e.target.value }))}>
                   <option value="">— Any / not tied to a crop —</option>
-                  {crops.map((c) => (
+                  {orderableCrops.map((c) => (
                     <option key={c.id} value={c.id}>
                       {cropLabel(c)}
                       {c.zone_ids?.length ? ` (${c.zone_ids.map((zid) => bedLabel(zones.find((z) => z.id === zid))).filter(Boolean).join(", ")})` : ""}
