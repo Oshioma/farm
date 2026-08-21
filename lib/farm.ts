@@ -898,12 +898,13 @@ export type HarvestEtaEntry = {
   created_at: string | null;
 };
 
-export async function getHarvestEta(farmId: string, year: number): Promise<HarvestEtaEntry[]> {
+export async function getHarvestEta(farmId: string, years: number | number[]): Promise<HarvestEtaEntry[]> {
+  const seasons = Array.isArray(years) ? years : [years];
   const { data, error } = await supabase
     .from("harvest_eta")
     .select("id, farm_id, year, bed_name, zone_id, crop_id, zone:zones(name, code), main_crop, expected_harvest_date, beneficial_companions, mar_expected, mar_actual, apr_expected, apr_actual, may_expected, may_actual, jun_expected, jun_actual, jul_expected, jul_actual, aug_expected, aug_actual, sep_expected, sep_actual, oct_expected, oct_actual, nov_expected, nov_actual, dec_expected, dec_actual, jan_expected, jan_actual, feb_expected, feb_actual, notes, created_at")
     .eq("farm_id", farmId)
-    .eq("year", year)
+    .in("year", seasons)
     .order("bed_name");
 
   if (error) throw new Error(`getHarvestEta failed: ${error.message}`);
@@ -940,6 +941,36 @@ export function harvestSeasonYear(date: Date | string = new Date()): number {
   const d = typeof date === "string" ? new Date(date) : date;
   if (Number.isNaN(d.getTime())) return new Date().getFullYear();
   return d.getMonth() + 1 >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+}
+
+/** One month on the sheet: which season row stores it, and how to label it. */
+export type SeasonMonth = {
+  key: HarvestMonthKey;
+  label: string;
+  /** The harvest_eta row's `year` — the Mar–Feb season this month belongs to. */
+  season: number;
+  /** Calendar year, e.g. Jan of season 2026 is 2027. */
+  calendarYear: number;
+};
+
+/**
+ * A continuous run of months across consecutive seasons, so the sheet can plan
+ * further ahead than the twelve months of a single Mar–Feb season.
+ */
+export function seasonMonths(startSeason: number, seasonCount = 2): SeasonMonth[] {
+  const months: SeasonMonth[] = [];
+  for (let i = 0; i < seasonCount; i++) {
+    const season = startSeason + i;
+    for (const m of HARVEST_MONTHS) {
+      months.push({
+        key: m.key,
+        label: m.label,
+        season,
+        calendarYear: harvestMonthYear(m.key, season),
+      });
+    }
+  }
+  return months;
 }
 
 /** First day of a season month as an ISO date, for date columns like crops.expected_harvest_start. */

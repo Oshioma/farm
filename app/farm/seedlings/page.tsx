@@ -9,15 +9,14 @@ import {
   getSeedlings,
   getSeedCollection,
   getZones,
-  HARVEST_MONTHS,
   harvestSeasonYear,
   harvestMonthKeyFor,
-  harvestMonthYear,
   harvestMonthStartDate,
+  seasonMonths,
   bedLabel,
   upsertHarvestEstimate,
 } from "@/lib/farm";
-import type { Farm, SeedlingEntry, SeedCollectionEntry, Zone, HarvestMonthKey } from "@/lib/farm";
+import type { Farm, SeedlingEntry, SeedCollectionEntry, Zone, SeasonMonth } from "@/lib/farm";
 import { createLunarTask } from "@/lib/lunarTasks";
 import { SeedlingMap } from "../components/SeedlingMap";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
@@ -102,8 +101,9 @@ export default function SeedlingsPage() {
   const [transplantZoneIds, setTransplantZoneIds] = useState<string[]>([]);
   const [transplantDate, setTransplantDate] = useState("");
   const [transplanting, setTransplanting] = useState(false);
-  // Estimated harvest captured while transplanting -> harvest ETA sheet
-  const [estimateMonth, setEstimateMonth] = useState<HarvestMonthKey>("mar");
+  // Estimated harvest captured while transplanting -> harvest ETA sheet.
+  // Identified as "<season>:<month>" so it can reach past the planting season.
+  const [estimateMonthId, setEstimateMonthId] = useState("");
   const [estimateYield, setEstimateYield] = useState("");
 
   // Seed collection
@@ -202,19 +202,21 @@ export default function SeedlingsPage() {
     setEntries(s); setSeedEntries(seeds);
   }
 
-  // The harvest season (Mar–Feb) the transplant falls into, and the readable
-  // month label the estimate is filed under, e.g. "Sep 2026".
-  const estimateSeason = useMemo(() => harvestSeasonYear(transplantDate || new Date()), [transplantDate]);
-  const estimateHarvestDate = useMemo(() => {
-    const month = HARVEST_MONTHS.find((m) => m.key === estimateMonth);
-    if (!month) return "";
-    return `${month.label} ${harvestMonthYear(estimateMonth, estimateSeason)}`;
-  }, [estimateMonth, estimateSeason]);
-  // crops.expected_harvest_start is a date column, so it gets the 1st of that month.
-  const estimateHarvestStart = useMemo(
-    () => harvestMonthStartDate(estimateMonth, estimateSeason),
-    [estimateMonth, estimateSeason]
+  /* Harvest months on offer: two Mar–Feb seasons from the transplant date, so a
+     long crop can be estimated well beyond the season it goes in the ground. */
+  const estimateMonths = useMemo(
+    () => seasonMonths(harvestSeasonYear(transplantDate || new Date()), 2),
+    [transplantDate]
   );
+  const monthId = (m: SeasonMonth) => `${m.season}:${m.key}`;
+  const estimateMonth = useMemo(
+    () => estimateMonths.find((m) => monthId(m) === estimateMonthId) ?? estimateMonths[0],
+    [estimateMonths, estimateMonthId]
+  );
+  // Free text on the sheet, e.g. "Sep 2027".
+  const estimateHarvestDate = estimateMonth ? `${estimateMonth.label} ${estimateMonth.calendarYear}` : "";
+  // crops.expected_harvest_start is a date column, so it gets the 1st of that month.
+  const estimateHarvestStart = estimateMonth ? harvestMonthStartDate(estimateMonth.key, estimateMonth.season) : "";
 
   function openTransplant(entry: SeedlingEntry) {
     setError("");
@@ -223,7 +225,7 @@ export default function SeedlingsPage() {
     const today = new Date();
     const localToday = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
     setTransplantDate(localToday);
-    setEstimateMonth(harvestMonthKeyFor(localToday));
+    setEstimateMonthId(`${harvestSeasonYear(localToday)}:${harvestMonthKeyFor(localToday)}`);
     setEstimateYield("");
   }
 
@@ -268,10 +270,10 @@ export default function SeedlingsPage() {
           .join(", ");
         await upsertHarvestEstimate({
           farmId: activeFarmId,
-          year: harvestSeasonYear(transplantDate || new Date()),
+          year: estimateMonth.season,
           zoneId: zoneIds[0],
           bedName: beds || "—",
-          monthKey: estimateMonth,
+          monthKey: estimateMonth.key,
           expected: estimateYield.trim(),
           cropId: newCrop?.id ?? null,
           mainCrop: transplantModal.plant + (transplantModal.variety ? ` · ${transplantModal.variety}` : ""),
@@ -748,12 +750,12 @@ export default function SeedlingsPage() {
                   <Field label="Harvest month">
                     <select
                       className={inp}
-                      value={estimateMonth}
-                      onChange={(e) => setEstimateMonth(e.target.value as HarvestMonthKey)}
+                      value={estimateMonth ? monthId(estimateMonth) : ""}
+                      onChange={(e) => setEstimateMonthId(e.target.value)}
                     >
-                      {HARVEST_MONTHS.map((m) => (
-                        <option key={m.key} value={m.key}>
-                          {m.label} {harvestMonthYear(m.key, estimateSeason)}
+                      {estimateMonths.map((m) => (
+                        <option key={monthId(m)} value={monthId(m)}>
+                          {m.label} {m.calendarYear}
                         </option>
                       ))}
                     </select>
