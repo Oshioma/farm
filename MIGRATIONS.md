@@ -17,6 +17,13 @@ npx supabase migration new add_something_to_table   # creates the timestamped fi
 Commit it, open a PR, merge. The workflow runs `supabase db push` against the
 hosted project. There is no rollback — undo a bad migration with a new one.
 
+## Checking the remote without changing it
+
+Actions tab → **Database migrations** → *Run workflow* → mode **check**. It links
+the project and prints `supabase migration list`, so you can see which local
+migrations the remote has recorded as applied and which a push would run.
+Nothing is written. Choose mode **apply** to push from there instead.
+
 ## One-time setup
 
 **1. Repository credentials** — GitHub → Settings → Secrets and variables → Actions:
