@@ -1131,6 +1131,8 @@ export type Customer = {
   phone: string | null;
   email: string | null;
   notes: string | null;
+  /** The share this customer usually takes, offered when ticking crops. */
+  default_share_pct: number | null;
   created_at: string | null;
 };
 
@@ -1153,15 +1155,21 @@ export type CustomerOrder = {
 };
 
 export async function getCustomers(farmId: string): Promise<Customer[]> {
+  /* Selected with * rather than by name so the page still loads on a database
+     where a newer column has not been added yet; the field simply reads as
+     undefined until the migration runs. */
   const { data, error } = await supabase
     .from("customers")
-    .select("id, farm_id, name, contact_name, phone, email, notes, created_at")
+    .select("*")
     .eq("farm_id", farmId)
     .eq("is_active", true)
     .order("name");
 
   if (error) throw new Error(`getCustomers failed: ${error.message}`);
-  return (data ?? []) as Customer[];
+  return (data ?? []).map((row) => ({
+    ...(row as Customer),
+    default_share_pct: (row as Partial<Customer>).default_share_pct ?? null,
+  }));
 }
 
 export async function getCustomerOrders(farmId: string): Promise<CustomerOrder[]> {
@@ -1173,6 +1181,15 @@ export async function getCustomerOrders(farmId: string): Promise<CustomerOrder[]
 
   if (error) throw new Error(`getCustomerOrders failed: ${error.message}`);
   return (data ?? []) as CustomerOrder[];
+}
+
+/**
+ * A standing order: a share of one crop with no month set, so it applies to
+ * every month that crop is expected to yield in. Ticking a crop for a customer
+ * creates one of these.
+ */
+export function isStandingOrder(order: CustomerOrder): boolean {
+  return !!order.crop_id && order.season === null && !order.month_key && order.share_pct !== null;
 }
 
 /**
