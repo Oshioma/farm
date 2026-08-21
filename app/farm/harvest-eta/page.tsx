@@ -79,74 +79,86 @@ function norm(value: string | null | undefined): string {
   return (value ?? "").trim().toLowerCase();
 }
 
-/* A row on the sheet: either a saved harvest_eta entry, a bed that currently
-   has crops in it but no entry yet, or both. */
-type BedRow = {
+/* A row on the sheet is one crop. Crops with no saved entry yet still get a
+   row so an estimate can be added; saved rows that no longer match a crop (the
+   original CSV import) keep their own rows at the bottom. */
+type CropRow = {
   key: string;
   entry: HarvestEtaEntry | null;
-  zone: Zone | null;
-  bedName: string;
-  crops: Crop[];
-  mainCrop: string | null;
+  crop: Crop | null;
+  cropName: string;
+  beds: string;
+  zoneId: string | null;
   expectedHarvestDate: string | null;
 };
 
-type ViewMode = "crops" | "all" | "saved";
+type ViewMode = "crops" | "missing" | "saved";
 
-function buildRows(entries: HarvestEtaEntry[], zones: Zone[], crops: Crop[]): BedRow[] {
-  const cropsByZone = new Map<string, Crop[]>();
-  for (const c of crops) {
-    for (const zid of c.zone_ids ?? []) {
-      const list = cropsByZone.get(zid);
-      if (list) list.push(c);
-      else cropsByZone.set(zid, [c]);
-    }
-  }
+function bedsForCrop(crop: Crop, zones: Zone[]): string {
+  const labels = (crop.zone_ids ?? [])
+    .map((zid) => bedLabel(zones.find((z) => z.id === zid)))
+    .filter(Boolean);
+  return labels.join(", ");
+}
 
+function buildRows(entries: HarvestEtaEntry[], zones: Zone[], crops: Crop[]): CropRow[] {
   const usedEntryIds = new Set<string>();
-  const rows: BedRow[] = zones.map((z) => {
-    const label = bedLabel(z);
+
+  const rows: CropRow[] = crops.map((crop) => {
+    const beds = bedsForCrop(crop, zones);
+    const zoneIds = crop.zone_ids ?? [];
+
+    /* Prefer the hard crop link. Otherwise adopt an unlinked row for the same
+       bed whose main crop names this crop — that is how the CSV rows join up
+       with the crops they were describing. Saving the row writes the link. */
     const entry =
-      entries.find((e) => !usedEntryIds.has(e.id) && e.zone_id === z.id) ??
+      entries.find((e) => !usedEntryIds.has(e.id) && e.crop_id === crop.id) ??
       entries.find(
         (e) =>
           !usedEntryIds.has(e.id) &&
-          !e.zone_id &&
-          (norm(e.bed_name) === norm(z.code) || norm(e.bed_name) === norm(z.name))
+          !e.crop_id &&
+          norm(e.main_crop).includes(norm(crop.crop_name)) &&
+          (zoneIds.includes(e.zone_id ?? "") ||
+            zoneIds.some((zid) => {
+              const z = zones.find((zn) => zn.id === zid);
+              return z ? norm(e.bed_name) === norm(bedLabel(z)) : false;
+            }))
       ) ??
       null;
     if (entry) usedEntryIds.add(entry.id);
 
-    const zoneCrops = cropsByZone.get(z.id) ?? [];
     return {
-      key: `zone:${z.id}`,
+      key: `crop:${crop.id}`,
       entry,
-      zone: z,
-      bedName: entry?.bed_name?.trim() || label,
-      crops: zoneCrops,
-      mainCrop: entry?.main_crop ?? (zoneCrops.length > 0 ? zoneCrops.map(cropLabel).join(", ") : null),
-      expectedHarvestDate: entry?.expected_harvest_date ?? zoneCrops.find((c) => c.expected_harvest_start)?.expected_harvest_start ?? null,
+      crop,
+      cropName: cropLabel(crop),
+      beds: beds || entry?.bed_name || "—",
+      zoneId: crop.zone_id ?? entry?.zone_id ?? null,
+      expectedHarvestDate: entry?.expected_harvest_date ?? crop.expected_harvest_start ?? null,
     };
   });
 
-  /* Saved rows that don't line up with a bed (e.g. straight from the CSV import). */
   for (const e of entries) {
     if (usedEntryIds.has(e.id)) continue;
     rows.push({
       key: `entry:${e.id}`,
       entry: e,
-      zone: null,
-      bedName: e.bed_name || "—",
-      crops: [],
-      mainCrop: e.main_crop,
+      crop: null,
+      cropName: e.main_crop?.trim() || "—",
+      beds: e.bed_name || "—",
+      zoneId: e.zone_id,
       expectedHarvestDate: e.expected_harvest_date,
     });
   }
 
-  return rows.sort((a, b) => a.bedName.localeCompare(b.bedName, undefined, { numeric: true, sensitivity: "base" }));
+  return rows.sort(
+    (a, b) =>
+      a.cropName.localeCompare(b.cropName, undefined, { numeric: true, sensitivity: "base" }) ||
+      a.beds.localeCompare(b.beds, undefined, { numeric: true, sensitivity: "base" })
+  );
 }
 
-function rowHasEstimates(row: BedRow): boolean {
+function rowHasEstimates(row: CropRow): boolean {
   if (!row.entry) return false;
   const e = row.entry as Record<string, unknown>;
   return MONTHS.some((m) => e[`${m.key}_expected`] || e[`${m.key}_actual`]);
@@ -206,16 +218,12 @@ export default function HarvestEtaPage() {
   }, [activeFarmId, year]);
 
   const allRows = useMemo(() => buildRows(entries, zones, crops), [entries, zones, crops]);
-  const withCropsCount = useMemo(() => allRows.filter((r) => r.crops.length > 0).length, [allRows]);
+  const missingEstimates = useMemo(() => allRows.filter((r) => !rowHasEstimates(r)).length, [allRows]);
   const rows = useMemo(() => {
-    if (view === "all") return allRows;
+    if (view === "missing") return allRows.filter((r) => !rowHasEstimates(r));
     if (view === "saved") return allRows.filter((r) => r.entry);
-    return allRows.filter((r) => r.crops.length > 0 || r.entry);
+    return allRows;
   }, [allRows, view]);
-  const missingEstimates = useMemo(
-    () => rows.filter((r) => r.crops.length > 0 && !rowHasEstimates(r)).length,
-    [rows]
-  );
 
   async function handleSave() {
     if (!activeFarmId || !form.bed_name.trim()) return;
@@ -266,36 +274,40 @@ export default function HarvestEtaPage() {
     }
   }
 
-  /* Edit a saved row, or start one pre-filled from the bed and the crops in it. */
-  function openRow(row: BedRow) {
+  /* Edit a saved row, or start one pre-filled from the crop it belongs to. */
+  function openRow(row: CropRow) {
+    const title = row.beds && row.beds !== "—" ? `${row.cropName} · ${row.beds}` : row.cropName;
     if (row.entry) {
-      setForm(entryToForm(row.entry));
-      setModalTitle(`Edit — ${row.bedName}`);
+      const f = entryToForm(row.entry);
+      /* A row adopted by name keeps the link once it is saved. */
+      if (!f.crop_id && row.crop) f.crop_id = row.crop.id;
+      setForm(f);
+      setModalTitle(`Edit — ${title}`);
       setModal(row.entry);
       return;
     }
     const f = blankForm();
-    f.bed_name = row.bedName;
-    f.zone_id = row.zone?.id ?? "";
-    f.main_crop = row.mainCrop ?? "";
-    f.crop_id = row.crops.length === 1 ? row.crops[0].id : "";
+    f.bed_name = row.beds === "—" ? "" : row.beds;
+    f.zone_id = row.zoneId ?? "";
+    f.main_crop = row.cropName === "—" ? "" : row.cropName;
+    f.crop_id = row.crop?.id ?? "";
     f.expected_harvest_date = row.expectedHarvestDate ?? "";
     setForm(f);
-    setModalTitle(`Add estimate — ${row.bedName}`);
+    setModalTitle(`Add estimate — ${title}`);
     setModal("new");
   }
 
   function openAdd() {
     setForm(blankForm());
-    setModalTitle("Add bed entry");
+    setModalTitle("Add row");
     setModal("new");
   }
 
   const activeFarm = farms.find((f) => f.id === activeFarmId);
 
   const VIEWS: { key: ViewMode; label: string }[] = [
-    { key: "crops", label: "Beds with crops" },
-    { key: "all", label: "All beds" },
+    { key: "crops", label: "All crops" },
+    { key: "missing", label: "Needs an estimate" },
     { key: "saved", label: "Saved entries" },
   ];
 
@@ -365,14 +377,15 @@ export default function HarvestEtaPage() {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-zinc-500">
-              {rows.length} bed{rows.length === 1 ? "" : "s"} · {withCropsCount} with crops
+              {rows.length} crop{rows.length === 1 ? "" : "s"}
+              {missingEstimates > 0 ? ` · ${missingEstimates} without an estimate` : ""}
             </span>
             {isManager && (
               <button
                 onClick={openAdd}
                 className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
               >
-                + Add bed
+                + Add row
               </button>
             )}
           </div>
@@ -393,9 +406,9 @@ export default function HarvestEtaPage() {
               </button>
             ))}
           </div>
-          {missingEstimates > 0 && (
+          {missingEstimates > 0 && view !== "missing" && (
             <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700">
-              {missingEstimates} bed{missingEstimates === 1 ? "" : "s"} with crops still need an estimate
+              {missingEstimates} crop{missingEstimates === 1 ? "" : "s"} still need an estimate
             </span>
           )}
         </div>
@@ -407,10 +420,12 @@ export default function HarvestEtaPage() {
           <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-center text-sm text-zinc-500">
             {view === "saved"
               ? `No saved harvest ETA entries for ${year}.`
-              : zones.length === 0
-                ? "No beds yet — add beds on the farm map or zones page first."
-                : `No beds with crops for ${year}. Switch to “All beds” to plan ahead.`}
-            {isManager ? " You can also click “+ Add bed”." : ""}
+              : view === "missing"
+                ? "Every crop has an estimate."
+                : crops.length === 0
+                  ? "No crops planted yet — add crops on the farm page, or transplant from the nursery."
+                  : `Nothing to show for ${year}.`}
+            {isManager && view !== "missing" ? " You can also click “+ Add row”." : ""}
           </div>
         ) : (
           <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
@@ -418,8 +433,8 @@ export default function HarvestEtaPage() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-zinc-200 bg-zinc-50 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                    <th className="sticky left-0 z-10 bg-zinc-50 px-3 py-2.5 text-left">Bed</th>
-                    <th className="px-3 py-2.5 text-left">Main Crop</th>
+                    <th className="sticky left-0 z-10 bg-zinc-50 px-3 py-2.5 text-left">Crop</th>
+                    <th className="px-3 py-2.5 text-left">Bed(s)</th>
                     <th className="px-3 py-2.5 text-left">Harvest Date</th>
                     <th className="px-3 py-2.5 text-left">Companions</th>
                     {MONTHS.map((m) => (
@@ -441,19 +456,14 @@ export default function HarvestEtaPage() {
                     return (
                       <tr key={row.key} className={`border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50 align-top transition-colors ${row.entry ? "" : "bg-amber-50/30"}`}>
                         <td className={`sticky left-0 z-10 px-3 py-2 font-semibold text-zinc-900 whitespace-nowrap ${row.entry ? "bg-white" : "bg-amber-50/60"}`}>
-                          {row.bedName}
-                          {row.entry?.crop_id ? (
-                            <span className="ml-1 text-[9px] font-normal text-emerald-600" title="Linked to crop">&#x1F517;</span>
-                          ) : null}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap font-medium">
-                          {row.mainCrop ?? <span className="text-zinc-300">—</span>}
-                          {row.crops.length > 0 && (
-                            <span className="ml-1.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700">
-                              {row.crops.length} planted
+                          {row.cropName}
+                          {!row.crop && (
+                            <span className="ml-1.5 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[9px] font-medium text-zinc-500" title="Saved row with no matching crop">
+                              no crop
                             </span>
                           )}
                         </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-zinc-600">{row.beds}</td>
                         <td className="px-3 py-2 whitespace-nowrap text-zinc-600">{row.expectedHarvestDate ?? <span className="text-zinc-300">—</span>}</td>
                         <td className="px-3 py-2 text-zinc-600 max-w-[120px] truncate">{row.entry?.beneficial_companions ?? <span className="text-zinc-300">—</span>}</td>
                         {MONTHS.map((m) => {
@@ -507,7 +517,7 @@ export default function HarvestEtaPage() {
         <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-zinc-500">
           <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded bg-emerald-50 border border-emerald-200" /> Expected</span>
           <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded bg-blue-50 border border-blue-200" /> Actual</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded bg-amber-50 border border-amber-200" /> No estimate saved yet</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded bg-amber-50 border border-amber-200" /> No estimate saved for this crop yet</span>
         </div>
       </div>
 
@@ -521,7 +531,7 @@ export default function HarvestEtaPage() {
               {crops.length > 0 && (
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-zinc-600">
-                    Link to crop <span className="font-normal text-zinc-400">(auto-fills bed, zone &amp; crop name)</span>
+                    Crop <span className="font-normal text-zinc-400">(the row belongs to this crop; auto-fills bed &amp; name)</span>
                   </label>
                   <select
                     className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"

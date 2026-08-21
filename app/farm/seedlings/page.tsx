@@ -259,24 +259,24 @@ export default function SeedlingsPage() {
         .eq("id", transplantModal.id);
       if (seedlingErr) throw seedlingErr;
 
-      // Estimated harvest goes straight onto the harvest ETA sheet for each bed.
+      // The harvest ETA sheet is one row per crop, so the estimate lands on a
+      // single row naming every bed this crop went into.
       if (estimateYield.trim()) {
-        const season = harvestSeasonYear(transplantDate || new Date());
-        const mainCrop = transplantModal.plant + (transplantModal.variety ? ` · ${transplantModal.variety}` : "");
-        for (const zoneId of zoneIds) {
-          const zone = zones.find((z) => z.id === zoneId);
-          await upsertHarvestEstimate({
-            farmId: activeFarmId,
-            year: season,
-            zoneId,
-            bedName: bedLabel(zone) || "—",
-            monthKey: estimateMonth,
-            expected: estimateYield.trim(),
-            cropId: newCrop?.id ?? null,
-            mainCrop,
-            expectedHarvestDate: estimateHarvestDate,
-          });
-        }
+        const beds = zoneIds
+          .map((zoneId) => bedLabel(zones.find((z) => z.id === zoneId)))
+          .filter(Boolean)
+          .join(", ");
+        await upsertHarvestEstimate({
+          farmId: activeFarmId,
+          year: harvestSeasonYear(transplantDate || new Date()),
+          zoneId: zoneIds[0],
+          bedName: beds || "—",
+          monthKey: estimateMonth,
+          expected: estimateYield.trim(),
+          cropId: newCrop?.id ?? null,
+          mainCrop: transplantModal.plant + (transplantModal.variety ? ` · ${transplantModal.variety}` : ""),
+          expectedHarvestDate: estimateHarvestDate,
+        });
       }
 
       await supabase.from("activities").insert({
@@ -769,7 +769,7 @@ export default function SeedlingsPage() {
                 </div>
                 <p className="mt-2 text-xs text-emerald-700">
                   {estimateYield.trim()
-                    ? `Adds ${estimateYield.trim()} to ${estimateHarvestDate} on the Harvest ETA sheet for ${transplantZoneIds.length || "the selected"} bed${transplantZoneIds.length === 1 ? "" : "s"}.`
+                    ? `Adds ${estimateYield.trim()} to ${estimateHarvestDate} on the Harvest ETA sheet as this crop's own row.`
                     : "Leave blank to skip — you can add estimates later on the Harvest ETA page."}
                 </p>
               </div>
