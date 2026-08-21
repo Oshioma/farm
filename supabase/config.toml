@@ -1,0 +1,8 @@
+# Minimal Supabase CLI project config. `supabase link --project-ref <ref>`
+# stores the linked project locally (in supabase/.temp, which is gitignored),
+# so no project ref is committed here.
+project_id = "farm"
+
+[db]
+# Match the Postgres major version of the hosted project.
+major_version = 15

@@ -18,3 +18,7 @@ tsconfig.tsbuildinfo
 # misc
 .DS_Store
 *.pem
+
+# supabase cli
+supabase/.temp/
+supabase/.branches/

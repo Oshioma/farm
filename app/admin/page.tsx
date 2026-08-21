@@ -157,12 +157,20 @@ export default function AdminPage() {
                 {uniqueUsers.length} {uniqueUsers.length === 1 ? "user" : "users"}
               </p>
             </div>
-            <Link
-              href="/farm"
-              className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-            >
-              &larr; Farm
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href="/admin/system"
+                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+              >
+                System
+              </Link>
+              <Link
+                href="/farm"
+                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+              >
+                &larr; Farm
+              </Link>
+            </div>
           </div>
         </header>
 
