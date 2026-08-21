@@ -1629,6 +1629,7 @@ export default function FarmPage() {
               { href: withFarmContext("/companion"), label: "Companion planting" },
               { href: withFarmContext("/farm/compost"), label: "Compost" },
               { href: "#crops", label: "Crops" },
+              { href: withFarmContext("/farm/customers"), label: "Customers", managerOnly: true },
               { href: withFarmContext("/fertiliser"), label: "Fertiliser" },
               { href: workerGoalsHref, label: "Goals" },
               { href: withFarmContext("/farm/harvest-eta"), label: "Harvest" },

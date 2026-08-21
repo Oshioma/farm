@@ -1119,6 +1119,74 @@ export async function upsertHarvestEstimate(input: HarvestEstimateInput): Promis
   if (error) throw new Error(`upsertHarvestEstimate failed: ${error.message}`);
 }
 
+/* ── Customers & orders ───────────────────────────────────────
+   Orders are placed against a crop's expected harvest in a given month,
+   either as a share of it or as a fixed weight. */
+
+export type Customer = {
+  id: string;
+  farm_id: string;
+  name: string;
+  contact_name: string | null;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+  created_at: string | null;
+};
+
+export const ORDER_STATUSES = ["pending", "confirmed", "fulfilled", "cancelled"] as const;
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+
+export type CustomerOrder = {
+  id: string;
+  farm_id: string;
+  customer_id: string;
+  crop_id: string | null;
+  season: number | null;
+  month_key: HarvestMonthKey | null;
+  share_pct: number | null;
+  quantity_kg: number | null;
+  price_per_kg: number | null;
+  status: string;
+  notes: string | null;
+  created_at: string | null;
+};
+
+export async function getCustomers(farmId: string): Promise<Customer[]> {
+  const { data, error } = await supabase
+    .from("customers")
+    .select("id, farm_id, name, contact_name, phone, email, notes, created_at")
+    .eq("farm_id", farmId)
+    .eq("is_active", true)
+    .order("name");
+
+  if (error) throw new Error(`getCustomers failed: ${error.message}`);
+  return (data ?? []) as Customer[];
+}
+
+export async function getCustomerOrders(farmId: string): Promise<CustomerOrder[]> {
+  const { data, error } = await supabase
+    .from("customer_orders")
+    .select("id, farm_id, customer_id, crop_id, season, month_key, share_pct, quantity_kg, price_per_kg, status, notes, created_at")
+    .eq("farm_id", farmId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(`getCustomerOrders failed: ${error.message}`);
+  return (data ?? []) as CustomerOrder[];
+}
+
+/**
+ * What an order actually comes to in kilos. A fixed weight stands on its own; a
+ * share needs the expected harvest for that crop and month, and comes back null
+ * when there is no estimate to take a share of.
+ */
+export function orderKg(order: Pick<CustomerOrder, "share_pct" | "quantity_kg">, expectedKg: number | null): number | null {
+  if (order.quantity_kg !== null && order.quantity_kg !== undefined) return order.quantity_kg;
+  if (order.share_pct === null || order.share_pct === undefined) return null;
+  if (expectedKg === null) return null;
+  return (expectedKg * order.share_pct) / 100;
+}
+
 export type WorkHoursEntry = {
   id: string;
   farm_id: string;
