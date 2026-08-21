@@ -974,9 +974,10 @@ export type HarvestEstimateInput = {
 };
 
 /**
- * Add an estimated harvest to the harvest ETA sheet, reusing the bed's row for
- * that season when one already exists (so a transplant tops up the sheet rather
- * than duplicating beds).
+ * Add an estimated harvest to the harvest ETA sheet. The sheet is one row per
+ * crop, so an estimate lands on that crop's row for the season when it already
+ * exists and creates it otherwise. Rows with no crop behind them (the original
+ * CSV import) are still matched by bed.
  */
 export async function upsertHarvestEstimate(input: HarvestEstimateInput): Promise<void> {
   const { farmId, year, zoneId, bedName, monthKey, expected, cropId, mainCrop, expectedHarvestDate } = input;
@@ -987,7 +988,9 @@ export async function upsertHarvestEstimate(input: HarvestEstimateInput): Promis
     .eq("farm_id", farmId)
     .eq("year", year)
     .limit(1);
-  query = zoneId ? query.eq("zone_id", zoneId) : query.eq("bed_name", bedName);
+  if (cropId) query = query.eq("crop_id", cropId);
+  else if (zoneId) query = query.eq("zone_id", zoneId);
+  else query = query.eq("bed_name", bedName);
 
   const { data: existingRows, error: findErr } = await query;
   if (findErr) throw new Error(`upsertHarvestEstimate failed: ${findErr.message}`);
@@ -1013,7 +1016,9 @@ export async function upsertHarvestEstimate(input: HarvestEstimateInput): Promis
   const nextMain = (mainCrop ?? "").trim();
   let mergedMain = currentMain;
   if (nextMain && !currentMain.toLowerCase().includes(nextMain.toLowerCase())) {
-    mergedMain = currentMain ? `${currentMain} / ${nextMain}` : nextMain;
+    // A crop's own row just carries that crop's name; a shared bed row keeps
+    // both, so a rotation doesn't erase what grew there earlier.
+    mergedMain = cropId ? nextMain : currentMain ? `${currentMain} / ${nextMain}` : nextMain;
   }
 
   const patch: Record<string, unknown> = {
