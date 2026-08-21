@@ -16,6 +16,7 @@ import {
   harvestMonthKeyFor,
   parseYieldKg,
   orderKg,
+  isStandingOrder,
   bedLabel,
   ORDER_STATUSES,
 } from "@/lib/farm";
@@ -70,8 +71,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-type CustomerForm = { name: string; contact_name: string; phone: string; email: string; notes: string };
-const blankCustomer = (): CustomerForm => ({ name: "", contact_name: "", phone: "", email: "", notes: "" });
+type CustomerForm = {
+  name: string; contact_name: string; phone: string; email: string; notes: string; default_share_pct: string;
+};
+const blankCustomer = (): CustomerForm => ({
+  name: "", contact_name: "", phone: "", email: "", notes: "", default_share_pct: "30",
+});
+
+/** Falls back to 30% when a customer has no default of their own. */
+const DEFAULT_SHARE = 30;
 
 type OrderForm = {
   crop_id: string;
@@ -114,6 +122,10 @@ export default function CustomersPage() {
   const [orderForm, setOrderForm] = useState<OrderForm>(blankOrder(""));
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  /** Crop id currently being ticked or unticked, for the row's spinner. */
+  const [togglingCropId, setTogglingCropId] = useState<string | null>(null);
+  /** Per-crop share being edited, keyed `${customerId}:${cropId}`. */
+  const [shareDrafts, setShareDrafts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const router = useRouter();
@@ -185,6 +197,28 @@ export default function CustomersPage() {
     return orderKg(order, expectedKgFor(order.crop_id, order.season, order.month_key));
   }
 
+  /** A standing order's share of one month, or null if that month has no estimate. */
+  function standingKgForMonth(order: CustomerOrder, m: SeasonMonth): number | null {
+    const expected = expectedKgFor(order.crop_id, m.season, m.key);
+    if (expected === null) return null;
+    return orderKg(order, expected);
+  }
+
+  /** Everything a standing order comes to across the whole window. */
+  function standingKgOverWindow(order: CustomerOrder): number {
+    return months.reduce((sum, m) => sum + (standingKgForMonth(order, m) ?? 0), 0);
+  }
+
+  /** The months a standing order actually lands in. */
+  function standingMonths(order: CustomerOrder): SeasonMonth[] {
+    return months.filter((m) => standingKgForMonth(order, m) !== null);
+  }
+
+  /** What one order contributes in total across the window. */
+  function orderTotalKg(order: CustomerOrder): number | null {
+    return isStandingOrder(order) ? standingKgOverWindow(order) : resolveOrderKg(order);
+  }
+
   const liveOrders = useMemo(() => orders.filter((o) => o.status !== "cancelled"), [orders]);
 
   const ordersByCustomer = useMemo(() => {
@@ -197,22 +231,87 @@ export default function CustomersPage() {
     return map;
   }, [orders]);
 
-  /* The schedule: for each month, what is expected and how much of it is spoken for. */
+  /* The schedule: for each month, what is expected and how much of it is spoken
+     for — by orders placed on that month, and by standing orders on crops that
+     yield in it. */
   const schedule = useMemo(() => {
     return months.map((m) => {
-      const monthOrders = liveOrders.filter((o) => o.season === m.season && o.month_key === m.key);
-      const expected = monthExpectedKg(m);
-      const committed = monthOrders.reduce((sum, o) => sum + (resolveOrderKg(o) ?? 0), 0);
-      const unresolved = monthOrders.filter((o) => resolveOrderKg(o) === null).length;
-      return { month: m, orders: monthOrders, expected, committed, unresolved };
+      const dated = liveOrders.filter((o) => o.season === m.season && o.month_key === m.key);
+      const standing = liveOrders.filter((o) => isStandingOrder(o) && standingKgForMonth(o, m) !== null);
+      const lines = [
+        ...dated.map((o) => ({ order: o, kg: resolveOrderKg(o), standing: false })),
+        ...standing.map((o) => ({ order: o, kg: standingKgForMonth(o, m), standing: true })),
+      ];
+      return {
+        month: m,
+        lines,
+        expected: monthExpectedKg(m),
+        committed: lines.reduce((sum, l) => sum + (l.kg ?? 0), 0),
+        unresolved: lines.filter((l) => l.kg === null).length,
+      };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [months, liveOrders, entries]);
 
+  /* Only an order with neither a crop nor a month is genuinely unplaced — one
+     with a crop and no month is a standing order and does appear above. */
   const unscheduled = useMemo(
-    () => liveOrders.filter((o) => o.season === null || !o.month_key),
+    () => liveOrders.filter((o) => !isStandingOrder(o) && (o.season === null || !o.month_key)),
     [liveOrders]
   );
+
+  /* Standing orders for the open customer, by crop. */
+  function standingFor(customerId: string, cropId: string): CustomerOrder | undefined {
+    return orders.find((o) => o.customer_id === customerId && o.crop_id === cropId && isStandingOrder(o));
+  }
+
+  /** Tick or untick a crop for a customer, saving straight away. */
+  async function toggleCrop(customer: Customer, crop: Crop, checked: boolean) {
+    const existing = standingFor(customer.id, crop.id);
+    try {
+      setTogglingCropId(crop.id);
+      setError("");
+      if (!checked) {
+        if (existing) {
+          const { error: e } = await supabase.from("customer_orders").delete().eq("id", existing.id);
+          if (e) throw e;
+        }
+      } else if (!existing) {
+        const { error: e } = await supabase.from("customer_orders").insert({
+          farm_id: activeFarmId,
+          customer_id: customer.id,
+          crop_id: crop.id,
+          season: null,
+          month_key: null,
+          share_pct: customer.default_share_pct ?? DEFAULT_SHARE,
+          status: "confirmed",
+        });
+        if (e) throw e;
+      }
+      await load(activeFarmId, year);
+    } catch (err) {
+      setError(errMsg(err, "Failed to update crops"));
+    } finally {
+      setTogglingCropId(null);
+    }
+  }
+
+  /** Change one crop's share for a customer, away from their default. */
+  async function saveCropShare(customer: Customer, crop: Crop, value: string) {
+    const existing = standingFor(customer.id, crop.id);
+    const pct = Number(value);
+    if (!existing || !value.trim() || !Number.isFinite(pct) || pct === existing.share_pct) return;
+    try {
+      setTogglingCropId(crop.id);
+      const { error: e } = await supabase.from("customer_orders").update({ share_pct: pct }).eq("id", existing.id);
+      if (e) throw e;
+      await load(activeFarmId, year);
+    } catch (err) {
+      setError(errMsg(err, "Failed to update share"));
+    } finally {
+      setTogglingCropId(null);
+    }
+  }
 
   function openAddCustomer() {
     setCustomerForm(blankCustomer());
@@ -226,6 +325,7 @@ export default function CustomersPage() {
       phone: c.phone ?? "",
       email: c.email ?? "",
       notes: c.notes ?? "",
+      default_share_pct: c.default_share_pct !== null && c.default_share_pct !== undefined ? String(c.default_share_pct) : "",
     });
     setCustomerModal(c);
   }
@@ -242,6 +342,7 @@ export default function CustomersPage() {
         phone: customerForm.phone.trim() || null,
         email: customerForm.email.trim() || null,
         notes: customerForm.notes.trim() || null,
+        default_share_pct: customerForm.default_share_pct.trim() ? Number(customerForm.default_share_pct) : null,
       };
       if (customerModal === "new") {
         const { error: e } = await supabase.from("customers").insert(payload);
@@ -484,7 +585,7 @@ export default function CustomersPage() {
               {customers.map((c) => {
                 const custOrders = ordersByCustomer.get(c.id) ?? [];
                 const live = custOrders.filter((o) => o.status !== "cancelled");
-                const committed = live.reduce((sum, o) => sum + (resolveOrderKg(o) ?? 0), 0);
+                const committed = live.reduce((sum, o) => sum + (orderTotalKg(o) ?? 0), 0);
                 const isOpen = openCustomerId === c.id;
                 return (
                   <div key={c.id} className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
@@ -496,6 +597,7 @@ export default function CustomersPage() {
                         <p className="truncate text-base font-semibold">{c.name}</p>
                         <p className="mt-0.5 truncate text-xs text-zinc-500">
                           {[c.contact_name, c.phone, c.email].filter(Boolean).join(" · ") || "No contact details"}
+                          {c.default_share_pct != null && <span className="text-zinc-400"> · takes {c.default_share_pct}% by default</span>}
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-3">
@@ -526,6 +628,84 @@ export default function CustomersPage() {
                         </div>
                         {c.notes && <p className="mb-3 text-sm text-zinc-500">{c.notes}</p>}
 
+                        {/* Tick the crops this customer takes a share of. Each tick is a
+                            standing order at their default share, applying to every month
+                            that crop is expected to yield in. */}
+                        {isManager && (
+                          <div className="mb-4 rounded-2xl border border-zinc-200 bg-white p-3">
+                            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                                Crops this customer takes
+                              </p>
+                              <p className="text-xs text-zinc-500">
+                                Ticking uses {c.default_share_pct ?? DEFAULT_SHARE}% — change it per crop below, or on
+                                the customer to change the default.
+                              </p>
+                            </div>
+                            {crops.length === 0 ? (
+                              <p className="text-sm text-zinc-400">No crops on this farm yet.</p>
+                            ) : (
+                              <div className="max-h-72 space-y-1 overflow-y-auto">
+                                {crops.map((crop) => {
+                                  const standing = standingFor(c.id, crop.id);
+                                  const checked = !!standing;
+                                  const draftKey = `${c.id}:${crop.id}`;
+                                  const share = shareDrafts[draftKey] ?? (standing?.share_pct != null ? String(standing.share_pct) : "");
+                                  const landsIn = standing ? standingMonths(standing) : [];
+                                  const total = standing ? standingKgOverWindow(standing) : 0;
+                                  return (
+                                    <div
+                                      key={crop.id}
+                                      className={`flex flex-wrap items-center gap-2 rounded-xl px-2 py-1.5 transition ${
+                                        checked ? "bg-emerald-50/60" : "hover:bg-zinc-50"
+                                      }`}
+                                    >
+                                      <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+                                        <input
+                                          type="checkbox"
+                                          className="rounded border-zinc-300"
+                                          checked={checked}
+                                          disabled={togglingCropId === crop.id}
+                                          onChange={(e) => toggleCrop(c, crop, e.target.checked)}
+                                        />
+                                        <span className="min-w-0 truncate text-sm">
+                                          {cropLabel(crop)}
+                                          {crop.zone_ids?.length ? (
+                                            <span className="text-zinc-400">
+                                              {" "}· {crop.zone_ids.map((zid) => bedLabel(zones.find((z) => z.id === zid))).filter(Boolean).join(", ")}
+                                            </span>
+                                          ) : null}
+                                        </span>
+                                      </label>
+                                      {checked && (
+                                        <div className="flex items-center gap-2">
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            className="w-16 rounded-lg border border-zinc-300 px-2 py-1 text-xs outline-none focus:border-zinc-900"
+                                            value={share}
+                                            disabled={togglingCropId === crop.id}
+                                            onChange={(e) => setShareDrafts((p) => ({ ...p, [draftKey]: e.target.value }))}
+                                            onBlur={(e) => saveCropShare(c, crop, e.target.value)}
+                                          />
+                                          <span className="text-xs text-zinc-500">%</span>
+                                          <span className="text-xs font-medium text-emerald-700">
+                                            {total > 0
+                                              ? `${fmtKg(total)} over ${landsIn.length} month${landsIn.length === 1 ? "" : "s"}`
+                                              : "no estimates yet"}
+                                          </span>
+                                        </div>
+                                      )}
+                                      {togglingCropId === crop.id && <span className="text-xs text-zinc-400">saving…</span>}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         {custOrders.length === 0 ? (
                           <p className="mb-3 text-sm text-zinc-400">No orders yet.</p>
                         ) : (
@@ -541,10 +721,17 @@ export default function CustomersPage() {
                             </thead>
                             <tbody>
                               {custOrders.map((o) => {
-                                const kg = resolveOrderKg(o);
+                                const kg = orderTotalKg(o);
                                 return (
                                   <tr key={o.id} className="border-t border-zinc-200/70">
-                                    <td className="py-1.5 pr-3 font-medium">{orderLine(o)}</td>
+                                    <td className="py-1.5 pr-3 font-medium">
+                                      {orderLine(o)}
+                                      {isStandingOrder(o) && (
+                                        <span className="ml-1.5 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[9px] font-medium text-zinc-500">
+                                          standing
+                                        </span>
+                                      )}
+                                    </td>
                                     <td className="py-1.5 pr-3 text-zinc-500">
                                       {o.quantity_kg !== null ? `${o.quantity_kg} kg` : `${o.share_pct}% of harvest`}
                                       {o.price_per_kg !== null && <span className="text-zinc-400"> · {o.price_per_kg}/kg</span>}
@@ -643,7 +830,7 @@ export default function CustomersPage() {
             <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
               {schedule.map((s) => {
                 const over = s.committed > s.expected && s.expected > 0;
-                const isEmpty = s.orders.length === 0 && s.expected === 0;
+                const isEmpty = s.lines.length === 0 && s.expected === 0;
                 return (
                   <div key={monthId(s.month)} className="border-b border-zinc-100 px-5 py-3.5 last:border-b-0">
                     <div className="flex items-center justify-between gap-4">
@@ -651,9 +838,9 @@ export default function CustomersPage() {
                         <span className={`w-24 text-sm font-semibold ${isEmpty ? "text-zinc-400" : "text-zinc-900"}`}>
                           {s.month.label} {s.month.calendarYear}
                         </span>
-                        {s.orders.length > 0 && (
+                        {s.lines.length > 0 && (
                           <span className="text-xs text-zinc-500">
-                            {s.orders.length} order{s.orders.length === 1 ? "" : "s"}
+                            {s.lines.length} order{s.lines.length === 1 ? "" : "s"}
                           </span>
                         )}
                         {over && (
@@ -672,25 +859,31 @@ export default function CustomersPage() {
                       </div>
                     </div>
 
-                    {s.orders.length > 0 && (
+                    {s.lines.length > 0 && (
                       <table className="mt-2 w-full text-xs">
                         <tbody>
-                          {s.orders.map((o) => {
-                            const customer = customers.find((c) => c.id === o.customer_id);
-                            const kg = resolveOrderKg(o);
+                          {s.lines.map((line) => {
+                            const customer = customers.find((c) => c.id === line.order.customer_id);
                             return (
-                              <tr key={o.id} className="border-t border-zinc-100">
+                              <tr key={`${line.order.id}:${line.standing ? "s" : "d"}`} className="border-t border-zinc-100">
                                 <td className="py-1.5 pr-3 font-medium">{customer?.name ?? "Unknown customer"}</td>
-                                <td className="py-1.5 pr-3 text-zinc-500">{orderLine(o)}</td>
                                 <td className="py-1.5 pr-3 text-zinc-500">
-                                  {o.quantity_kg !== null ? `${o.quantity_kg} kg` : `${o.share_pct}%`}
+                                  {orderLine(line.order)}
+                                  {line.standing && (
+                                    <span className="ml-1.5 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[9px] font-medium text-zinc-500" title="Standing order on this crop">
+                                      standing
+                                    </span>
+                                  )}
                                 </td>
-                                <td className={`py-1.5 text-right font-medium ${kg === null ? "text-amber-700" : "text-blue-700"}`}>
-                                  {kg === null ? "no estimate yet" : fmtKg(kg)}
+                                <td className="py-1.5 pr-3 text-zinc-500">
+                                  {line.order.quantity_kg !== null ? `${line.order.quantity_kg} kg` : `${line.order.share_pct}%`}
+                                </td>
+                                <td className={`py-1.5 text-right font-medium ${line.kg === null ? "text-amber-700" : "text-blue-700"}`}>
+                                  {line.kg === null ? "no estimate yet" : fmtKg(line.kg)}
                                 </td>
                                 <td className="py-1.5 pl-3 text-right">
-                                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLES[o.status] ?? "bg-zinc-100 text-zinc-600"}`}>
-                                    {o.status}
+                                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLES[line.order.status] ?? "bg-zinc-100 text-zinc-600"}`}>
+                                    {line.order.status}
                                   </span>
                                 </td>
                               </tr>
@@ -741,6 +934,21 @@ export default function CustomersPage() {
                   <input className={inp} type="email" value={customerForm.email} onChange={(e) => setCustomerForm((p) => ({ ...p, email: e.target.value }))} placeholder="orders@example.com" />
                 </Field>
               </div>
+              <Field label="Default share of a harvest">
+                <div className="flex items-center gap-2">
+                  <input
+                    className={inp}
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={customerForm.default_share_pct}
+                    onChange={(e) => setCustomerForm((p) => ({ ...p, default_share_pct: e.target.value }))}
+                    placeholder="30"
+                  />
+                  <span className="text-sm text-zinc-500">%</span>
+                </div>
+                <p className="mt-1 text-xs text-zinc-400">Used when ticking crops for this customer.</p>
+              </Field>
               <Field label="Notes">
                 <textarea className={`${inp} min-h-[60px]`} value={customerForm.notes} onChange={(e) => setCustomerForm((p) => ({ ...p, notes: e.target.value }))} />
               </Field>
@@ -781,7 +989,7 @@ export default function CustomersPage() {
               </Field>
               <Field label="Expected in">
                 <select className={inp} value={orderForm.monthId} onChange={(e) => setOrderForm((p) => ({ ...p, monthId: e.target.value }))}>
-                  <option value="">— No month set —</option>
+                  <option value="">— Every month this crop yields —</option>
                   {months.map((m) => (
                     <option key={monthId(m)} value={monthId(m)}>
                       {m.label} {m.calendarYear}
