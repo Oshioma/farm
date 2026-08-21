@@ -1,0 +1,233 @@
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import {
+  HARVEST_MONTHS,
+  seasonMonths,
+  harvestSeasonYear,
+  harvestMonthKeyFor,
+  parseYieldKg,
+  orderKg,
+} from "@/lib/harvest";
+import type { HarvestMonthKey, SeasonMonth } from "@/lib/harvest";
+
+/* The public shopfront. Visitors are not farm members, so every read here goes
+   through the service role and returns only what a shop should show: what is
+   coming, when, and how much of it is still unclaimed. No customer is ever
+   named, and nothing but produce leaves this module. */
+
+export const SHOP_SEASON_SPAN = 2;
+
+export type ShopMonth = {
+  season: number;
+  key: HarvestMonthKey;
+  label: string;
+  calendarYear: number;
+  /** What the sheet says, verbatim — "40kg", "20 crates". */
+  expectedText: string;
+  /** Null when the sheet's text is not a weight. */
+  expectedKg: number | null;
+  committedKg: number;
+  availableKg: number | null;
+};
+
+export type ShopProduce = {
+  cropId: string;
+  name: string;
+  variety: string | null;
+  beds: string;
+  notes: string | null;
+  imageUrl: string | null;
+  pricePerKg: number | null;
+  months: ShopMonth[];
+  totalExpectedKg: number;
+  totalAvailableKg: number;
+};
+
+export type ShopData = {
+  farm: { id: string; name: string; slug: string; location: string | null };
+  months: { season: number; key: HarvestMonthKey; label: string; calendarYear: number; expectedKg: number; crops: number }[];
+  produce: ShopProduce[];
+  currentMonth: { season: number; key: HarvestMonthKey } | null;
+};
+
+/** "top land", "Top-Land" and "topland" all address the same farm. */
+function slugKey(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+export async function findShopFarm(slug: string) {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("farms")
+    .select("id, name, slug, location")
+    .eq("is_active", true);
+  if (error) throw new Error(`findShopFarm failed: ${error.message}`);
+
+  const wanted = slugKey(slug);
+  const farms = (data ?? []) as { id: string; name: string; slug: string | null; location: string | null }[];
+  const match =
+    farms.find((f) => f.slug && slugKey(f.slug) === wanted) ??
+    farms.find((f) => slugKey(f.name) === wanted) ??
+    null;
+  return match ? { id: match.id, name: match.name, slug: match.slug ?? slug, location: match.location } : null;
+}
+
+/**
+ * Everything the shopfront lists. A crop only appears once the harvest ETA
+ * sheet expects something from it — nothing is offered on a maybe.
+ */
+export async function getShopData(slug: string): Promise<ShopData | null> {
+  const farm = await findShopFarm(slug);
+  if (!farm) return null;
+
+  const admin = getSupabaseAdmin();
+  const startSeason = harvestSeasonYear();
+  const seasons = Array.from({ length: SHOP_SEASON_SPAN }, (_, i) => startSeason + i);
+  const window = seasonMonths(startSeason, SHOP_SEASON_SPAN);
+
+  const [{ data: etaRows, error: etaErr }, { data: cropRows, error: cropErr }, { data: zoneRows, error: zoneErr }] =
+    await Promise.all([
+      admin.from("harvest_eta").select("*").eq("farm_id", farm.id).in("year", seasons),
+      admin
+        .from("crops")
+        .select("id, crop_name, variety, notes, image_url, zone_id, extra_zone_ids, expected_sale_price_per_kg")
+        .eq("farm_id", farm.id)
+        .eq("is_active", true),
+      admin.from("zones").select("id, name, code").eq("farm_id", farm.id).eq("is_active", true),
+    ]);
+  if (etaErr) throw new Error(`getShopData failed: ${etaErr.message}`);
+  if (cropErr) throw new Error(`getShopData failed: ${cropErr.message}`);
+  if (zoneErr) throw new Error(`getShopData failed: ${zoneErr.message}`);
+
+  const zones = (zoneRows ?? []) as { id: string; name: string; code: string | null }[];
+  const entries = (etaRows ?? []) as Record<string, unknown>[];
+
+  /* Orders are read only to work out how much is left, never to expose who
+     holds what. A missing table (the migration has not run) just means
+     nothing is committed yet. */
+  const orders = await loadCommitments(farm.id);
+
+  const bedsFor = (zoneId: string | null, extra: string | null): string => {
+    const ids: string[] = [];
+    if (zoneId) ids.push(zoneId);
+    if (extra) {
+      try {
+        for (const id of JSON.parse(extra) as string[]) if (id && !ids.includes(id)) ids.push(id);
+      } catch { /* ignore bad JSON */ }
+    }
+    return ids
+      .map((id) => {
+        const z = zones.find((zn) => zn.id === id);
+        return z ? z.code?.trim() || z.name : "";
+      })
+      .filter(Boolean)
+      .join(", ");
+  };
+
+  const produce: ShopProduce[] = [];
+  for (const crop of (cropRows ?? []) as Record<string, unknown>[]) {
+    const cropId = crop.id as string;
+    const months: ShopMonth[] = [];
+
+    for (const m of window) {
+      const row = entries.find((e) => e.crop_id === cropId && e.year === m.season);
+      const text = (((row?.[`${m.key}_expected`] as string | null) ?? "")).trim();
+      if (!text) continue;
+
+      const expectedKg = parseYieldKg(text).kg;
+      const committedKg = committedFor(orders, cropId, m, expectedKg);
+      months.push({
+        season: m.season,
+        key: m.key,
+        label: m.label,
+        calendarYear: m.calendarYear,
+        expectedText: text,
+        expectedKg,
+        committedKg,
+        availableKg: expectedKg === null ? null : Math.max(0, expectedKg - committedKg),
+      });
+    }
+
+    if (months.length === 0) continue;  // nothing expected — not for sale
+
+    produce.push({
+      cropId,
+      name: crop.crop_name as string,
+      variety: (crop.variety as string | null) ?? null,
+      beds: bedsFor((crop.zone_id as string | null) ?? null, (crop.extra_zone_ids as string | null) ?? null),
+      notes: (crop.notes as string | null) ?? null,
+      imageUrl: (crop.image_url as string | null) ?? null,
+      pricePerKg: (crop.expected_sale_price_per_kg as number | null) ?? null,
+      months,
+      totalExpectedKg: months.reduce((sum, m) => sum + (m.expectedKg ?? 0), 0),
+      totalAvailableKg: months.reduce((sum, m) => sum + (m.availableKg ?? 0), 0),
+    });
+  }
+
+  produce.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+
+  const monthTotals = window.map((m) => {
+    const listed = produce.filter((p) => p.months.some((pm) => pm.season === m.season && pm.key === m.key));
+    return {
+      season: m.season,
+      key: m.key,
+      label: m.label,
+      calendarYear: m.calendarYear,
+      expectedKg: listed.reduce((sum, p) => {
+        const pm = p.months.find((x) => x.season === m.season && x.key === m.key);
+        return sum + (pm?.expectedKg ?? 0);
+      }, 0),
+      crops: listed.length,
+    };
+  });
+
+  return {
+    farm: { id: farm.id, name: farm.name, slug: farm.slug, location: farm.location },
+    months: monthTotals,
+    produce,
+    currentMonth: { season: harvestSeasonYear(), key: harvestMonthKeyFor(new Date()) },
+  };
+}
+
+type Commitment = {
+  crop_id: string | null;
+  season: number | null;
+  month_key: string | null;
+  share_pct: number | null;
+  quantity_kg: number | null;
+};
+
+async function loadCommitments(farmId: string): Promise<Commitment[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("customer_orders")
+    .select("crop_id, season, month_key, share_pct, quantity_kg")
+    .eq("farm_id", farmId)
+    .neq("status", "cancelled");
+  if (error) return [];  // table not there yet — nothing is committed
+  return (data ?? []) as Commitment[];
+}
+
+/** How much of one crop-month is already spoken for, dated and standing orders alike. */
+function committedFor(orders: Commitment[], cropId: string, m: SeasonMonth, expectedKg: number | null): number {
+  return orders.reduce((sum, o) => {
+    if (o.crop_id !== cropId) return sum;
+    const dated = o.season === m.season && o.month_key === m.key;
+    const standing = o.season === null && !o.month_key && o.share_pct !== null;
+    if (!dated && !standing) return sum;
+    return sum + (orderKg(o, expectedKg) ?? 0);
+  }, 0);
+}
+
+/** Server-side guard: a month can only be ordered if the sheet expects something. */
+export function monthIsOffered(produce: ShopProduce[], cropId: string, season: number, key: string): ShopMonth | null {
+  const crop = produce.find((p) => p.cropId === cropId);
+  if (!crop) return null;
+  return crop.months.find((m) => m.season === season && m.key === key) ?? null;
+}
+
+export function monthLabel(season: number, key: string): string {
+  const m = HARVEST_MONTHS.find((x) => x.key === key);
+  if (!m) return "";
+  const year = key === "jan" || key === "feb" ? season + 1 : season;
+  return `${m.label} ${year}`;
+}
