@@ -28,14 +28,15 @@ Nothing is written. Choose mode **apply** to push from there instead.
 
 **1. Repository credentials** — GitHub → Settings → Secrets and variables → Actions:
 
-| Kind | Name | Value |
-| --- | --- | --- |
-| Variable | `SUPABASE_PROJECT_ID` | the project ref from your Supabase dashboard URL |
-| Secret | `SUPABASE_ACCESS_TOKEN` | supabase.com/dashboard/account/tokens |
-| Secret | `SUPABASE_DB_PASSWORD` | the project's database password |
+| Name | Value |
+| --- | --- |
+| `SUPABASE_PROJECT_ID` | the project ref from your Supabase dashboard URL (secret or variable, either works) |
+| `SUPABASE_ACCESS_TOKEN` | supabase.com/dashboard/account/tokens (secret) |
+| `SUPABASE_DB_PASSWORD` | the project's database password (secret) |
 
-Until `SUPABASE_PROJECT_ID` exists the workflow skips itself, so nothing fails
-in the meantime.
+If any are missing the run finishes with a warning naming them and applies
+nothing, so an unconfigured repo never fails a build — but it also never
+pretends to have migrated.
 
 **2. Mark the already-applied migrations as applied.** Every migration below the
 harvest ETA one was run by hand in the SQL editor before this setup existed, so
