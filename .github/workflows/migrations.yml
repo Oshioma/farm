@@ -34,7 +34,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Say plainly what is missing rather than skipping in silence.
+      # Say plainly what is missing or malformed rather than failing three
+      # steps later with a CLI error. Nothing here echoes a secret value —
+      # only its shape, which is what actually goes wrong in practice.
       - name: Check configuration
         id: config
         run: |
@@ -46,10 +48,51 @@ jobs:
             echo "ready=false" >> "$GITHUB_OUTPUT"
             echo "::warning title=Migrations not configured::Missing:$missing — add them under Settings → Secrets and variables → Actions. Nothing was applied."
             echo "Not configured. Missing:$missing"
-          else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-            echo "Configured for project $SUPABASE_PROJECT_ID"
+            exit 0
           fi
+
+          # A pasted secret often carries a trailing newline or space. Neither
+          # the token nor the project ref can legitimately contain whitespace,
+          # so strip it; the password is left exactly as given.
+          token=$(printf '%s' "$SUPABASE_ACCESS_TOKEN" | tr -d '[:space:]')
+          ref=$(printf '%s' "$SUPABASE_PROJECT_ID" | tr -d '[:space:]')
+
+          if [ "${#token}" -ne "${#SUPABASE_ACCESS_TOKEN}" ]; then
+            echo "Note: stripped whitespace from SUPABASE_ACCESS_TOKEN (was ${#SUPABASE_ACCESS_TOKEN} chars, now ${#token})."
+          fi
+          if [ "${#ref}" -ne "${#SUPABASE_PROJECT_ID}" ]; then
+            echo "Note: stripped whitespace from SUPABASE_PROJECT_ID."
+          fi
+
+          # Shape checks. These warn rather than fail, so a valid token in a
+          # format newer than this check still gets its chance.
+          if printf '%s' "$token" | grep -Eq '^sbp_(oauth_)?[a-f0-9]{40}$'; then
+            echo "Access token looks like a personal access token."
+          elif printf '%s' "$token" | grep -q '^eyJ'; then
+            echo "::warning title=Wrong kind of token::SUPABASE_ACCESS_TOKEN is a project API key (anon or service_role). The CLI needs a personal access token from supabase.com/dashboard/account/tokens, which starts sbp_."
+          else
+            echo "::warning title=Access token looks wrong::SUPABASE_ACCESS_TOKEN is ${#token} characters and is not sbp_ followed by 40 hex characters (44 in total). If it was pasted in parts or truncated, re-copy it whole from supabase.com/dashboard/account/tokens."
+          fi
+          case "$ref" in
+            *.*|*/*|http*)
+              echo "::warning title=Project ref looks wrong::SUPABASE_PROJECT_ID looks like a URL or hostname. It should be just the ref, e.g. abcdefghijklmnopqrst." ;;
+            *)
+              if [ "${#ref}" -ne 20 ]; then
+                echo "::warning title=Project ref looks wrong::SUPABASE_PROJECT_ID is ${#ref} characters; a project ref is normally 20."
+              fi ;;
+          esac
+
+          if printf '%s' "$SUPABASE_DB_PASSWORD" | grep -Eq '^[[:space:]]|[[:space:]]$'; then
+            echo "::warning title=Database password has whitespace::SUPABASE_DB_PASSWORD starts or ends with whitespace. It is used as given, so if it was pasted with a stray newline, re-add it without one."
+          fi
+
+          # Hand the cleaned values to the later steps.
+          {
+            echo "SUPABASE_ACCESS_TOKEN=$token"
+            echo "SUPABASE_PROJECT_ID=$ref"
+          } >> "$GITHUB_ENV"
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+          echo "Configured."
 
       - uses: supabase/setup-cli@v1
         if: steps.config.outputs.ready == 'true'
