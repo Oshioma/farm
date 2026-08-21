@@ -992,6 +992,62 @@ export function bedLabel(zone: Pick<Zone, "name" | "code"> | undefined | null): 
   return zone.code?.trim() || zone.name;
 }
 
+/* The harvest ETA sheet stores month cells as free text — "20kg", "10-15 kg",
+   "1.5t", "500g", "40". Totalling produce means reading a weight out of that
+   without silently swallowing anything it cannot understand. */
+
+const WEIGHT_UNITS: { pattern: RegExp; toKg: number }[] = [
+  { pattern: /^(t|tonnes?|tons?)$/i, toKg: 1000 },
+  { pattern: /^(kgs?|kilos?|kilograms?)$/i, toKg: 1 },
+  { pattern: /^(g|grams?)$/i, toKg: 0.001 },
+  { pattern: /^(lbs?|pounds?)$/i, toKg: 0.453592 },
+];
+
+export type ParsedYield = {
+  /** Weight in kilos, or null when no number could be read. */
+  kg: number | null;
+  /** True when the text gave a range like "10-15kg" and kg is its midpoint. */
+  isRange: boolean;
+  /** The unit that was read, or null when none was written (kilos assumed). */
+  unit: string | null;
+};
+
+/* Words that sit next to a number without being a unit. */
+const NOT_A_UNIT = /^(to|and|or|approx|approximately|about|circa|ca|est|estimate[ds]?|ish|plus|total|each)$/i;
+
+/** Read a weight in kilos out of a free-text yield cell. */
+export function parseYieldKg(text: string | null | undefined): ParsedYield {
+  const raw = (text ?? "").trim();
+  if (!raw) return { kg: null, isRange: false, unit: null };
+
+  /* Strip thousands separators so "1,200kg" reads as one number. */
+  const cleaned = raw.replace(/,(?=\d{3}(?!\d))/g, "");
+
+  /* Every number, with whatever word follows it. */
+  const parts: { value: number; unit: string | null }[] = [];
+  const re = /(\d+(?:\.\d+)?)\s*([a-zA-Z]+)?/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(cleaned)) !== null) {
+    const word = match[2] ?? null;
+    parts.push({ value: parseFloat(match[1]), unit: word && NOT_A_UNIT.test(word) ? null : word });
+  }
+  if (parts.length === 0) return { kg: null, isRange: false, unit: null };
+
+  /* A recognised weight unit anywhere wins ("10 to 15kg"). A word that is not a
+     weight means these are not kilos at all ("20 crates"), so nothing is
+     invented — the cell is reported as unconverted instead. */
+  const withUnit = parts.find((p) => p.unit);
+  const unitText = withUnit?.unit ?? null;
+  const unit = unitText ? WEIGHT_UNITS.find((u) => u.pattern.test(unitText)) : undefined;
+  if (unitText && !unit) return { kg: null, isRange: false, unit: unitText };
+
+  const isRange = /\d\s*(?:-|–|to)\s*\d/.test(cleaned) && parts.length >= 2;
+  const value = isRange ? (parts[0].value + parts[1].value) / 2 : parts[0].value;
+  if (!Number.isFinite(value)) return { kg: null, isRange: false, unit: unitText };
+
+  return { kg: value * (unit?.toKg ?? 1), isRange, unit: unitText };
+}
+
 export type HarvestEstimateInput = {
   farmId: string;
   year: number;

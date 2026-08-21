@@ -398,6 +398,9 @@ export default function HarvestEtaPage() {
                   {f.name}
                 </button>
               ))}
+              <Link href="/farm/produce-expected" className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
+                Produce expected
+              </Link>
               <Link href="/farm" className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
                 ← Farm
               </Link>

@@ -1637,6 +1637,7 @@ export default function FarmPage() {
               { href: "#map", label: "Map" },
               { href: withFarmContext("/farm/mulch"), label: "Mulch" },
               { href: withFarmContext("/farm/planting-plan"), label: "Planting plan" },
+              { href: withFarmContext("/farm/produce-expected"), label: "Produce expected" },
               { href: withFarmContext("/plants"), label: "Plants" },
               { href: withFarmContext("/farm/seedlings"), label: "Seedlings" },
               { href: withFarmContext("/farm/soil-tests"), label: "Soil tests" },
