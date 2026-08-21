@@ -22,3 +22,6 @@ tsconfig.tsbuildinfo
 # supabase cli
 supabase/.temp/
 supabase/.branches/
+
+# generated design canvas (bundled editor, ~2MB) — sources live beside it
+design/**/*-shopfront.html

@@ -1,0 +1,107 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,300;6..72,400;6..72,500&family=Karla:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; font-family: Karla, Helvetica, sans-serif; color: #1c1917; background: #faf7f2; }
+    a { color: #166534; text-decoration: none; }
+    a:hover { color: #052e16; }
+    h1, h2, h3 { margin: 0; font-family: Newsreader, Georgia, serif; font-weight: 400; }
+    p { margin: 0; }
+  </style>
+</helmet>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); min-height: 100%; background: #faf7f2;">
+
+  <!-- Left: why -->
+  <div style="display: flex; flex-direction: column; justify-content: space-between; gap: 40px; background: #052e16; padding: 48px 44px;">
+    <div style="display: flex; align-items: baseline; gap: 12px;">
+      <span style="font-family: Newsreader, Georgia, serif; font-size: 24px; color: #ffffff;">Top Land</span>
+      <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #6f9b7f;">Shamba Online</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 22px;">
+      <h1 style="font-size: 40px; line-height: 1.1; color: #ffffff; letter-spacing: -0.02em; text-wrap: pretty;">An account is how we know what to pick for you.</h1>
+      <p style="font-size: 16px; line-height: 1.65; color: #a7d3b4; max-width: 40ch;">No card, no subscription. We keep your details so we can tell you when your produce is ready and what it weighed.</p>
+
+      <div style="display: flex; flex-direction: column; gap: 16px; padding-top: 8px;">
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7cc78f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px;" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+          <p style="font-size: 15px; line-height: 1.5; color: #d3e8da;">Reserve a share of any bed with a harvest date</p>
+        </div>
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7cc78f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px;" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+          <p style="font-size: 15px; line-height: 1.5; color: #d3e8da;">A message the week it is picked, with the real weight</p>
+        </div>
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7cc78f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px;" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+          <p style="font-size: 15px; line-height: 1.5; color: #d3e8da;">Pay on collection, for what you actually take</p>
+        </div>
+      </div>
+    </div>
+
+    <p style="font-size: 13px; line-height: 1.6; color: #6f9b7f; max-width: 42ch;">We use your number to reach you about your own orders. Nothing else, and nobody else.</p>
+  </div>
+
+  <!-- Right: form -->
+  <div style="display: flex; flex-direction: column; gap: 22px; padding: 56px 56px 48px;">
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <h2 style="font-size: 32px; letter-spacing: -0.01em;">Open a customer account</h2>
+      <p style="font-size: 15px; color: #78716c;">Already have one? <a href="#" style="font-weight: 600;">Sign in</a></p>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 7px;">
+      <label style="font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #78716c;">Name or business</label>
+      <div style="border: 1px solid #ded6c9; background: #ffffff; border-radius: 16px; padding: 15px 18px; font-size: 15px; color: #a8a29e;">Green Grocer Ltd</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 7px;">
+      <label style="font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #78716c;">Who we ask for</label>
+      <div style="border: 1px solid #ded6c9; background: #ffffff; border-radius: 16px; padding: 15px 18px; font-size: 15px; color: #a8a29e;">Jane Wanjiku</div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;">
+      <div style="display: flex; flex-direction: column; gap: 7px;">
+        <label style="font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #78716c;">Telephone</label>
+        <div style="border: 1px solid #ded6c9; background: #ffffff; border-radius: 16px; padding: 15px 18px; font-size: 15px; color: #a8a29e;">+254 7&thinsp;__ &thinsp;___&thinsp;___</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 7px;">
+        <label style="font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #78716c;">Email</label>
+        <div style="border: 1px solid #ded6c9; background: #ffffff; border-radius: 16px; padding: 15px 18px; font-size: 15px; color: #a8a29e;">orders@example.com</div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 9px; background: #ffffff; border: 1px solid #e7e0d5; border-radius: 20px; padding: 20px;">
+      <label style="font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #78716c;">The share you usually take</label>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="display: flex; gap: 8px;">
+          <span style="font-size: 14px; font-weight: 600; color: #1c1917; border: 1px solid #ded6c9; border-radius: 12px; padding: 10px 16px;">10%</span>
+          <span style="font-size: 14px; font-weight: 600; color: #1c1917; border: 1px solid #ded6c9; border-radius: 12px; padding: 10px 16px;">25%</span>
+          <span style="font-size: 14px; font-weight: 700; color: #ffffff; background: #166534; border: 1px solid #166534; border-radius: 12px; padding: 10px 16px;">30%</span>
+          <span style="font-size: 14px; font-weight: 600; color: #1c1917; border: 1px solid #ded6c9; border-radius: 12px; padding: 10px 16px;">50%</span>
+        </div>
+        <span style="font-size: 13px; color: #a8a29e;">or type your own</span>
+      </div>
+      <p style="font-size: 13px; line-height: 1.55; color: #78716c; text-wrap: pretty;">We use this when you tick a crop, so you are not typing the same number every time. You can change it on any single order.</p>
+    </div>
+
+    <div style="display: flex; align-items: flex-start; gap: 12px; padding-top: 2px;">
+      <span style="width: 20px; height: 20px; border: 1px solid #ded6c9; border-radius: 6px; background: #ffffff; flex-shrink: 0; margin-top: 2px;"></span>
+      <p style="font-size: 14px; line-height: 1.55; color: #57534e;">Send me a message when a crop I have reserved is about to be picked.</p>
+    </div>
+
+    <a href="#" style="display: block; text-align: center; background: #166534; color: #ffffff; font-size: 16px; font-weight: 700; padding: 17px; border-radius: 999px; margin-top: 4px;">Create account</a>
+
+    <p style="font-size: 13px; line-height: 1.6; color: #a8a29e; text-wrap: pretty;">By opening an account you agree to collect and pay for what you reserve, or tell us at least [notice period] beforehand if you cannot.</p>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

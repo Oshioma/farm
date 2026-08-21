@@ -1,0 +1,14 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 2560, "title": "Shopfront" },
+    { "file": "Produce.dc.html", "x": 1560, "y": 0, "w": 1440, "h": 1180, "title": "Produce & pre-order" },
+    { "file": "SignUp.dc.html", "x": 1560, "y": 1300, "w": 1100, "h": 900, "title": "Customer sign-up" },
+    { "file": "Basket.dc.html", "x": 1560, "y": 2320, "w": 1200, "h": 1180, "title": "Pre-order & confirmation" },
+    { "file": "Mobile.dc.html", "x": 3120, "y": 0, "w": 390, "h": 1560, "title": "Phone" }
+  ],
+  "annotations": [
+    { "id": "scope", "x": 0, "y": -180, "w": 460, "text": "Top Land shopfront — shamba.online/topland\n\nOnly crops with an expected harvest are listed, on the shop and in the customer order section.\n\nNo payment step: reservations are confirmed by the farm and settled on collection." },
+    { "id": "placeholders", "x": 520, "y": -180, "w": 420, "text": "Bracketed text is a real fact I don't have — address, phone, collection days, notice period.\n\nProduce, weights and prices are sample values shaped like the Harvest ETA data that would fill them." }
+  ],
+  "launch": { "view": "canvas" }
+}
