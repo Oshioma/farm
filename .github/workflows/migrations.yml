@@ -3,14 +3,23 @@ name: Database migrations
 # Applies any new file in supabase/migrations/ to the hosted Supabase project
 # as soon as it lands on main. Migrations are expected to be idempotent
 # (IF NOT EXISTS / DROP ... IF EXISTS) so a replay is always safe.
+#
+# Run it by hand from the Actions tab to check the remote without changing it:
+# mode "check" links the project and lists local vs applied migrations, then
+# stops. Editing this file does not itself trigger a run — only migrations do.
 
 on:
   push:
     branches: [main]
     paths:
       - "supabase/migrations/**"
-      - ".github/workflows/migrations.yml"
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "check = list migrations only · apply = also run db push"
+        type: choice
+        options: [check, apply]
+        default: check
 
 jobs:
   migrate:
@@ -32,8 +41,16 @@ jobs:
       - name: Link project
         run: supabase link --project-ref "${{ vars.SUPABASE_PROJECT_ID }}"
 
-      - name: Show pending migrations
+      # Local files beside what the remote has recorded as applied. A migration
+      # with no remote version is one `db push` would run.
+      - name: Show migration status
         run: supabase migration list
 
+      # A merge always applies; a manual run only when asked to.
       - name: Apply migrations
+        if: ${{ github.event_name == 'push' || inputs.mode == 'apply' }}
         run: supabase db push
+
+      - name: Check-only notice
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode != 'apply' }}
+        run: echo "Check mode — nothing was applied. Re-run with mode=apply to push."
