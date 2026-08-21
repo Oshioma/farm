@@ -1,11 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { getFarms, getHarvestEta, getZones, getCrops } from "@/lib/farm";
-import type { Farm, HarvestEtaEntry, Zone, Crop } from "@/lib/farm";
+import {
+  getFarms,
+  getHarvestEta,
+  getZones,
+  getCrops,
+  HARVEST_MONTHS,
+  harvestSeasonYear,
+  bedLabel,
+} from "@/lib/farm";
+import type { Farm, HarvestEtaEntry, Zone, Crop, HarvestMonthKey } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { useFarmRole } from "@/hooks/useFarmRole";
 
@@ -16,22 +24,8 @@ function errMsg(err: unknown, fallback: string): string {
   return fallback;
 }
 
-const MONTHS = [
-  { key: "mar", label: "Mar" },
-  { key: "apr", label: "Apr" },
-  { key: "may", label: "May" },
-  { key: "jun", label: "Jun" },
-  { key: "jul", label: "Jul" },
-  { key: "aug", label: "Aug" },
-  { key: "sep", label: "Sep" },
-  { key: "oct", label: "Oct" },
-  { key: "nov", label: "Nov" },
-  { key: "dec", label: "Dec" },
-  { key: "jan", label: "Jan" },
-  { key: "feb", label: "Feb" },
-] as const;
-
-type MonthKey = (typeof MONTHS)[number]["key"];
+const MONTHS = HARVEST_MONTHS;
+type MonthKey = HarvestMonthKey;
 
 type FormData = {
   crop_id: string;
@@ -62,7 +56,7 @@ function blankForm(): FormData {
 
 function entryToForm(e: HarvestEtaEntry): FormData {
   const f: Record<string, string> = {
-    crop_id: (e as Record<string, unknown>).crop_id as string ?? "",
+    crop_id: e.crop_id ?? "",
     bed_name: e.bed_name ?? "",
     zone_id: e.zone_id ?? "",
     main_crop: e.main_crop ?? "",
@@ -77,16 +71,85 @@ function entryToForm(e: HarvestEtaEntry): FormData {
   return f as FormData;
 }
 
-function displayName(entry: HarvestEtaEntry, zones: Zone[]): string {
-  if (entry.zone && entry.zone.length > 0) {
-    const z = entry.zone[0];
-    return z.code ?? z.name;
+function cropLabel(c: Crop): string {
+  return c.crop_name + (c.variety ? ` · ${c.variety}` : "");
+}
+
+function norm(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase();
+}
+
+/* A row on the sheet: either a saved harvest_eta entry, a bed that currently
+   has crops in it but no entry yet, or both. */
+type BedRow = {
+  key: string;
+  entry: HarvestEtaEntry | null;
+  zone: Zone | null;
+  bedName: string;
+  crops: Crop[];
+  mainCrop: string | null;
+  expectedHarvestDate: string | null;
+};
+
+type ViewMode = "crops" | "all" | "saved";
+
+function buildRows(entries: HarvestEtaEntry[], zones: Zone[], crops: Crop[]): BedRow[] {
+  const cropsByZone = new Map<string, Crop[]>();
+  for (const c of crops) {
+    for (const zid of c.zone_ids ?? []) {
+      const list = cropsByZone.get(zid);
+      if (list) list.push(c);
+      else cropsByZone.set(zid, [c]);
+    }
   }
-  if (entry.zone_id) {
-    const found = zones.find((zn) => zn.id === entry.zone_id);
-    if (found) return found.code ?? found.name;
+
+  const usedEntryIds = new Set<string>();
+  const rows: BedRow[] = zones.map((z) => {
+    const label = bedLabel(z);
+    const entry =
+      entries.find((e) => !usedEntryIds.has(e.id) && e.zone_id === z.id) ??
+      entries.find(
+        (e) =>
+          !usedEntryIds.has(e.id) &&
+          !e.zone_id &&
+          (norm(e.bed_name) === norm(z.code) || norm(e.bed_name) === norm(z.name))
+      ) ??
+      null;
+    if (entry) usedEntryIds.add(entry.id);
+
+    const zoneCrops = cropsByZone.get(z.id) ?? [];
+    return {
+      key: `zone:${z.id}`,
+      entry,
+      zone: z,
+      bedName: entry?.bed_name?.trim() || label,
+      crops: zoneCrops,
+      mainCrop: entry?.main_crop ?? (zoneCrops.length > 0 ? zoneCrops.map(cropLabel).join(", ") : null),
+      expectedHarvestDate: entry?.expected_harvest_date ?? zoneCrops.find((c) => c.expected_harvest_start)?.expected_harvest_start ?? null,
+    };
+  });
+
+  /* Saved rows that don't line up with a bed (e.g. straight from the CSV import). */
+  for (const e of entries) {
+    if (usedEntryIds.has(e.id)) continue;
+    rows.push({
+      key: `entry:${e.id}`,
+      entry: e,
+      zone: null,
+      bedName: e.bed_name || "—",
+      crops: [],
+      mainCrop: e.main_crop,
+      expectedHarvestDate: e.expected_harvest_date,
+    });
   }
-  return entry.bed_name || "—";
+
+  return rows.sort((a, b) => a.bedName.localeCompare(b.bedName, undefined, { numeric: true, sensitivity: "base" }));
+}
+
+function rowHasEstimates(row: BedRow): boolean {
+  if (!row.entry) return false;
+  const e = row.entry as Record<string, unknown>;
+  return MONTHS.some((m) => e[`${m.key}_expected`] || e[`${m.key}_actual`]);
 }
 
 export default function HarvestEtaPage() {
@@ -95,11 +158,13 @@ export default function HarvestEtaPage() {
   const [crops, setCrops] = useState<Crop[]>([]);
   const [entries, setEntries] = useState<HarvestEtaEntry[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
-  const [year, setYear] = useState(2025);
+  const [year, setYear] = useState(() => harvestSeasonYear());
+  const [view, setView] = useState<ViewMode>("crops");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [modal, setModal] = useState<HarvestEtaEntry | null | "new">(null);
   const [form, setForm] = useState<FormData>(blankForm());
+  const [modalTitle, setModalTitle] = useState("");
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
@@ -139,6 +204,18 @@ export default function HarvestEtaPage() {
       .catch((err) => setError(errMsg(err, "Failed to load")))
       .finally(() => setLoading(false));
   }, [activeFarmId, year]);
+
+  const allRows = useMemo(() => buildRows(entries, zones, crops), [entries, zones, crops]);
+  const withCropsCount = useMemo(() => allRows.filter((r) => r.crops.length > 0).length, [allRows]);
+  const rows = useMemo(() => {
+    if (view === "all") return allRows;
+    if (view === "saved") return allRows.filter((r) => r.entry);
+    return allRows.filter((r) => r.crops.length > 0 || r.entry);
+  }, [allRows, view]);
+  const missingEstimates = useMemo(
+    () => rows.filter((r) => r.crops.length > 0 && !rowHasEstimates(r)).length,
+    [rows]
+  );
 
   async function handleSave() {
     if (!activeFarmId || !form.bed_name.trim()) return;
@@ -189,17 +266,38 @@ export default function HarvestEtaPage() {
     }
   }
 
-  function openEdit(entry: HarvestEtaEntry) {
-    setForm(entryToForm(entry));
-    setModal(entry);
+  /* Edit a saved row, or start one pre-filled from the bed and the crops in it. */
+  function openRow(row: BedRow) {
+    if (row.entry) {
+      setForm(entryToForm(row.entry));
+      setModalTitle(`Edit — ${row.bedName}`);
+      setModal(row.entry);
+      return;
+    }
+    const f = blankForm();
+    f.bed_name = row.bedName;
+    f.zone_id = row.zone?.id ?? "";
+    f.main_crop = row.mainCrop ?? "";
+    f.crop_id = row.crops.length === 1 ? row.crops[0].id : "";
+    f.expected_harvest_date = row.expectedHarvestDate ?? "";
+    setForm(f);
+    setModalTitle(`Add estimate — ${row.bedName}`);
+    setModal("new");
   }
 
   function openAdd() {
     setForm(blankForm());
+    setModalTitle("Add bed entry");
     setModal("new");
   }
 
   const activeFarm = farms.find((f) => f.id === activeFarmId);
+
+  const VIEWS: { key: ViewMode; label: string }[] = [
+    { key: "crops", label: "Beds with crops" },
+    { key: "all", label: "All beds" },
+    { key: "saved", label: "Saved entries" },
+  ];
 
   return (
     <main className="min-h-screen bg-stone-50 text-zinc-900">
@@ -266,7 +364,9 @@ export default function HarvestEtaPage() {
             </button>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-zinc-500">{entries.length} beds</span>
+            <span className="text-sm text-zinc-500">
+              {rows.length} bed{rows.length === 1 ? "" : "s"} · {withCropsCount} with crops
+            </span>
             {isManager && (
               <button
                 onClick={openAdd}
@@ -278,12 +378,39 @@ export default function HarvestEtaPage() {
           </div>
         </div>
 
+        {/* View filter */}
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="flex rounded-full border border-zinc-200 bg-white p-1">
+            {VIEWS.map((v) => (
+              <button
+                key={v.key}
+                onClick={() => setView(v.key)}
+                className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${
+                  view === v.key ? "bg-zinc-900 text-white" : "text-zinc-600 hover:bg-zinc-100"
+                }`}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+          {missingEstimates > 0 && (
+            <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700">
+              {missingEstimates} bed{missingEstimates === 1 ? "" : "s"} with crops still need an estimate
+            </span>
+          )}
+        </div>
+
         {/* Table */}
         {loading ? (
           <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">Loading...</div>
-        ) : entries.length === 0 ? (
+        ) : rows.length === 0 ? (
           <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-center text-sm text-zinc-500">
-            No harvest ETA entries for {year}.{isManager ? " Click “+ Add bed” to get started." : ""}
+            {view === "saved"
+              ? `No saved harvest ETA entries for ${year}.`
+              : zones.length === 0
+                ? "No beds yet — add beds on the farm map or zones page first."
+                : `No beds with crops for ${year}. Switch to “All beds” to plan ahead.`}
+            {isManager ? " You can also click “+ Add bed”." : ""}
           </div>
         ) : (
           <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
@@ -309,46 +436,67 @@ export default function HarvestEtaPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {entries.map((row) => (
-                    <tr key={row.id} className="border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50 align-top transition-colors">
-                      <td className="sticky left-0 z-10 bg-white px-3 py-2 font-semibold text-zinc-900 whitespace-nowrap">
-                        {displayName(row, zones)}
-                        {(row as Record<string, unknown>).crop_id ? (
-                          <span className="ml-1 text-[9px] font-normal text-emerald-600" title="Linked to crop">&#x1F517;</span>
-                        ) : null}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap font-medium">{row.main_crop ?? <span className="text-zinc-300">—</span>}</td>
-                      <td className="px-3 py-2 whitespace-nowrap text-zinc-600">{row.expected_harvest_date ?? <span className="text-zinc-300">—</span>}</td>
-                      <td className="px-3 py-2 text-zinc-600 max-w-[120px] truncate">{row.beneficial_companions ?? <span className="text-zinc-300">—</span>}</td>
-                      {MONTHS.map((m) => {
-                        const exp = (row as Record<string, unknown>)[`${m.key}_expected`] as string | null;
-                        const act = (row as Record<string, unknown>)[`${m.key}_actual`] as string | null;
-                        return (
-                          <td key={m.key} colSpan={2} className="px-1 py-2">
-                            <div className="flex gap-0.5 text-center">
-                              <span className={`flex-1 rounded px-1 py-0.5 ${exp ? "bg-emerald-50 text-emerald-700" : "text-zinc-300"}`}>
-                                {exp || "—"}
-                              </span>
-                              <span className={`flex-1 rounded px-1 py-0.5 ${act ? "bg-blue-50 text-blue-700" : "text-zinc-300"}`}>
-                                {act || "—"}
-                              </span>
+                  {rows.map((row) => {
+                    const entry = row.entry as Record<string, unknown> | null;
+                    return (
+                      <tr key={row.key} className={`border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50 align-top transition-colors ${row.entry ? "" : "bg-amber-50/30"}`}>
+                        <td className={`sticky left-0 z-10 px-3 py-2 font-semibold text-zinc-900 whitespace-nowrap ${row.entry ? "bg-white" : "bg-amber-50/60"}`}>
+                          {row.bedName}
+                          {row.entry?.crop_id ? (
+                            <span className="ml-1 text-[9px] font-normal text-emerald-600" title="Linked to crop">&#x1F517;</span>
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap font-medium">
+                          {row.mainCrop ?? <span className="text-zinc-300">—</span>}
+                          {row.crops.length > 0 && (
+                            <span className="ml-1.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700">
+                              {row.crops.length} planted
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-zinc-600">{row.expectedHarvestDate ?? <span className="text-zinc-300">—</span>}</td>
+                        <td className="px-3 py-2 text-zinc-600 max-w-[120px] truncate">{row.entry?.beneficial_companions ?? <span className="text-zinc-300">—</span>}</td>
+                        {MONTHS.map((m) => {
+                          const exp = entry ? (entry[`${m.key}_expected`] as string | null) : null;
+                          const act = entry ? (entry[`${m.key}_actual`] as string | null) : null;
+                          return (
+                            <td key={m.key} colSpan={2} className="px-1 py-2">
+                              <div className="flex gap-0.5 text-center">
+                                <span className={`flex-1 rounded px-1 py-0.5 ${exp ? "bg-emerald-50 text-emerald-700" : "text-zinc-300"}`}>
+                                  {exp || "—"}
+                                </span>
+                                <span className={`flex-1 rounded px-1 py-0.5 ${act ? "bg-blue-50 text-blue-700" : "text-zinc-300"}`}>
+                                  {act || "—"}
+                                </span>
+                              </div>
+                            </td>
+                          );
+                        })}
+                        <td className="px-3 py-2 text-zinc-500 max-w-[120px] truncate">{row.entry?.notes ?? <span className="text-zinc-300">—</span>}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {isManager && (
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => openRow(row)}
+                                className={`rounded-lg px-2 py-1 text-[10px] font-medium transition ${
+                                  row.entry
+                                    ? "border border-zinc-200 text-zinc-600 hover:bg-zinc-100"
+                                    : "bg-zinc-900 text-white hover:bg-zinc-800"
+                                }`}
+                              >
+                                {row.entry ? "Edit" : "+ Estimate"}
+                              </button>
+                              {row.entry && (
+                                <button onClick={() => handleDelete(row.entry!.id)} disabled={deletingId === row.entry.id} className="rounded-lg border border-rose-200 px-2 py-1 text-[10px] font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">
+                                  {deletingId === row.entry.id ? "…" : "Del"}
+                                </button>
+                              )}
                             </div>
-                          </td>
-                        );
-                      })}
-                      <td className="px-3 py-2 text-zinc-500 max-w-[120px] truncate">{row.notes ?? <span className="text-zinc-300">—</span>}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        {isManager && (
-                          <div className="flex gap-1">
-                            <button onClick={() => openEdit(row)} className="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] font-medium text-zinc-600 transition hover:bg-zinc-100">Edit</button>
-                            <button onClick={() => handleDelete(row.id)} disabled={deletingId === row.id} className="rounded-lg border border-rose-200 px-2 py-1 text-[10px] font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">
-                              {deletingId === row.id ? "…" : "Del"}
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -356,9 +504,10 @@ export default function HarvestEtaPage() {
         )}
 
         {/* Legend */}
-        <div className="mt-3 flex items-center gap-4 text-xs text-zinc-500">
+        <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-zinc-500">
           <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded bg-emerald-50 border border-emerald-200" /> Expected</span>
           <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded bg-blue-50 border border-blue-200" /> Actual</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded bg-amber-50 border border-amber-200" /> No estimate saved yet</span>
         </div>
       </div>
 
@@ -366,9 +515,7 @@ export default function HarvestEtaPage() {
       {isManager && modal !== null && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-8">
           <div className="w-full max-w-2xl rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl">
-            <h2 className="mb-5 text-lg font-semibold">
-              {modal === "new" ? "Add bed entry" : `Edit — ${displayName(modal as HarvestEtaEntry, zones)}`}
-            </h2>
+            <h2 className="mb-5 text-lg font-semibold">{modalTitle || "Bed entry"}</h2>
             <div className="space-y-3">
               {/* Link to existing crop */}
               {crops.length > 0 && (
@@ -384,11 +531,11 @@ export default function HarvestEtaPage() {
                       if (selected) {
                         // Find the bed name from the zone code
                         const primaryZone = zones.find((z) => z.id === selected.zone_id);
-                        const bedName = primaryZone?.code ?? primaryZone?.name ?? form.bed_name;
+                        const bedName = primaryZone ? bedLabel(primaryZone) : form.bed_name;
                         setForm((p) => ({
                           ...p,
                           crop_id: selected.id,
-                          main_crop: selected.crop_name + (selected.variety ? ` · ${selected.variety}` : ""),
+                          main_crop: cropLabel(selected),
                           zone_id: selected.zone_id ?? "",
                           bed_name: bedName,
                           expected_harvest_date: selected.expected_harvest_start ?? p.expected_harvest_date,
@@ -401,8 +548,8 @@ export default function HarvestEtaPage() {
                     <option value="">— Select a crop (optional) —</option>
                     {crops.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.crop_name}{c.variety ? ` · ${c.variety}` : ""}
-                        {c.zone_ids?.length ? ` (${c.zone_ids.map((zid) => zones.find((z) => z.id === zid)?.code ?? zones.find((z) => z.id === zid)?.name).filter(Boolean).join(", ")})` : ""}
+                        {cropLabel(c)}
+                        {c.zone_ids?.length ? ` (${c.zone_ids.map((zid) => bedLabel(zones.find((z) => z.id === zid))).filter(Boolean).join(", ")})` : ""}
                       </option>
                     ))}
                   </select>

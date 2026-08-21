@@ -4,8 +4,20 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { getFarms, getSeedlings, getSeedCollection, getZones } from "@/lib/farm";
-import type { Farm, SeedlingEntry, SeedCollectionEntry, Zone } from "@/lib/farm";
+import {
+  getFarms,
+  getSeedlings,
+  getSeedCollection,
+  getZones,
+  HARVEST_MONTHS,
+  harvestSeasonYear,
+  harvestMonthKeyFor,
+  harvestMonthYear,
+  harvestMonthStartDate,
+  bedLabel,
+  upsertHarvestEstimate,
+} from "@/lib/farm";
+import type { Farm, SeedlingEntry, SeedCollectionEntry, Zone, HarvestMonthKey } from "@/lib/farm";
 import { createLunarTask } from "@/lib/lunarTasks";
 import { SeedlingMap } from "../components/SeedlingMap";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
@@ -90,6 +102,9 @@ export default function SeedlingsPage() {
   const [transplantZoneIds, setTransplantZoneIds] = useState<string[]>([]);
   const [transplantDate, setTransplantDate] = useState("");
   const [transplanting, setTransplanting] = useState(false);
+  // Estimated harvest captured while transplanting -> harvest ETA sheet
+  const [estimateMonth, setEstimateMonth] = useState<HarvestMonthKey>("mar");
+  const [estimateYield, setEstimateYield] = useState("");
 
   // Seed collection
   const [seedEntries, setSeedEntries] = useState<SeedCollectionEntry[]>([]);
@@ -187,12 +202,29 @@ export default function SeedlingsPage() {
     setEntries(s); setSeedEntries(seeds);
   }
 
+  // The harvest season (Mar–Feb) the transplant falls into, and the readable
+  // month label the estimate is filed under, e.g. "Sep 2026".
+  const estimateSeason = useMemo(() => harvestSeasonYear(transplantDate || new Date()), [transplantDate]);
+  const estimateHarvestDate = useMemo(() => {
+    const month = HARVEST_MONTHS.find((m) => m.key === estimateMonth);
+    if (!month) return "";
+    return `${month.label} ${harvestMonthYear(estimateMonth, estimateSeason)}`;
+  }, [estimateMonth, estimateSeason]);
+  // crops.expected_harvest_start is a date column, so it gets the 1st of that month.
+  const estimateHarvestStart = useMemo(
+    () => harvestMonthStartDate(estimateMonth, estimateSeason),
+    [estimateMonth, estimateSeason]
+  );
+
   function openTransplant(entry: SeedlingEntry) {
     setError("");
     setTransplantModal(entry);
     setTransplantZoneIds([]);
     const today = new Date();
-    setTransplantDate(new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().slice(0, 10));
+    const localToday = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    setTransplantDate(localToday);
+    setEstimateMonth(harvestMonthKeyFor(localToday));
+    setEstimateYield("");
   }
 
   async function handleTransplant() {
@@ -203,17 +235,22 @@ export default function SeedlingsPage() {
       setTransplanting(true);
       setError("");
 
-      const { error: cropErr } = await supabase.from("crops").insert({
-        farm_id: activeFarmId,
-        zone_id: zoneIds[0],
-        extra_zone_ids: zoneIds.length > 1 ? JSON.stringify(zoneIds.slice(1)) : null,
-        crop_name: transplantModal.plant,
-        variety: transplantModal.variety,
-        status: "planted",
-        planted_on: transplantDate || null,
-        notes: transplantModal.notes,
-        is_active: true,
-      });
+      const { data: newCrop, error: cropErr } = await supabase
+        .from("crops")
+        .insert({
+          farm_id: activeFarmId,
+          zone_id: zoneIds[0],
+          extra_zone_ids: zoneIds.length > 1 ? JSON.stringify(zoneIds.slice(1)) : null,
+          crop_name: transplantModal.plant,
+          variety: transplantModal.variety,
+          status: "planted",
+          planted_on: transplantDate || null,
+          expected_harvest_start: estimateYield.trim() ? estimateHarvestStart || null : null,
+          notes: transplantModal.notes,
+          is_active: true,
+        })
+        .select("id")
+        .single();
       if (cropErr) throw cropErr;
 
       const { error: seedlingErr } = await supabase
@@ -221,6 +258,26 @@ export default function SeedlingsPage() {
         .update({ transplanted: true, transplanted_at: transplantDate || null })
         .eq("id", transplantModal.id);
       if (seedlingErr) throw seedlingErr;
+
+      // Estimated harvest goes straight onto the harvest ETA sheet for each bed.
+      if (estimateYield.trim()) {
+        const season = harvestSeasonYear(transplantDate || new Date());
+        const mainCrop = transplantModal.plant + (transplantModal.variety ? ` · ${transplantModal.variety}` : "");
+        for (const zoneId of zoneIds) {
+          const zone = zones.find((z) => z.id === zoneId);
+          await upsertHarvestEstimate({
+            farmId: activeFarmId,
+            year: season,
+            zoneId,
+            bedName: bedLabel(zone) || "—",
+            monthKey: estimateMonth,
+            expected: estimateYield.trim(),
+            cropId: newCrop?.id ?? null,
+            mainCrop,
+            expectedHarvestDate: estimateHarvestDate,
+          });
+        }
+      }
 
       await supabase.from("activities").insert({
         farm_id: activeFarmId,
@@ -675,12 +732,47 @@ export default function SeedlingsPage() {
                           }}
                           className="rounded border-zinc-300"
                         />
-                        <span className="text-sm">{z.name}</span>
+                        <span className="text-sm">{z.code ? `${z.code} — ${z.name}` : z.name}</span>
                       </label>
                     ))
                   )}
                 </div>
               </Field>
+
+              {/* Estimated harvest — written straight onto the Harvest ETA sheet */}
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                  Estimated harvest <span className="font-normal normal-case tracking-normal text-emerald-600">(optional)</span>
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Harvest month">
+                    <select
+                      className={inp}
+                      value={estimateMonth}
+                      onChange={(e) => setEstimateMonth(e.target.value as HarvestMonthKey)}
+                    >
+                      {HARVEST_MONTHS.map((m) => (
+                        <option key={m.key} value={m.key}>
+                          {m.label} {harvestMonthYear(m.key, estimateSeason)}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Estimated yield">
+                    <input
+                      className={inp}
+                      value={estimateYield}
+                      onChange={(e) => setEstimateYield(e.target.value)}
+                      placeholder="e.g. 20kg"
+                    />
+                  </Field>
+                </div>
+                <p className="mt-2 text-xs text-emerald-700">
+                  {estimateYield.trim()
+                    ? `Adds ${estimateYield.trim()} to ${estimateHarvestDate} on the Harvest ETA sheet for ${transplantZoneIds.length || "the selected"} bed${transplantZoneIds.length === 1 ? "" : "s"}.`
+                    : "Leave blank to skip — you can add estimates later on the Harvest ETA page."}
+                </p>
+              </div>
             </div>
             <div className="mt-5 flex gap-2">
               <button

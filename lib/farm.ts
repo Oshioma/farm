@@ -865,6 +865,7 @@ export type HarvestEtaEntry = {
   year: number;
   bed_name: string;
   zone_id: string | null;
+  crop_id: string | null;
   zone: { name: string; code: string | null }[] | null;
   main_crop: string | null;
   expected_harvest_date: string | null;
@@ -900,13 +901,130 @@ export type HarvestEtaEntry = {
 export async function getHarvestEta(farmId: string, year: number): Promise<HarvestEtaEntry[]> {
   const { data, error } = await supabase
     .from("harvest_eta")
-    .select("id, farm_id, year, bed_name, zone_id, zone:zones(name, code), main_crop, expected_harvest_date, beneficial_companions, mar_expected, mar_actual, apr_expected, apr_actual, may_expected, may_actual, jun_expected, jun_actual, jul_expected, jul_actual, aug_expected, aug_actual, sep_expected, sep_actual, oct_expected, oct_actual, nov_expected, nov_actual, dec_expected, dec_actual, jan_expected, jan_actual, feb_expected, feb_actual, notes, created_at")
+    .select("id, farm_id, year, bed_name, zone_id, crop_id, zone:zones(name, code), main_crop, expected_harvest_date, beneficial_companions, mar_expected, mar_actual, apr_expected, apr_actual, may_expected, may_actual, jun_expected, jun_actual, jul_expected, jul_actual, aug_expected, aug_actual, sep_expected, sep_actual, oct_expected, oct_actual, nov_expected, nov_actual, dec_expected, dec_actual, jan_expected, jan_actual, feb_expected, feb_actual, notes, created_at")
     .eq("farm_id", farmId)
     .eq("year", year)
     .order("bed_name");
 
   if (error) throw new Error(`getHarvestEta failed: ${error.message}`);
   return (data ?? []) as HarvestEtaEntry[];
+}
+
+/* ── Harvest ETA season helpers ───────────────────────────────
+   The harvest year runs Mar → Feb, so "2025" means Mar 2025 – Feb 2026. */
+
+export const HARVEST_MONTHS = [
+  { key: "mar", label: "Mar", month: 3 },
+  { key: "apr", label: "Apr", month: 4 },
+  { key: "may", label: "May", month: 5 },
+  { key: "jun", label: "Jun", month: 6 },
+  { key: "jul", label: "Jul", month: 7 },
+  { key: "aug", label: "Aug", month: 8 },
+  { key: "sep", label: "Sep", month: 9 },
+  { key: "oct", label: "Oct", month: 10 },
+  { key: "nov", label: "Nov", month: 11 },
+  { key: "dec", label: "Dec", month: 12 },
+  { key: "jan", label: "Jan", month: 1 },
+  { key: "feb", label: "Feb", month: 2 },
+] as const;
+
+export type HarvestMonthKey = (typeof HARVEST_MONTHS)[number]["key"];
+
+/** Calendar year of a month within a given harvest season (Jan/Feb roll over). */
+export function harvestMonthYear(key: HarvestMonthKey, seasonYear: number): number {
+  return key === "jan" || key === "feb" ? seasonYear + 1 : seasonYear;
+}
+
+/** The harvest season a calendar date belongs to (Jan/Feb belong to the previous season). */
+export function harvestSeasonYear(date: Date | string = new Date()): number {
+  const d = typeof date === "string" ? new Date(date) : date;
+  if (Number.isNaN(d.getTime())) return new Date().getFullYear();
+  return d.getMonth() + 1 >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+}
+
+/** First day of a season month as an ISO date, for date columns like crops.expected_harvest_start. */
+export function harvestMonthStartDate(key: HarvestMonthKey, seasonYear: number): string {
+  const month = HARVEST_MONTHS.find((m) => m.key === key);
+  if (!month) return "";
+  return `${harvestMonthYear(key, seasonYear)}-${String(month.month).padStart(2, "0")}-01`;
+}
+
+export function harvestMonthKeyFor(date: Date | string): HarvestMonthKey {
+  const d = typeof date === "string" ? new Date(date) : date;
+  const month = Number.isNaN(d.getTime()) ? new Date().getMonth() + 1 : d.getMonth() + 1;
+  return (HARVEST_MONTHS.find((m) => m.month === month)?.key ?? "mar") as HarvestMonthKey;
+}
+
+/** Bed label used on the harvest ETA sheet — the zone code if it has one. */
+export function bedLabel(zone: Pick<Zone, "name" | "code"> | undefined | null): string {
+  if (!zone) return "";
+  return zone.code?.trim() || zone.name;
+}
+
+export type HarvestEstimateInput = {
+  farmId: string;
+  year: number;
+  zoneId: string | null;
+  bedName: string;
+  monthKey: HarvestMonthKey;
+  expected: string;
+  cropId?: string | null;
+  mainCrop?: string | null;
+  expectedHarvestDate?: string | null;
+};
+
+/**
+ * Add an estimated harvest to the harvest ETA sheet, reusing the bed's row for
+ * that season when one already exists (so a transplant tops up the sheet rather
+ * than duplicating beds).
+ */
+export async function upsertHarvestEstimate(input: HarvestEstimateInput): Promise<void> {
+  const { farmId, year, zoneId, bedName, monthKey, expected, cropId, mainCrop, expectedHarvestDate } = input;
+
+  let query = supabase
+    .from("harvest_eta")
+    .select("id, main_crop, expected_harvest_date, crop_id")
+    .eq("farm_id", farmId)
+    .eq("year", year)
+    .limit(1);
+  query = zoneId ? query.eq("zone_id", zoneId) : query.eq("bed_name", bedName);
+
+  const { data: existingRows, error: findErr } = await query;
+  if (findErr) throw new Error(`upsertHarvestEstimate failed: ${findErr.message}`);
+  const existing = (existingRows ?? [])[0] as unknown as Record<string, unknown> | undefined;
+
+  if (!existing) {
+    const payload: Record<string, unknown> = {
+      farm_id: farmId,
+      year,
+      bed_name: bedName,
+      zone_id: zoneId,
+      crop_id: cropId ?? null,
+      main_crop: mainCrop ?? null,
+      expected_harvest_date: expectedHarvestDate ?? null,
+      [`${monthKey}_expected`]: expected || null,
+    };
+    const { error } = await supabase.from("harvest_eta").insert(payload);
+    if (error) throw new Error(`upsertHarvestEstimate failed: ${error.message}`);
+    return;
+  }
+
+  const currentMain = ((existing.main_crop as string | null) ?? "").trim();
+  const nextMain = (mainCrop ?? "").trim();
+  let mergedMain = currentMain;
+  if (nextMain && !currentMain.toLowerCase().includes(nextMain.toLowerCase())) {
+    mergedMain = currentMain ? `${currentMain} / ${nextMain}` : nextMain;
+  }
+
+  const patch: Record<string, unknown> = {
+    [`${monthKey}_expected`]: expected || null,
+  };
+  if (mergedMain !== currentMain) patch.main_crop = mergedMain;
+  if (!existing.expected_harvest_date && expectedHarvestDate) patch.expected_harvest_date = expectedHarvestDate;
+  if (!existing.crop_id && cropId) patch.crop_id = cropId;
+
+  const { error } = await supabase.from("harvest_eta").update(patch).eq("id", existing.id as string);
+  if (error) throw new Error(`upsertHarvestEstimate failed: ${error.message}`);
 }
 
 export type WorkHoursEntry = {
