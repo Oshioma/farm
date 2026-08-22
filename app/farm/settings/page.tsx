@@ -181,14 +181,6 @@ export default function SettingsPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-zinc-500">Loading…</p>
-      </div>
-    );
-  }
-
   useEffect(() => {
     if (!activeFarmId) return;
     let cancelled = false;
@@ -224,6 +216,14 @@ export default function SettingsPage() {
     } finally {
       setSavingListing(false);
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-zinc-500">Loading…</p>
+      </div>
+    );
   }
 
   const isManager = userRole === "owner" || userRole === "manager";
