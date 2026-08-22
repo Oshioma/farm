@@ -458,6 +458,7 @@ const MIGRATIONS: { version: string; name: string; probes: string[]; note?: stri
   { version: "20260821203000", name: "add_list_in_market_to_farms", probes: ["farms.list_in_market"] },
   { version: "20260822080000", name: "add_shop_hero_to_farms", probes: ["farms.shop_hero_url"] },
   { version: "20260822090000", name: "notification_deep_links", probes: [], note: "Trigger functions only — not visible from here." },
+  { version: "20260822100000", name: "add_detail_fields_to_crops", probes: ["crops.flavour", "crops.best_eaten", "crops.why_special"] },
 ];
 
 type ProbeResult = { status: Status; detail: string };

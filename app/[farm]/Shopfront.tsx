@@ -335,6 +335,12 @@ function ProduceCard({ produce, onOpen }: { produce: ShopProduce; onOpen: () => 
         </span>
       </div>
 
+      {produce.details[0] && (
+        <p style={{ fontSize: 13, lineHeight: 1.5, color: "#57534e", margin: 0, textWrap: "pretty" }}>
+          {produce.details[0].value}
+        </p>
+      )}
+
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
           <span style={{ fontSize: 13, color: "#57534e" }}>
@@ -400,6 +406,19 @@ function ProduceSheet({ produce, onClose, onAdd }: { produce: ShopProduce; onClo
 
         {produce.notes && (
           <p style={{ fontSize: 15, lineHeight: 1.6, color: "#57534e", margin: 0, textWrap: "pretty" }}>{produce.notes}</p>
+        )}
+
+        {produce.details.length > 0 && (
+          <dl style={{ display: "flex", flexDirection: "column", gap: 10, margin: 0, background: "#ffffff", border: `1px solid ${LINE}`, borderRadius: 18, padding: 18 }}>
+            {produce.details.map((d) => (
+              <div key={d.label} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <dt style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#a8a29e" }}>
+                  {d.label}
+                </dt>
+                <dd style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "#3f3f46", textWrap: "pretty" }}>{d.value}</dd>
+              </div>
+            ))}
+          </dl>
         )}
 
         <Labelled label="Harvest month">

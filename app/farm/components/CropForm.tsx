@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { CROP_DETAIL_FIELDS } from "@/lib/cropDetails";
 import { Plus, X } from "lucide-react";
 import type { Zone } from "@/lib/farm";
 
@@ -15,6 +16,12 @@ export type CropFormData = {
   expected_sale_price_per_kg: string;
   notes: string;
   medicinal_properties: string;
+  flavour: string;
+  appearance: string;
+  size: string;
+  best_eaten: string;
+  nutritional_qualities: string;
+  why_special: string;
   image_file: File | null;
 };
 
@@ -29,6 +36,12 @@ const blank: CropFormData = {
   expected_sale_price_per_kg: "",
   notes: "",
   medicinal_properties: "",
+  flavour: "",
+  appearance: "",
+  size: "",
+  best_eaten: "",
+  nutritional_qualities: "",
+  why_special: "",
   image_file: null,
 };
 
@@ -281,6 +294,36 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
             className="min-h-[80px] w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
             placeholder="Known medicinal uses, healing properties…"
           />
+        </div>
+
+        <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 p-4">
+          <p className="text-sm font-medium">For the shop <span className="font-normal text-zinc-400">(all optional)</span></p>
+          <p className="mt-1 text-xs text-zinc-500">
+            Whatever you fill in here is shown to customers on the shopfront. Anything left blank simply is not shown.
+          </p>
+          <div className="mt-3 space-y-3">
+            {CROP_DETAIL_FIELDS.map((field) => (
+              <div key={field.key}>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">{field.label}</label>
+                {field.long ? (
+                  <textarea
+                    value={form[field.key]}
+                    onChange={(e) => setForm((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                    className="min-h-[70px] w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                    placeholder={field.placeholder}
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    value={form[field.key]}
+                    onChange={(e) => setForm((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                    className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                    placeholder={field.placeholder}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
 
         <button
