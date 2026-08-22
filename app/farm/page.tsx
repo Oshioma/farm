@@ -39,6 +39,7 @@ import type { WantFormData } from "@/app/farm/components/WantForm";
 import { FarmMap } from "@/app/farm/components/FarmMap";
 import LunarPlanner from "@/app/farm/components/LunarPlanner";
 import { useFocusTarget } from "@/hooks/useFocusTarget";
+import { blankCropDetails, cropDetailsToForm, cropDetailsPayload } from "@/lib/cropDetails";
 import { LogHoursModal } from "@/app/farm/components/LogHoursModal";
 import { ExpandableText } from "@/app/farm/components/ExpandableText";
 import { ArrowUp, Images, Plus, Settings, X } from "lucide-react";
@@ -101,7 +102,7 @@ export default function FarmPage() {
   const [editingCropForm, setEditingCropForm] = useState({
     crop_name: "", variety: "", zone_ids: [] as string[], status: "", planted_on: "",
     expected_harvest_start: "", estimated_yield_kg: "", expected_sale_price_per_kg: "",
-    notes: "", medicinal_properties: "", image_file: null as File | null, image_url: "" as string,
+    notes: "", medicinal_properties: "", ...blankCropDetails(), image_file: null as File | null, image_url: "" as string,
   });
   const [cropImagePreview, setCropImagePreview] = useState("");
   const [savingCropId, setSavingCropId] = useState<string | null>(null);
@@ -729,6 +730,7 @@ export default function FarmPage() {
           : null,
         notes: data.notes.trim() || null,
         medicinal_properties: data.medicinal_properties.trim() || null,
+        ...cropDetailsPayload(data as unknown as Record<string, string>),
         is_active: true,
       });
       if (insertError) throw insertError;
@@ -782,6 +784,7 @@ export default function FarmPage() {
       expected_sale_price_per_kg: crop.expected_sale_price_per_kg != null ? String(crop.expected_sale_price_per_kg) : "",
       notes: crop.notes ?? "",
       medicinal_properties: crop.medicinal_properties ?? "",
+      ...cropDetailsToForm(crop as unknown as Record<string, unknown>),
       image_file: null,
       image_url: crop.image_url ?? "",
     });
@@ -827,6 +830,7 @@ export default function FarmPage() {
         expected_sale_price_per_kg: editingCropForm.expected_sale_price_per_kg ? Number(editingCropForm.expected_sale_price_per_kg) : null,
         notes: editingCropForm.notes.trim() || null,
         medicinal_properties: editingCropForm.medicinal_properties.trim() || null,
+        ...cropDetailsPayload(editingCropForm as unknown as Record<string, string>),
         image_url: imageUrl,
       };
       console.log("Crop update payload:", JSON.stringify(payload), "id:", id);

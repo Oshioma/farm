@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { CROP_DETAIL_FIELDS, blankCropDetails, cropDetailsToForm, cropDetailsPayload } from "@/lib/cropDetails";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Camera, Info, Pencil, Sprout, X } from "lucide-react";
@@ -43,6 +44,7 @@ export default function CropsGalleryPage() {
     status: "planned",
     notes: "",
     medicinal_properties: "",
+    ...blankCropDetails(),
     zone_ids: [] as string[],
     image_file: null as File | null,
     image_url: "",
@@ -150,6 +152,7 @@ export default function CropsGalleryPage() {
       status: crop.status ?? "planned",
       notes: crop.notes ?? "",
       medicinal_properties: crop.medicinal_properties ?? "",
+      ...cropDetailsToForm(crop as unknown as Record<string, unknown>),
       zone_ids: crop.zone_ids?.length ? crop.zone_ids : crop.zone_id ? [crop.zone_id] : [],
       image_file: null,
       image_url: crop.image_url ?? "",
@@ -185,6 +188,7 @@ export default function CropsGalleryPage() {
           status: editForm.status,
           notes: editForm.notes.trim() || null,
           medicinal_properties: editForm.medicinal_properties.trim() || null,
+          ...cropDetailsPayload(editForm as unknown as Record<string, string>),
           image_url: imageUrl,
           zone_id: primaryZone,
           extra_zone_ids: extraZones.length > 0 ? JSON.stringify(extraZones) : null,
@@ -202,6 +206,7 @@ export default function CropsGalleryPage() {
                 status: editForm.status,
                 notes: editForm.notes.trim() || null,
                 medicinal_properties: editForm.medicinal_properties.trim() || null,
+                ...cropDetailsPayload(editForm as unknown as Record<string, string>),
                 image_url: imageUrl,
                 zone_id: primaryZone,
                 extra_zone_ids: extraZones.length > 0 ? JSON.stringify(extraZones) : null,
@@ -545,6 +550,34 @@ export default function CropsGalleryPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 p-4">
+                <p className="text-sm font-medium">For the shop <span className="font-normal text-zinc-400">(all optional)</span></p>
+                <p className="mt-1 text-xs text-zinc-500">Shown to customers on the shopfront; blanks are left out.</p>
+                <div className="mt-3 space-y-3">
+                  {CROP_DETAIL_FIELDS.map((field) => (
+                    <div key={field.key}>
+                      <label className="mb-1.5 block text-xs font-medium text-zinc-600">{field.label}</label>
+                      {field.long ? (
+                        <textarea
+                          value={editForm[field.key]}
+                          onChange={(e) => setEditForm((p) => ({ ...p, [field.key]: e.target.value }))}
+                          className="min-h-[60px] w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                          placeholder={field.placeholder}
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={editForm[field.key]}
+                          onChange={(e) => setEditForm((p) => ({ ...p, [field.key]: e.target.value }))}
+                          className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
+                          placeholder={field.placeholder}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div>

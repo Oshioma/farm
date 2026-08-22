@@ -8,6 +8,7 @@ import {
   orderKg,
 } from "@/lib/harvest";
 import type { HarvestMonthKey, SeasonMonth } from "@/lib/harvest";
+import { filledCropDetails } from "@/lib/cropDetails";
 
 /* The public shopfront. Visitors are not farm members, so every read here goes
    through the service role and returns only what a shop should show: what is
@@ -37,6 +38,8 @@ export type ShopProduce = {
   notes: string | null;
   imageUrl: string | null;
   pricePerKg: number | null;
+  /** Flavour, appearance, size and so on — only what the farm filled in. */
+  details: { label: string; value: string }[];
   months: ShopMonth[];
   totalExpectedKg: number;
   totalAvailableKg: number;
@@ -116,7 +119,9 @@ export async function getShopData(slug: string): Promise<ShopData | null> {
       admin.from("harvest_eta").select("*").eq("farm_id", farm.id).in("year", seasons),
       admin
         .from("crops")
-        .select("id, crop_name, variety, notes, image_url, zone_id, extra_zone_ids, expected_sale_price_per_kg")
+        /* Selected with * so a database without the descriptive columns still
+           serves the shop; those details just come back empty. */
+        .select("*")
         .eq("farm_id", farm.id)
         .eq("is_active", true),
       admin.from("zones").select("id, name, code").eq("farm_id", farm.id).eq("is_active", true),
@@ -183,6 +188,7 @@ export async function getShopData(slug: string): Promise<ShopData | null> {
       beds: bedsFor((crop.zone_id as string | null) ?? null, (crop.extra_zone_ids as string | null) ?? null),
       notes: (crop.notes as string | null) ?? null,
       imageUrl: (crop.image_url as string | null) ?? null,
+      details: filledCropDetails(crop),
       pricePerKg: (crop.expected_sale_price_per_kg as number | null) ?? null,
       months,
       totalExpectedKg: months.reduce((sum, m) => sum + (m.expectedKg ?? 0), 0),

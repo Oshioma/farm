@@ -151,6 +151,13 @@ export type Crop = {
   expected_sale_price_per_kg: number | null;
   notes: string | null;
   medicinal_properties: string | null;
+  /* Descriptive fields for the shopfront — see lib/cropDetails.ts. */
+  flavour: string | null;
+  appearance: string | null;
+  size: string | null;
+  best_eaten: string | null;
+  nutritional_qualities: string | null;
+  why_special: string | null;
   image_url: string | null;
   zone_id: string | null;
   extra_zone_ids: string | null;
@@ -273,28 +280,11 @@ export async function getCrops(farmId: string): Promise<Crop[]> {
     `crops_${farmId}`,
     "crops",
     async () => {
+      /* Selected with * rather than by name so a database missing a newer
+         descriptive column still loads; the field simply reads as undefined. */
       const { data, error } = await supabase
         .from("crops")
-        .select(
-          `
-          id,
-          crop_name,
-          variety,
-          status,
-          planted_on,
-          expected_harvest_start,
-          expected_harvest_end,
-          estimated_yield_kg,
-          actual_yield_kg,
-          expected_sale_price_per_kg,
-          notes,
-          medicinal_properties,
-          image_url,
-          zone_id,
-          extra_zone_ids,
-          zone:zones(name)
-        `
-        )
+        .select("*, zone:zones(name)")
         .eq("farm_id", farmId)
         .eq("is_active", true)
         .order("created_at", { ascending: false });
