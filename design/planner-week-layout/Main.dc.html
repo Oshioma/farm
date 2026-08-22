@@ -1,0 +1,256 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; color: #18181b; background: #f5f5f4; }
+    a { color: #166534; } a:hover { color: #052e16; }
+    p, h1, h2, h3 { margin: 0; }
+  </style>
+</helmet>
+
+<div style="background: #f5f5f4; padding: 24px;">
+
+  <p style="font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #a1a1aa; padding-bottom: 12px;">
+    Option A &middot; today full width, the rest collapsed
+  </p>
+
+  <!-- View switcher, unchanged -->
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; background: #ffffff; border: 1px solid #e4e4e7; border-radius: 24px; padding: 12px 16px; margin-bottom: 16px;">
+    <div style="display: flex; gap: 6px; background: #f4f4f5; border-radius: 999px; padding: 4px;">
+      <span style="font-size: 13px; font-weight: 600; color: #52525b; padding: 7px 16px;">1 Day</span>
+      <span style="font-size: 13px; font-weight: 600; color: #ffffff; background: #18181b; border-radius: 999px; padding: 7px 16px;">7 Day</span>
+      <span style="font-size: 13px; font-weight: 600; color: #52525b; padding: 7px 16px;">Month</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="font-size: 13px; color: #71717a;">22 Aug – 28 Aug 2026</span>
+      <span style="font-size: 13px; font-weight: 600; border: 1px solid #e4e4e7; border-radius: 999px; padding: 7px 16px;">Today</span>
+    </div>
+  </div>
+
+  <!-- TODAY — full width, tasks in columns -->
+  <div style="background: #ffffff; border: 1px solid #34d399; box-shadow: 0 0 0 1px #a7f3d0; border-radius: 24px; padding: 20px; margin-bottom: 14px;">
+    <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 14px;">
+      <div style="display: flex; align-items: baseline; gap: 10px;">
+        <span style="font-size: 20px; font-weight: 700;">22 Aug</span>
+        <span style="font-size: 14px; color: #71717a;">Saturday</span>
+        <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #065f46; background: #d1fae5; border-radius: 999px; padding: 4px 9px;">Today</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #52525b; background: #f4f4f5; border-radius: 999px; padding: 4px 10px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="#3f3f46" aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg>
+          New Moon &middot; planning
+        </span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 12px; color: #71717a;">10 tasks &middot; 0 done</span>
+        <span style="font-size: 13px; font-weight: 600; color: #ffffff; background: #18181b; border-radius: 999px; padding: 8px 16px;">+ Add</span>
+      </div>
+    </div>
+
+    <!-- the ten tasks, three abreast instead of one long column -->
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+      <div style="display: flex; align-items: flex-start; gap: 9px; border: 1px solid #f4f4f5; background: #fafafa; border-radius: 14px; padding: 10px 12px;">
+        <span style="width: 17px; height: 17px; border: 1.5px solid #d4d4d8; border-radius: 5px; flex-shrink: 0; margin-top: 1px; background: #ffffff;"></span>
+        <div style="min-width: 0;">
+          <p style="font-size: 14px; font-weight: 500;">Plant sweet potatoes</p>
+          <div style="display: flex; flex-wrap: wrap; gap: 5px; padding-top: 5px;">
+            <span style="font-size: 10px; color: #52525b; background: #f4f4f5; border-radius: 999px; padding: 3px 8px;">Planting</span>
+            <span style="font-size: 10px; color: #b45309; background: #fef3c7; border-radius: 999px; padding: 3px 8px;">&#8618; for 30 Jul</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: flex-start; gap: 9px; border: 1px solid #f4f4f5; background: #fafafa; border-radius: 14px; padding: 10px 12px;">
+        <span style="width: 17px; height: 17px; border: 1.5px solid #d4d4d8; border-radius: 5px; flex-shrink: 0; margin-top: 1px; background: #ffffff;"></span>
+        <div style="min-width: 0;">
+          <p style="font-size: 14px; font-weight: 500;">Start onion seedlings</p>
+          <div style="display: flex; flex-wrap: wrap; gap: 5px; padding-top: 5px;">
+            <span style="font-size: 10px; color: #52525b; background: #f4f4f5; border-radius: 999px; padding: 3px 8px;">Planting</span>
+            <span style="font-size: 10px; color: #b45309; background: #fef3c7; border-radius: 999px; padding: 3px 8px;">&#8618; for 3 Aug</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: flex-start; gap: 9px; border: 1px solid #f4f4f5; background: #fafafa; border-radius: 14px; padding: 10px 12px;">
+        <span style="width: 17px; height: 17px; border: 1.5px solid #d4d4d8; border-radius: 5px; flex-shrink: 0; margin-top: 1px; background: #ffffff;"></span>
+        <div style="min-width: 0;">
+          <p style="font-size: 14px; font-weight: 500;">New moon — planning</p>
+          <div style="display: flex; flex-wrap: wrap; gap: 5px; padding-top: 5px;">
+            <span style="font-size: 10px; color: #52525b; background: #f4f4f5; border-radius: 999px; padding: 3px 8px;">Planting</span>
+            <span style="font-size: 10px; color: #71717a;">note &#9662;</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: flex-start; gap: 9px; border: 1px solid #f4f4f5; background: #fafafa; border-radius: 14px; padding: 10px 12px;">
+        <span style="width: 17px; height: 17px; border: 1.5px solid #d4d4d8; border-radius: 5px; flex-shrink: 0; margin-top: 1px; background: #ffffff;"></span>
+        <div style="min-width: 0;">
+          <p style="font-size: 14px; font-weight: 500;">First day of Waxing Gibbous</p>
+          <div style="display: flex; flex-wrap: wrap; gap: 5px; padding-top: 5px;">
+            <span style="font-size: 10px; color: #52525b; background: #f4f4f5; border-radius: 999px; padding: 3px 8px;">Planting</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: flex-start; gap: 9px; border: 1px solid #f4f4f5; background: #fafafa; border-radius: 14px; padding: 10px 12px;">
+        <span style="width: 17px; height: 17px; border: 1.5px solid #d4d4d8; border-radius: 5px; flex-shrink: 0; margin-top: 1px; background: #ffffff;"></span>
+        <div style="min-width: 0;">
+          <p style="font-size: 14px; font-weight: 500;">Sow: Basil</p>
+          <div style="display: flex; flex-wrap: wrap; gap: 5px; padding-top: 5px;">
+            <span style="font-size: 10px; color: #52525b; background: #f4f4f5; border-radius: 999px; padding: 3px 8px;">Planting</span>
+            <span style="font-size: 10px; color: #b45309; background: #fef3c7; border-radius: 999px; padding: 3px 8px;">&#8618; for 17 Aug</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: flex-start; gap: 9px; border: 1px solid #f4f4f5; background: #fafafa; border-radius: 14px; padding: 10px 12px;">
+        <span style="width: 17px; height: 17px; border: 1.5px solid #d4d4d8; border-radius: 5px; flex-shrink: 0; margin-top: 1px; background: #ffffff;"></span>
+        <div style="min-width: 0;">
+          <p style="font-size: 14px; font-weight: 500;">Sow: Coriander</p>
+          <div style="display: flex; flex-wrap: wrap; gap: 5px; padding-top: 5px;">
+            <span style="font-size: 10px; color: #52525b; background: #f4f4f5; border-radius: 999px; padding: 3px 8px;">Planting</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: flex-start; gap: 9px; border: 1px solid #f4f4f5; background: #fafafa; border-radius: 14px; padding: 10px 12px;">
+        <span style="width: 17px; height: 17px; border: 1.5px solid #d4d4d8; border-radius: 5px; flex-shrink: 0; margin-top: 1px; background: #ffffff;"></span>
+        <div style="min-width: 0;">
+          <p style="font-size: 14px; font-weight: 500;">Sow: Rocket</p>
+          <div style="display: flex; flex-wrap: wrap; gap: 5px; padding-top: 5px;">
+            <span style="font-size: 10px; color: #52525b; background: #f4f4f5; border-radius: 999px; padding: 3px 8px;">Planting</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: flex-start; gap: 9px; border: 1px solid #f4f4f5; background: #fafafa; border-radius: 14px; padding: 10px 12px;">
+        <span style="width: 17px; height: 17px; border: 1.5px solid #d4d4d8; border-radius: 5px; flex-shrink: 0; margin-top: 1px; background: #ffffff;"></span>
+        <div style="min-width: 0;">
+          <p style="font-size: 14px; font-weight: 500;">Water tunnel beds</p>
+          <div style="display: flex; flex-wrap: wrap; gap: 5px; padding-top: 5px;">
+            <span style="font-size: 10px; color: #52525b; background: #f4f4f5; border-radius: 999px; padding: 3px 8px;">Watering</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: flex-start; gap: 9px; border: 1px solid #f4f4f5; background: #fafafa; border-radius: 14px; padding: 10px 12px;">
+        <span style="width: 17px; height: 17px; border: 1.5px solid #d4d4d8; border-radius: 5px; flex-shrink: 0; margin-top: 1px; background: #ffffff;"></span>
+        <div style="min-width: 0;">
+          <p style="font-size: 14px; font-weight: 500;">Check pepper seedlings</p>
+          <div style="display: flex; flex-wrap: wrap; gap: 5px; padding-top: 5px;">
+            <span style="font-size: 10px; color: #52525b; background: #f4f4f5; border-radius: 999px; padding: 3px 8px;">Nursery</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: flex-start; gap: 9px; border: 1px solid #f4f4f5; background: #fafafa; border-radius: 14px; padding: 10px 12px;">
+        <span style="width: 17px; height: 17px; border: 1.5px solid #d4d4d8; border-radius: 5px; flex-shrink: 0; margin-top: 1px; background: #ffffff;"></span>
+        <div style="min-width: 0;">
+          <p style="font-size: 14px; font-weight: 500;">Turn compost heap</p>
+          <div style="display: flex; flex-wrap: wrap; gap: 5px; padding-top: 5px;">
+            <span style="font-size: 10px; color: #52525b; background: #f4f4f5; border-radius: 999px; padding: 3px 8px;">Compost</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- The rest of the week, one line each -->
+  <div style="background: #ffffff; border: 1px solid #e4e4e7; border-radius: 24px; overflow: hidden;">
+
+    <div style="display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid #f4f4f5;">
+      <span style="width: 58px; font-size: 14px; font-weight: 600;">Sun 23</span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #71717a;">
+        <svg width="10" height="10" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 000 18 7 7 0 010-18z" fill="#a1a1aa"/></svg>
+        Waxing Crescent
+      </span>
+      <span style="flex-grow: 1; font-size: 13px; color: #a1a1aa;">Nothing planned</span>
+      <span style="font-size: 12px; font-weight: 600; color: #52525b; border: 1px solid #e4e4e7; border-radius: 999px; padding: 6px 14px;">+ Add</span>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid #f4f4f5; background: #fafafa;">
+      <span style="width: 58px; font-size: 14px; font-weight: 600;">Mon 24</span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #71717a;">
+        <svg width="10" height="10" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 000 18 7 7 0 010-18z" fill="#a1a1aa"/></svg>
+        Waxing Crescent
+      </span>
+      <span style="flex-grow: 1; font-size: 13px; color: #52525b;">
+        <strong style="font-weight: 600;">2 tasks</strong> &middot; Transplant tomatoes, Weed TR1
+      </span>
+      <span style="font-size: 12px; font-weight: 600; color: #52525b; border: 1px solid #e4e4e7; border-radius: 999px; padding: 6px 14px;">+ Add</span>
+      <span style="font-size: 12px; color: #71717a;">&#9652;</span>
+    </div>
+
+    <!-- Mon 24 expanded -->
+    <div style="padding: 4px 18px 14px 90px; border-bottom: 1px solid #f4f4f5; background: #fafafa;">
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+        <div style="display: flex; align-items: flex-start; gap: 9px; border: 1px solid #f4f4f5; background: #ffffff; border-radius: 14px; padding: 10px 12px;">
+          <span style="width: 17px; height: 17px; border: 1.5px solid #d4d4d8; border-radius: 5px; flex-shrink: 0; margin-top: 1px;"></span>
+          <div>
+            <p style="font-size: 14px; font-weight: 500;">Transplant tomatoes</p>
+            <span style="font-size: 10px; color: #52525b; background: #f4f4f5; border-radius: 999px; padding: 3px 8px; display: inline-block; margin-top: 5px;">Planting</span>
+          </div>
+        </div>
+        <div style="display: flex; align-items: flex-start; gap: 9px; border: 1px solid #f4f4f5; background: #ffffff; border-radius: 14px; padding: 10px 12px;">
+          <span style="width: 17px; height: 17px; border: 1.5px solid #d4d4d8; border-radius: 5px; flex-shrink: 0; margin-top: 1px;"></span>
+          <div>
+            <p style="font-size: 14px; font-weight: 500;">Weed TR1</p>
+            <span style="font-size: 10px; color: #52525b; background: #f4f4f5; border-radius: 999px; padding: 3px 8px; display: inline-block; margin-top: 5px;">Maintenance</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid #f4f4f5;">
+      <span style="width: 58px; font-size: 14px; font-weight: 600;">Tue 25</span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #71717a;">
+        <svg width="10" height="10" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 000 18 7 7 0 010-18z" fill="#a1a1aa"/></svg>
+        First Quarter
+      </span>
+      <span style="flex-grow: 1; font-size: 13px; color: #a1a1aa;">Nothing planned</span>
+      <span style="font-size: 12px; font-weight: 600; color: #52525b; border: 1px solid #e4e4e7; border-radius: 999px; padding: 6px 14px;">+ Add</span>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid #f4f4f5;">
+      <span style="width: 58px; font-size: 14px; font-weight: 600;">Wed 26</span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #71717a;">
+        <svg width="10" height="10" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 000 18 7 7 0 010-18z" fill="#a1a1aa"/></svg>
+        First Quarter
+      </span>
+      <span style="flex-grow: 1; font-size: 13px; color: #52525b;"><strong style="font-weight: 600;">1 task</strong> &middot; Side-dress the brassicas</span>
+      <span style="font-size: 12px; font-weight: 600; color: #52525b; border: 1px solid #e4e4e7; border-radius: 999px; padding: 6px 14px;">+ Add</span>
+      <span style="font-size: 12px; color: #71717a;">&#9662;</span>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid #f4f4f5;">
+      <span style="width: 58px; font-size: 14px; font-weight: 600;">Thu 27</span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #71717a;">
+        <svg width="10" height="10" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 000 18 7 7 0 010-18z" fill="#a1a1aa"/></svg>
+        Waxing Gibbous
+      </span>
+      <span style="flex-grow: 1; font-size: 13px; color: #a1a1aa;">Nothing planned</span>
+      <span style="font-size: 12px; font-weight: 600; color: #52525b; border: 1px solid #e4e4e7; border-radius: 999px; padding: 6px 14px;">+ Add</span>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 14px; padding: 14px 18px;">
+      <span style="width: 58px; font-size: 14px; font-weight: 600;">Fri 28</span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #71717a;">
+        <svg width="10" height="10" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 000 18 7 7 0 010-18z" fill="#a1a1aa"/></svg>
+        Waxing Gibbous
+      </span>
+      <span style="flex-grow: 1; font-size: 13px; color: #a1a1aa;">Nothing planned</span>
+      <span style="font-size: 12px; font-weight: 600; color: #52525b; border: 1px solid #e4e4e7; border-radius: 999px; padding: 6px 14px;">+ Add</span>
+    </div>
+  </div>
+
+  <p style="font-size: 12px; color: #a1a1aa; padding-top: 12px;">
+    Whole week visible without scrolling. Today keeps its detail; the other days cost one line each until you open them.
+  </p>
+</div>
+</x-dc>
+</body>
+</html>

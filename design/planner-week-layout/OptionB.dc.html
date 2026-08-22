@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; color: #18181b; background: #f5f5f4; }
+    a { color: #166534; } a:hover { color: #052e16; }
+    p, h1, h2, h3 { margin: 0; }
+  </style>
+</helmet>
+
+<div style="background: #f5f5f4; padding: 24px;">
+  <p style="font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #a1a1aa; padding-bottom: 12px;">
+    Option B &middot; one running agenda
+  </p>
+
+  <div style="background: #ffffff; border: 1px solid #e4e4e7; border-radius: 24px; padding: 6px 0 0;">
+
+    <!-- Today -->
+    <div style="display: flex; align-items: center; gap: 10px; padding: 14px 20px 8px;">
+      <span style="font-size: 16px; font-weight: 700;">Today</span>
+      <span style="font-size: 13px; color: #71717a;">Sat 22 Aug</span>
+      <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #065f46; background: #d1fae5; border-radius: 999px; padding: 4px 9px;">New Moon</span>
+      <span style="flex-grow: 1;"></span>
+      <span style="font-size: 12px; color: #71717a;">10 tasks</span>
+      <span style="font-size: 12px; font-weight: 600; color: #52525b; border: 1px solid #e4e4e7; border-radius: 999px; padding: 6px 14px;">+ Add</span>
+    </div>
+
+    <div style="padding: 0 20px 8px;">
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px;">
+        <div style="display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; background: #fafafa;">
+          <span style="width: 16px; height: 16px; border: 1.5px solid #d4d4d8; border-radius: 5px; background: #ffffff; flex-shrink: 0;"></span>
+          <span style="font-size: 14px; flex-grow: 1;">Plant sweet potatoes</span>
+          <span style="font-size: 10px; color: #b45309; background: #fef3c7; border-radius: 999px; padding: 3px 8px;">30 Jul</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; background: #fafafa;">
+          <span style="width: 16px; height: 16px; border: 1.5px solid #d4d4d8; border-radius: 5px; background: #ffffff; flex-shrink: 0;"></span>
+          <span style="font-size: 14px; flex-grow: 1;">Start onion seedlings</span>
+          <span style="font-size: 10px; color: #b45309; background: #fef3c7; border-radius: 999px; padding: 3px 8px;">3 Aug</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; background: #fafafa;">
+          <span style="width: 16px; height: 16px; border: 1.5px solid #d4d4d8; border-radius: 5px; background: #ffffff; flex-shrink: 0;"></span>
+          <span style="font-size: 14px; flex-grow: 1;">New moon — planning</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; background: #fafafa;">
+          <span style="width: 16px; height: 16px; border: 1.5px solid #d4d4d8; border-radius: 5px; background: #ffffff; flex-shrink: 0;"></span>
+          <span style="font-size: 14px; flex-grow: 1;">Sow: Basil</span>
+          <span style="font-size: 10px; color: #b45309; background: #fef3c7; border-radius: 999px; padding: 3px 8px;">17 Aug</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; background: #fafafa;">
+          <span style="width: 16px; height: 16px; border: 1.5px solid #d4d4d8; border-radius: 5px; background: #ffffff; flex-shrink: 0;"></span>
+          <span style="font-size: 14px; flex-grow: 1;">Sow: Coriander</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; background: #fafafa;">
+          <span style="width: 16px; height: 16px; border: 1.5px solid #d4d4d8; border-radius: 5px; background: #ffffff; flex-shrink: 0;"></span>
+          <span style="font-size: 14px; flex-grow: 1;">Turn compost heap</span>
+        </div>
+      </div>
+      <p style="font-size: 12px; color: #71717a; padding: 8px 2px 0;">4 more today &#9662;</p>
+    </div>
+
+    <!-- Quiet stretch, folded into one line -->
+    <div style="display: flex; align-items: center; gap: 12px; margin: 8px 20px; padding: 11px 14px; border-radius: 14px; background: #fafafa; border: 1px dashed #e4e4e7;">
+      <span style="font-size: 13px; color: #71717a; flex-grow: 1;">Sun 23 – Tue 25 &middot; nothing planned</span>
+      <span style="font-size: 12px; font-weight: 600; color: #52525b;">+ Add a task</span>
+    </div>
+
+    <!-- Next day with work -->
+    <div style="border-top: 1px solid #f4f4f5; padding: 14px 20px 8px;">
+      <div style="display: flex; align-items: center; gap: 10px; padding-bottom: 8px;">
+        <span style="font-size: 15px; font-weight: 700;">Wed 26 Aug</span>
+        <span style="font-size: 11px; color: #71717a;">First Quarter</span>
+        <span style="flex-grow: 1;"></span>
+        <span style="font-size: 12px; color: #71717a;">1 task</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; background: #fafafa; max-width: 50%;">
+        <span style="width: 16px; height: 16px; border: 1.5px solid #d4d4d8; border-radius: 5px; background: #ffffff; flex-shrink: 0;"></span>
+        <span style="font-size: 14px; flex-grow: 1;">Side-dress the brassicas</span>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 12px; margin: 12px 20px 18px; padding: 11px 14px; border-radius: 14px; background: #fafafa; border: 1px dashed #e4e4e7;">
+      <span style="font-size: 13px; color: #71717a; flex-grow: 1;">Thu 27 – Fri 28 &middot; nothing planned</span>
+      <span style="font-size: 12px; font-weight: 600; color: #52525b;">+ Add a task</span>
+    </div>
+  </div>
+
+  <p style="font-size: 12px; color: #a1a1aa; padding-top: 12px;">
+    Shortest of the three: empty days fold together into one line, so the page is only as long as the work in it.
+    The cost is that a day is no longer a fixed place on the page — quiet days move around as work is added.
+  </p>
+</div>
+</x-dc>
+</body>
+</html>
