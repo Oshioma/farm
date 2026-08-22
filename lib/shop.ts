@@ -36,6 +36,7 @@ export type ShopProduce = {
   variety: string | null;
   beds: string;
   notes: string | null;
+  /** The produce picture, or the plant where no produce picture exists. */
   imageUrl: string | null;
   pricePerKg: number | null;
   /** Flavour, appearance, size and so on — only what the farm filled in. */
@@ -187,7 +188,8 @@ export async function getShopData(slug: string): Promise<ShopData | null> {
       variety: (crop.variety as string | null) ?? null,
       beds: bedsFor((crop.zone_id as string | null) ?? null, (crop.extra_zone_ids as string | null) ?? null),
       notes: (crop.notes as string | null) ?? null,
-      imageUrl: (crop.image_url as string | null) ?? null,
+      imageUrl:
+        ((crop.produce_image_url as string | null) ?? null) || ((crop.image_url as string | null) ?? null),
       details: filledCropDetails(crop),
       pricePerKg: (crop.expected_sale_price_per_kg as number | null) ?? null,
       months,

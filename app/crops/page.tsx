@@ -31,6 +31,9 @@ export default function CropsGalleryPage() {
 
   // Which card currently has its details overlay flipped open
   const [detailsId, setDetailsId] = useState<string | null>(null);
+  /* The harvested produce, kept apart from the plant photo above. */
+  const [produceFile, setProduceFile] = useState<File | null>(null);
+  const [producePreview, setProducePreview] = useState("");
 
   // Quick-photo (inline camera/upload straight onto a card, no modal)
   const [quickPhotoId, setQuickPhotoId] = useState<string | null>(null);
@@ -45,6 +48,7 @@ export default function CropsGalleryPage() {
     notes: "",
     medicinal_properties: "",
     ...blankCropDetails(),
+    produce_image_url: "",
     zone_ids: [] as string[],
     image_file: null as File | null,
     image_url: "",
@@ -153,6 +157,7 @@ export default function CropsGalleryPage() {
       notes: crop.notes ?? "",
       medicinal_properties: crop.medicinal_properties ?? "",
       ...cropDetailsToForm(crop as unknown as Record<string, unknown>),
+      produce_image_url: crop.produce_image_url ?? "",
       zone_ids: crop.zone_ids?.length ? crop.zone_ids : crop.zone_id ? [crop.zone_id] : [],
       image_file: null,
       image_url: crop.image_url ?? "",
@@ -167,6 +172,13 @@ export default function CropsGalleryPage() {
     setEditPreview(f ? URL.createObjectURL(f) : editForm.image_url);
   }
 
+  function handleProduceFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null;
+    if (producePreview && producePreview.startsWith("blob:")) URL.revokeObjectURL(producePreview);
+    setProduceFile(f);
+    setProducePreview(f ? URL.createObjectURL(f) : editForm.produce_image_url);
+  }
+
   async function handleSaveEdit() {
     if (!editCrop) return;
     try {
@@ -176,6 +188,11 @@ export default function CropsGalleryPage() {
       let imageUrl = editForm.image_url;
       if (editForm.image_file) {
         imageUrl = await uploadImage(editForm.image_file);
+      }
+
+      let produceUrl = editForm.produce_image_url;
+      if (produceFile) {
+        produceUrl = await uploadImage(produceFile);
       }
 
       const primaryZone = editForm.zone_ids[0] || null;
@@ -190,6 +207,7 @@ export default function CropsGalleryPage() {
           medicinal_properties: editForm.medicinal_properties.trim() || null,
           ...cropDetailsPayload(editForm as unknown as Record<string, string>),
           image_url: imageUrl,
+          produce_image_url: produceUrl || null,
           zone_id: primaryZone,
           extra_zone_ids: extraZones.length > 0 ? JSON.stringify(extraZones) : null,
         })
@@ -208,6 +226,7 @@ export default function CropsGalleryPage() {
                 medicinal_properties: editForm.medicinal_properties.trim() || null,
                 ...cropDetailsPayload(editForm as unknown as Record<string, string>),
                 image_url: imageUrl,
+                produce_image_url: produceUrl || null,
                 zone_id: primaryZone,
                 extra_zone_ids: extraZones.length > 0 ? JSON.stringify(extraZones) : null,
                 zone_ids: editForm.zone_ids,
@@ -336,10 +355,10 @@ export default function CropsGalleryPage() {
                 >
                   {/* Image / placeholder */}
                   <div className="relative aspect-square w-full">
-                    {crop.image_url ? (
+                    {crop.produce_image_url || crop.image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={crop.image_url}
+                        src={crop.produce_image_url ?? crop.image_url ?? ""}
                         alt={crop.crop_name}
                         className="h-full w-full object-cover"
                       />
@@ -491,7 +510,9 @@ export default function CropsGalleryPage() {
             <div className="mt-4 space-y-4">
               {/* Photo — take or upload */}
               <div>
-                <label className="mb-2 block text-sm font-medium">Photo</label>
+                <label className="mb-2 block text-sm font-medium">
+                  Plant photo <span className="font-normal text-zinc-400">(the crop growing)</span>
+                </label>
                 <div className="flex gap-2">
                   <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-zinc-300 px-3 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100">
                     <Camera size={15} /> Take photo
@@ -511,6 +532,31 @@ export default function CropsGalleryPage() {
                       onChange={handleEditFileChange}
                       className="hidden"
                     />
+                  </label>
+                </div>
+              </div>
+
+              {/* Produce photo — the harvested vegetable, and what the shop shows */}
+              <div>
+                <label className="mb-2 block text-sm font-medium">
+                  Produce photo <span className="font-normal text-zinc-400">(what the shop shows)</span>
+                </label>
+                {producePreview ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={producePreview} alt="Harvested produce" className="mb-2 h-32 w-full rounded-2xl object-cover" />
+                ) : (
+                  <div className="mb-2 flex h-32 w-full items-center justify-center rounded-2xl bg-zinc-100 text-xs text-zinc-400">
+                    No produce photo — the shop will use the plant photo
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-zinc-300 px-3 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100">
+                    <Camera size={15} /> Take photo
+                    <input type="file" accept="image/*" capture="environment" onChange={handleProduceFileChange} className="hidden" />
+                  </label>
+                  <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-zinc-300 px-3 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100">
+                    Upload
+                    <input type="file" accept="image/*" onChange={handleProduceFileChange} className="hidden" />
                   </label>
                 </div>
               </div>

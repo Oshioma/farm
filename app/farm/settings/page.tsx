@@ -268,10 +268,12 @@ export default function SettingsPage() {
       setError("");
       setSuccess("");
       const url = await uploadShopImage(file);
-      const { error: updateError } = await supabase.from("crops").update({ image_url: url }).eq("id", cropId);
+      /* The shop shows the produce picture, so that is what this sets — the
+         plant photo on the crops page is left alone. */
+      const { error: updateError } = await supabase.from("crops").update({ produce_image_url: url }).eq("id", cropId);
       if (updateError) throw updateError;
-      setShopCrops((prev) => prev.map((c) => (c.id === cropId ? { ...c, image_url: url } : c)));
-      setSuccess("Photo updated.");
+      setShopCrops((prev) => prev.map((c) => (c.id === cropId ? { ...c, produce_image_url: url } : c)));
+      setSuccess("Produce photo updated.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save that photo");
     } finally {
@@ -375,8 +377,9 @@ export default function SettingsPage() {
       <section className="mb-6 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold">Shop pictures</h2>
         <p className="mt-1 text-sm text-zinc-500">
-          One picture for the top of the shop, and one per crop. Crop photos are the same ones the Crops page uses, so
-          a photo taken there shows up here and in the shop.
+          One picture for the top of the shop, and a photo of the produce for each crop — the harvested vegetable
+          rather than the plant in the ground. Where a crop has no produce photo, the shop falls back to its plant
+          photo from the Crops page.
         </p>
 
         {/* Hero */}
@@ -418,7 +421,7 @@ export default function SettingsPage() {
 
         {/* Per crop */}
         <div className="mt-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">Produce</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">Produce photos</p>
           {shopCrops.length === 0 ? (
             <p className="mt-2 text-sm text-zinc-400">No crops on this farm yet.</p>
           ) : (
@@ -428,9 +431,13 @@ export default function SettingsPage() {
                   key={crop.id}
                   className="group cursor-pointer overflow-hidden rounded-xl border border-zinc-200 transition hover:border-zinc-400"
                 >
-                  {crop.image_url ? (
+                  {crop.produce_image_url || crop.image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={crop.image_url} alt={crop.crop_name} className="h-24 w-full object-cover" />
+                    <img
+                      src={crop.produce_image_url ?? crop.image_url ?? ""}
+                      alt={crop.crop_name}
+                      className="h-24 w-full object-cover"
+                    />
                   ) : (
                     <div className="flex h-24 w-full items-center justify-center bg-zinc-50 text-xs text-zinc-400">
                       No photo
@@ -439,9 +446,12 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between gap-2 px-3 py-2">
                     <span className="truncate text-xs font-medium">{crop.crop_name}</span>
                     <span className="shrink-0 text-[10px] text-zinc-400">
-                      {uploading === crop.id ? "…" : crop.image_url ? "Swap" : "Add"}
+                      {uploading === crop.id ? "…" : crop.produce_image_url ? "Swap" : "Add"}
                     </span>
                   </div>
+                  {!crop.produce_image_url && crop.image_url && (
+                    <p className="px-3 pb-2 text-[10px] text-amber-700">Showing the plant photo</p>
+                  )}
                   <input
                     type="file"
                     accept="image/*"
@@ -455,7 +465,7 @@ export default function SettingsPage() {
           )}
           <p className="mt-3 text-xs text-zinc-400">
             Only crops with an expected harvest appear in the shop, so a photo here shows up once that crop has an
-            estimate on the Harvest ETA sheet.
+            estimate on the Harvest ETA sheet. Plant photos are taken on the Crops page.
           </p>
         </div>
       </section>
