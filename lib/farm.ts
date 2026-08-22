@@ -158,7 +158,10 @@ export type Crop = {
   best_eaten: string | null;
   nutritional_qualities: string | null;
   why_special: string | null;
+  /** The plant growing. */
   image_url: string | null;
+  /** The harvested produce — what the shop shows. */
+  produce_image_url: string | null;
   zone_id: string | null;
   extra_zone_ids: string | null;
   zone: { name: string }[] | null;
