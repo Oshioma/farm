@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase, getCurrentUser } from "@/lib/supabase";
-import { getFarms } from "@/lib/farm";
-import type { Farm } from "@/lib/farm";
+import { getFarms, getCrops } from "@/lib/farm";
+import type { Farm, Crop } from "@/lib/farm";
 import { downloadCsvFile, toFileSlug } from "@/app/farm/utils";
-import { Download } from "lucide-react";
+import { Download, ImagePlus } from "lucide-react";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { ManagerOnly } from "@/components/ManagerOnly";
 
@@ -34,6 +34,10 @@ export default function SettingsPage() {
   const [listingAvailable, setListingAvailable] = useState(true);
   const [listingSlug, setListingSlug] = useState<string | null>(null);
   const [savingListing, setSavingListing] = useState(false);
+  /* Shop images: the hero at the top of the shopfront, and a photo per crop. */
+  const [heroUrl, setHeroUrl] = useState<string | null>(null);
+  const [shopCrops, setShopCrops] = useState<Crop[]>([]);
+  const [uploading, setUploading] = useState<string | null>(null);
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
 
   useEffect(() => {
@@ -191,10 +195,89 @@ export default function SettingsPage() {
         setListed(!!data.listed);
         setListingAvailable(data.available !== false);
         setListingSlug(data.slug ?? null);
+        setHeroUrl(data.heroUrl ?? null);
       })
       .catch(() => { if (!cancelled) setListingAvailable(false); });
     return () => { cancelled = true; };
   }, [activeFarmId]);
+
+  useEffect(() => {
+    if (!activeFarmId) return;
+    let cancelled = false;
+    getCrops(activeFarmId)
+      .then((rows) => { if (!cancelled) setShopCrops(rows); })
+      .catch(() => { if (!cancelled) setShopCrops([]); });
+    return () => { cancelled = true; };
+  }, [activeFarmId]);
+
+  /* Same bucket the crops page uses, so photos taken there and here are one set. */
+  async function uploadShopImage(file: File): Promise<string> {
+    const ext = file.name.split(".").pop() ?? "jpg";
+    const path = `${activeFarmId}/${Date.now()}-${Math.round(Math.random() * 1e6)}.${ext}`;
+    const { error: uploadError } = await supabase.storage.from("plant-images").upload(path, file);
+    if (uploadError) throw uploadError;
+    return supabase.storage.from("plant-images").getPublicUrl(path).data.publicUrl;
+  }
+
+  async function handleHeroFile(file: File | null) {
+    if (!file || !activeFarmId) return;
+    try {
+      setUploading("hero");
+      setError("");
+      setSuccess("");
+      const url = await uploadShopImage(file);
+      const res = await fetch("/api/farm/market-listing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ farmId: activeFarmId, heroUrl: url }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not save the picture");
+      setHeroUrl(url);
+      setSuccess("Shop picture updated.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save the picture");
+    } finally {
+      setUploading(null);
+    }
+  }
+
+  async function removeHero() {
+    if (!activeFarmId) return;
+    try {
+      setUploading("hero");
+      const res = await fetch("/api/farm/market-listing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ farmId: activeFarmId, heroUrl: null }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Could not remove the picture");
+      setHeroUrl(null);
+      setSuccess("Shop picture removed.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove the picture");
+    } finally {
+      setUploading(null);
+    }
+  }
+
+  async function handleCropFile(cropId: string, file: File | null) {
+    if (!file || !activeFarmId) return;
+    try {
+      setUploading(cropId);
+      setError("");
+      setSuccess("");
+      const url = await uploadShopImage(file);
+      const { error: updateError } = await supabase.from("crops").update({ image_url: url }).eq("id", cropId);
+      if (updateError) throw updateError;
+      setShopCrops((prev) => prev.map((c) => (c.id === cropId ? { ...c, image_url: url } : c)));
+      setSuccess("Photo updated.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save that photo");
+    } finally {
+      setUploading(null);
+    }
+  }
 
   async function toggleListing(next: boolean) {
     if (!activeFarmId) return;
@@ -287,6 +370,94 @@ export default function SettingsPage() {
             )}
           </div>
         )}
+      </section>
+
+      <section className="mb-6 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold">Shop pictures</h2>
+        <p className="mt-1 text-sm text-zinc-500">
+          One picture for the top of the shop, and one per crop. Crop photos are the same ones the Crops page uses, so
+          a photo taken there shows up here and in the shop.
+        </p>
+
+        {/* Hero */}
+        <div className="mt-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">Top of the shop</p>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            {heroUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={heroUrl} alt="Shop header" className="h-24 w-40 rounded-xl object-cover" />
+            ) : (
+              <div className="flex h-24 w-40 items-center justify-center rounded-xl border border-dashed border-zinc-300 text-xs text-zinc-400">
+                No picture
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
+                <ImagePlus className="h-4 w-4" />
+                {uploading === "hero" ? "Uploading..." : heroUrl ? "Swap picture" : "Add picture"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={uploading !== null}
+                  onChange={(e) => { const f = e.target.files?.[0] ?? null; e.target.value = ""; handleHeroFile(f); }}
+                />
+              </label>
+              {heroUrl && (
+                <button
+                  onClick={removeHero}
+                  disabled={uploading !== null}
+                  className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-500 transition hover:bg-zinc-100 disabled:opacity-60"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Per crop */}
+        <div className="mt-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">Produce</p>
+          {shopCrops.length === 0 ? (
+            <p className="mt-2 text-sm text-zinc-400">No crops on this farm yet.</p>
+          ) : (
+            <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {shopCrops.map((crop) => (
+                <label
+                  key={crop.id}
+                  className="group cursor-pointer overflow-hidden rounded-xl border border-zinc-200 transition hover:border-zinc-400"
+                >
+                  {crop.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={crop.image_url} alt={crop.crop_name} className="h-24 w-full object-cover" />
+                  ) : (
+                    <div className="flex h-24 w-full items-center justify-center bg-zinc-50 text-xs text-zinc-400">
+                      No photo
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between gap-2 px-3 py-2">
+                    <span className="truncate text-xs font-medium">{crop.crop_name}</span>
+                    <span className="shrink-0 text-[10px] text-zinc-400">
+                      {uploading === crop.id ? "…" : crop.image_url ? "Swap" : "Add"}
+                    </span>
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploading !== null}
+                    onChange={(e) => { const f = e.target.files?.[0] ?? null; e.target.value = ""; handleCropFile(crop.id, f); }}
+                  />
+                </label>
+              ))}
+            </div>
+          )}
+          <p className="mt-3 text-xs text-zinc-400">
+            Only crops with an expected harvest appear in the shop, so a photo here shows up once that crop has an
+            estimate on the Harvest ETA sheet.
+          </p>
+        </div>
       </section>
 
       <section className="mb-6 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">

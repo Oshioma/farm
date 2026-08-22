@@ -152,6 +152,15 @@ function FarmSection({ farm }: { farm: MarketFarm }) {
             href={`/${farm.slug}`}
             style={{ display: "flex", flexDirection: "column", gap: 12, background: "#ffffff", border: `1px solid ${LINE}`, borderRadius: 22, padding: 20, textDecoration: "none", color: "inherit" }}
           >
+            {p.imageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={p.imageUrl}
+                alt={p.name}
+                loading="lazy"
+                style={{ display: "block", width: "100%", height: 150, objectFit: "cover", borderRadius: 14 }}
+              />
+            )}
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                 <span style={{ fontFamily: serif, fontSize: 22 }}>{p.name}</span>

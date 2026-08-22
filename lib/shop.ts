@@ -43,7 +43,7 @@ export type ShopProduce = {
 };
 
 export type ShopData = {
-  farm: { id: string; name: string; slug: string; location: string | null };
+  farm: { id: string; name: string; slug: string; location: string | null; heroUrl: string | null };
   months: { season: number; key: HarvestMonthKey; label: string; calendarYear: number; expectedKg: number; crops: number }[];
   produce: ShopProduce[];
   currentMonth: { season: number; key: HarvestMonthKey } | null;
@@ -61,7 +61,7 @@ async function listedFarms() {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("farms")
-    .select("id, name, slug, location")
+    .select("id, name, slug, location, shop_hero_url")
     .eq("is_active", true)
     .eq("list_in_market", true);
   if (error) {
@@ -69,7 +69,9 @@ async function listedFarms() {
     throw new Error(`findShopFarm failed: ${error.message}`);
   }
   return {
-    farms: (data ?? []) as { id: string; name: string; slug: string | null; location: string | null }[],
+    farms: (data ?? []) as {
+      id: string; name: string; slug: string | null; location: string | null; shop_hero_url?: string | null;
+    }[],
     available: true,
   };
 }
@@ -85,7 +87,15 @@ export async function findShopFarm(slug: string) {
     farms.find((f) => f.slug && slugKey(f.slug) === wanted) ??
     farms.find((f) => slugKey(f.name) === wanted) ??
     null;
-  return match ? { id: match.id, name: match.name, slug: match.slug ?? slug, location: match.location } : null;
+  return match
+    ? {
+        id: match.id,
+        name: match.name,
+        slug: match.slug ?? slug,
+        location: match.location,
+        heroUrl: match.shop_hero_url ?? null,
+      }
+    : null;
 }
 
 /**
@@ -198,7 +208,7 @@ export async function getShopData(slug: string): Promise<ShopData | null> {
   });
 
   return {
-    farm: { id: farm.id, name: farm.name, slug: farm.slug, location: farm.location },
+    farm: { id: farm.id, name: farm.name, slug: farm.slug, location: farm.location, heroUrl: farm.heroUrl },
     months: monthTotals,
     produce,
     currentMonth: { season: harvestSeasonYear(), key: harvestMonthKeyFor(new Date()) },
@@ -255,6 +265,7 @@ export type MarketFarm = {
   slug: string;
   name: string;
   location: string | null;
+  heroUrl: string | null;
   produce: ShopProduce[];
   totalExpectedKg: number;
   totalAvailableKg: number;
@@ -293,6 +304,7 @@ export async function getMarketData(): Promise<MarketData> {
       slug: shop.farm.slug,
       name: shop.farm.name,
       location: shop.farm.location,
+      heroUrl: shop.farm.heroUrl,
       produce: shop.produce,
       totalExpectedKg: shop.produce.reduce((sum, p) => sum + p.totalExpectedKg, 0),
       totalAvailableKg: shop.produce.reduce((sum, p) => sum + p.totalAvailableKg, 0),
