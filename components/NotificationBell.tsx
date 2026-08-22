@@ -10,6 +10,7 @@ import {
   markAllNotificationsRead,
   type FarmNotification,
 } from "@/lib/notifications";
+import { FOCUS_EVENT } from "@/hooks/useFocusTarget";
 
 const POLL_MS = 45_000;
 
@@ -77,7 +78,12 @@ export default function NotificationBell() {
       setUnread((c) => Math.max(0, c - 1));
       markNotificationsRead([n.id]).catch(() => {});
     }
-    if (n.link) router.push(n.link);
+    if (!n.link) return;
+    router.push(n.link);
+    /* Already on that page? Nothing remounts, so tell it directly. */
+    if (n.link.split("?")[0] === window.location.pathname) {
+      window.dispatchEvent(new CustomEvent(FOCUS_EVENT, { detail: n.link }));
+    }
   }
 
   async function handleMarkAll() {
