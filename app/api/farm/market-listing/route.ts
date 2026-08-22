@@ -10,9 +10,14 @@ export const dynamic = "force-dynamic";
    rather than from the browser against RLS. */
 
 export async function POST(req: NextRequest) {
-  const { farmId, listed } = await req.json();
-  if (!farmId || typeof listed !== "boolean") {
+  const { farmId, listed, heroUrl } = await req.json();
+  const settingListing = typeof listed === "boolean";
+  const settingHero = heroUrl === null || typeof heroUrl === "string";
+  if (!farmId || (!settingListing && !settingHero)) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
+  if (settingHero && typeof heroUrl === "string" && heroUrl && !/^https?:\/\//.test(heroUrl)) {
+    return NextResponse.json({ error: "That image address does not look right" }, { status: 400 });
   }
 
   const cookieStore = await cookies();
@@ -39,18 +44,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Only farm owners and managers can publish a farm" }, { status: 403 });
   }
 
-  const { error } = await admin.from("farms").update({ list_in_market: listed }).eq("id", farmId);
+  const patch: Record<string, unknown> = {};
+  if (settingListing) patch.list_in_market = listed;
+  if (settingHero) patch.shop_hero_url = heroUrl || null;
+
+  const { error } = await admin.from("farms").update(patch).eq("id", farmId);
   if (error) {
-    if (/list_in_market/.test(error.message)) {
+    if (/list_in_market|shop_hero_url/.test(error.message)) {
       return NextResponse.json(
-        { error: "The market column is not on the database yet — run the pending migration first." },
+        { error: "The shop columns are not on the database yet — run the pending migration first." },
         { status: 503 }
       );
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, listed });
+  return NextResponse.json({ ok: true, listed, heroUrl });
 }
 
 export async function GET(req: NextRequest) {
@@ -77,8 +86,17 @@ export async function GET(req: NextRequest) {
     .single();
   if (!membership) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { data, error } = await admin.from("farms").select("slug, list_in_market").eq("id", farmId).single();
-  if (error) return NextResponse.json({ listed: false, available: false, slug: null });
+  const { data, error } = await admin
+    .from("farms")
+    .select("slug, list_in_market, shop_hero_url")
+    .eq("id", farmId)
+    .single();
+  if (error) return NextResponse.json({ listed: false, available: false, slug: null, heroUrl: null });
 
-  return NextResponse.json({ listed: !!data.list_in_market, available: true, slug: data.slug });
+  return NextResponse.json({
+    listed: !!data.list_in_market,
+    available: true,
+    slug: data.slug,
+    heroUrl: data.shop_hero_url ?? null,
+  });
 }

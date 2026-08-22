@@ -154,12 +154,26 @@ export function Shopfront({ shop }: { shop: ShopData }) {
           </div>
         </div>
 
-        <div style={{ borderRadius: 24, background: DEEP, padding: "clamp(24px, 3vw, 36px)" }}>
-          <BedsIllustration />
-          <p style={{ fontSize: 13, color: "#a7d3b4", paddingTop: 20, margin: 0 }}>
-            Picked to order, never held in cold store.
-          </p>
-        </div>
+        {shop.farm.heroUrl ? (
+          <div style={{ borderRadius: 24, overflow: "hidden", background: DEEP, position: "relative" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={shop.farm.heroUrl}
+              alt={`Produce from ${shop.farm.name}`}
+              style={{ display: "block", width: "100%", height: "clamp(280px, 34vw, 460px)", objectFit: "cover" }}
+            />
+            <p style={{ position: "absolute", left: 0, right: 0, bottom: 0, margin: 0, padding: "48px 24px 20px", fontSize: 13, color: "#ffffff", background: "linear-gradient(to top, rgba(5,46,22,0.85), rgba(5,46,22,0))" }}>
+              Picked to order, never held in cold store.
+            </p>
+          </div>
+        ) : (
+          <div style={{ borderRadius: 24, background: DEEP, padding: "clamp(24px, 3vw, 36px)" }}>
+            <BedsIllustration />
+            <p style={{ fontSize: 13, color: "#a7d3b4", paddingTop: 20, margin: 0 }}>
+              Picked to order, never held in cold store.
+            </p>
+          </div>
+        )}
       </section>
 
       {/* Season strip */}
@@ -300,6 +314,15 @@ function ProduceCard({ produce, onOpen }: { produce: ShopProduce; onOpen: () => 
     : 0;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14, background: "#ffffff", border: `1px solid ${LINE}`, borderRadius: 24, padding: 22 }}>
+      {produce.imageUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={produce.imageUrl}
+          alt={produce.name}
+          loading="lazy"
+          style={{ display: "block", width: "100%", height: 160, objectFit: "cover", borderRadius: 16, marginBottom: 2 }}
+        />
+      )}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
           <span style={{ fontFamily: serif, fontSize: 24 }}>{produce.name}</span>
@@ -362,6 +385,14 @@ function ProduceSheet({ produce, onClose, onAdd }: { produce: ShopProduce; onClo
   return (
     <Overlay onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        {produce.imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={produce.imageUrl}
+            alt={produce.name}
+            style={{ display: "block", width: "100%", height: 200, objectFit: "cover", borderRadius: 18 }}
+          />
+        )}
         <div>
           <h2 style={{ fontFamily: serif, fontWeight: 400, fontSize: 30, margin: 0 }}>{produceName(produce)}</h2>
           {produce.beds && <p style={{ fontSize: 13, color: "#78716c", margin: "4px 0 0" }}>Bed {produce.beds}</p>}
