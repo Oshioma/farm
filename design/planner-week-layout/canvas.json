@@ -1,0 +1,11 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1180, "h": 1180, "title": "Option A — today full width" },
+    { "file": "OptionB.dc.html", "x": 1300, "y": 0, "w": 1180, "h": 760, "title": "Option B — running agenda" }
+  ],
+  "annotations": [
+    { "id": "problem", "x": 0, "y": -190, "w": 520, "text": "The problem: the 7-day view is a CSS grid, so every day card stretches to the tallest in its row. Ten tasks on today leaves three empty cards the same height.\n\nA one-line fix (items-start) stops the stretching, but the columns stay narrow and today still runs long." },
+    { "id": "recommend", "x": 1300, "y": -190, "w": 460, "text": "My preference: Option A.\n\nToday keeps a fixed, obvious place and gets the width to lay ten tasks out three abreast. Quiet days cost one line each but stay where you expect them.\n\nOption B is shorter still, but a day stops being a fixed place on the page." }
+  ],
+  "launch": { "view": "canvas" }
+}

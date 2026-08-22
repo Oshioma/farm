@@ -23,5 +23,6 @@ tsconfig.tsbuildinfo
 supabase/.temp/
 supabase/.branches/
 
-# generated design canvas (bundled editor, ~2MB) — sources live beside it
+# generated design canvases (bundled editor, ~2MB each) — sources live beside them
 design/**/*-shopfront.html
+design/**/*-week-layout.html

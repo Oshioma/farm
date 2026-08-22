@@ -214,6 +214,10 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
     return { rangeStart: dates[0], rangeEnd: dates[dates.length - 1], visibleDates: dates };
   }, [view, anchor, anchorISO]);
 
+  /* The week leads with today, or with its first day when today is elsewhere. */
+  const featuredDate = visibleDates.includes(todayISO) ? todayISO : visibleDates[0];
+  const restDates = visibleDates.filter((d) => d !== featuredDate);
+
   // -------------------------------------------------------------------------
   // Data loading
   // -------------------------------------------------------------------------
@@ -832,20 +836,17 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
             showLunar={tab === "lunar"}
           />
         ) : (
-          <div
-            className={
-              view === "7day"
-                ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                : "grid grid-cols-1 gap-4"
-            }
-          >
-            {visibleDates.map((dateISO) => {
+          <div className={view === "7day" ? "space-y-3" : "grid grid-cols-1 gap-4"}>
+            {/* The week leads with one day in full — today when it is in range —
+                and gives the rest a line each, so an empty Thursday no longer
+                takes as much room as a ten-task Saturday. */}
+            {(view === "7day" ? [featuredDate] : visibleDates).map((dateISO) => {
               const { phase, overridden } = resolvedPhase(dateISO);
               return (
                 <DayCard
                   key={dateISO}
                   dateISO={dateISO}
-                  large={view === "1day"}
+                  large
                   isToday={dateISO === todayISO}
                   phase={phase}
                   overridden={overridden}
@@ -866,6 +867,26 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
                 />
               );
             })}
+
+            {view === "7day" && restDates.length > 0 && (
+              <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
+                {restDates.map((dateISO) => (
+                  <DayRow
+                    key={dateISO}
+                    dateISO={dateISO}
+                    phase={resolvedPhase(dateISO).phase}
+                    tasks={tasksByDate[dateISO] ?? []}
+                    busyTaskId={busyTaskId}
+                    memberEmailMap={memberEmailMap}
+                    showLunar={tab === "lunar"}
+                    onAddTask={() => openAddTask(dateISO)}
+                    onEditTask={openEditTask}
+                    onToggleDone={handleToggleDone}
+                    onDeleteTask={handleDeleteTask}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -1236,6 +1257,140 @@ function GuidanceBlock({ phase, theme }: { phase: MoonPhase; theme: typeof PHASE
 // ---------------------------------------------------------------------------
 // Day card (1-day + 7-day views)
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// The list of tasks for one day. Shared by the full-width card and the
+// collapsed day rows, so both behave the same when opened.
+// ---------------------------------------------------------------------------
+interface DayTaskListProps {
+  tasks: LunarTask[];
+  busyTaskId: string | null;
+  memberEmailMap: Record<string, string>;
+  /** Lay the tasks out in this many columns where there is room. */
+  columns?: 1 | 2 | 3;
+  onEditTask: (t: LunarTask) => void;
+  onToggleDone: (t: LunarTask) => void;
+  onDeleteTask: (t: LunarTask) => void;
+}
+
+function DayTaskList(props: DayTaskListProps) {
+  const { tasks, busyTaskId, memberEmailMap, columns = 1, onEditTask, onToggleDone, onDeleteTask } = props;
+  /* A lunar task notification links here with ?task=<id>. */
+  const focusTaskId = useFocusTarget("task", "lunar-task", true);
+  const grid =
+    columns === 3
+      ? "grid grid-cols-1 gap-1.5 sm:grid-cols-2 xl:grid-cols-3"
+      : columns === 2
+        ? "grid grid-cols-1 gap-1.5 sm:grid-cols-2"
+        : "space-y-1.5";
+  return (
+    <>
+        {tasks.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-zinc-200 px-3 py-3 text-center text-xs text-zinc-400">
+          No tasks yet.
+        </p>
+      ) : (
+        <ul className={grid}>
+          {tasks.map((t) => {
+            const Icon = CATEGORY_ICON[t.category ?? "Other"] ?? CircleDot;
+            const done = t.status === "done";
+            const busy = busyTaskId === t.id;
+            return (
+              <li
+                key={t.id}
+                id={`lunar-task-${t.id}`}
+                className={`flex items-start gap-2 rounded-xl border px-2.5 py-2 text-sm transition ${
+                  focusTaskId === t.id
+                    ? "border-emerald-400 bg-emerald-50/60 ring-2 ring-emerald-300"
+                    : done
+                      ? "border-emerald-100 bg-emerald-50/60"
+                      : "border-zinc-100 bg-zinc-50"
+                }`}
+              >
+                <button
+                  onClick={() => onToggleDone(t)}
+                  disabled={busy}
+                  aria-label={done ? "Mark as not done" : "Mark as done"}
+                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition ${
+                    done
+                      ? "border-emerald-500 bg-emerald-500 text-white"
+                      : "border-zinc-300 bg-white text-transparent hover:border-emerald-400"
+                  }`}
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </button>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start gap-1.5">
+                    <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                    <span
+                      className={`font-medium break-words ${
+                        done ? "text-zinc-400 line-through" : "text-zinc-800"
+                      }`}
+                    >
+                      {t.title}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500">
+                    {t.category && (
+                      <span className="rounded-full bg-white px-1.5 py-0.5 ring-1 ring-zinc-200">
+                        {t.category}
+                      </span>
+                    )}
+                    {t.crop_or_activity && <span>· {t.crop_or_activity}</span>}
+                    {t.reminder_date && t.reminder_status === "pending" && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-1.5 py-0.5 text-rose-600 ring-1 ring-rose-100">
+                        <Bell className="h-3 w-3" />
+                        {formatDayLabel(fromISODate(t.reminder_date), { short: true })}
+                      </span>
+                    )}
+                    {t.carried_over_from && !done && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-amber-700 ring-1 ring-amber-100"
+                        title={`Rolled over — originally scheduled for ${formatDayLabel(
+                          fromISODate(t.carried_over_from),
+                          { weekday: true, year: true }
+                        )}`}
+                      >
+                        ↪ probably for {formatDayLabel(fromISODate(t.carried_over_from), { short: true })}
+                      </span>
+                    )}
+                    {t.assigned_to && (
+                      <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-indigo-600 ring-1 ring-indigo-100">
+                        {memberEmailMap[t.assigned_to] ?? "Assigned"}
+                      </span>
+                    )}
+                  </div>
+                  {t.notes && (
+                    <ExpandableText text={t.notes} className="mt-1 text-[11px] leading-snug text-zinc-500" />
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <button
+                    onClick={() => onEditTask(t)}
+                    disabled={busy}
+                    aria-label="Edit task"
+                    className="rounded-lg p-1 text-zinc-400 transition hover:bg-zinc-200 hover:text-zinc-700"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => onDeleteTask(t)}
+                    disabled={busy}
+                    aria-label="Delete task"
+                    className="rounded-lg p-1 text-zinc-400 transition hover:bg-rose-100 hover:text-rose-600"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </>
+  );
+}
+
 interface DayCardProps {
   dateISO: string;
   large: boolean;
@@ -1259,8 +1414,6 @@ interface DayCardProps {
 }
 
 function DayCard(props: DayCardProps) {
-  /* A lunar task notification links here with ?task=<id>. */
-  const focusTaskId = useFocusTarget("task", "lunar-task", true);
   const {
     dateISO,
     large,
@@ -1374,108 +1527,15 @@ function DayCard(props: DayCardProps) {
             <Plus className="h-3 w-3" /> Add
           </button>
         </div>
-        {tasks.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-zinc-200 px-3 py-3 text-center text-xs text-zinc-400">
-            No tasks yet.
-          </p>
-        ) : (
-          <ul className="space-y-1.5">
-            {tasks.map((t) => {
-              const Icon = CATEGORY_ICON[t.category ?? "Other"] ?? CircleDot;
-              const done = t.status === "done";
-              const busy = busyTaskId === t.id;
-              return (
-                <li
-                  key={t.id}
-                  id={`lunar-task-${t.id}`}
-                  className={`flex items-start gap-2 rounded-xl border px-2.5 py-2 text-sm transition ${
-                    focusTaskId === t.id
-                      ? "border-emerald-400 bg-emerald-50/60 ring-2 ring-emerald-300"
-                      : done
-                        ? "border-emerald-100 bg-emerald-50/60"
-                        : "border-zinc-100 bg-zinc-50"
-                  }`}
-                >
-                  <button
-                    onClick={() => onToggleDone(t)}
-                    disabled={busy}
-                    aria-label={done ? "Mark as not done" : "Mark as done"}
-                    className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition ${
-                      done
-                        ? "border-emerald-500 bg-emerald-500 text-white"
-                        : "border-zinc-300 bg-white text-transparent hover:border-emerald-400"
-                    }`}
-                  >
-                    <Check className="h-3.5 w-3.5" />
-                  </button>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start gap-1.5">
-                      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-500" />
-                      <span
-                        className={`font-medium break-words ${
-                          done ? "text-zinc-400 line-through" : "text-zinc-800"
-                        }`}
-                      >
-                        {t.title}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500">
-                      {t.category && (
-                        <span className="rounded-full bg-white px-1.5 py-0.5 ring-1 ring-zinc-200">
-                          {t.category}
-                        </span>
-                      )}
-                      {t.crop_or_activity && <span>· {t.crop_or_activity}</span>}
-                      {t.reminder_date && t.reminder_status === "pending" && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-1.5 py-0.5 text-rose-600 ring-1 ring-rose-100">
-                          <Bell className="h-3 w-3" />
-                          {formatDayLabel(fromISODate(t.reminder_date), { short: true })}
-                        </span>
-                      )}
-                      {t.carried_over_from && !done && (
-                        <span
-                          className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-amber-700 ring-1 ring-amber-100"
-                          title={`Rolled over — originally scheduled for ${formatDayLabel(
-                            fromISODate(t.carried_over_from),
-                            { weekday: true, year: true }
-                          )}`}
-                        >
-                          ↪ probably for {formatDayLabel(fromISODate(t.carried_over_from), { short: true })}
-                        </span>
-                      )}
-                      {t.assigned_to && (
-                        <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-indigo-600 ring-1 ring-indigo-100">
-                          {memberEmailMap[t.assigned_to] ?? "Assigned"}
-                        </span>
-                      )}
-                    </div>
-                    {t.notes && (
-                      <ExpandableText text={t.notes} className="mt-1 text-[11px] leading-snug text-zinc-500" />
-                    )}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-0.5">
-                    <button
-                      onClick={() => onEditTask(t)}
-                      disabled={busy}
-                      aria-label="Edit task"
-                      className="rounded-lg p-1 text-zinc-400 transition hover:bg-zinc-200 hover:text-zinc-700"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => onDeleteTask(t)}
-                      disabled={busy}
-                      aria-label="Delete task"
-                      className="rounded-lg p-1 text-zinc-400 transition hover:bg-rose-100 hover:text-rose-600"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        <DayTaskList
+          tasks={tasks}
+          busyTaskId={busyTaskId}
+          memberEmailMap={memberEmailMap}
+          columns={large ? 3 : 1}
+          onEditTask={onEditTask}
+          onToggleDone={onToggleDone}
+          onDeleteTask={onDeleteTask}
+        />
       </div>
 
       {/* Today's Lunar Guidance — lunar mode only */}
@@ -1525,6 +1585,100 @@ function DayCard(props: DayCardProps) {
           }`}
         />
       </div>
+    </div>
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+// One line per day for the rest of the week. A day is worth a whole card only
+// when it has your attention; the others say what is on them and open in place.
+// ---------------------------------------------------------------------------
+interface DayRowProps {
+  dateISO: string;
+  phase: MoonPhase;
+  tasks: LunarTask[];
+  busyTaskId: string | null;
+  memberEmailMap: Record<string, string>;
+  showLunar: boolean;
+  onAddTask: () => void;
+  onEditTask: (t: LunarTask) => void;
+  onToggleDone: (t: LunarTask) => void;
+  onDeleteTask: (t: LunarTask) => void;
+}
+
+function DayRow(props: DayRowProps) {
+  const { dateISO, phase, tasks, busyTaskId, memberEmailMap, showLunar, onAddTask, onEditTask, onToggleDone, onDeleteTask } = props;
+  const [open, setOpen] = useState(false);
+  const date = fromISODate(dateISO);
+  const done = tasks.filter((t) => t.status === "done").length;
+  /* Enough of the titles to often save opening it at all. */
+  const preview = tasks.slice(0, 2).map((t) => t.title).join(", ");
+
+  return (
+    <div className="border-b border-zinc-100 last:border-b-0">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:flex-nowrap">
+        <button
+          onClick={() => tasks.length > 0 && setOpen(!open)}
+          disabled={tasks.length === 0}
+          className={`flex min-w-0 flex-1 items-center gap-3 text-left ${tasks.length > 0 ? "cursor-pointer" : "cursor-default"}`}
+        >
+          <span className="w-24 shrink-0 text-sm font-semibold">
+            {formatDayLabel(date, { short: true })}
+          </span>
+          {showLunar && (
+            <span className="hidden shrink-0 items-center gap-1.5 text-[11px] text-zinc-500 sm:flex">
+              <span aria-hidden>{PHASE_MOON_EMOJI[phase]}</span>
+              {phase}
+            </span>
+          )}
+          <span className="min-w-0 flex-1 truncate text-sm">
+            {tasks.length === 0 ? (
+              <span className="text-zinc-400">Nothing planned</span>
+            ) : (
+              <>
+                <span className="font-medium">
+                  {tasks.length} task{tasks.length === 1 ? "" : "s"}
+                </span>
+                {done > 0 && <span className="text-zinc-400"> · {done} done</span>}
+                <span className="text-zinc-500"> · {preview}</span>
+                {tasks.length > 2 && <span className="text-zinc-400"> +{tasks.length - 2}</span>}
+              </>
+            )}
+          </span>
+        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={onAddTask}
+            className="inline-flex items-center gap-1 rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100"
+          >
+            <Plus className="h-3 w-3" /> Add
+          </button>
+          {tasks.length > 0 && (
+            <button
+              onClick={() => setOpen(!open)}
+              aria-label={open ? "Collapse day" : "Expand day"}
+              className="rounded-full p-1.5 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"
+            >
+              <ChevronRight className={`h-4 w-4 transition-transform ${open ? "rotate-90" : ""}`} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {open && tasks.length > 0 && (
+        <div className="bg-zinc-50/70 px-4 pb-3 pt-1 sm:pl-[7.75rem]">
+          <DayTaskList
+            tasks={tasks}
+            busyTaskId={busyTaskId}
+            memberEmailMap={memberEmailMap}
+            columns={2}
+            onEditTask={onEditTask}
+            onToggleDone={onToggleDone}
+            onDeleteTask={onDeleteTask}
+          />
+        </div>
+      )}
     </div>
   );
 }
