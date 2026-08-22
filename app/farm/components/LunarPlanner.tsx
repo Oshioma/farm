@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase, getCurrentUser } from "@/lib/supabase";
+import { useFocusTarget } from "@/hooks/useFocusTarget";
 import type { FarmMember } from "@/lib/farm";
 import { ExpandableText } from "@/app/farm/components/ExpandableText";
 import { LogHoursModal } from "@/app/farm/components/LogHoursModal";
@@ -1258,6 +1259,8 @@ interface DayCardProps {
 }
 
 function DayCard(props: DayCardProps) {
+  /* A lunar task notification links here with ?task=<id>. */
+  const focusTaskId = useFocusTarget("task", "lunar-task", true);
   const {
     dateISO,
     large,
@@ -1384,8 +1387,13 @@ function DayCard(props: DayCardProps) {
               return (
                 <li
                   key={t.id}
+                  id={`lunar-task-${t.id}`}
                   className={`flex items-start gap-2 rounded-xl border px-2.5 py-2 text-sm transition ${
-                    done ? "border-emerald-100 bg-emerald-50/60" : "border-zinc-100 bg-zinc-50"
+                    focusTaskId === t.id
+                      ? "border-emerald-400 bg-emerald-50/60 ring-2 ring-emerald-300"
+                      : done
+                        ? "border-emerald-100 bg-emerald-50/60"
+                        : "border-zinc-100 bg-zinc-50"
                   }`}
                 >
                   <button

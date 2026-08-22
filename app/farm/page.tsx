@@ -38,6 +38,7 @@ import { WantForm } from "@/app/farm/components/WantForm";
 import type { WantFormData } from "@/app/farm/components/WantForm";
 import { FarmMap } from "@/app/farm/components/FarmMap";
 import LunarPlanner from "@/app/farm/components/LunarPlanner";
+import { useFocusTarget } from "@/hooks/useFocusTarget";
 import { LogHoursModal } from "@/app/farm/components/LogHoursModal";
 import { ExpandableText } from "@/app/farm/components/ExpandableText";
 import { ArrowUp, Images, Plus, Settings, X } from "lucide-react";
@@ -113,6 +114,8 @@ export default function FarmPage() {
   const [highlightCropId, setHighlightCropId] = useState<string | null>(null);
   const deepLinkHandledRef = React.useRef(false);
   const [expandAllTasks, setExpandAllTasks] = useState(false);
+  /* A task notification links here with ?task=<id>. */
+  const focusTaskId = useFocusTarget("task", "task", tasks.length > 0);
   // No-farm state
   const [noFarmMode, setNoFarmMode] = useState<"idle" | "create" | "join">("idle");
   const [newFarmName, setNewFarmName] = useState("");
@@ -565,7 +568,7 @@ export default function FarmPage() {
 
   // Calculate which tasks to display based on expand state
   const displayedTaskGroups = useMemo(() => {
-    if (expandAllTasks) {
+    if (expandAllTasks || focusTaskId) {
       // Show all groups with all tasks
       return groupedOpenTasks;
     } else {
@@ -577,7 +580,7 @@ export default function FarmPage() {
         tasks: myTasksGroup.tasks.slice(0, 3)
       }];
     }
-  }, [groupedOpenTasks, expandAllTasks]);
+  }, [groupedOpenTasks, expandAllTasks, focusTaskId]);
 
   const completedTasks = monthGoals.filter(
     (task) => task.status === "done" || task.status === "cancelled"
@@ -2059,7 +2062,15 @@ export default function FarmPage() {
                     const isEditing = editingTaskId === task.id;
                     const isToday = task.due_date === today;
                     return (
-                      <div key={task.id} className="rounded-2xl border border-zinc-200 p-4">
+                      <div
+                        key={task.id}
+                        id={`task-${task.id}`}
+                        className={`rounded-2xl border p-4 transition ${
+                          focusTaskId === task.id
+                            ? "border-emerald-400 bg-emerald-50/60 ring-2 ring-emerald-300"
+                            : "border-zinc-200"
+                        }`}
+                      >
                         {isEditing && editingTaskForm ? (
                           <div className="space-y-3">
                             <input
