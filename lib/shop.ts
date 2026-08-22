@@ -54,16 +54,33 @@ function slugKey(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-export async function findShopFarm(slug: string) {
+/* Nothing is public until a farm opts in. If the column is not on the database
+   yet we publish nobody rather than everybody — a farm that never agreed to be
+   listed must not be exposed by a migration that has not run. */
+async function listedFarms() {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("farms")
     .select("id, name, slug, location")
-    .eq("is_active", true);
-  if (error) throw new Error(`findShopFarm failed: ${error.message}`);
+    .eq("is_active", true)
+    .eq("list_in_market", true);
+  if (error) {
+    if (/list_in_market/.test(error.message)) return { farms: [], available: false };
+    throw new Error(`findShopFarm failed: ${error.message}`);
+  }
+  return {
+    farms: (data ?? []) as { id: string; name: string; slug: string | null; location: string | null }[],
+    available: true,
+  };
+}
 
+export async function findShopFarm(slug: string) {
+  /* /shop is the market itself, never a farm. */
+  if (slugKey(slug) === "shop") return null;
+
+  const { farms: data } = await listedFarms();
   const wanted = slugKey(slug);
-  const farms = (data ?? []) as { id: string; name: string; slug: string | null; location: string | null }[];
+  const farms = data;
   const match =
     farms.find((f) => f.slug && slugKey(f.slug) === wanted) ??
     farms.find((f) => slugKey(f.name) === wanted) ??
@@ -230,4 +247,63 @@ export function monthLabel(season: number, key: string): string {
   if (!m) return "";
   const year = key === "jan" || key === "feb" ? season + 1 : season;
   return `${m.label} ${year}`;
+}
+
+/* ── The market: every farm's produce in one place ──────────── */
+
+export type MarketFarm = {
+  slug: string;
+  name: string;
+  location: string | null;
+  produce: ShopProduce[];
+  totalExpectedKg: number;
+  totalAvailableKg: number;
+  /** Months this farm has produce in, earliest first. */
+  monthLabels: string[];
+};
+
+export type MarketData = {
+  farms: MarketFarm[];
+  totalExpectedKg: number;
+  totalAvailableKg: number;
+  cropCount: number;
+};
+
+/**
+ * Every active farm that has produce with an expected harvest. A farm with
+ * nothing coming is left out entirely rather than listed as empty.
+ */
+export async function getMarketData(): Promise<MarketData> {
+  const { farms: listed } = await listedFarms();
+
+  const farms: MarketFarm[] = [];
+  for (const row of [...listed].sort((a, b) => a.name.localeCompare(b.name))) {
+    const shop = await getShopData(row.slug || row.name);
+    if (!shop || shop.produce.length === 0) continue;
+
+    const seen: string[] = [];
+    for (const p of shop.produce) {
+      for (const m of p.months) {
+        const label = `${m.label} ${m.calendarYear}`;
+        if (!seen.includes(label)) seen.push(label);
+      }
+    }
+
+    farms.push({
+      slug: shop.farm.slug,
+      name: shop.farm.name,
+      location: shop.farm.location,
+      produce: shop.produce,
+      totalExpectedKg: shop.produce.reduce((sum, p) => sum + p.totalExpectedKg, 0),
+      totalAvailableKg: shop.produce.reduce((sum, p) => sum + p.totalAvailableKg, 0),
+      monthLabels: seen,
+    });
+  }
+
+  return {
+    farms,
+    totalExpectedKg: farms.reduce((sum, f) => sum + f.totalExpectedKg, 0),
+    totalAvailableKg: farms.reduce((sum, f) => sum + f.totalAvailableKg, 0),
+    cropCount: farms.reduce((sum, f) => sum + f.produce.length, 0),
+  };
 }

@@ -28,7 +28,8 @@ function produceName(p: ShopProduce): string {
   return p.variety ? `${p.name} · ${p.variety}` : p.name;
 }
 
-/** A line in the basket, before it is sent. */
+/** A line in the basket, before it is sent. Weights only — the shop sells
+    kilos, not shares of a bed a stranger cannot see. */
 type BasketLine = {
   id: string;
   cropId: string;
@@ -36,10 +37,7 @@ type BasketLine = {
   season: number;
   monthKey: string;
   monthLabel: string;
-  sharePct: number | null;
-  quantityKg: number | null;
-  /** What it is expected to come to, for showing only. */
-  estimateKg: number | null;
+  quantityKg: number;
   pricePerKg: number | null;
 };
 
@@ -58,8 +56,8 @@ export function Shopfront({ shop }: { shop: ShopData }) {
     [shop.produce]
   );
   const reservedPct = seasonTotal > 0 ? Math.round(((seasonTotal - availableTotal) / seasonTotal) * 100) : 0;
-  const basketKg = basket.reduce((sum, l) => sum + (l.estimateKg ?? 0), 0);
-  const basketValue = basket.reduce((sum, l) => sum + (l.estimateKg ?? 0) * (l.pricePerKg ?? 0), 0);
+  const basketKg = basket.reduce((sum, l) => sum + l.quantityKg, 0);
+  const basketValue = basket.reduce((sum, l) => sum + l.quantityKg * (l.pricePerKg ?? 0), 0);
 
   function addLine(line: BasketLine) {
     setBasket((prev) => [...prev, line]);
@@ -80,7 +78,6 @@ export function Shopfront({ shop }: { shop: ShopData }) {
             cropId: l.cropId,
             season: l.season,
             monthKey: l.monthKey,
-            sharePct: l.sharePct,
             quantityKg: l.quantityKg,
           })),
         }),
@@ -141,8 +138,8 @@ export function Shopfront({ shop }: { shop: ShopData }) {
             Claim your share before it is picked.
           </h1>
           <p style={{ fontSize: 18, lineHeight: 1.6, color: "#57534e", maxWidth: "46ch", margin: 0, textWrap: "pretty" }}>
-            Everything on this page is already in the ground with a harvest expected against it. Reserve a share of a
-            bed, and collect it the week it comes out.
+            Everything on this page is already in the ground with a harvest expected against it. Reserve the kilos
+            you want, and collect them the week they come out.
           </p>
           <a
             href="#produce"
@@ -219,7 +216,7 @@ export function Shopfront({ shop }: { shop: ShopData }) {
             Three steps, no card needed
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 32 }}>
-            <Step n="Step one" title="Reserve a share" body="Pick a crop and say how much of that month's harvest you want — a share of the bed, or a number of kilos." />
+            <Step n="Step one" title="Reserve your kilos" body="Pick a crop, pick the month it is coming out, and say how many kilos you want from it." />
             <Step n="Step two" title="We pick to your order" body="You hear from us the week it is ready with the real weight. Short of a good crop, we tell you early rather than late." />
             <Step n="Step three" title="Collect and settle" body="Collect on the agreed day and pay then. Nothing is charged when you reserve." />
           </div>
@@ -348,26 +345,19 @@ function ProduceCard({ produce, onOpen }: { produce: ShopProduce; onOpen: () => 
   );
 }
 
-/* The reserve sheet: pick a month, then a share or a weight. */
+/* The reserve sheet: pick a month, then say how many kilos. */
 function ProduceSheet({ produce, onClose, onAdd }: { produce: ShopProduce; onClose: () => void; onAdd: (l: BasketLine) => void }) {
   const [monthIdx, setMonthIdx] = useState(0);
-  const [basis, setBasis] = useState<"share" | "fixed">("share");
-  const [share, setShare] = useState("30");
   const [kg, setKg] = useState("");
 
   const month: ShopMonth = produce.months[monthIdx];
-  const shareNum = Number(share);
   const kgNum = Number(kg);
-  const estimate =
-    basis === "share"
-      ? month.expectedKg !== null && Number.isFinite(shareNum) && shareNum > 0
-        ? (month.expectedKg * shareNum) / 100
-        : null
-      : Number.isFinite(kgNum) && kgNum > 0
-        ? kgNum
-        : null;
-  const tooMuch = basis === "fixed" && month.availableKg !== null && estimate !== null && estimate > month.availableKg;
-  const valid = basis === "share" ? shareNum > 0 && shareNum <= 100 : kgNum > 0 && !tooMuch;
+  const wanted = Number.isFinite(kgNum) && kgNum > 0 ? kgNum : null;
+  const tooMuch = wanted !== null && month.availableKg !== null && wanted > month.availableKg;
+  const valid = wanted !== null && !tooMuch;
+
+  /* Quick amounts, kept under what is actually left that month. */
+  const picks = [5, 10, 25, 50].filter((v) => month.availableKg === null || v <= month.availableKg);
 
   return (
     <Overlay onClose={onClose}>
@@ -386,7 +376,7 @@ function ProduceSheet({ produce, onClose, onAdd }: { produce: ShopProduce; onClo
             {produce.months.map((m, i) => (
               <button
                 key={`${m.season}:${m.key}`}
-                onClick={() => setMonthIdx(i)}
+                onClick={() => { setMonthIdx(i); setKg(""); }}
                 style={{
                   flexGrow: 1, fontFamily: sans, fontSize: 14, fontWeight: 600, cursor: "pointer", minHeight: 44,
                   color: i === monthIdx ? "#ffffff" : INK, background: i === monthIdx ? GREEN : "#ffffff",
@@ -407,74 +397,60 @@ function ProduceSheet({ produce, onClose, onAdd }: { produce: ShopProduce; onClo
           </span>
         </div>
 
-        <Labelled label="How much">
-          <div style={{ display: "flex", gap: 8 }}>
-            {(["share", "fixed"] as const).map((b) => (
-              <button
-                key={b}
-                onClick={() => setBasis(b)}
-                style={{
-                  flexGrow: 1, fontFamily: sans, fontSize: 14, fontWeight: 600, cursor: "pointer", minHeight: 44,
-                  color: basis === b ? "#ffffff" : INK, background: basis === b ? INK : "#ffffff",
-                  border: `1px solid ${basis === b ? INK : "#ded6c9"}`, borderRadius: 14, padding: "12px 10px",
-                }}
-              >
-                {b === "share" ? "A share of the bed" : "A set weight"}
-              </button>
-            ))}
-          </div>
-        </Labelled>
-
-        {basis === "share" ? (
+        <Labelled label="How many kilos">
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-            {["10", "25", "30", "50"].map((v) => (
+            {picks.map((v) => (
               <button
                 key={v}
-                onClick={() => setShare(v)}
+                onClick={() => setKg(String(v))}
                 style={{
                   fontFamily: sans, fontSize: 14, fontWeight: 600, cursor: "pointer", minHeight: 44, padding: "10px 18px",
-                  color: share === v ? "#ffffff" : INK, background: share === v ? GREEN : "#ffffff",
-                  border: `1px solid ${share === v ? GREEN : "#ded6c9"}`, borderRadius: 12,
+                  color: kg === String(v) ? "#ffffff" : INK, background: kg === String(v) ? GREEN : "#ffffff",
+                  border: `1px solid ${kg === String(v) ? GREEN : "#ded6c9"}`, borderRadius: 12,
                 }}
               >
-                {v}%
+                {v} kg
               </button>
             ))}
+            {month.availableKg !== null && month.availableKg > 0 && (
+              <button
+                onClick={() => setKg(String(Math.floor(month.availableKg as number)))}
+                style={{
+                  fontFamily: sans, fontSize: 14, fontWeight: 600, cursor: "pointer", minHeight: 44, padding: "10px 18px",
+                  color: INK, background: "#ffffff", border: "1px solid #ded6c9", borderRadius: 12,
+                }}
+              >
+                All {fmtKg(month.availableKg)}
+              </button>
+            )}
             <input
-              type="number" min="1" max="100" value={share} onChange={(e) => setShare(e.target.value)}
-              style={{ width: 90, fontFamily: sans, fontSize: 14, padding: "12px 14px", borderRadius: 12, border: "1px solid #ded6c9", minHeight: 44 }}
+              type="number" min="1" value={kg} onChange={(e) => setKg(e.target.value)} placeholder="kg"
+              style={{ width: 100, fontFamily: sans, fontSize: 15, padding: "12px 14px", borderRadius: 12, border: "1px solid #ded6c9", minHeight: 44 }}
             />
           </div>
-        ) : (
-          <input
-            type="number" min="1" value={kg} onChange={(e) => setKg(e.target.value)} placeholder="kilos"
-            style={{ width: "100%", fontFamily: sans, fontSize: 15, padding: "14px 16px", borderRadius: 14, border: "1px solid #ded6c9", minHeight: 44 }}
-          />
-        )}
+        </Labelled>
 
         <div style={{ background: "#f7f3ec", borderRadius: 18, padding: 18, display: "flex", flexDirection: "column", gap: 6 }}>
           {tooMuch ? (
             <span style={{ fontSize: 14, color: "#9f1239" }}>
               Only {fmtKg(month.availableKg ?? 0)} is still unclaimed that month.
             </span>
-          ) : estimate !== null ? (
+          ) : wanted !== null ? (
             <>
               <span style={{ fontSize: 15 }}>
-                Comes to <strong>{fmtKg(estimate)}</strong>
-                {produce.pricePerKg !== null && <> · about {money(estimate * produce.pricePerKg)}</>}
+                <strong>{fmtKg(wanted)}</strong> of {produce.name} in {month.label}
+                {produce.pricePerKg !== null && <> · about {money(wanted * produce.pricePerKg)}</>}
               </span>
-              {basis === "share" && (
-                <span style={{ fontSize: 13, color: "#78716c", textWrap: "pretty" }}>
-                  A share moves with the crop — a better month means more, a poor one means less, and you pay for what
-                  you take.
-                </span>
-              )}
+              <span style={{ fontSize: 13, color: "#78716c", textWrap: "pretty" }}>
+                We pick to the weight you reserve and weigh it on the day. If the crop falls short, we tell you early
+                rather than late.
+              </span>
             </>
           ) : (
             <span style={{ fontSize: 14, color: "#78716c" }}>
               {month.expectedKg === null
-                ? `The farm expects "${month.expectedText}" that month, which is not a weight — reserve a share and they will confirm.`
-                : "Choose how much you would like."}
+                ? `The farm expects "${month.expectedText}" that month, so say how many kilos you would like and they will confirm.`
+                : "Say how many kilos you would like."}
             </span>
           )}
         </div>
@@ -490,9 +466,7 @@ function ProduceSheet({ produce, onClose, onAdd }: { produce: ShopProduce; onClo
                 season: month.season,
                 monthKey: month.key,
                 monthLabel: `${month.label} ${month.calendarYear}`,
-                sharePct: basis === "share" ? shareNum : null,
-                quantityKg: basis === "fixed" ? kgNum : null,
-                estimateKg: estimate,
+                quantityKg: wanted as number,
                 pricePerKg: produce.pricePerKg,
               })
             }
@@ -534,11 +508,11 @@ function Checkout({
               <div style={{ display: "flex", flexDirection: "column", gap: 2, flexGrow: 1, minWidth: 0 }}>
                 <span style={{ fontSize: 16, fontWeight: 600 }}>{l.cropName}</span>
                 <span style={{ fontSize: 13, color: "#78716c" }}>
-                  {l.sharePct !== null ? `${l.sharePct}% of the ${l.monthLabel} pick` : `${l.quantityKg} kg · ${l.monthLabel}`}
+                  {fmtKg(l.quantityKg)} · {l.monthLabel}
                 </span>
               </div>
               <span style={{ fontSize: 15, fontWeight: 700, whiteSpace: "nowrap" }}>
-                {l.estimateKg !== null ? `≈ ${fmtKg(l.estimateKg)}` : "—"}
+                {l.pricePerKg !== null ? money(l.quantityKg * l.pricePerKg) : fmtKg(l.quantityKg)}
               </span>
               <button onClick={() => onRemove(l.id)} aria-label="Remove" style={{ background: "none", border: "none", color: "#a8a29e", fontSize: 20, cursor: "pointer", padding: 8, minHeight: 44 }}>
                 ×
@@ -549,13 +523,13 @@ function Checkout({
 
         <div style={{ display: "flex", justifyContent: "space-between", gap: 16, background: "#f7f3ec", borderRadius: 18, padding: 18 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontSize: 14, color: "#57534e" }}>Expected weight</span>
-            <span style={{ fontSize: 15, fontWeight: 700 }}>≈ {fmtKg(basketKg)}</span>
+            <span style={{ fontSize: 14, color: "#57534e" }}>Reserved weight</span>
+            <span style={{ fontSize: 15, fontWeight: 700 }}>{fmtKg(basketKg)}</span>
           </div>
           {basketValue > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <span style={{ fontSize: 14, color: "#57534e" }}>Indicative value</span>
-              <span style={{ fontSize: 15, fontWeight: 700 }}>≈ {money(basketValue)}</span>
+              <span style={{ fontSize: 15, fontWeight: 700 }}>{money(basketValue)}</span>
             </div>
           )}
           <div style={{ display: "flex", flexDirection: "column", gap: 4, textAlign: "right" }}>

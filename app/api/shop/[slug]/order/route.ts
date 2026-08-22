@@ -13,7 +13,7 @@ const MAX_ITEMS = 12;
 const MAX_KG = 10_000;
 const MAX_TEXT = 200;
 
-type Item = { cropId: string; season: number; monthKey: string; sharePct?: number | null; quantityKg?: number | null };
+type Item = { cropId: string; season: number; monthKey: string; quantityKg?: number | null };
 
 function clean(value: unknown, max = MAX_TEXT): string {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -62,13 +62,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
     const month = monthIsOffered(shop.produce, cropId, season, monthKey);
     if (!month) return bad("One of those crops is no longer expected that month. Please refresh and try again.");
 
-    const share = item?.sharePct === null || item?.sharePct === undefined ? null : Number(item.sharePct);
-    const quantity = item?.quantityKg === null || item?.quantityKg === undefined ? null : Number(item.quantityKg);
-
-    if (share === null && quantity === null) return bad("Each line needs a share or a weight.");
-    if (share !== null && (!Number.isFinite(share) || share <= 0 || share > 100)) return bad("A share must be between 1 and 100%.");
-    if (quantity !== null && (!Number.isFinite(quantity) || quantity <= 0 || quantity > MAX_KG)) return bad("That weight does not look right.");
-    if (quantity !== null && month.availableKg !== null && quantity > month.availableKg) {
+    /* The shop sells weights. Shares of a harvest are an arrangement the farm
+       makes with a customer directly, not something a visitor can place. */
+    const quantity = Number(item?.quantityKg);
+    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > MAX_KG) return bad("That weight does not look right.");
+    if (month.availableKg !== null && quantity > month.availableKg) {
       return bad(`Only ${Math.floor(month.availableKg)} kg of ${monthLabel(season, monthKey)} is still unclaimed.`);
     }
 
@@ -78,7 +76,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
       crop_id: cropId,
       season,
       month_key: monthKey,
-      share_pct: share,
+      share_pct: null,
       quantity_kg: quantity,
       price_per_kg: crop.pricePerKg,
       status: "pending",
@@ -87,7 +85,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
     summary.push({
       crop: crop.name + (crop.variety ? ` · ${crop.variety}` : ""),
       when: monthLabel(season, monthKey),
-      amount: quantity !== null ? `${quantity} kg` : `${share}% of the harvest`,
+      amount: `${quantity} kg`,
     });
   }
 

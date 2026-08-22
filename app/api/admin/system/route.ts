@@ -453,6 +453,9 @@ const MIGRATIONS: { version: string; name: string; probes: string[]; note?: stri
   { version: "20260728143226", name: "add_join_requests_rls", probes: ["join_requests"], note: "Table check only; the policy change itself is not visible from here." },
   { version: "20260728145203", name: "create_notifications", probes: ["notifications"] },
   { version: "20260821153055", name: "add_crop_id_to_harvest_eta", probes: ["harvest_eta.crop_id"] },
+  { version: "20260821170000", name: "create_customers_and_orders", probes: ["customers", "customer_orders"] },
+  { version: "20260821190000", name: "add_default_share_to_customers", probes: ["customers.default_share_pct"] },
+  { version: "20260821203000", name: "add_list_in_market_to_farms", probes: ["farms.list_in_market"] },
 ];
 
 type ProbeResult = { status: Status; detail: string };

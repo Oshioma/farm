@@ -29,6 +29,11 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState("");
 
   const activeFarm = farms.find((f) => f.id === activeFarmId);
+  /* Public listing: null while unknown, false when the column is missing. */
+  const [listed, setListed] = useState<boolean | null>(null);
+  const [listingAvailable, setListingAvailable] = useState(true);
+  const [listingSlug, setListingSlug] = useState<string | null>(null);
+  const [savingListing, setSavingListing] = useState(false);
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
 
   useEffect(() => {
@@ -184,6 +189,43 @@ export default function SettingsPage() {
     );
   }
 
+  useEffect(() => {
+    if (!activeFarmId) return;
+    let cancelled = false;
+    fetch(`/api/farm/market-listing?farm_id=${activeFarmId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        setListed(!!data.listed);
+        setListingAvailable(data.available !== false);
+        setListingSlug(data.slug ?? null);
+      })
+      .catch(() => { if (!cancelled) setListingAvailable(false); });
+    return () => { cancelled = true; };
+  }, [activeFarmId]);
+
+  async function toggleListing(next: boolean) {
+    if (!activeFarmId) return;
+    try {
+      setSavingListing(true);
+      setError("");
+      setSuccess("");
+      const res = await fetch("/api/farm/market-listing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ farmId: activeFarmId, listed: next }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not change the listing");
+      setListed(next);
+      setSuccess(next ? "This farm is now public." : "This farm is no longer public.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not change the listing");
+    } finally {
+      setSavingListing(false);
+    }
+  }
+
   const isManager = userRole === "owner" || userRole === "manager";
   if (activeFarmId && !isManager) {
     return <ManagerOnly title="Settings — managers only" />;
@@ -211,6 +253,41 @@ export default function SettingsPage() {
           {success}
         </div>
       )}
+
+      <section className="mb-6 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold">Public shop</h2>
+        <p className="mt-1 text-sm text-zinc-500">
+          Off by default. While it is off, this farm appears nowhere public — not in the market, and not at its own
+          shop address either. Turning it on publishes the crops that have an expected harvest, the weight expected,
+          and how much is unclaimed. Customer details are never shown.
+        </p>
+
+        {!listingAvailable ? (
+          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            The database does not have the market column yet. Run the pending migration and this switch will work.
+          </p>
+        ) : (
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => toggleListing(!listed)}
+              disabled={savingListing || listed === null}
+              className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium transition disabled:opacity-60 ${
+                listed ? "border border-zinc-200 text-zinc-700 hover:bg-zinc-100" : "bg-zinc-900 text-white hover:bg-zinc-800"
+              }`}
+            >
+              {savingListing ? "Saving..." : listed ? "Take this farm off the market" : "Publish this farm to the market"}
+            </button>
+            <span className={`rounded-full px-3 py-1 text-xs font-medium ${listed ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-500"}`}>
+              {listed === null ? "…" : listed ? "Public" : "Not public"}
+            </span>
+            {listed && listingSlug && (
+              <a href={`/${listingSlug}`} className="text-sm text-zinc-500 underline hover:text-zinc-700" target="_blank" rel="noreferrer">
+                View the shop
+              </a>
+            )}
+          </div>
+        )}
+      </section>
 
       <section className="mb-6 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold">Data Export</h2>
