@@ -18,6 +18,7 @@ import {
   getFertilisations,
   getCompost,
   getMulch,
+  getPestControls,
   getPlants,
   getHarvestEta,
   getWants,
@@ -25,7 +26,7 @@ import {
   saveActiveFarmId,
   getActiveFarmId,
 } from "@/lib/farm";
-import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, FertilisationEntry, CompostEntry, MulchEntry, Plant, HarvestEtaEntry, FarmMember, Want, WantWithFarm } from "@/lib/farm";
+import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, FertilisationEntry, CompostEntry, MulchEntry, PestControlEntry, Plant, HarvestEtaEntry, FarmMember, Want, WantWithFarm } from "@/lib/farm";
 import { formatDate, formatMoney, badgeClass } from "@/app/farm/utils";
 import { CropForm } from "@/app/farm/components/CropForm";
 import { TaskForm } from "@/app/farm/components/TaskForm";
@@ -73,6 +74,7 @@ export default function FarmPage() {
   const [fertilisations, setFertilisations] = useState<FertilisationEntry[]>([]);
   const [compostEntries, setCompostEntries] = useState<CompostEntry[]>([]);
   const [mulchEntries, setMulchEntries] = useState<MulchEntry[]>([]);
+  const [pestControls, setPestControls] = useState<PestControlEntry[]>([]);
   const [harvestEtaEntries, setHarvestEtaEntries] = useState<HarvestEtaEntry[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
   const [members, setMembers] = useState<FarmMember[]>([]);
@@ -294,7 +296,7 @@ export default function FarmPage() {
     // already-resolved token instead of each triggering a refresh. Lock
     // contention itself is handled by the in-memory auth lock in lib/supabase.
     await supabase.auth.getSession();
-    const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows, pestRows, saleRows, fertilisationRows, compostRows, mulchRows, plantRows, harvestEtaRows, memberRows, wantRows, otherWantRows] = await Promise.all([
+    const [zoneRows, cropRows, taskRows, activityRows, expenseRows, assetRows, pestRows, saleRows, fertilisationRows, compostRows, mulchRows, pestControlRows, plantRows, harvestEtaRows, memberRows, wantRows, otherWantRows] = await Promise.all([
       getZones(farmId),
       getCrops(farmId),
       getTasks(farmId),
@@ -306,6 +308,7 @@ export default function FarmPage() {
       getFertilisations(farmId),
       getCompost(farmId),
       getMulch(farmId),
+      getPestControls(farmId),
       getPlants(farmId),
       getHarvestEta(farmId, currentYear),
       getMembers(farmId),
@@ -332,6 +335,7 @@ export default function FarmPage() {
     setFertilisations(fertilisationRows);
     setCompostEntries(compostRows);
     setMulchEntries(mulchRows);
+    setPestControls(pestControlRows);
     setPlants(plantRows);
     setHarvestEtaEntries(harvestEtaRows);
     setMembers(memberRows);
@@ -1644,6 +1648,7 @@ export default function FarmPage() {
               { href: withFarmContext("/income-prediction"), label: "Income prediction", managerOnly: true },
               { href: "#map", label: "Map" },
               { href: withFarmContext("/farm/mulch"), label: "Mulch" },
+              { href: withFarmContext("/farm/pest-control"), label: "Pest control" },
               { href: withFarmContext("/farm/planting-plan"), label: "Planting plan" },
               { href: withFarmContext("/farm/produce-expected"), label: "Produce expected" },
               { href: withFarmContext("/plants"), label: "Plants" },
@@ -2401,6 +2406,7 @@ export default function FarmPage() {
                   fertilisations={fertilisations}
                   compostEntries={compostEntries}
                   mulchEntries={mulchEntries}
+                  pestControls={pestControls}
                   harvestEta={harvestEtaEntries}
                   farmName={activeFarm?.name}
                   farmId={activeFarm?.id}
@@ -2414,7 +2420,8 @@ export default function FarmPage() {
                   }}
                 />
                 <p className="mt-2 text-xs text-zinc-400">
-                  Click a bed to see details, add crops, or quickly log fertiliser, compost, and mulch.
+                  Click a bed to see details, add crops, or quickly log fertiliser, compost, mulch,
+                  and pest control. The red dot on a bed counts its pest control treatments.
                 </p>
               </div>
             </section>
@@ -2821,7 +2828,11 @@ export default function FarmPage() {
                     <div>
                       <h2 className="text-xl font-semibold">Pest log</h2>
                       <p className="mt-1 text-sm text-zinc-500">
-                        Issues spotted and actions taken.
+                        Issues spotted and actions taken. Sprays and treatments live in the{" "}
+                        <Link href={withFarmContext("/farm/pest-control")} className="underline hover:text-zinc-700">
+                          pest control log
+                        </Link>
+                        .
                       </p>
                     </div>
                     <span className="text-sm text-zinc-500">{pests.length} logged</span>

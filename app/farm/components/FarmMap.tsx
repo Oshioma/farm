@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import type { Zone, Crop, FertilisationEntry, CompostEntry, MulchEntry, HarvestEtaEntry, Plant, SeedlingEntry } from "@/lib/farm";
+import type { Zone, Crop, FertilisationEntry, CompostEntry, MulchEntry, PestControlEntry, HarvestEtaEntry, Plant, SeedlingEntry } from "@/lib/farm";
 
 type SeedlingTray = { id?: string; code: string; zoneId?: string };
 type SeedlingZoneDef = { id: string; label: string };
@@ -274,6 +274,7 @@ type Props = {
   fertilisations?: FertilisationEntry[];
   compostEntries?: CompostEntry[];
   mulchEntries?: MulchEntry[];
+  pestControls?: PestControlEntry[];
   harvestEta?: HarvestEtaEntry[];
   farmName?: string;
   farmId?: string;
@@ -282,7 +283,7 @@ type Props = {
   onBedsSaved?: () => void | Promise<void>;
 };
 
-export function FarmMap({ zones, crops, plants = [], fertilisations = [], compostEntries = [], mulchEntries = [], harvestEta = [], farmName, farmId, onSelectBed, onAddCropToBed, onBedsSaved }: Props) {
+export function FarmMap({ zones, crops, plants = [], fertilisations = [], compostEntries = [], mulchEntries = [], pestControls = [], harvestEta = [], farmName, farmId, onSelectBed, onAddCropToBed, onBedsSaved }: Props) {
   const [hoveredBed, setHoveredBed] = useState<string | null>(null);
   const [selectedBed, setSelectedBed] = useState<string | null>(null);
 
@@ -742,6 +743,19 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
       .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   }
 
+  function getPestControlsForZone(zoneId: string): PestControlEntry[] {
+    return pestControls
+      .filter((p) => p.zone_ids?.includes(zoneId) || p.zone_id === zoneId)
+      .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  }
+
+  // How many times this bed has been treated - shown as a badge on the map.
+  function pestControlCountForBed(bedId: string): number {
+    const zone = getZoneForBed(bedId);
+    if (!zone) return 0;
+    return getPestControlsForZone(zone.id).length;
+  }
+
   function getPlantsForZone(zoneId: string): Plant[] {
     return plants.filter((p) => p.zone_ids?.includes(zoneId) || p.zone_id === zoneId);
   }
@@ -794,6 +808,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
   const selectedFertilisations = selected ? getFertilisationsForZone(selected.id) : [];
   const selectedCompost = selected ? getCompostForZone(selected.id) : [];
   const selectedMulch = selected ? getMulchForZone(selected.id) : [];
+  const selectedPestControls = selected ? getPestControlsForZone(selected.id) : [];
   const selectedHarvestEta = selectedBed ? getHarvestEtaForBed(selectedBed) : undefined;
 
   function buildQuickActionHref(path: string): string {
@@ -1172,6 +1187,22 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                   {bed.label}
                 </text>
               )}
+              {/* Pest-control tally (top-right corner) */}
+              {!editMode && pestControlCountForBed(bed.id) > 0 && (
+                <g className="pointer-events-none">
+                  <circle cx={bed.x + bed.w - 4} cy={bed.y + 4} r={4} fill="#e11d48" stroke="white" strokeWidth={0.8} />
+                  <text
+                    x={bed.x + bed.w - 4}
+                    y={bed.y + 4.3}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    className="text-[5px] font-bold"
+                    fill="white"
+                  >
+                    {pestControlCountForBed(bed.id)}
+                  </text>
+                </g>
+              )}
               {/* Resize handle (bottom-right corner) */}
               {editMode && (
                 <rect
@@ -1413,7 +1444,10 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                   )}
                   {selectedFertilisations.length > 0 && (
                     <div className="mt-4">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Fertiliser</div>
+                      <div className="flex items-baseline justify-between gap-2">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Fertiliser</div>
+                        <div className="text-[10px] text-zinc-400">{selectedFertilisations.length} time{selectedFertilisations.length === 1 ? "" : "s"}</div>
+                      </div>
                       <div className="mt-1.5 space-y-1.5">
                         {selectedFertilisations.map((f) => (
                           <div key={f.id} className="rounded-xl border border-amber-100 bg-amber-50/50 p-2">
@@ -1429,7 +1463,10 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                   )}
                   {selectedCompost.length > 0 && (
                     <div className="mt-4">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Compost</div>
+                      <div className="flex items-baseline justify-between gap-2">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Compost</div>
+                        <div className="text-[10px] text-zinc-400">{selectedCompost.length} time{selectedCompost.length === 1 ? "" : "s"}</div>
+                      </div>
                       <div className="mt-1.5 space-y-1.5">
                         {selectedCompost.map((c) => (
                           <div key={c.id} className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-2">
@@ -1446,7 +1483,10 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                   )}
                   {selectedMulch.length > 0 && (
                     <div className="mt-4">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Mulch</div>
+                      <div className="flex items-baseline justify-between gap-2">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Mulch</div>
+                        <div className="text-[10px] text-zinc-400">{selectedMulch.length} time{selectedMulch.length === 1 ? "" : "s"}</div>
+                      </div>
                       <div className="mt-1.5 space-y-1.5">
                         {selectedMulch.map((m) => (
                           <div key={m.id} className="rounded-xl border border-amber-200 bg-amber-100/40 p-2">
@@ -1456,6 +1496,32 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                             </div>
                             {m.source && <div className="mt-0.5 text-[10px] text-amber-700/80">{m.source}</div>}
                             {m.notes && <div className="mt-0.5 text-[10px] text-amber-700/80">{m.notes}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedPestControls.length > 0 && (
+                    <div className="mt-4">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Pest control</div>
+                        <div className="text-[10px] text-zinc-400">
+                          {selectedPestControls.length} time{selectedPestControls.length === 1 ? "" : "s"}
+                        </div>
+                      </div>
+                      <div className="mt-1.5 space-y-1.5">
+                        {selectedPestControls.map((p) => (
+                          <div key={p.id} className="rounded-xl border border-rose-100 bg-rose-50/50 p-2">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-xs font-medium text-rose-800">{p.product ?? "Pest control"}</span>
+                              <span className="text-[10px] text-rose-600">{fmtDate(p.date)}</span>
+                            </div>
+                            {p.target_pest && <div className="mt-0.5 text-[10px] text-rose-600/70">Target: {p.target_pest}</div>}
+                            {p.method && <div className="mt-0.5 text-[10px] text-rose-600/70">{p.method}</div>}
+                            {p.next_spray_date && (
+                              <div className="mt-0.5 text-[10px] text-rose-600/70">Next: {fmtDate(p.next_spray_date)}</div>
+                            )}
+                            {p.notes && <div className="mt-0.5 text-[10px] text-rose-600/70">{p.notes}</div>}
                           </div>
                         ))}
                       </div>
@@ -1528,6 +1594,12 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                   >
                     + Mulch
                   </Link>
+                  <Link
+                    href={buildQuickActionHref("/farm/pest-control")}
+                    className="block rounded-lg border border-rose-200 bg-rose-100 px-2.5 py-1.5 text-xs font-medium text-rose-900 hover:bg-rose-200"
+                  >
+                    + Pest control
+                  </Link>
                 </div>
               </div>
             </div>
@@ -1555,6 +1627,9 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-green-200" /> Harvest ready
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded-full bg-rose-600" /> Pest control treatments
               </span>
             </div>
           </div>

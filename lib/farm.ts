@@ -796,6 +796,35 @@ export async function getFertilisations(farmId: string): Promise<FertilisationEn
   return withZoneIds((data ?? []) as FertilisationEntry[]);
 }
 
+export type PestControlEntry = {
+  id: string;
+  farm_id: string;
+  date: string | null;
+  product: string | null;
+  target_pest: string | null;
+  method: string | null;
+  quantity: string | null;
+  zone_id: string | null;
+  extra_zone_ids: string | null;
+  zone_ids?: string[];
+  zone: { name: string }[] | null;
+  notes: string | null;
+  next_spray_date: string | null;
+  next_spray_task_id: string | null;
+  created_at: string | null;
+};
+
+export async function getPestControls(farmId: string): Promise<PestControlEntry[]> {
+  const { data, error } = await supabase
+    .from("pest_controls")
+    .select("id, farm_id, date, product, target_pest, method, quantity, zone_id, extra_zone_ids, zone:zones(name), notes, next_spray_date, next_spray_task_id, created_at")
+    .eq("farm_id", farmId)
+    .order("date", { ascending: false });
+
+  if (error) throw new Error(`getPestControls failed: ${error.message}`);
+  return withZoneIds((data ?? []) as PestControlEntry[]);
+}
+
 export type IncomePredictionRow = {
   id: string;
   farm_id: string;
