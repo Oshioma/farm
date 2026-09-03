@@ -45,7 +45,10 @@ export function Shopfront({ shop }: { shop: ShopData }) {
   const [basket, setBasket] = useState<BasketLine[]>([]);
   const [open, setOpen] = useState<ShopProduce | null>(null);
   const [checkout, setCheckout] = useState(false);
-  const [sent, setSent] = useState<{ crop: string; when: string; amount: string }[] | null>(null);
+  const [sent, setSent] = useState<{
+    lines: { crop: string; when: string; amount: string }[];
+    reference: string | null;
+  } | null>(null);
   const [form, setForm] = useState({ name: "", contactName: "", phone: "", email: "", notes: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -84,7 +87,7 @@ export function Shopfront({ shop }: { shop: ShopData }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not send your pre-order.");
-      setSent(data.summary ?? []);
+      setSent({ lines: data.summary ?? [], reference: data.reference ?? null });
       setBasket([]);
       setCheckout(false);
     } catch (err) {
@@ -265,7 +268,14 @@ export function Shopfront({ shop }: { shop: ShopData }) {
         />
       )}
 
-      {sent && <Confirmation lines={sent} farm={shop.farm.name} onClose={() => setSent(null)} />}
+      {sent && (
+        <Confirmation
+          lines={sent.lines}
+          reference={sent.reference}
+          farm={shop.farm.name}
+          onClose={() => setSent(null)}
+        />
+      )}
     </main>
   );
 }
@@ -636,7 +646,17 @@ function Checkout({
   );
 }
 
-function Confirmation({ lines, farm, onClose }: { lines: { crop: string; when: string; amount: string }[]; farm: string; onClose: () => void }) {
+function Confirmation({
+  lines,
+  reference,
+  farm,
+  onClose,
+}: {
+  lines: { crop: string; when: string; amount: string }[];
+  reference: string | null;
+  farm: string;
+  onClose: () => void;
+}) {
   return (
     <Overlay onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -646,7 +666,14 @@ function Confirmation({ lines, farm, onClose }: { lines: { crop: string; when: s
               <path d="M20 6 9 17l-5-5" />
             </svg>
           </span>
-          <h2 style={{ fontFamily: serif, fontWeight: 400, fontSize: 28, margin: 0 }}>Reserved. We will pick it for you.</h2>
+          <div>
+            <h2 style={{ fontFamily: serif, fontWeight: 400, fontSize: 28, margin: 0 }}>Reserved. We will pick it for you.</h2>
+            {reference && (
+              <p style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", color: GREEN, margin: "5px 0 0" }}>
+                Reference {reference}
+              </p>
+            )}
+          </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {lines.map((l, i) => (
