@@ -1039,7 +1039,7 @@ export type Customer = {
   created_at: string | null;
 };
 
-export const ORDER_STATUSES = ["pending", "confirmed", "fulfilled", "cancelled"] as const;
+export const ORDER_STATUSES = ["pending", "confirmed", "growing", "ready", "collected", "cancelled"] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export type CustomerOrder = {
@@ -1052,8 +1052,16 @@ export type CustomerOrder = {
   share_pct: number | null;
   quantity_kg: number | null;
   price_per_kg: number | null;
+  actual_quantity_kg: number | null;
+  actual_price_per_kg: number | null;
+  reservation_id: string | null;
+  reservation_reference: string | null;
   status: string;
   notes: string | null;
+  confirmed_at: string | null;
+  ready_at: string | null;
+  collected_at: string | null;
+  cancelled_at: string | null;
   created_at: string | null;
 };
 
@@ -1078,7 +1086,7 @@ export async function getCustomers(farmId: string): Promise<Customer[]> {
 export async function getCustomerOrders(farmId: string): Promise<CustomerOrder[]> {
   const { data, error } = await supabase
     .from("customer_orders")
-    .select("id, farm_id, customer_id, crop_id, season, month_key, share_pct, quantity_kg, price_per_kg, status, notes, created_at")
+    .select("id, farm_id, customer_id, crop_id, season, month_key, share_pct, quantity_kg, price_per_kg, actual_quantity_kg, actual_price_per_kg, reservation_id, reservation_reference, status, notes, confirmed_at, ready_at, collected_at, cancelled_at, created_at")
     .eq("farm_id", farmId)
     .order("created_at", { ascending: false });
 
