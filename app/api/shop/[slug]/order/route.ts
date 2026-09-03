@@ -72,15 +72,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
 
     const crop = shop.produce.find((p) => p.cropId === cropId)!;
     rows.push({
-      farm_id: shop.farm.id,
-      crop_id: cropId,
+      cropId,
       season,
-      month_key: monthKey,
-      share_pct: null,
-      quantity_kg: quantity,
-      price_per_kg: crop.pricePerKg,
-      status: "pending",
-      notes: notes || null,
+      monthKey,
+      quantityKg: quantity,
+      pricePerKg: crop.pricePerKg,
+      expectedKg: month.expectedKg,
     });
     summary.push({
       crop: crop.name + (crop.variety ? ` · ${crop.variety}` : ""),
@@ -106,16 +103,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
     ) as { id: string } | undefined;
 
     if (match) {
+      /* A public visitor may reuse a known contact address, but that alone is
+         not proof that they may overwrite the farm's customer record. */
       customerId = match.id;
-      await admin
-        .from("customers")
-        .update({
-          name,
-          contact_name: contactName || null,
-          phone: phone || null,
-          email: email || null,
-        })
-        .eq("id", customerId);
     } else {
       const { data: created, error: createErr } = await admin
         .from("customers")
@@ -139,19 +129,33 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
     return bad("We could not save your details. Please try again.", 500);
   }
 
-  const { error: orderErr } = await admin
-    .from("customer_orders")
-    .insert(rows.map((r) => ({ ...r, customer_id: customerId })));
+  /* The database function locks every requested crop-month, rechecks all
+     commitments and inserts the complete basket in one transaction. */
+  const { data: reservation, error: orderErr } = await admin
+    .rpc("create_public_reservation", {
+      p_farm_id: shop.farm.id,
+      p_customer_id: customerId,
+      p_items: rows,
+      p_notes: notes || null,
+    })
+    .single();
+
   if (orderErr) {
+    const availability = /Only ([0-9.]+) kg is still available/i.exec(orderErr.message);
+    if (availability) {
+      return bad(`Only ${availability[1]} kg is still available. Please refresh and try again.`, 409);
+    }
     return bad("We could not save your pre-order. Please try again.", 500);
   }
+
+  const reference = (reservation as { reservation_reference?: string } | null)?.reservation_reference ?? null;
 
   await admin.from("activities").insert({
     farm_id: shop.farm.id,
     type: "order_created",
-    title: `Pre-order from ${name}`,
+    title: `Pre-order ${reference ?? ""} from ${name}`.replace("  ", " "),
     meta: `${rows.length} item${rows.length === 1 ? "" : "s"} from the shopfront`,
   });
 
-  return NextResponse.json({ ok: true, summary, farm: shop.farm.name });
+  return NextResponse.json({ ok: true, summary, farm: shop.farm.name, reference });
 }
