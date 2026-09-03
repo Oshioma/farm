@@ -56,7 +56,9 @@ function cropLabel(c: Crop): string {
 const STATUS_STYLES: Record<string, string> = {
   pending: "bg-amber-50 text-amber-700",
   confirmed: "bg-emerald-50 text-emerald-700",
-  fulfilled: "bg-blue-50 text-blue-700",
+  growing: "bg-lime-50 text-lime-700",
+  ready: "bg-blue-50 text-blue-700",
+  collected: "bg-violet-50 text-violet-700",
   cancelled: "bg-zinc-100 text-zinc-500",
 };
 
@@ -88,6 +90,8 @@ type OrderForm = {
   share_pct: string;
   quantity_kg: string;
   price_per_kg: string;
+  actual_quantity_kg: string;
+  actual_price_per_kg: string;
   status: string;
   notes: string;
 };
@@ -100,6 +104,8 @@ function blankOrder(defaultMonthId: string): OrderForm {
     share_pct: "",
     quantity_kg: "",
     price_per_kg: "",
+    actual_quantity_kg: "",
+    actual_price_per_kg: "",
     status: "pending",
     notes: "",
   };
@@ -408,6 +414,8 @@ export default function CustomersPage() {
       share_pct: order.share_pct !== null ? String(order.share_pct) : "",
       quantity_kg: order.quantity_kg !== null ? String(order.quantity_kg) : "",
       price_per_kg: order.price_per_kg !== null ? String(order.price_per_kg) : "",
+      actual_quantity_kg: order.actual_quantity_kg !== null ? String(order.actual_quantity_kg) : "",
+      actual_price_per_kg: order.actual_price_per_kg !== null ? String(order.actual_price_per_kg) : "",
       status: order.status,
       notes: order.notes ?? "",
     });
@@ -431,6 +439,8 @@ export default function CustomersPage() {
         share_pct: orderForm.basis === "share" ? Number(orderForm.share_pct) : null,
         quantity_kg: orderForm.basis === "fixed" ? Number(orderForm.quantity_kg) : null,
         price_per_kg: orderForm.price_per_kg.trim() ? Number(orderForm.price_per_kg) : null,
+        actual_quantity_kg: orderForm.actual_quantity_kg.trim() ? Number(orderForm.actual_quantity_kg) : null,
+        actual_price_per_kg: orderForm.actual_price_per_kg.trim() ? Number(orderForm.actual_price_per_kg) : null,
         status: orderForm.status,
         notes: orderForm.notes.trim() || null,
       };
@@ -753,6 +763,11 @@ export default function CustomersPage() {
                                   <tr key={o.id} className="border-t border-zinc-200/70">
                                     <td className="py-1.5 pr-3 font-medium">
                                       {orderLine(o)}
+                                      {o.reservation_reference && (
+                                        <span className="ml-1.5 rounded-full bg-blue-50 px-1.5 py-0.5 text-[9px] font-semibold text-blue-700">
+                                          {o.reservation_reference}
+                                        </span>
+                                      )}
                                       {isStandingOrder(o) && (
                                         <span className="ml-1.5 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[9px] font-medium text-zinc-500">
                                           standing
@@ -762,6 +777,12 @@ export default function CustomersPage() {
                                     <td className="py-1.5 pr-3 text-zinc-500">
                                       {o.quantity_kg !== null ? `${o.quantity_kg} kg` : `${o.share_pct}% of harvest`}
                                       {o.price_per_kg !== null && <span className="text-zinc-400"> · {o.price_per_kg}/kg</span>}
+                                      {o.actual_quantity_kg !== null && (
+                                        <span className="block font-medium text-violet-700">
+                                          Final: {o.actual_quantity_kg} kg
+                                          {o.actual_price_per_kg !== null ? ` · ${o.actual_price_per_kg}/kg` : ""}
+                                        </span>
+                                      )}
                                     </td>
                                     <td className={`py-1.5 text-right font-medium ${kg === null ? "text-amber-700" : "text-emerald-700"}`}>
                                       {kg === null ? "no estimate yet" : fmtKg(kg)}
@@ -1094,6 +1115,42 @@ export default function CustomersPage() {
                   </select>
                 </Field>
               </div>
+              {(orderForm.status === "ready" || orderForm.status === "collected") && (
+                <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-3">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">
+                    Final harvest
+                  </p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Field label="Actual weight (kg)">
+                      <input
+                        className={inp}
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value={orderForm.actual_quantity_kg}
+                        onChange={(e) => setOrderForm((p) => ({ ...p, actual_quantity_kg: e.target.value }))}
+                        placeholder={orderForm.quantity_kg || "Weight picked"}
+                      />
+                    </Field>
+                    <Field label="Actual price per kg">
+                      <input
+                        className={inp}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={orderForm.actual_price_per_kg}
+                        onChange={(e) => setOrderForm((p) => ({ ...p, actual_price_per_kg: e.target.value }))}
+                        placeholder={orderForm.price_per_kg || "Final price"}
+                      />
+                    </Field>
+                  </div>
+                  {orderForm.actual_quantity_kg.trim() && orderForm.actual_price_per_kg.trim() && (
+                    <p className="mt-2 text-sm font-semibold text-blue-900">
+                      Final total: {(Number(orderForm.actual_quantity_kg) * Number(orderForm.actual_price_per_kg)).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    </p>
+                  )}
+                </div>
+              )}
               <Field label="Notes">
                 <textarea className={`${inp} min-h-[60px]`} value={orderForm.notes} onChange={(e) => setOrderForm((p) => ({ ...p, notes: e.target.value }))} />
               </Field>
