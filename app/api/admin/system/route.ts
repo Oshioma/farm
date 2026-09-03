@@ -465,6 +465,11 @@ const MIGRATIONS: { version: string; name: string; probes: string[]; note?: stri
     name: "create_atomic_public_reservations",
     probes: ["customer_orders.reservation_id", "customer_orders.reservation_reference"],
   },
+  {
+    version: "20260903113000",
+    name: "add_order_fulfilment_flow",
+    probes: ["customer_orders.actual_quantity_kg", "customer_orders.actual_price_per_kg", "customer_orders.collected_at"],
+  },
 ];
 
 type ProbeResult = { status: Status; detail: string };
