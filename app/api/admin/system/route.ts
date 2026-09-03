@@ -460,6 +460,11 @@ const MIGRATIONS: { version: string; name: string; probes: string[]; note?: stri
   { version: "20260822090000", name: "notification_deep_links", probes: [], note: "Trigger functions only — not visible from here." },
   { version: "20260822100000", name: "add_detail_fields_to_crops", probes: ["crops.flavour", "crops.best_eaten", "crops.why_special"] },
   { version: "20260822110000", name: "add_produce_image_to_crops", probes: ["crops.produce_image_url"] },
+  {
+    version: "20260903100000",
+    name: "create_atomic_public_reservations",
+    probes: ["customer_orders.reservation_id", "customer_orders.reservation_reference"],
+  },
 ];
 
 type ProbeResult = { status: Status; detail: string };
