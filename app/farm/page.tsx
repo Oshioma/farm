@@ -207,17 +207,17 @@ export default function FarmPage() {
     setError("");
     try {
       const user = await getCurrentUser();
+      if (!user) throw new Error("You must be signed in to create a farm.");
       const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-      const { data: farm, error: farmErr } = await supabase
-        .from("farms")
-        .insert({ name, slug, is_active: true, created_by: user?.id ?? null })
-        .select("id")
-        .single();
+      const { data: farmId, error: farmErr } = await supabase.rpc("create_farm_with_owner", {
+        p_name: name,
+        p_slug: slug,
+      });
       if (farmErr) throw farmErr;
-      await supabase.from("farm_members").insert({ farm_id: farm.id, profile_id: user?.id, user_email: user?.email, role_on_farm: "owner" });
+      if (!farmId) throw new Error("The farm was not created.");
       setNewFarmName("");
       setNoFarmMode("idle");
-      await saveActiveFarmId(farm.id);
+      await saveActiveFarmId(farmId);
       await loadFarms();
       router.push("/farm/onboarding");
     } catch (err) {
