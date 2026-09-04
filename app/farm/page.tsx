@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { supabase, getCurrentUser } from "@/lib/supabase";
 import {
   getFarms,
@@ -62,8 +62,7 @@ function errMsg(err: unknown, fallback: string): string {
 }
 
 export default function FarmPage() {
-  const searchParams = useSearchParams();
-  const onboardingMode = searchParams.get("onboarding") === "1";
+  const [onboardingMode, setOnboardingMode] = useState(false);
   const [farms, setFarms] = useState<Farm[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
   const [crops, setCrops] = useState<Crop[]>([]);
@@ -153,6 +152,10 @@ export default function FarmPage() {
   const [deleteFarmStep, setDeleteFarmStep] = useState<0 | 1 | 2>(0);
   const [deletingFarm, setDeletingFarm] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  useEffect(() => {
+    setOnboardingMode(new URLSearchParams(window.location.search).get("onboarding") === "1");
+  }, []);
   const withFarmContext = (path: string) =>
     activeFarmId ? `${path}?farmId=${encodeURIComponent(activeFarmId)}` : path;
   const workerGoalsHref = activeFarmId
