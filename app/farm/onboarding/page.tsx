@@ -6,6 +6,7 @@ import { Check, ChevronRight, Circle, ExternalLink, Languages, Sprout } from "lu
 import { getCrops, getFarms, getHarvestEta } from "@/lib/farm";
 import type { Crop, Farm, HarvestEtaEntry } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { supabase } from "@/lib/supabase";
 
 type Lang = "en" | "sw";
 type Listing = { listed: boolean; slug: string | null; heroUrl: string | null; available: boolean };
@@ -14,9 +15,11 @@ const copy = {
   en: {
     eyebrow: "Farmer setup", title: "Get ready to take real orders",
     intro: "Work through this once. You can return any time and Shamba will recognise what is already complete.",
-    back: "Back to farm", farm: "Farm", checking: "Checking your farm setup…",
+    back: "Enter farm", farm: "Farm", checking: "Checking your farm setup…",
     createTitle: "Create your farm first", createBody: "Once it exists, this guide will take you from the first crop to a public shop.", create: "Create a farm",
     complete: "complete", done: "Done", review: "Review", continue: "Continue",
+    farmName: "Farm name", location: "Location", acreage: "Farm size (acres)", saveDetails: "Save and continue", savingDetails: "Saving…",
+    detailsSaved: "Farm details saved. Continue to your first crop.", locationPlaceholder: "Village, district or region", acreagePlaceholder: "e.g. 2.5",
     live: "Your shop is live", open: "Open public shop",
     privacy: "Publishing stays off until you choose it. Buyers cannot find an unfinished shop.",
     steps: [
@@ -30,9 +33,11 @@ const copy = {
   sw: {
     eyebrow: "Maandalizi ya mkulima", title: "Jiandae kupokea oda halisi",
     intro: "Fuata hatua hizi mara moja. Unaweza kurudi wakati wowote, na Shamba itatambua hatua ulizokamilisha.",
-    back: "Rudi shambani", farm: "Shamba", checking: "Tunakagua maandalizi ya shamba lako…",
+    back: "Ingia shambani", farm: "Shamba", checking: "Tunakagua maandalizi ya shamba lako…",
     createTitle: "Anza kwa kuunda shamba lako", createBody: "Likishaundwa, mwongozo huu utakusaidia kutoka zao la kwanza hadi duka la umma.", create: "Unda shamba",
     complete: "zimekamilika", done: "Imekamilika", review: "Kagua", continue: "Endelea",
+    farmName: "Jina la shamba", location: "Eneo", acreage: "Ukubwa wa shamba (ekari)", saveDetails: "Hifadhi na uendelee", savingDetails: "Inahifadhi…",
+    detailsSaved: "Taarifa za shamba zimehifadhiwa. Endelea kuongeza zao lako la kwanza.", locationPlaceholder: "Kijiji, wilaya au mkoa", acreagePlaceholder: "mf. 2.5",
     live: "Duka lako sasa liko hewani", open: "Fungua duka la umma",
     privacy: "Duka halitawekwa hadharani mpaka uchague kufanya hivyo. Wanunuzi hawawezi kuona duka ambalo halijakamilika.",
     steps: [
@@ -54,6 +59,9 @@ export default function FarmerOnboardingPage() {
   const [listing, setListing] = useState<Listing>({ listed: false, slug: null, heroUrl: null, available: true });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [detailsForm, setDetailsForm] = useState({ name: "", location: "", sizeAcres: "" });
+  const [savingDetails, setSavingDetails] = useState(false);
+  const [detailsMessage, setDetailsMessage] = useState("");
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
 
   useEffect(() => {
@@ -89,10 +97,48 @@ export default function FarmerOnboardingPage() {
 
   const t = copy[lang];
   const farm = farms.find((item) => item.id === activeFarmId) ?? null;
+
+  useEffect(() => {
+    if (!farm) return;
+    setDetailsForm({
+      name: farm.name,
+      location: farm.location ?? "",
+      sizeAcres: farm.size_acres?.toString() ?? "",
+    });
+    setDetailsMessage("");
+  }, [farm?.id]);
+
+  async function saveFarmDetails(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!farm) return;
+    const name = detailsForm.name.trim();
+    const location = detailsForm.location.trim();
+    const sizeAcres = Number(detailsForm.sizeAcres);
+    if (!name || !location || !Number.isFinite(sizeAcres) || sizeAcres <= 0) return;
+
+    setSavingDetails(true);
+    setError("");
+    setDetailsMessage("");
+    const { error: updateError } = await supabase
+      .from("farms")
+      .update({ name, location, size_acres: sizeAcres })
+      .eq("id", farm.id);
+
+    if (updateError) {
+      setError(updateError.message);
+    } else {
+      setFarms((current) => current.map((item) => item.id === farm.id
+        ? { ...item, name, location, size_acres: sizeAcres }
+        : item));
+      setDetailsMessage(t.detailsSaved);
+    }
+    setSavingDetails(false);
+  }
+
   const hasCrop = crops.length > 0;
   const hasHarvest = harvests.some((row) => Object.entries(row).filter(([key]) => /_expected$/.test(key)).some(([, value]) => Number(value) > 0));
   const hasShopDetails = !!listing.heroUrl && crops.some((crop) => crop.expected_sale_price_per_kg && (crop.produce_image_url || crop.image_url));
-  const hrefs = ["/farm#farm-details", "/farm#crops", "/farm/harvest-eta", "/farm/settings#public-shop", "/farm/settings#public-shop"];
+  const hrefs = ["#farm-details", "/farm?onboarding=1#crops", "/farm/harvest-eta?onboarding=1", "/farm/settings?onboarding=1#public-shop", "/farm/settings?onboarding=1#public-shop"];
   const done = [!!farm?.location && !!farm?.size_acres, hasCrop, hasHarvest, hasShopDetails, listing.listed];
 
   const steps = useMemo(() => t.steps.map((step, index) => ({
@@ -121,7 +167,7 @@ export default function FarmerOnboardingPage() {
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-950">{t.title}</h1>
           <p className="mt-2 max-w-2xl text-zinc-600">{t.intro}</p>
         </div>
-        <Link href="/farm" className="text-sm font-medium text-zinc-600 hover:text-zinc-950">{t.back}</Link>
+        {completed === steps.length && <Link href="/farm" className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">{t.back}</Link>}
       </div>
 
       {error && <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -140,12 +186,32 @@ export default function FarmerOnboardingPage() {
             <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/20"><div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${progress}%` }} /></div>
           </section>
 
-          <div className="space-y-3">{steps.map((step, index) => (
+          <div className="space-y-3">
+            <section id="farm-details" className="scroll-mt-6 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+              <div className="flex gap-4">
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-sm font-semibold text-zinc-600">{done[0] ? <Check className="h-4 w-4 text-emerald-700" /> : 1}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 font-semibold text-zinc-950">{steps[0].title}{done[0] && <span className="text-xs font-medium text-emerald-700">{t.done}</span>}</div>
+                  <p className="mt-1 text-sm leading-6 text-zinc-600">{steps[0].detail}</p>
+                  <form onSubmit={saveFarmDetails} className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <label className="text-sm font-medium text-zinc-700 sm:col-span-2">{t.farmName}<input required value={detailsForm.name} onChange={(event) => setDetailsForm((current) => ({ ...current, name: event.target.value }))} className="mt-1.5 block w-full rounded-xl border border-zinc-300 px-3 py-3 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100" /></label>
+                    <label className="text-sm font-medium text-zinc-700">{t.location}<input required value={detailsForm.location} onChange={(event) => setDetailsForm((current) => ({ ...current, location: event.target.value }))} placeholder={t.locationPlaceholder} className="mt-1.5 block w-full rounded-xl border border-zinc-300 px-3 py-3 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100" /></label>
+                    <label className="text-sm font-medium text-zinc-700">{t.acreage}<input required type="number" min="0.01" step="0.01" value={detailsForm.sizeAcres} onChange={(event) => setDetailsForm((current) => ({ ...current, sizeAcres: event.target.value }))} placeholder={t.acreagePlaceholder} className="mt-1.5 block w-full rounded-xl border border-zinc-300 px-3 py-3 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100" /></label>
+                    <div className="sm:col-span-2"><button disabled={savingDetails || !detailsForm.name.trim() || !detailsForm.location.trim() || Number(detailsForm.sizeAcres) <= 0} className="w-full rounded-full bg-emerald-700 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">{savingDetails ? t.savingDetails : t.saveDetails}</button>{detailsMessage && <p className="mt-3 text-sm font-medium text-emerald-700">{detailsMessage}</p>}</div>
+                  </form>
+                </div>
+              </div>
+            </section>
+            {steps.slice(1).map((step, offset) => {
+              const index = offset + 1;
+              return (
             <Link key={step.title} href={step.href} className="group flex gap-4 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-emerald-300">
               <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-sm font-semibold text-zinc-600">{step.done ? <Check className="h-4 w-4 text-emerald-700" /> : index + 1}</span>
               <span className="min-w-0 flex-1"><span className="flex items-center gap-2 font-semibold text-zinc-950">{step.title}{step.done && <span className="text-xs font-medium text-emerald-700">{t.done}</span>}</span><span className="mt-1 block text-sm leading-6 text-zinc-600">{step.detail}</span><span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-emerald-700">{step.done ? t.review : step.action}<ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" /></span></span>
             </Link>
-          ))}</div>
+              );
+            })}
+          </div>
 
           {completed === steps.length ? (
             <section className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-6"><div className="flex items-center gap-2 font-semibold text-emerald-950"><Check className="h-5 w-5" />{t.live}</div>{listing.slug && <Link href={`/${listing.slug}`} target="_blank" className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-emerald-800">{t.open} <ExternalLink className="h-4 w-4" /></Link>}</section>
