@@ -35,6 +35,16 @@ export default function SettingsPage() {
   const [listingSlug, setListingSlug] = useState<string | null>(null);
   const [savingListing, setSavingListing] = useState(false);
   const [savingFulfilment, setSavingFulfilment] = useState(false);
+  const [savingPractice, setSavingPractice] = useState(false);
+  const [practice, setPractice] = useState({
+    growingPractice: "unspecified",
+    practiceNotes: "",
+    certificationBody: "",
+    certificationReference: "",
+    certificationUrl: "",
+    certificationExpiresOn: "",
+    certificationVerifiedAt: null as string | null,
+  });
   const [fulfilment, setFulfilment] = useState({
     contactPhone: "",
     fulfilmentMethod: "collection",
@@ -203,6 +213,15 @@ export default function SettingsPage() {
         setListingAvailable(data.available !== false);
         setListingSlug(data.slug ?? null);
         setHeroUrl(data.heroUrl ?? null);
+        setPractice({
+          growingPractice: data.growingPractice ?? "unspecified",
+          practiceNotes: data.practiceNotes ?? "",
+          certificationBody: data.certificationBody ?? "",
+          certificationReference: data.certificationReference ?? "",
+          certificationUrl: data.certificationUrl ?? "",
+          certificationExpiresOn: data.certificationExpiresOn ?? "",
+          certificationVerifiedAt: data.certificationVerifiedAt ?? null,
+        });
         setFulfilment({
           contactPhone: data.contactPhone ?? "",
           fulfilmentMethod: data.fulfilmentMethod ?? "collection",
@@ -294,6 +313,28 @@ export default function SettingsPage() {
     }
   }
 
+  async function savePractice() {
+    if (!activeFarmId) return;
+    try {
+      setSavingPractice(true);
+      setError("");
+      setSuccess("");
+      const res = await fetch("/api/farm/market-listing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ farmId: activeFarmId, ...practice }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not save growing practices");
+      setPractice((value) => ({ ...value, certificationVerifiedAt: null }));
+      setSuccess("Growing practice information saved. Certification evidence must be independently verified before a verified badge appears.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save growing practices");
+    } finally {
+      setSavingPractice(false);
+    }
+  }
+
   async function saveFulfilment() {
     if (!activeFarmId) return;
     try {
@@ -372,6 +413,39 @@ export default function SettingsPage() {
           {success}
         </div>
       )}
+
+      <section className="mb-6 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold">Growing practices</h2>
+        <p className="mt-1 text-sm text-zinc-500">Tell buyers how you grow. “Organic practices” is a farmer declaration; Shamba only shows a verified certification badge after the evidence is independently checked.</p>
+        <div className="mt-5 grid gap-4">
+          <label className="text-sm font-medium text-zinc-700">
+            Growing approach
+            <select value={practice.growingPractice} onChange={(event) => setPractice((value) => ({ ...value, growingPractice: event.target.value }))} className="mt-2 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5">
+              <option value="unspecified">Not specified</option>
+              <option value="organic_practices">Uses organic practices</option>
+              <option value="regenerative">Regenerative practices</option>
+              <option value="conventional">Conventional farming</option>
+            </select>
+          </label>
+          <label className="text-sm font-medium text-zinc-700">
+            How you grow
+            <textarea value={practice.practiceNotes} onChange={(event) => setPractice((value) => ({ ...value, practiceNotes: event.target.value }))} placeholder="For example: compost inputs, pest controls, seed sources and what you do not use" rows={4} className="mt-2 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5" />
+          </label>
+          <div className="rounded-2xl bg-zinc-50 p-4">
+            <h3 className="text-sm font-semibold text-zinc-900">Optional certification evidence</h3>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <input value={practice.certificationBody} onChange={(event) => setPractice((value) => ({ ...value, certificationBody: event.target.value }))} placeholder="Certifying organisation" className="rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm" />
+              <input value={practice.certificationReference} onChange={(event) => setPractice((value) => ({ ...value, certificationReference: event.target.value }))} placeholder="Certificate reference" className="rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm" />
+              <input type="url" value={practice.certificationUrl} onChange={(event) => setPractice((value) => ({ ...value, certificationUrl: event.target.value }))} placeholder="Evidence link (https://…)" className="rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm" />
+              <input type="date" value={practice.certificationExpiresOn} onChange={(event) => setPractice((value) => ({ ...value, certificationExpiresOn: event.target.value }))} className="rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm" />
+            </div>
+            <p className="mt-3 text-xs text-zinc-500">{practice.certificationVerifiedAt ? "Certification currently verified. Editing and saving these details will require verification again." : "Evidence supplied here is not presented as verified until an administrator checks it."}</p>
+          </div>
+          <button onClick={savePractice} disabled={savingPractice} className="justify-self-start rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+            {savingPractice ? "Saving…" : "Save growing practices"}
+          </button>
+        </div>
+      </section>
 
       <section id="public-shop" className="mb-6 scroll-mt-6 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold">Public shop</h2>
