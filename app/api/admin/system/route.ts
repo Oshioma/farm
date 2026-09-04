@@ -490,6 +490,12 @@ const MIGRATIONS: { version: string; name: string; probes: string[]; note?: stri
     name: "add_farm_coordinates",
     probes: ["farms.location_latitude", "farms.location_longitude"],
   },
+  {
+    version: "20260904180000",
+    name: "create_farm_with_owner",
+    probes: [],
+    note: "Authenticated RPC function only — not visible from here.",
+  },
 ];
 
 type ProbeResult = { status: Status; detail: string };
