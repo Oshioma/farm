@@ -232,7 +232,17 @@ export async function getShopData(slug: string): Promise<ShopData | null> {
   });
 
   return {
-    farm: { id: farm.id, name: farm.name, slug: farm.slug, location: farm.location, heroUrl: farm.heroUrl },
+    farm: {
+      id: farm.id,
+      name: farm.name,
+      slug: farm.slug,
+      location: farm.location,
+      heroUrl: farm.heroUrl,
+      contactPhone: farm.contactPhone,
+      fulfilmentMethod: farm.fulfilmentMethod,
+      collectionInstructions: farm.collectionInstructions,
+      deliveryArea: farm.deliveryArea,
+    },
     months: monthTotals,
     produce,
     currentMonth: { season: harvestSeasonYear(), key: harvestMonthKeyFor(new Date()) },
