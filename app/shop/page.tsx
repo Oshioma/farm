@@ -180,7 +180,7 @@ function FarmSection({ farm }: { farm: MarketFarm }) {
             </div>
             {p.pricePerKg !== null && (
               <span style={{ fontSize: 14 }}>
-                <strong>KSh {Math.round(p.pricePerKg).toLocaleString()}</strong>{" "}
+                <strong>TZS {Math.round(p.pricePerKg).toLocaleString()}</strong>{" "}
                 <span style={{ color: "#a8a29e" }}>/ kg</span>
               </span>
             )}
