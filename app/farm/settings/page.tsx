@@ -36,6 +36,8 @@ export default function SettingsPage() {
   const [savingListing, setSavingListing] = useState(false);
   const [savingFulfilment, setSavingFulfilment] = useState(false);
   const [savingPractice, setSavingPractice] = useState(false);
+  const [savingCoordinates, setSavingCoordinates] = useState(false);
+  const [coordinates, setCoordinates] = useState<{ latitude: number | null; longitude: number | null }>({ latitude: null, longitude: null });
   const [practice, setPractice] = useState({
     growingPractice: "unspecified",
     practiceNotes: "",
@@ -213,6 +215,7 @@ export default function SettingsPage() {
         setListingAvailable(data.available !== false);
         setListingSlug(data.slug ?? null);
         setHeroUrl(data.heroUrl ?? null);
+        setCoordinates({ latitude: data.latitude ?? null, longitude: data.longitude ?? null });
         setPractice({
           growingPractice: data.growingPractice ?? "unspecified",
           practiceNotes: data.practiceNotes ?? "",
@@ -311,6 +314,26 @@ export default function SettingsPage() {
     } finally {
       setUploading(null);
     }
+  }
+
+  function captureCoordinates() {
+    if (!navigator.geolocation) { setError("Location is not available on this device."); return; }
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => setCoordinates({ latitude: coords.latitude, longitude: coords.longitude }),
+      () => setError("Allow location access to save the farm position.")
+    );
+  }
+
+  async function saveCoordinates() {
+    if (!activeFarmId || coordinates.latitude == null || coordinates.longitude == null) return;
+    setSavingCoordinates(true); setError(""); setSuccess("");
+    try {
+      const res = await fetch("/api/farm/market-listing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ farmId: activeFarmId, ...coordinates }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not save location");
+      setSuccess("Farm position saved for nearest-farm sorting.");
+    } catch (err) { setError(err instanceof Error ? err.message : "Could not save location"); }
+    finally { setSavingCoordinates(false); }
   }
 
   async function savePractice() {
@@ -454,6 +477,16 @@ export default function SettingsPage() {
           shop address either. Turning it on publishes the crops that have an expected harvest, the weight expected,
           and how much is unclaimed. Customer details are never shown.
         </p>
+
+        <div className="mt-5 rounded-2xl border border-zinc-200 p-4">
+          <h3 className="text-sm font-semibold">Position for nearest-farm sorting</h3>
+          <p className="mt-1 text-xs leading-5 text-zinc-500">Save the farm’s approximate public position. Buyers only use their own location after tapping “Sort by nearest”.</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button type="button" onClick={captureCoordinates} className="rounded-xl border border-zinc-300 px-4 py-2.5 text-sm font-semibold">Use this device’s location</button>
+            <button type="button" onClick={saveCoordinates} disabled={savingCoordinates || coordinates.latitude == null} className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40">{savingCoordinates ? "Saving…" : "Save position"}</button>
+            {coordinates.latitude != null && <span className="text-xs text-zinc-500">{coordinates.latitude.toFixed(4)}, {coordinates.longitude?.toFixed(4)}</span>}
+          </div>
+        </div>
 
         <div className="mt-5 grid gap-4 rounded-2xl bg-zinc-50 p-4">
           <label className="text-sm font-medium text-zinc-700">
