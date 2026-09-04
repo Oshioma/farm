@@ -47,7 +47,17 @@ export type ShopProduce = {
 };
 
 export type ShopData = {
-  farm: { id: string; name: string; slug: string; location: string | null; heroUrl: string | null };
+  farm: {
+    id: string;
+    name: string;
+    slug: string;
+    location: string | null;
+    heroUrl: string | null;
+    contactPhone: string | null;
+    fulfilmentMethod: "collection" | "delivery" | "both";
+    collectionInstructions: string | null;
+    deliveryArea: string | null;
+  };
   months: { season: number; key: HarvestMonthKey; label: string; calendarYear: number; expectedKg: number; crops: number }[];
   produce: ShopProduce[];
   currentMonth: { season: number; key: HarvestMonthKey } | null;
@@ -65,7 +75,7 @@ async function listedFarms() {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("farms")
-    .select("id, name, slug, location, shop_hero_url")
+    .select("id, name, slug, location, shop_hero_url, shop_contact_phone, fulfilment_method, collection_instructions, delivery_area")
     .eq("is_active", true)
     .eq("list_in_market", true);
   if (error) {
@@ -75,6 +85,8 @@ async function listedFarms() {
   return {
     farms: (data ?? []) as {
       id: string; name: string; slug: string | null; location: string | null; shop_hero_url?: string | null;
+      shop_contact_phone?: string | null; fulfilment_method?: "collection" | "delivery" | "both" | null;
+      collection_instructions?: string | null; delivery_area?: string | null;
     }[],
     available: true,
   };
@@ -98,6 +110,10 @@ export async function findShopFarm(slug: string) {
         slug: match.slug ?? slug,
         location: match.location,
         heroUrl: match.shop_hero_url ?? null,
+        contactPhone: match.shop_contact_phone ?? null,
+        fulfilmentMethod: match.fulfilment_method ?? "collection",
+        collectionInstructions: match.collection_instructions ?? null,
+        deliveryArea: match.delivery_area ?? null,
       }
     : null;
 }
