@@ -10,12 +10,13 @@ export const dynamic = "force-dynamic";
    rather than from the browser against RLS. */
 
 export async function POST(req: NextRequest) {
-  const { farmId, listed, heroUrl, contactPhone, fulfilmentMethod, collectionInstructions, deliveryArea, growingPractice, practiceNotes, certificationBody, certificationReference, certificationUrl, certificationExpiresOn } = await req.json();
+  const { farmId, listed, heroUrl, contactPhone, fulfilmentMethod, collectionInstructions, deliveryArea, growingPractice, practiceNotes, certificationBody, certificationReference, certificationUrl, certificationExpiresOn, latitude, longitude } = await req.json();
   const settingListing = typeof listed === "boolean";
   const settingHero = heroUrl === null || typeof heroUrl === "string";
   const settingFulfilment = [contactPhone, fulfilmentMethod, collectionInstructions, deliveryArea].some((value) => typeof value === "string");
   const settingPractice = typeof growingPractice === "string";
-  if (!farmId || (!settingListing && !settingHero && !settingFulfilment && !settingPractice)) {
+  const settingCoordinates = latitude === null || typeof latitude === "number" || longitude === null || typeof longitude === "number";
+  if (!farmId || (!settingListing && !settingHero && !settingFulfilment && !settingPractice && !settingCoordinates)) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
   if (settingHero && typeof heroUrl === "string" && heroUrl && !/^https?:\/\//.test(heroUrl)) {
@@ -76,9 +77,15 @@ export async function POST(req: NextRequest) {
     patch.certification_verified_at = null;
   }
 
+  if (settingCoordinates) {
+    if ((latitude != null && (latitude < -90 || latitude > 90)) || (longitude != null && (longitude < -180 || longitude > 180))) return NextResponse.json({ error: "Invalid coordinates" }, { status: 400 });
+    patch.location_latitude = latitude;
+    patch.location_longitude = longitude;
+  }
+
   const { error } = await admin.from("farms").update(patch).eq("id", farmId);
   if (error) {
-    if (/list_in_market|shop_hero_url|shop_contact_phone|fulfilment_method|collection_instructions|delivery_area|growing_practice|certification_/.test(error.message)) {
+    if (/list_in_market|shop_hero_url|shop_contact_phone|fulfilment_method|collection_instructions|delivery_area|location_latitude|location_longitude|growing_practice|certification_/.test(error.message)) {
       return NextResponse.json(
         { error: "The shop columns are not on the database yet — run the pending migration first." },
         { status: 503 }
@@ -87,7 +94,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, listed, heroUrl, contactPhone, fulfilmentMethod, collectionInstructions, deliveryArea, growingPractice, practiceNotes, certificationBody, certificationReference, certificationUrl, certificationExpiresOn });
+  return NextResponse.json({ ok: true, listed, heroUrl, contactPhone, fulfilmentMethod, collectionInstructions, deliveryArea, growingPractice, practiceNotes, certificationBody, certificationReference, certificationUrl, certificationExpiresOn, latitude, longitude });
 }
 
 export async function GET(req: NextRequest) {
@@ -116,7 +123,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await admin
     .from("farms")
-    .select("slug, list_in_market, shop_hero_url, shop_contact_phone, fulfilment_method, collection_instructions, delivery_area, growing_practice, practice_notes, certification_body, certification_reference, certification_url, certification_expires_on, certification_verified_at")
+    .select("slug, list_in_market, shop_hero_url, shop_contact_phone, fulfilment_method, collection_instructions, delivery_area, growing_practice, practice_notes, certification_body, certification_reference, certification_url, certification_expires_on, certification_verified_at, location_latitude, location_longitude")
     .eq("id", farmId)
     .single();
   if (error) return NextResponse.json({ listed: false, available: false, slug: null, heroUrl: null });
@@ -137,5 +144,7 @@ export async function GET(req: NextRequest) {
     certificationUrl: data.certification_url ?? null,
     certificationExpiresOn: data.certification_expires_on ?? null,
     certificationVerifiedAt: data.certification_verified_at ?? null,
+    latitude: data.location_latitude ?? null,
+    longitude: data.location_longitude ?? null,
   });
 }
