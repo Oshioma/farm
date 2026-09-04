@@ -485,6 +485,11 @@ const MIGRATIONS: { version: string; name: string; probes: string[]; note?: stri
     name: "add_growing_practice_trust",
     probes: ["farms.growing_practice", "farms.certification_reference", "farms.certification_verified_at"],
   },
+  {
+    version: "20260904160000",
+    name: "add_farm_coordinates",
+    probes: ["farms.location_latitude", "farms.location_longitude"],
+  },
 ];
 
 type ProbeResult = { status: Status; detail: string };

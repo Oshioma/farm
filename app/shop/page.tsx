@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getMarketData } from "@/lib/shop";
 import type { MarketFarm, ShopProduce } from "@/lib/shop";
+import MarketExplorer from "./MarketExplorer";
 
 export const dynamic = "force-dynamic";
 
@@ -110,7 +111,7 @@ export default async function MarketPage() {
               No farm has produce listed just now. Check back next season.
             </div>
           ) : (
-            market.farms.map((farm) => <FarmSection key={farm.slug} farm={farm} />)
+            <MarketExplorer farms={market.farms} />
           )}
         </section>
 

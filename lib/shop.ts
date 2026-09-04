@@ -54,6 +54,8 @@ export type ShopData = {
     name: string;
     slug: string;
     location: string | null;
+    latitude: number | null;
+    longitude: number | null;
     heroUrl: string | null;
     contactPhone: string | null;
     fulfilmentMethod: "collection" | "delivery" | "both";
@@ -84,7 +86,7 @@ async function listedFarms() {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("farms")
-    .select("id, name, slug, location, shop_hero_url, shop_contact_phone, fulfilment_method, collection_instructions, delivery_area, growing_practice, practice_notes, certification_body, certification_reference, certification_url, certification_expires_on, certification_verified_at")
+    .select("id, name, slug, location, shop_hero_url, shop_contact_phone, fulfilment_method, collection_instructions, delivery_area, location_latitude, location_longitude, growing_practice, practice_notes, certification_body, certification_reference, certification_url, certification_expires_on, certification_verified_at")
     .eq("is_active", true)
     .eq("list_in_market", true);
   if (error) {
@@ -95,7 +97,7 @@ async function listedFarms() {
     farms: (data ?? []) as {
       id: string; name: string; slug: string | null; location: string | null; shop_hero_url?: string | null;
       shop_contact_phone?: string | null; fulfilment_method?: "collection" | "delivery" | "both" | null;
-      collection_instructions?: string | null; delivery_area?: string | null;
+      collection_instructions?: string | null; delivery_area?: string | null; location_latitude?: number | null; location_longitude?: number | null;
       growing_practice?: GrowingPractice | null; practice_notes?: string | null; certification_body?: string | null;
       certification_reference?: string | null; certification_url?: string | null; certification_expires_on?: string | null;
       certification_verified_at?: string | null;
@@ -122,6 +124,8 @@ export async function findShopFarm(slug: string) {
         slug: match.slug ?? slug,
         location: match.location,
         heroUrl: match.shop_hero_url ?? null,
+        latitude: match.location_latitude ?? null,
+        longitude: match.location_longitude ?? null,
         contactPhone: match.shop_contact_phone ?? null,
         fulfilmentMethod: match.fulfilment_method ?? "collection",
         collectionInstructions: match.collection_instructions ?? null,
@@ -257,6 +261,8 @@ export async function getShopData(slug: string): Promise<ShopData | null> {
       slug: farm.slug,
       location: farm.location,
       heroUrl: farm.heroUrl,
+      latitude: farm.latitude,
+      longitude: farm.longitude,
       contactPhone: farm.contactPhone,
       fulfilmentMethod: farm.fulfilmentMethod,
       collectionInstructions: farm.collectionInstructions,
@@ -326,6 +332,8 @@ export type MarketFarm = {
   name: string;
   location: string | null;
   heroUrl: string | null;
+  latitude: number | null;
+  longitude: number | null;
   produce: ShopProduce[];
   totalExpectedKg: number;
   totalAvailableKg: number;
@@ -372,6 +380,8 @@ export async function getMarketData(): Promise<MarketData> {
       name: shop.farm.name,
       location: shop.farm.location,
       heroUrl: shop.farm.heroUrl,
+      latitude: shop.farm.latitude,
+      longitude: shop.farm.longitude,
       growingPractice: shop.farm.growingPractice,
       practiceNotes: shop.farm.practiceNotes,
       certificationBody: shop.farm.certificationBody,
