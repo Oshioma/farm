@@ -48,6 +48,7 @@ export function Shopfront({ shop }: { shop: ShopData }) {
   const [sent, setSent] = useState<{
     lines: { crop: string; when: string; amount: string }[];
     reference: string | null;
+    trackingUrl: string | null;
   } | null>(null);
   const [form, setForm] = useState({ name: "", contactName: "", phone: "", email: "", notes: "" });
   const [saving, setSaving] = useState(false);
@@ -87,7 +88,7 @@ export function Shopfront({ shop }: { shop: ShopData }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not send your pre-order.");
-      setSent({ lines: data.summary ?? [], reference: data.reference ?? null });
+      setSent({ lines: data.summary ?? [], reference: data.reference ?? null, trackingUrl: data.trackingUrl ?? null });
       setBasket([]);
       setCheckout(false);
     } catch (err) {
@@ -272,6 +273,7 @@ export function Shopfront({ shop }: { shop: ShopData }) {
         <Confirmation
           lines={sent.lines}
           reference={sent.reference}
+          trackingUrl={sent.trackingUrl}
           farm={shop.farm.name}
           onClose={() => setSent(null)}
         />
@@ -649,11 +651,13 @@ function Checkout({
 function Confirmation({
   lines,
   reference,
+  trackingUrl,
   farm,
   onClose,
 }: {
   lines: { crop: string; when: string; amount: string }[];
   reference: string | null;
+  trackingUrl: string | null;
   farm: string;
   onClose: () => void;
 }) {
@@ -687,7 +691,15 @@ function Confirmation({
           {farm} will be in touch to confirm. Nothing has been charged — you settle on collection, for the weight
           actually picked.
         </p>
-        <button onClick={onClose} style={{ fontFamily: sans, fontSize: 15, fontWeight: 700, color: "#ffffff", background: GREEN, border: "none", padding: 16, borderRadius: 999, cursor: "pointer", minHeight: 44 }}>
+        {trackingUrl && (
+          <a
+            href={trackingUrl}
+            style={{ fontFamily: sans, fontSize: 15, fontWeight: 700, color: "#ffffff", background: GREEN, padding: 16, borderRadius: 999, textDecoration: "none", minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            Track your reservation
+          </a>
+        )}
+        <button onClick={onClose} style={{ fontFamily: sans, fontSize: 15, fontWeight: 700, color: GREEN, background: "#ffffff", border: `1px solid ${LINE}`, padding: 16, borderRadius: 999, cursor: "pointer", minHeight: 44 }}>
           Done
         </button>
       </div>

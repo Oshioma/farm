@@ -148,7 +148,24 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
     return bad("We could not save your pre-order. Please try again.", 500);
   }
 
-  const reference = (reservation as { reservation_reference?: string } | null)?.reservation_reference ?? null;
+  const saved = reservation as { reservation_id?: string; reservation_reference?: string } | null;
+  const reservationId = saved?.reservation_id ?? null;
+  const reference = saved?.reservation_reference ?? null;
+  const trackingToken = crypto.randomUUID();
+  let trackingUrl: string | null = null;
+
+  if (reservationId) {
+    const { error: trackingError } = await admin
+      .from("customer_orders")
+      .update({ tracking_token: trackingToken })
+      .eq("reservation_id", reservationId);
+
+    if (!trackingError) {
+      trackingUrl = `${req.nextUrl.origin}/track/${trackingToken}`;
+    } else {
+      console.error("Could not attach tracking token:", trackingError.message);
+    }
+  }
 
   await admin.from("activities").insert({
     farm_id: shop.farm.id,
@@ -157,5 +174,5 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
     meta: `${rows.length} item${rows.length === 1 ? "" : "s"} from the shopfront`,
   });
 
-  return NextResponse.json({ ok: true, summary, farm: shop.farm.name, reference });
+  return NextResponse.json({ ok: true, summary, farm: shop.farm.name, reference, trackingUrl });
 }
