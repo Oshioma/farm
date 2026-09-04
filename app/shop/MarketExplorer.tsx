@@ -62,7 +62,7 @@ export default function MarketExplorer({ farms }: { farms: MarketFarm[] }) {
       if (practice === "organic" && farm.growingPractice !== "organic_practices" && !verified(farm)) return false;
       if (practice === "regenerative" && farm.growingPractice !== "regenerative") return false;
       if (month !== "all" && !farm.produce.some((p) => p.months.some((m) => `${m.calendarYear}-${m.key}` === month))) return false;
-      if (availableNow && !farm.produce.some((p) => p.months.some((m) => m.calendarYear === now.getFullYear() && m.key === currentKey && m.availableKg > 0))) return false;
+      if (availableNow && !farm.produce.some((p) => p.months.some((m) => m.calendarYear === now.getFullYear() && m.key === currentKey && (m.availableKg ?? 0) > 0))) return false;
       return true;
     }).sort((a,b) => sort === "nearest" ? distance(a,position)-distance(b,position) : sort === "farm" ? a.name.localeCompare(b.name) : earliest(a)-earliest(b));
   }, [farms, query, practice, month, availableNow, sort, position]);
