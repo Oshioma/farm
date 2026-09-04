@@ -475,6 +475,11 @@ const MIGRATIONS: { version: string; name: string; probes: string[]; note?: stri
     name: "add_order_tracking_and_notifications",
     probes: ["customer_orders.tracking_token"],
   },
+  {
+    version: "20260904120000",
+    name: "add_tanzania_fulfilment",
+    probes: ["farms.shop_contact_phone", "farms.fulfilment_method", "farms.collection_instructions", "farms.delivery_area"],
+  },
 ];
 
 type ProbeResult = { status: Status; detail: string };
