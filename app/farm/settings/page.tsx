@@ -34,6 +34,13 @@ export default function SettingsPage() {
   const [listingAvailable, setListingAvailable] = useState(true);
   const [listingSlug, setListingSlug] = useState<string | null>(null);
   const [savingListing, setSavingListing] = useState(false);
+  const [savingFulfilment, setSavingFulfilment] = useState(false);
+  const [fulfilment, setFulfilment] = useState({
+    contactPhone: "",
+    fulfilmentMethod: "collection",
+    collectionInstructions: "",
+    deliveryArea: "",
+  });
   /* Shop images: the hero at the top of the shopfront, and a photo per crop. */
   const [heroUrl, setHeroUrl] = useState<string | null>(null);
   const [shopCrops, setShopCrops] = useState<Crop[]>([]);
@@ -196,6 +203,12 @@ export default function SettingsPage() {
         setListingAvailable(data.available !== false);
         setListingSlug(data.slug ?? null);
         setHeroUrl(data.heroUrl ?? null);
+        setFulfilment({
+          contactPhone: data.contactPhone ?? "",
+          fulfilmentMethod: data.fulfilmentMethod ?? "collection",
+          collectionInstructions: data.collectionInstructions ?? "",
+          deliveryArea: data.deliveryArea ?? "",
+        });
       })
       .catch(() => { if (!cancelled) setListingAvailable(false); });
     return () => { cancelled = true; };
@@ -281,6 +294,27 @@ export default function SettingsPage() {
     }
   }
 
+  async function saveFulfilment() {
+    if (!activeFarmId) return;
+    try {
+      setSavingFulfilment(true);
+      setError("");
+      setSuccess("");
+      const res = await fetch("/api/farm/market-listing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ farmId: activeFarmId, ...fulfilment }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not save collection and delivery details");
+      setSuccess("Buyer collection and delivery details saved.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save collection and delivery details");
+    } finally {
+      setSavingFulfilment(false);
+    }
+  }
+
   async function toggleListing(next: boolean) {
     if (!activeFarmId) return;
     try {
@@ -346,6 +380,61 @@ export default function SettingsPage() {
           shop address either. Turning it on publishes the crops that have an expected harvest, the weight expected,
           and how much is unclaimed. Customer details are never shown.
         </p>
+
+        <div className="mt-5 grid gap-4 rounded-2xl bg-zinc-50 p-4">
+          <label className="text-sm font-medium text-zinc-700">
+            Public phone or WhatsApp number
+            <input
+              value={fulfilment.contactPhone}
+              onChange={(event) => setFulfilment((value) => ({ ...value, contactPhone: event.target.value }))}
+              placeholder="+255 7xx xxx xxx"
+              className="mt-2 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5"
+            />
+          </label>
+          <label className="text-sm font-medium text-zinc-700">
+            How buyers receive orders
+            <select
+              value={fulfilment.fulfilmentMethod}
+              onChange={(event) => setFulfilment((value) => ({ ...value, fulfilmentMethod: event.target.value }))}
+              className="mt-2 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5"
+            >
+              <option value="collection">Collection only</option>
+              <option value="delivery">Delivery only</option>
+              <option value="both">Collection or delivery</option>
+            </select>
+          </label>
+          {fulfilment.fulfilmentMethod !== "delivery" && (
+            <label className="text-sm font-medium text-zinc-700">
+              Collection instructions
+              <textarea
+                value={fulfilment.collectionInstructions}
+                onChange={(event) => setFulfilment((value) => ({ ...value, collectionInstructions: event.target.value }))}
+                placeholder="Where to collect, useful directions and available times"
+                rows={3}
+                className="mt-2 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5"
+              />
+            </label>
+          )}
+          {fulfilment.fulfilmentMethod !== "collection" && (
+            <label className="text-sm font-medium text-zinc-700">
+              Delivery area and arrangements
+              <textarea
+                value={fulfilment.deliveryArea}
+                onChange={(event) => setFulfilment((value) => ({ ...value, deliveryArea: event.target.value }))}
+                placeholder="Areas covered, delivery days and whether a fee applies"
+                rows={3}
+                className="mt-2 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5"
+              />
+            </label>
+          )}
+          <button
+            onClick={saveFulfilment}
+            disabled={savingFulfilment}
+            className="justify-self-start rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            {savingFulfilment ? "Saving…" : "Save buyer information"}
+          </button>
+        </div>
 
         {!listingAvailable ? (
           <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
