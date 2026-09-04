@@ -217,7 +217,9 @@ export default function FarmPage() {
       await supabase.from("farm_members").insert({ farm_id: farm.id, profile_id: user?.id, user_email: user?.email, role_on_farm: "owner" });
       setNewFarmName("");
       setNoFarmMode("idle");
+      await saveActiveFarmId(farm.id);
       await loadFarms();
+      router.push("/farm/onboarding");
     } catch (err) {
       setError(errMsg(err, "Failed to create farm"));
     } finally {
@@ -1642,6 +1644,7 @@ export default function FarmPage() {
               { href: "#crops", label: "Crops" },
               { href: withFarmContext("/farm/customers"), label: "Customers", managerOnly: true },
               { href: withFarmContext("/farm/orders"), label: "Orders", managerOnly: true },
+              { href: withFarmContext("/farm/onboarding"), label: "Setup", managerOnly: true },
               { href: withFarmContext("/fertiliser"), label: "Fertiliser" },
               { href: workerGoalsHref, label: "Goals" },
               { href: withFarmContext("/farm/harvest-eta"), label: "Harvest" },

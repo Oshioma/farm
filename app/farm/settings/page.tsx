@@ -339,7 +339,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <section className="mb-6 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+      <section id="public-shop" className="mb-6 scroll-mt-6 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold">Public shop</h2>
         <p className="mt-1 text-sm text-zinc-500">
           Off by default. While it is off, this farm appears nowhere public — not in the market, and not at its own
