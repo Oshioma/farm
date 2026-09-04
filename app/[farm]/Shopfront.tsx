@@ -182,17 +182,32 @@ export function Shopfront({ shop }: { shop: ShopData }) {
 
       {shop.farm.growingPractice !== "unspecified" && (
         <section style={{ padding: "0 clamp(20px, 5vw, 64px) 24px" }}>
-          <div style={{ border: `1px solid ${LINE}`, background: "#ffffff", borderRadius: 24, padding: "clamp(22px, 3vw, 30px)" }}>
-            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: GREEN, margin: 0 }}>
-              {shop.farm.certificationVerifiedAt && (!shop.farm.certificationExpiresOn || shop.farm.certificationExpiresOn >= new Date().toISOString().slice(0, 10))
-                ? "Organic certification verified"
-                : shop.farm.growingPractice === "organic_practices"
-                  ? "Farmer-declared organic practices"
-                  : shop.farm.growingPractice === "regenerative"
-                    ? "Regenerative practices"
+          <div style={{
+            border: shop.farm.growingPractice === "regenerative" ? `2px solid ${GREEN}` : `1px solid ${LINE}`,
+            background: shop.farm.growingPractice === "regenerative" ? "linear-gradient(135deg, #ecfdf3 0%, #ffffff 68%)" : "#ffffff",
+            borderRadius: shop.farm.growingPractice === "regenerative" ? 32 : 24,
+            padding: shop.farm.growingPractice === "regenerative" ? "clamp(30px, 5vw, 54px)" : "clamp(22px, 3vw, 30px)",
+          }}>
+            {shop.farm.growingPractice === "regenerative" ? (
+              <>
+                <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: GREEN, margin: 0 }}>Farming that restores the land</p>
+                <h2 style={{ fontFamily: serif, fontSize: "clamp(38px, 6vw, 68px)", fontWeight: 400, lineHeight: 1, letterSpacing: "-0.025em", color: DEEP, margin: "12px 0 0", maxWidth: "14ch" }}>
+                  Regenerative practices
+                </h2>
+                <p style={{ margin: "18px 0 0", maxWidth: "58ch", color: "#365342", fontSize: "clamp(17px, 2vw, 21px)", lineHeight: 1.6 }}>
+                  This farm says it grows to rebuild soil, encourage biodiversity and leave the land healthier for the next harvest.
+                </p>
+              </>
+            ) : (
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: GREEN, margin: 0 }}>
+                {shop.farm.certificationVerifiedAt && (!shop.farm.certificationExpiresOn || shop.farm.certificationExpiresOn >= new Date().toISOString().slice(0, 10))
+                  ? "Organic certification verified"
+                  : shop.farm.growingPractice === "organic_practices"
+                    ? "Farmer-declared organic practices"
                     : "Conventional farming"}
-            </p>
-            {shop.farm.practiceNotes && <p style={{ margin: "10px 0 0", maxWidth: "70ch", color: "#57534e", lineHeight: 1.65, whiteSpace: "pre-wrap" }}>{shop.farm.practiceNotes}</p>}
+              </p>
+            )}
+            {shop.farm.practiceNotes && <p style={{ margin: shop.farm.growingPractice === "regenerative" ? "22px 0 0" : "10px 0 0", maxWidth: "70ch", color: "#57534e", fontSize: shop.farm.growingPractice === "regenerative" ? 16 : 14, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{shop.farm.practiceNotes}</p>}
             {shop.farm.certificationBody && (
               <p style={{ margin: "12px 0 0", fontSize: 13, color: "#78716c" }}>
                 Certification evidence: {shop.farm.certificationBody}{shop.farm.certificationReference ? ` · ${shop.farm.certificationReference}` : ""}
