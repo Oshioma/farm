@@ -45,7 +45,7 @@ export default async function TrackOrderPage({ params }: { params: Promise<{ tok
   const first = orders[0];
   const cropIds = orders.map((o) => o.crop_id).filter(Boolean) as string[];
   const [{ data: farm }, { data: customer }, { data: crops }] = await Promise.all([
-    admin.from("farms").select("name, location").eq("id", first.farm_id).single(),
+    admin.from("farms").select("name, location, shop_contact_phone, fulfilment_method, collection_instructions, delivery_area").eq("id", first.farm_id).single(),
     admin.from("customers").select("name, contact_name").eq("id", first.customer_id).single(),
     cropIds.length
       ? admin.from("crops").select("id, crop_name, variety").in("id", cropIds)
@@ -126,6 +126,24 @@ export default async function TrackOrderPage({ params }: { params: Promise<{ tok
             <span className="font-medium">Current total</span><strong className="text-2xl">{money(finalTotal)}</strong>
           </section>
         )}
+        <section className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold">Collection and delivery</h2>
+          <p className="mt-2 text-sm font-medium text-emerald-800">
+            {farm?.fulfilment_method === "delivery" ? "Delivery" : farm?.fulfilment_method === "both" ? "Collection or delivery" : "Collection"}
+          </p>
+          {farm?.collection_instructions && farm.fulfilment_method !== "delivery" && <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-600">{farm.collection_instructions}</p>}
+          {farm?.delivery_area && farm.fulfilment_method !== "collection" && <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-600">{farm.delivery_area}</p>}
+          {farm?.shop_contact_phone && (
+            <a
+              href={`https://wa.me/${farm.shop_contact_phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Hello, I am asking about reservation ${first.reservation_reference ?? ""}`)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-5 inline-flex min-h-11 items-center rounded-full bg-green-500 px-5 py-3 text-sm font-semibold text-emerald-950"
+            >
+              Message the farm on WhatsApp
+            </a>
+          )}
+        </section>
         <p className="px-4 text-center text-xs leading-5 text-zinc-500">Harvest dates and weights can change with the season. The farm confirms the final weight and collection arrangements.</p>
       </div>
     </main>
