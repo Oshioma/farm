@@ -10,14 +10,18 @@ export const dynamic = "force-dynamic";
    rather than from the browser against RLS. */
 
 export async function POST(req: NextRequest) {
-  const { farmId, listed, heroUrl } = await req.json();
+  const { farmId, listed, heroUrl, contactPhone, fulfilmentMethod, collectionInstructions, deliveryArea } = await req.json();
   const settingListing = typeof listed === "boolean";
   const settingHero = heroUrl === null || typeof heroUrl === "string";
-  if (!farmId || (!settingListing && !settingHero)) {
+  const settingFulfilment = [contactPhone, fulfilmentMethod, collectionInstructions, deliveryArea].some((value) => typeof value === "string");
+  if (!farmId || (!settingListing && !settingHero && !settingFulfilment)) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
   if (settingHero && typeof heroUrl === "string" && heroUrl && !/^https?:\/\//.test(heroUrl)) {
     return NextResponse.json({ error: "That image address does not look right" }, { status: 400 });
+  }
+  if (settingFulfilment && !["collection", "delivery", "both"].includes(fulfilmentMethod)) {
+    return NextResponse.json({ error: "Choose collection, delivery, or both" }, { status: 400 });
   }
 
   const cookieStore = await cookies();
@@ -47,10 +51,16 @@ export async function POST(req: NextRequest) {
   const patch: Record<string, unknown> = {};
   if (settingListing) patch.list_in_market = listed;
   if (settingHero) patch.shop_hero_url = heroUrl || null;
+  if (settingFulfilment) {
+    patch.shop_contact_phone = String(contactPhone ?? "").trim().slice(0, 40) || null;
+    patch.fulfilment_method = fulfilmentMethod;
+    patch.collection_instructions = String(collectionInstructions ?? "").trim().slice(0, 1000) || null;
+    patch.delivery_area = String(deliveryArea ?? "").trim().slice(0, 1000) || null;
+  }
 
   const { error } = await admin.from("farms").update(patch).eq("id", farmId);
   if (error) {
-    if (/list_in_market|shop_hero_url/.test(error.message)) {
+    if (/list_in_market|shop_hero_url|shop_contact_phone|fulfilment_method|collection_instructions|delivery_area/.test(error.message)) {
       return NextResponse.json(
         { error: "The shop columns are not on the database yet — run the pending migration first." },
         { status: 503 }
@@ -59,7 +69,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, listed, heroUrl });
+  return NextResponse.json({ ok: true, listed, heroUrl, contactPhone, fulfilmentMethod, collectionInstructions, deliveryArea });
 }
 
 export async function GET(req: NextRequest) {
@@ -88,7 +98,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await admin
     .from("farms")
-    .select("slug, list_in_market, shop_hero_url")
+    .select("slug, list_in_market, shop_hero_url, shop_contact_phone, fulfilment_method, collection_instructions, delivery_area")
     .eq("id", farmId)
     .single();
   if (error) return NextResponse.json({ listed: false, available: false, slug: null, heroUrl: null });
@@ -98,5 +108,9 @@ export async function GET(req: NextRequest) {
     available: true,
     slug: data.slug,
     heroUrl: data.shop_hero_url ?? null,
+    contactPhone: data.shop_contact_phone ?? null,
+    fulfilmentMethod: data.fulfilment_method ?? "collection",
+    collectionInstructions: data.collection_instructions ?? null,
+    deliveryArea: data.delivery_area ?? null,
   });
 }
