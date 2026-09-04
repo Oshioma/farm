@@ -180,6 +180,30 @@ export function Shopfront({ shop }: { shop: ShopData }) {
         )}
       </section>
 
+      {shop.farm.growingPractice !== "unspecified" && (
+        <section style={{ padding: "0 clamp(20px, 5vw, 64px) 24px" }}>
+          <div style={{ border: `1px solid ${LINE}`, background: "#ffffff", borderRadius: 24, padding: "clamp(22px, 3vw, 30px)" }}>
+            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: GREEN, margin: 0 }}>
+              {shop.farm.certificationVerifiedAt && (!shop.farm.certificationExpiresOn || shop.farm.certificationExpiresOn >= new Date().toISOString().slice(0, 10))
+                ? "Organic certification verified"
+                : shop.farm.growingPractice === "organic_practices"
+                  ? "Farmer-declared organic practices"
+                  : shop.farm.growingPractice === "regenerative"
+                    ? "Regenerative practices"
+                    : "Conventional farming"}
+            </p>
+            {shop.farm.practiceNotes && <p style={{ margin: "10px 0 0", maxWidth: "70ch", color: "#57534e", lineHeight: 1.65, whiteSpace: "pre-wrap" }}>{shop.farm.practiceNotes}</p>}
+            {shop.farm.certificationBody && (
+              <p style={{ margin: "12px 0 0", fontSize: 13, color: "#78716c" }}>
+                Certification evidence: {shop.farm.certificationBody}{shop.farm.certificationReference ? ` · ${shop.farm.certificationReference}` : ""}
+                {shop.farm.certificationUrl && <> · <a href={shop.farm.certificationUrl} target="_blank" rel="noreferrer" style={{ color: GREEN }}>View evidence</a></>}
+              </p>
+            )}
+            {!shop.farm.certificationVerifiedAt && shop.farm.certificationBody && <p style={{ margin: "6px 0 0", fontSize: 12, color: OCHRE }}>Evidence supplied by the farmer; not yet independently verified by Shamba.</p>}
+          </div>
+        </section>
+      )}
+
       {/* Season strip */}
       {shop.months.some((m) => m.crops > 0) && (
         <section style={{ padding: "8px clamp(20px, 5vw, 64px) 24px" }}>

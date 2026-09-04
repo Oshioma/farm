@@ -46,6 +46,8 @@ export type ShopProduce = {
   totalAvailableKg: number;
 };
 
+export type GrowingPractice = "unspecified" | "organic_practices" | "regenerative" | "conventional";
+
 export type ShopData = {
   farm: {
     id: string;
@@ -57,6 +59,13 @@ export type ShopData = {
     fulfilmentMethod: "collection" | "delivery" | "both";
     collectionInstructions: string | null;
     deliveryArea: string | null;
+    growingPractice: GrowingPractice;
+    practiceNotes: string | null;
+    certificationBody: string | null;
+    certificationReference: string | null;
+    certificationUrl: string | null;
+    certificationExpiresOn: string | null;
+    certificationVerifiedAt: string | null;
   };
   months: { season: number; key: HarvestMonthKey; label: string; calendarYear: number; expectedKg: number; crops: number }[];
   produce: ShopProduce[];
@@ -75,7 +84,7 @@ async function listedFarms() {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("farms")
-    .select("id, name, slug, location, shop_hero_url, shop_contact_phone, fulfilment_method, collection_instructions, delivery_area")
+    .select("id, name, slug, location, shop_hero_url, shop_contact_phone, fulfilment_method, collection_instructions, delivery_area, growing_practice, practice_notes, certification_body, certification_reference, certification_url, certification_expires_on, certification_verified_at")
     .eq("is_active", true)
     .eq("list_in_market", true);
   if (error) {
@@ -87,6 +96,9 @@ async function listedFarms() {
       id: string; name: string; slug: string | null; location: string | null; shop_hero_url?: string | null;
       shop_contact_phone?: string | null; fulfilment_method?: "collection" | "delivery" | "both" | null;
       collection_instructions?: string | null; delivery_area?: string | null;
+      growing_practice?: GrowingPractice | null; practice_notes?: string | null; certification_body?: string | null;
+      certification_reference?: string | null; certification_url?: string | null; certification_expires_on?: string | null;
+      certification_verified_at?: string | null;
     }[],
     available: true,
   };
@@ -114,6 +126,13 @@ export async function findShopFarm(slug: string) {
         fulfilmentMethod: match.fulfilment_method ?? "collection",
         collectionInstructions: match.collection_instructions ?? null,
         deliveryArea: match.delivery_area ?? null,
+        growingPractice: match.growing_practice ?? "unspecified",
+        practiceNotes: match.practice_notes ?? null,
+        certificationBody: match.certification_body ?? null,
+        certificationReference: match.certification_reference ?? null,
+        certificationUrl: match.certification_url ?? null,
+        certificationExpiresOn: match.certification_expires_on ?? null,
+        certificationVerifiedAt: match.certification_verified_at ?? null,
       }
     : null;
 }
@@ -242,6 +261,13 @@ export async function getShopData(slug: string): Promise<ShopData | null> {
       fulfilmentMethod: farm.fulfilmentMethod,
       collectionInstructions: farm.collectionInstructions,
       deliveryArea: farm.deliveryArea,
+      growingPractice: farm.growingPractice,
+      practiceNotes: farm.practiceNotes,
+      certificationBody: farm.certificationBody,
+      certificationReference: farm.certificationReference,
+      certificationUrl: farm.certificationUrl,
+      certificationExpiresOn: farm.certificationExpiresOn,
+      certificationVerifiedAt: farm.certificationVerifiedAt,
     },
     months: monthTotals,
     produce,
@@ -303,6 +329,13 @@ export type MarketFarm = {
   produce: ShopProduce[];
   totalExpectedKg: number;
   totalAvailableKg: number;
+  growingPractice: GrowingPractice;
+  practiceNotes: string | null;
+  certificationBody: string | null;
+  certificationReference: string | null;
+  certificationUrl: string | null;
+  certificationExpiresOn: string | null;
+  certificationVerifiedAt: string | null;
   /** Months this farm has produce in, earliest first. */
   monthLabels: string[];
 };
@@ -339,6 +372,13 @@ export async function getMarketData(): Promise<MarketData> {
       name: shop.farm.name,
       location: shop.farm.location,
       heroUrl: shop.farm.heroUrl,
+      growingPractice: shop.farm.growingPractice,
+      practiceNotes: shop.farm.practiceNotes,
+      certificationBody: shop.farm.certificationBody,
+      certificationReference: shop.farm.certificationReference,
+      certificationUrl: shop.farm.certificationUrl,
+      certificationExpiresOn: shop.farm.certificationExpiresOn,
+      certificationVerifiedAt: shop.farm.certificationVerifiedAt,
       produce: shop.produce,
       totalExpectedKg: shop.produce.reduce((sum, p) => sum + p.totalExpectedKg, 0),
       totalAvailableKg: shop.produce.reduce((sum, p) => sum + p.totalAvailableKg, 0),

@@ -10,15 +10,22 @@ export const dynamic = "force-dynamic";
    rather than from the browser against RLS. */
 
 export async function POST(req: NextRequest) {
-  const { farmId, listed, heroUrl, contactPhone, fulfilmentMethod, collectionInstructions, deliveryArea } = await req.json();
+  const { farmId, listed, heroUrl, contactPhone, fulfilmentMethod, collectionInstructions, deliveryArea, growingPractice, practiceNotes, certificationBody, certificationReference, certificationUrl, certificationExpiresOn } = await req.json();
   const settingListing = typeof listed === "boolean";
   const settingHero = heroUrl === null || typeof heroUrl === "string";
   const settingFulfilment = [contactPhone, fulfilmentMethod, collectionInstructions, deliveryArea].some((value) => typeof value === "string");
-  if (!farmId || (!settingListing && !settingHero && !settingFulfilment)) {
+  const settingPractice = typeof growingPractice === "string";
+  if (!farmId || (!settingListing && !settingHero && !settingFulfilment && !settingPractice)) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
   if (settingHero && typeof heroUrl === "string" && heroUrl && !/^https?:\/\//.test(heroUrl)) {
     return NextResponse.json({ error: "That image address does not look right" }, { status: 400 });
+  }
+  if (settingPractice && !["unspecified", "organic_practices", "regenerative", "conventional"].includes(growingPractice)) {
+    return NextResponse.json({ error: "Choose a valid growing practice" }, { status: 400 });
+  }
+  if (settingPractice && certificationUrl && !/^https?:\/\//.test(certificationUrl)) {
+    return NextResponse.json({ error: "The certification link must start with http:// or https://" }, { status: 400 });
   }
   if (settingFulfilment && !["collection", "delivery", "both"].includes(fulfilmentMethod)) {
     return NextResponse.json({ error: "Choose collection, delivery, or both" }, { status: 400 });
@@ -58,9 +65,20 @@ export async function POST(req: NextRequest) {
     patch.delivery_area = String(deliveryArea ?? "").trim().slice(0, 1000) || null;
   }
 
+  if (settingPractice) {
+    patch.growing_practice = growingPractice;
+    patch.practice_notes = String(practiceNotes ?? "").trim().slice(0, 2000) || null;
+    patch.certification_body = String(certificationBody ?? "").trim().slice(0, 200) || null;
+    patch.certification_reference = String(certificationReference ?? "").trim().slice(0, 200) || null;
+    patch.certification_url = String(certificationUrl ?? "").trim().slice(0, 500) || null;
+    patch.certification_expires_on = certificationExpiresOn || null;
+    // Farmer edits invalidate a previous verification until an administrator rechecks the evidence.
+    patch.certification_verified_at = null;
+  }
+
   const { error } = await admin.from("farms").update(patch).eq("id", farmId);
   if (error) {
-    if (/list_in_market|shop_hero_url|shop_contact_phone|fulfilment_method|collection_instructions|delivery_area/.test(error.message)) {
+    if (/list_in_market|shop_hero_url|shop_contact_phone|fulfilment_method|collection_instructions|delivery_area|growing_practice|certification_/.test(error.message)) {
       return NextResponse.json(
         { error: "The shop columns are not on the database yet — run the pending migration first." },
         { status: 503 }
@@ -69,7 +87,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, listed, heroUrl, contactPhone, fulfilmentMethod, collectionInstructions, deliveryArea });
+  return NextResponse.json({ ok: true, listed, heroUrl, contactPhone, fulfilmentMethod, collectionInstructions, deliveryArea, growingPractice, practiceNotes, certificationBody, certificationReference, certificationUrl, certificationExpiresOn });
 }
 
 export async function GET(req: NextRequest) {
@@ -98,7 +116,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await admin
     .from("farms")
-    .select("slug, list_in_market, shop_hero_url, shop_contact_phone, fulfilment_method, collection_instructions, delivery_area")
+    .select("slug, list_in_market, shop_hero_url, shop_contact_phone, fulfilment_method, collection_instructions, delivery_area, growing_practice, practice_notes, certification_body, certification_reference, certification_url, certification_expires_on, certification_verified_at")
     .eq("id", farmId)
     .single();
   if (error) return NextResponse.json({ listed: false, available: false, slug: null, heroUrl: null });
@@ -112,5 +130,12 @@ export async function GET(req: NextRequest) {
     fulfilmentMethod: data.fulfilment_method ?? "collection",
     collectionInstructions: data.collection_instructions ?? null,
     deliveryArea: data.delivery_area ?? null,
+    growingPractice: data.growing_practice ?? "unspecified",
+    practiceNotes: data.practice_notes ?? null,
+    certificationBody: data.certification_body ?? null,
+    certificationReference: data.certification_reference ?? null,
+    certificationUrl: data.certification_url ?? null,
+    certificationExpiresOn: data.certification_expires_on ?? null,
+    certificationVerifiedAt: data.certification_verified_at ?? null,
   });
 }
