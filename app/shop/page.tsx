@@ -25,6 +25,15 @@ function fmtKg(kg: number): string {
   return `${kg.toLocaleString(undefined, { maximumFractionDigits: 1 })} kg`;
 }
 
+function trustLabel(farm: MarketFarm): string | null {
+  const verified = !!farm.certificationVerifiedAt && (!farm.certificationExpiresOn || farm.certificationExpiresOn >= new Date().toISOString().slice(0, 10));
+  if (verified) return "Organic certification verified";
+  if (farm.growingPractice === "organic_practices") return "Farmer-declared organic practices";
+  if (farm.growingPractice === "regenerative") return "Regenerative practices";
+  if (farm.growingPractice === "conventional") return "Conventional farming";
+  return null;
+}
+
 function monthRange(p: ShopProduce): string {
   if (p.months.length === 1) return p.months[0].label;
   return `${p.months[0].label}–${p.months[p.months.length - 1].label}`;
@@ -130,7 +139,10 @@ function FarmSection({ farm }: { farm: MarketFarm }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 16, borderBottom: `1px solid ${LINE}`, paddingBottom: 14 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <h2 style={{ fontFamily: serif, fontWeight: 400, fontSize: 32, letterSpacing: "-0.01em", margin: 0 }}>{farm.name}</h2>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+            <h2 style={{ fontFamily: serif, fontWeight: 400, fontSize: 32, letterSpacing: "-0.01em", margin: 0 }}>{farm.name}</h2>
+            {trustLabel(farm) && <span style={{ borderRadius: 999, background: farm.certificationVerifiedAt ? "#dcfce7" : "#f5f5f4", color: farm.certificationVerifiedAt ? "#166534" : "#57534e", padding: "5px 10px", fontSize: 11, fontWeight: 700 }}>{trustLabel(farm)}</span>}
+          </div>
           <p style={{ fontSize: 14, color: "#78716c", margin: 0 }}>
             {[farm.location, `${farm.produce.length} crop${farm.produce.length === 1 ? "" : "s"}`, `${fmtKg(farm.totalAvailableKg)} unclaimed`]
               .filter(Boolean)
