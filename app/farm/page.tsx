@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase, getCurrentUser } from "@/lib/supabase";
 import {
   getFarms,
@@ -62,6 +62,8 @@ function errMsg(err: unknown, fallback: string): string {
 }
 
 export default function FarmPage() {
+  const searchParams = useSearchParams();
+  const onboardingMode = searchParams.get("onboarding") === "1";
   const [farms, setFarms] = useState<Farm[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
   const [crops, setCrops] = useState<Crop[]>([]);
@@ -1635,8 +1637,8 @@ export default function FarmPage() {
           </div>
         </header>
 
-        {/* Navigation bar */}
-        <nav className="mb-6 rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
+        {/* Keep the full app navigation out of the focused setup flow. */}
+        {!onboardingMode && <nav className="mb-6 rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
           <div className="flex flex-wrap items-center gap-1.5 text-sm">
             {[
               { href: withFarmContext("/companion"), label: "Companion planting" },
@@ -1671,7 +1673,15 @@ export default function FarmPage() {
               </Link>
             ))}
           </div>
-        </nav>
+        </nav>}
+
+        {onboardingMode && (
+          <div className="mb-6 flex justify-end">
+            <Link href="/farm/onboarding" className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">
+              Back to setup / Rudi kwenye maandalizi
+            </Link>
+          </div>
+        )}
 
         {noFarmMode === "create" && activeFarm && (
           <div className="mb-6 mx-auto max-w-md rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
