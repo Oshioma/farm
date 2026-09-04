@@ -470,6 +470,11 @@ const MIGRATIONS: { version: string; name: string; probes: string[]; note?: stri
     name: "add_order_fulfilment_flow",
     probes: ["customer_orders.actual_quantity_kg", "customer_orders.actual_price_per_kg", "customer_orders.collected_at"],
   },
+  {
+    version: "20260904100000",
+    name: "add_order_tracking_and_notifications",
+    probes: ["customer_orders.tracking_token"],
+  },
 ];
 
 type ProbeResult = { status: Status; detail: string };
