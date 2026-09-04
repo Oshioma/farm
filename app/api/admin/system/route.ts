@@ -480,6 +480,11 @@ const MIGRATIONS: { version: string; name: string; probes: string[]; note?: stri
     name: "add_tanzania_fulfilment",
     probes: ["farms.shop_contact_phone", "farms.fulfilment_method", "farms.collection_instructions", "farms.delivery_area"],
   },
+  {
+    version: "20260904140000",
+    name: "add_growing_practice_trust",
+    probes: ["farms.growing_practice", "farms.certification_reference", "farms.certification_verified_at"],
+  },
 ];
 
 type ProbeResult = { status: Status; detail: string };
