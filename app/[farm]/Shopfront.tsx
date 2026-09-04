@@ -21,7 +21,7 @@ function fmtKg(kg: number): string {
 }
 
 function money(value: number): string {
-  return `KSh ${Math.round(value).toLocaleString()}`;
+  return `TZS ${Math.round(value).toLocaleString()}`;
 }
 
 function produceName(p: ShopProduce): string {
@@ -238,6 +238,31 @@ export function Shopfront({ shop }: { shop: ShopData }) {
             <Step n="Step two" title="We pick to your order" body="You hear from us the week it is ready with the real weight. Short of a good crop, we tell you early rather than late." />
             <Step n="Step three" title="Collect and settle" body="Collect on the agreed day and pay then. Nothing is charged when you reserve." />
           </div>
+        </div>
+      </section>
+
+      <section style={{ padding: "40px clamp(20px, 5vw, 64px) 8px" }}>
+        <div style={{ background: DEEP, color: "#ffffff", borderRadius: 28, padding: "clamp(28px, 4vw, 44px)" }}>
+          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "#86efac", margin: 0 }}>Getting your order</p>
+          <h2 style={{ fontFamily: serif, fontWeight: 400, fontSize: 34, margin: "8px 0 0" }}>
+            {shop.farm.fulfilmentMethod === "collection" ? "Collect from the farm" : shop.farm.fulfilmentMethod === "delivery" ? "Delivery is available" : "Collect or arrange delivery"}
+          </h2>
+          {shop.farm.collectionInstructions && shop.farm.fulfilmentMethod !== "delivery" && (
+            <p style={{ maxWidth: "65ch", lineHeight: 1.6, color: "#d1fae5", margin: "16px 0 0", whiteSpace: "pre-wrap" }}>{shop.farm.collectionInstructions}</p>
+          )}
+          {shop.farm.deliveryArea && shop.farm.fulfilmentMethod !== "collection" && (
+            <p style={{ maxWidth: "65ch", lineHeight: 1.6, color: "#d1fae5", margin: "12px 0 0", whiteSpace: "pre-wrap" }}>{shop.farm.deliveryArea}</p>
+          )}
+          {shop.farm.contactPhone && (
+            <a
+              href={`https://wa.me/${shop.farm.contactPhone.replace(/\D/g, "")}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{ marginTop: 20, display: "inline-flex", minHeight: 44, alignItems: "center", borderRadius: 999, background: "#22c55e", color: DEEP, padding: "12px 22px", fontWeight: 700, textDecoration: "none" }}
+            >
+              Ask the farm on WhatsApp
+            </a>
+          )}
         </div>
       </section>
 
