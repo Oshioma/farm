@@ -41,7 +41,10 @@ function LoginInner() {
   const [error, setError] = useState("");
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirectTo") ?? "/farm";
+  const requestedRedirect = searchParams.get("redirectTo");
+  const redirectTo = requestedRedirect ?? "/farm";
+  // Only forward an explicit destination; a brand-new account should land in the setup wizard.
+  const signupHref = requestedRedirect ? `/signup?redirectTo=${encodeURIComponent(requestedRedirect)}` : "/signup";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -127,7 +130,7 @@ function LoginInner() {
           <p className="mt-5 text-center text-sm text-zinc-500">
             {t.noAccount}{" "}
             <Link
-              href={`/signup?redirectTo=${encodeURIComponent(redirectTo)}`}
+              href={signupHref}
               className="font-medium text-zinc-900 hover:underline"
             >
               {t.create}

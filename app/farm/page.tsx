@@ -92,6 +92,10 @@ export default function FarmPage() {
   const [deletingWantId, setDeletingWantId] = useState<string | null>(null);
   const [convertingWantId, setConvertingWantId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  /* True once the first farms query has answered, so we know whether this
+     account has a farm at all. */
+  const [farmsLoaded, setFarmsLoaded] = useState(false);
+  const [joinIntent, setJoinIntent] = useState(false);
   const [editingFarm, setEditingFarm] = useState(false);
   const [farmEditForm, setFarmEditForm] = useState({ name: "", location: "", size_acres: "" });
   const [savingFarm, setSavingFarm] = useState(false);
@@ -158,6 +162,7 @@ export default function FarmPage() {
     setOnboardingMode(params.get("onboarding") === "1");
     // The setup wizard links here with ?join=1 for people joining an existing farm.
     if (params.get("join") === "1") {
+      setJoinIntent(true);
       setNoFarmMode("join");
       loadAllFarms();
     }
@@ -439,6 +444,7 @@ export default function FarmPage() {
       });
 
       await refreshAll();
+      setFarmsLoaded(true);
 
       // Only load the last active farm once per app session
       // Don't reload it when navigating between pages, to preserve farm selection during a session
@@ -1492,6 +1498,22 @@ export default function FarmPage() {
       setError(errMsg(err, "Failed to log sale"));
       return false;
     }
+  }
+
+  /* An account with no farm belongs in the setup wizard, unless it came here
+     to join an existing farm. Until the farms query answers we show a blank
+     loading screen rather than flashing the dashboard shell. */
+  const noFarmYet = farms.length === 0 && !joinIntent;
+  useEffect(() => {
+    if (farmsLoaded && noFarmYet) router.replace("/farm/onboarding");
+  }, [farmsLoaded, noFarmYet, router]);
+
+  if (noFarmYet) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-stone-50 text-sm text-zinc-500">
+        Loading… / Inapakia…
+      </main>
+    );
   }
 
   return (

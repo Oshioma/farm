@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
+import { LanguageProvider } from "@/lib/i18n";
 
 export const metadata: Metadata = {
   title: "Shamba Online",
@@ -22,8 +23,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {children}
-        <OfflineIndicator />
+        <LanguageProvider>
+          {children}
+          <OfflineIndicator />
+        </LanguageProvider>
       </body>
     </html>
   );
