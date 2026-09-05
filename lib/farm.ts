@@ -128,6 +128,8 @@ export type Farm = {
   slug: string;
   location: string | null;
   size_acres: number | null;
+  /** Whether the farm's public shop is published. */
+  list_in_market?: boolean | null;
 };
 
 export type Zone = {
@@ -248,7 +250,7 @@ export async function getFarms(): Promise<Farm[]> {
 
       const { data, error } = await supabase
         .from("farms")
-        .select("id, name, slug, location, size_acres")
+        .select("id, name, slug, location, size_acres, list_in_market")
         .in("id", farmIds)
         .eq("is_active", true)
         .order("name");

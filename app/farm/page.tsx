@@ -1562,6 +1562,23 @@ export default function FarmPage() {
                     {activeFarm?.location || "No location set"}
                     {activeFarm?.size_acres ? ` · ${activeFarm.size_acres} acres` : ""}
                   </p>
+                  {activeFarm && (
+                    activeFarm.list_in_market && activeFarm.slug ? (
+                      <Link
+                        href={`/${activeFarm.slug}`}
+                        className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:underline"
+                      >
+                        View your shop / Ona duka lako ↗
+                      </Link>
+                    ) : (
+                      <Link
+                        href="/farm/onboarding"
+                        className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:underline"
+                      >
+                        Publish your shop / Chapisha duka lako →
+                      </Link>
+                    )
+                  )}
                   {activeFarm && <button
                     onClick={startEditFarm}
                     className="mt-3 rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100"

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, ChevronRight, Circle, ExternalLink, Languages, Sprout } from "lucide-react";
+import { Check, ChevronRight, Circle, ExternalLink, Sprout } from "lucide-react";
 import {
   getCrops,
   getFarms,
@@ -15,9 +15,10 @@ import {
 } from "@/lib/farm";
 import type { Crop, Farm, HarvestEtaEntry } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { useLanguage } from "@/hooks/useLanguage";
+import { LanguageToggle } from "@/components/LanguageToggle";
 import { supabase } from "@/lib/supabase";
 
-type Lang = "en" | "sw";
 type Listing = { listed: boolean; slug: string | null; heroUrl: string | null; available: boolean };
 
 const copy = {
@@ -35,6 +36,9 @@ const copy = {
     cropPlaceholder: "e.g. Tomatoes", varietyPlaceholder: "e.g. Roma",
     publishQuestion: "Do you want to publish your shop now?", publishBody: "Buyers will be able to find your farm and reserve produce from the crops above.",
     publishYes: "Yes, publish and open my shop", publishing: "Publishing…", publishNo: "Not yet, take me to the farm",
+    detailsHint: "Farm name and location are needed to continue.",
+    cropHint: "Crop name, expected harvest date and expected kilograms are needed to continue.",
+    publishHint: "Add at least one crop with a harvest date and expected kilograms before publishing.",
     skip: "Skip setup for now and go to the farm dashboard",
     live: "Your shop is live", open: "Open public shop",
     privacy: "Publishing stays off until you choose it. Buyers cannot find an unfinished shop.",
@@ -59,6 +63,9 @@ const copy = {
     cropPlaceholder: "mf. Nyanya", varietyPlaceholder: "mf. Roma",
     publishQuestion: "Unataka kuchapisha duka lako sasa?", publishBody: "Wanunuzi wataweza kuona shamba lako na kuagiza mazao yaliyo hapo juu.",
     publishYes: "Ndiyo, chapisha na ufungue duka langu", publishing: "Inachapisha…", publishNo: "Bado, nipeleke shambani",
+    detailsHint: "Jina la shamba na eneo vinahitajika ili kuendelea.",
+    cropHint: "Jina la zao, tarehe ya mavuno inayotarajiwa na kilo zinazotarajiwa vinahitajika ili kuendelea.",
+    publishHint: "Ongeza angalau zao moja lenye tarehe ya mavuno na kilo zinazotarajiwa kabla ya kuchapisha.",
     skip: "Ruka maandalizi kwa sasa na uende kwenye dashibodi ya shamba",
     live: "Duka lako sasa liko hewani", open: "Fungua duka la umma",
     privacy: "Duka halitawekwa hadharani mpaka uchague kufanya hivyo. Wanunuzi hawawezi kuona duka ambalo halijakamilika.",
@@ -90,7 +97,7 @@ function expectedTotal(row: HarvestEtaEntry): number {
 
 export default function FarmerOnboardingPage() {
   const router = useRouter();
-  const [lang, setLang] = useState<Lang>("en");
+  const [lang, setLang] = useLanguage();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
   const [crops, setCrops] = useState<Crop[]>([]);
@@ -117,16 +124,8 @@ export default function FarmerOnboardingPage() {
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("shamba_onboarding_language");
-    const preferred: Lang = saved === "sw" || (!saved && navigator.language.toLowerCase().startsWith("sw")) ? "sw" : "en";
-    setLang(preferred);
     getFarms().then(setFarms).catch((err) => setError(errMsg(err, "Could not load farms"))).finally(() => setLoading(false));
   }, []);
-
-  function chooseLanguage(value: Lang) {
-    setLang(value);
-    window.localStorage.setItem("shamba_onboarding_language", value);
-  }
 
   async function loadFarmProgress(farmId: string) {
     const [cropRows, harvestRows, shop] = await Promise.all([
@@ -350,11 +349,7 @@ export default function FarmerOnboardingPage() {
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
       <div className="mb-6 flex justify-end">
-        <div className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white p-1 shadow-sm">
-          <Languages className="ml-2 h-4 w-4 text-emerald-700" />
-          <button onClick={() => chooseLanguage("en")} className={"rounded-full px-3 py-1.5 text-sm font-semibold " + (lang === "en" ? "bg-emerald-700 text-white" : "text-zinc-600")}>English</button>
-          <button onClick={() => chooseLanguage("sw")} className={"rounded-full px-3 py-1.5 text-sm font-semibold " + (lang === "sw" ? "bg-emerald-700 text-white" : "text-zinc-600")}>Kiswahili</button>
-        </div>
+        <LanguageToggle lang={lang} onChange={setLang} />
       </div>
 
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
@@ -396,6 +391,7 @@ export default function FarmerOnboardingPage() {
                 <label className="text-sm font-medium text-zinc-700">{t.location}<input required value={detailsForm.location} onChange={(event) => setDetailsForm((current) => ({ ...current, location: event.target.value }))} placeholder={t.locationPlaceholder} className={inputClass} /></label>
                 <div>
                   <button type="submit" disabled={savingDetails || !detailsForm.name.trim() || !detailsForm.location.trim()} className={"w-full sm:w-auto " + primaryButton}>{savingDetails ? t.savingDetails : t.saveDetails}</button>
+                  {(!detailsForm.name.trim() || !detailsForm.location.trim()) && <p className="mt-2 text-xs text-zinc-500">{t.detailsHint}</p>}
                 </div>
               </form>
             ))}
@@ -429,6 +425,7 @@ export default function FarmerOnboardingPage() {
                     <button type="submit" disabled={savingCrop || !cropForm.name.trim() || !cropForm.expectedHarvestStart || Number(cropForm.expectedKg) <= 0} className={primaryButton}>{savingCrop ? t.addingCrop : t.addCrop}</button>
                     {hasCrop && <button type="button" onClick={() => goToStep(2)} className={secondaryButton}>{t.continue}<ChevronRight className="ml-1 inline h-4 w-4" /></button>}
                   </div>
+                  {(!cropForm.name.trim() || !cropForm.expectedHarvestStart || Number(cropForm.expectedKg) <= 0) && <p className="text-xs text-zinc-500 sm:col-span-2">{t.cropHint}</p>}
                 </form>
               </div>
             ))}
@@ -456,6 +453,12 @@ export default function FarmerOnboardingPage() {
                   <button type="button" onClick={publishShop} disabled={publishing || !hasCrop} className={primaryButton}>{publishing ? t.publishing : t.publishYes}</button>
                   <Link href="/farm" className={secondaryButton}>{t.publishNo}</Link>
                 </div>
+                {!hasCrop && (
+                  <p className="mt-3 text-sm text-zinc-600">
+                    {t.publishHint}{" "}
+                    <button type="button" onClick={() => goToStep(1)} className="font-semibold text-emerald-700 hover:underline">{steps[1].action} →</button>
+                  </p>
+                )}
               </div>
             ))}
           </div>

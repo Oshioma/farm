@@ -1,7 +1,34 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ShopData, ShopMonth, ShopProduce } from "@/lib/shop";
+import { getFarms } from "@/lib/farm";
+
+/* Shown only to signed-in members of this farm: a way back to the farm
+   manager from the public shop. Buyers never see it. */
+function ManageFarmLink({ farmId }: { farmId: string }) {
+  const [isMember, setIsMember] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    getFarms()
+      .then((farms) => { if (!cancelled) setIsMember(farms.some((farm) => farm.id === farmId)); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [farmId]);
+  if (!isMember) return null;
+  return (
+    <a
+      href={`/farm?farmId=${encodeURIComponent(farmId)}`}
+      style={{
+        color: GREEN, border: `1px solid ${GREEN}`, borderRadius: 999, padding: "10px 16px",
+        fontSize: 13, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap", minHeight: 44,
+        display: "inline-flex", alignItems: "center",
+      }}
+    >
+      Manage farm / Simamia shamba
+    </a>
+  );
+}
 
 /* ── shared styling ───────────────────────────────────────────
    The shopfront's own palette: the app's brand green over warm paper. */
@@ -114,6 +141,8 @@ export function Shopfront({ shop }: { shop: ShopData }) {
             Shamba Online
           </span>
         </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <ManageFarmLink farmId={shop.farm.id} />
         <button
           onClick={() => { setSent(null); setCheckout(true); }}
           disabled={basket.length === 0}
@@ -125,6 +154,7 @@ export function Shopfront({ shop }: { shop: ShopData }) {
         >
           {basket.length ? `Your pre-order · ${basket.length}` : "Nothing reserved yet"}
         </button>
+        </div>
       </header>
 
       {/* Hero */}
