@@ -154,8 +154,18 @@ export default function FarmPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
-    setOnboardingMode(new URLSearchParams(window.location.search).get("onboarding") === "1");
+    const params = new URLSearchParams(window.location.search);
+    setOnboardingMode(params.get("onboarding") === "1");
+    // The setup wizard links here with ?join=1 for people joining an existing farm.
+    if (params.get("join") === "1") {
+      setNoFarmMode("join");
+      loadAllFarms();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // A brand-new account has no farm yet: keep the page down to the essentials
+  // (welcome card, sign out) until the first farm exists or is joined.
+  const hideChrome = onboardingMode || farms.length === 0;
   const withFarmContext = (path: string) =>
     activeFarmId ? `${path}?farmId=${encodeURIComponent(activeFarmId)}` : path;
   const workerGoalsHref = activeFarmId
@@ -1488,13 +1498,13 @@ export default function FarmPage() {
     <main className="min-h-screen bg-stone-50 text-zinc-900">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <header className="relative mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-          <Link
+          {!hideChrome && <Link
             href={withFarmContext("/farm/settings")}
             aria-label="Settings"
             className="absolute right-4 top-4 rounded-full border border-zinc-200 bg-white p-2 text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900"
           >
             <Settings className="h-5 w-5" />
-          </Link>
+          </Link>}
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
@@ -1552,12 +1562,12 @@ export default function FarmPage() {
                     {activeFarm?.location || "No location set"}
                     {activeFarm?.size_acres ? ` · ${activeFarm.size_acres} acres` : ""}
                   </p>
-                  <button
+                  {activeFarm && <button
                     onClick={startEditFarm}
                     className="mt-3 rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100"
                   >
                     Edit
-                  </button>
+                  </button>}
                 </>
               )}
             </div>
@@ -1579,6 +1589,7 @@ export default function FarmPage() {
                   </button>
                 );
               })}
+              {!hideChrome && (<>
               <button
                 onClick={() => {
                   setNoFarmMode(noFarmMode === "join" ? "idle" : "join");
@@ -1627,6 +1638,7 @@ export default function FarmPage() {
                 {isRefreshing ? "Refreshing..." : "Refresh"}
               </button>
               <NotificationBell />
+              </>)}
               {userEmail && (
                 <span className="text-sm text-zinc-500">{userEmail}</span>
               )}
@@ -1640,8 +1652,8 @@ export default function FarmPage() {
           </div>
         </header>
 
-        {/* Keep the full app navigation out of the focused setup flow. */}
-        {!onboardingMode && <nav className="mb-6 rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
+        {/* Keep the full app navigation out of the focused setup flow and away from accounts with no farm yet. */}
+        {!hideChrome && <nav className="mb-6 rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
           <div className="flex flex-wrap items-center gap-1.5 text-sm">
             {[
               { href: withFarmContext("/companion"), label: "Companion planting" },

@@ -14,7 +14,8 @@ function SignUpInner() {
   const [done, setDone] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirectTo") ?? "/farm";
+  // New accounts go straight into the farmer setup wizard.
+  const redirectTo = searchParams.get("redirectTo") ?? "/farm/onboarding";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -48,6 +49,9 @@ function SignUpInner() {
 
       // If email confirmation is disabled in Supabase, the session is set immediately
       if (data.session) {
+        // Drop any router cache entry captured while logged out (a prefetched
+        // /farm that middleware answered with a redirect to /login).
+        router.refresh();
         router.push(redirectTo);
       } else {
         setLoading(false);
