@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { useT } from "@/lib/i18n";
 import type { Zone, Crop, FertilisationEntry, CompostEntry, MulchEntry, PestControlEntry, HarvestEtaEntry, Plant, SeedlingEntry } from "@/lib/farm";
 
 type SeedlingTray = { id?: string; code: string; zoneId?: string };
@@ -284,6 +285,7 @@ type Props = {
 };
 
 export function FarmMap({ zones, crops, plants = [], fertilisations = [], compostEntries = [], mulchEntries = [], pestControls = [], harvestEta = [], farmName, farmId, onSelectBed, onAddCropToBed, onBedsSaved }: Props) {
+  const t = useT();
   const [hoveredBed, setHoveredBed] = useState<string | null>(null);
   const [selectedBed, setSelectedBed] = useState<string | null>(null);
 
@@ -835,10 +837,10 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
               disabled={saving}
               className="rounded-xl bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60"
             >
-              {saving ? "Saving…" : "Save Layout"}
+              {saving ? t("Saving…") : t("Save Layout")}
             </button>
             <button onClick={cancelEdit} className="rounded-xl bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-300">
-              Cancel
+              {t("Cancel")}
             </button>
             <div className="h-5 w-px bg-zinc-300" />
             {addingBed ? (
@@ -848,16 +850,16 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                   value={newBedLabel}
                   onChange={(e) => setNewBedLabel(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addBed()}
-                  placeholder="Bed name (e.g. R1)"
+                  placeholder={t("Bed name (e.g. R1)")}
                   className="w-36 rounded-lg border border-zinc-300 px-2 py-1.5 text-sm"
                   autoFocus
                 />
-                <button onClick={addBed} className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-800">Add</button>
-                <button onClick={() => setAddingBed(false)} className="text-sm text-zinc-500 hover:text-zinc-700">Cancel</button>
+                <button onClick={addBed} className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-800">{t("Add")}</button>
+                <button onClick={() => setAddingBed(false)} className="text-sm text-zinc-500 hover:text-zinc-700">{t("Cancel")}</button>
               </div>
             ) : (
               <button onClick={() => setAddingBed(true)} className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
-                + Add Bed
+                {t("+ Add Bed")}
               </button>
             )}
             {addingLabel ? (
@@ -867,36 +869,36 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                   value={newLabelText}
                   onChange={(e) => setNewLabelText(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addLabel()}
-                  placeholder="Label text"
+                  placeholder={t("Label text")}
                   className="w-36 rounded-lg border border-zinc-300 px-2 py-1.5 text-sm"
                   autoFocus
                 />
-                <button onClick={addLabel} className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-800">Add</button>
-                <button onClick={() => setAddingLabel(false)} className="text-sm text-zinc-500 hover:text-zinc-700">Cancel</button>
+                <button onClick={addLabel} className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-800">{t("Add")}</button>
+                <button onClick={() => setAddingLabel(false)} className="text-sm text-zinc-500 hover:text-zinc-700">{t("Cancel")}</button>
               </div>
             ) : (
               <button onClick={() => setAddingLabel(true)} className="rounded-xl bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700">
-                + Add Text
+                {t("+ Add Text")}
               </button>
             )}
             <button
               onClick={addSeedlingZone}
               className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
             >
-              + Add Seedling Zone
+              {t("+ Add Seedling Zone")}
             </button>
             <button
               onClick={() => fileInputRef.current?.click()}
               className="rounded-xl bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700"
             >
-              Upload Map Image
+              {t("Upload Map Image")}
             </button>
             {customBg && (
               <button
                 onClick={() => setCustomBg(undefined)}
                 className="rounded-xl bg-red-100 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-200"
               >
-                Remove Background
+                {t("Remove Background")}
               </button>
             )}
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
@@ -904,7 +906,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
         ) : (
           <>
             <button onClick={startEdit} className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800">
-              Edit Map
+              {t("Edit Map")}
             </button>
             {isBlankFarm && (
               <>
@@ -912,7 +914,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                   onClick={() => { startEdit(); setTimeout(() => fileInputRef.current?.click(), 100); }}
                   className="rounded-xl bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
                 >
-                  Upload Your Farm Map
+                  {t("Upload Your Farm Map")}
                 </button>
                 <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
               </>
@@ -924,13 +926,13 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
       {/* Blank farm prompt */}
       {isBlankFarm && !editMode && (
         <div className="mb-4 rounded-2xl border-2 border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
-          <p className="text-lg font-semibold text-zinc-600">No map configured for this farm</p>
-          <p className="mt-1 text-sm text-zinc-400">Upload an aerial photo or sketch of your farm, then place beds on top of it.</p>
+          <p className="text-lg font-semibold text-zinc-600">{t("No map configured for this farm")}</p>
+          <p className="mt-1 text-sm text-zinc-400">{t("Upload an aerial photo or sketch of your farm, then place beds on top of it.")}</p>
           <button
             onClick={() => { startEdit(); setTimeout(() => fileInputRef.current?.click(), 100); }}
             className="mt-4 rounded-xl bg-purple-600 px-6 py-3 text-sm font-medium text-white hover:bg-purple-700"
           >
-            Upload Farm Map
+            {t("Upload Farm Map")}
           </button>
         </div>
       )}
@@ -940,7 +942,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
         <div className={`flex-1 overflow-auto rounded-2xl border bg-white ${editMode ? "border-blue-400 ring-2 ring-blue-100" : "border-zinc-200"}`}>
           {editMode && (
             <div className="bg-blue-50 px-3 py-1.5 text-xs text-blue-700 border-b border-blue-200">
-              Drag beds &amp; labels to move them. Drag corners to resize beds. Double-click text to edit it.
+              {t("Drag beds & labels to move them. Drag corners to resize beds. Double-click text to edit it.")}
             </div>
           )}
           <svg
@@ -1004,7 +1006,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                     // Wrap the label into lines that fit the box width. SVG <text>
                     // doesn't auto-wrap, so split on spaces and greedy-pack words
                     // assuming roughly ~5.5px per character at 9px font.
-                    const raw = (lm.label ?? "Seedling Zone").trim();
+                    const raw = (lm.label ?? t("Seedling Zone")).trim();
                     const maxChars = Math.max(4, Math.floor((w - 8) / 5.5));
                     const words = raw.split(/\s+/);
                     const lines: string[] = [];
@@ -1228,14 +1230,14 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
           {/* Edit mode: selected bed controls */}
           {editMode && selectedBed && (
             <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm space-y-3">
-              <div className="text-lg font-semibold text-blue-900">Editing: {selectedBed}</div>
+              <div className="text-lg font-semibold text-blue-900">{t("Editing: {bed}", { bed: selectedBed })}</div>
               {(() => {
                 const bed = editBeds.find((b) => b.id === selectedBed);
                 if (!bed) return null;
                 return (
                   <div className="space-y-2 text-xs text-blue-800">
-                    <div>Position: ({bed.x}, {bed.y})</div>
-                    <div>Size: {bed.w} x {bed.h}</div>
+                    <div>{t("Position: ({x}, {y})", { x: bed.x, y: bed.y })}</div>
+                    <div>{t("Size: {w} x {h}", { w: bed.w, h: bed.h })}</div>
                   </div>
                 );
               })()}
@@ -1243,7 +1245,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                 onClick={() => deleteBed(selectedBed)}
                 className="w-full rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
               >
-                Delete Bed
+                {t("Delete Bed")}
               </button>
             </div>
           )}
@@ -1251,11 +1253,11 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
           {/* Edit mode: label editing panel */}
           {editMode && editingLabelIdx !== null && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm space-y-3">
-              <div className="text-lg font-semibold text-amber-900">Edit Text</div>
+              <div className="text-lg font-semibold text-amber-900">{t("Edit Text")}</div>
               <textarea
                 value={editingLabelText}
                 onChange={(e) => setEditingLabelText(e.target.value)}
-                placeholder="Label text (use newlines for multi-line)"
+                placeholder={t("Label text (use newlines for multi-line)")}
                 className="w-full rounded-lg border border-amber-300 px-2 py-1.5 text-sm"
                 rows={3}
               />
@@ -1264,20 +1266,20 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                   onClick={saveEditLabel}
                   className="flex-1 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700"
                 >
-                  Save Text
+                  {t("Save Text")}
                 </button>
                 <button
                   onClick={() => setEditingLabelIdx(null)}
                   className="rounded-lg bg-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-300"
                 >
-                  Cancel
+                  {t("Cancel")}
                 </button>
               </div>
               <button
                 onClick={() => deleteLandmark(editingLabelIdx)}
                 className="w-full rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
               >
-                Delete Label
+                {t("Delete Label")}
               </button>
             </div>
           )}
@@ -1294,10 +1296,10 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
             );
             // If matched, show only that zone's trays; otherwise show all trays
             const traysToShow: SeedlingTray[] = matchedZone
-              ? seedlingTrays.filter((t) => t.zoneId === matchedZone.id)
+              ? seedlingTrays.filter((tray) => tray.zoneId === matchedZone.id)
               : seedlingTrays;
 
-            const codesSet = new Set(traysToShow.map((t) => t.code.toUpperCase()));
+            const codesSet = new Set(traysToShow.map((tray) => tray.code.toUpperCase()));
             const matchedSeedlings = seedlings.filter(
               (s) => s.row_location && codesSet.has(s.row_location.toUpperCase())
             );
@@ -1312,21 +1314,21 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
             return (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-sm">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-lg font-semibold text-emerald-900">{label}</div>
+                  <div className="text-lg font-semibold text-emerald-900">{lm.label ? label : t("Seedling Zone")}</div>
                   <button
                     onClick={() => setSelectedSeedlingZoneIdx(null)}
                     className="text-xs text-emerald-700 hover:text-emerald-900"
                   >
-                    Close
+                    {t("Close")}
                   </button>
                 </div>
                 <div className="mt-1 text-xs text-emerald-700/80">
-                  {traysToShow.length} tray{traysToShow.length === 1 ? "" : "s"}
-                  {matchedZone ? ` · linked to "${matchedZone.label}"` : " · all trays"}
+                  {traysToShow.length === 1 ? t("1 tray") : t("{n} trays", { n: traysToShow.length })}
+                  {matchedZone ? t(' · linked to "{zone}"', { zone: matchedZone.label }) : t(" · all trays")}
                 </div>
                 {traysToShow.length === 0 ? (
                   <div className="mt-3 text-xs text-emerald-700/70">
-                    No trays on the seedling map yet. Add some on the Seedlings page.
+                    {t("No trays on the seedling map yet. Add some on the Seedlings page.")}
                   </div>
                 ) : (
                   <div className="mt-3 max-h-[420px] space-y-2 overflow-y-auto pr-1">
@@ -1347,7 +1349,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                             )}
                           </div>
                           {rows.length === 0 ? (
-                            <div className="mt-1 text-[10px] text-zinc-400">Empty</div>
+                            <div className="mt-1 text-[10px] text-zinc-400">{t("Empty")}</div>
                           ) : (
                             <div className="mt-1.5 space-y-1">
                               {rows.map((s) => (
@@ -1381,7 +1383,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                   href="/farm/seedlings"
                   className="mt-3 block rounded-xl border border-emerald-300 bg-white px-3 py-2 text-center text-xs font-medium text-emerald-700 hover:bg-emerald-100"
                 >
-                  Open seedling map →
+                  {t("Open seedling map →")}
                 </Link>
               </div>
             );
@@ -1389,12 +1391,12 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
 
           {selectedBed && !editMode ? (
             <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-sm">
-              <div className="text-lg font-semibold">{isVerticalLayout ? "Row" : "Bed"} {selectedBed}</div>
+              <div className="text-lg font-semibold">{isVerticalLayout ? t("Row") : t("Bed")} {selectedBed}</div>
               {selected ? (
                 <>
                   <div className="mt-1 text-zinc-500">
-                    Bed link: {selected.name}
-                    {selected.size_acres ? ` · ${selected.size_acres} ac` : ""}
+                    {t("Bed link: {name}", { name: selected.name })}
+                    {selected.size_acres ? t(" · {n} ac", { n: selected.size_acres }) : ""}
                   </div>
                   {selectedCrops.length > 0 ? (
                     <div className="mt-3 space-y-2">
@@ -1417,16 +1419,16 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                               {c.variety ? ` · ${c.variety}` : ""}
                             </span>
                           </div>
-                          <div className="mt-1 text-xs text-zinc-400 capitalize">{c.status}</div>
+                          <div className="mt-1 text-xs text-zinc-400 capitalize">{c.status ? t(c.status) : null}</div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="mt-3 text-xs text-zinc-400">No crops in this bed</div>
+                    <div className="mt-3 text-xs text-zinc-400">{t("No crops in this bed")}</div>
                   )}
                   {selectedPlants.length > 0 && (
                     <div className="mt-4">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Plants</div>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{t("Plants")}</div>
                       <div className="mt-1.5 space-y-1.5">
                         {selectedPlants.map((p) => (
                           <div key={p.id} className="rounded-xl border border-violet-100 bg-violet-50/50 p-2">
@@ -1434,7 +1436,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                               {p.image_url && (
                                 <img src={p.image_url} alt="" className="h-6 w-6 rounded object-cover" />
                               )}
-                              <span className="text-xs font-medium text-violet-800">{p.name || "Unnamed"}</span>
+                              <span className="text-xs font-medium text-violet-800">{p.name || t("Unnamed")}</span>
                             </div>
                             {p.notes && <div className="mt-0.5 text-[10px] text-violet-600/70">{p.notes}</div>}
                           </div>
@@ -1445,8 +1447,8 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                   {selectedFertilisations.length > 0 && (
                     <div className="mt-4">
                       <div className="flex items-baseline justify-between gap-2">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Fertiliser</div>
-                        <div className="text-[10px] text-zinc-400">{selectedFertilisations.length} time{selectedFertilisations.length === 1 ? "" : "s"}</div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{t("Fertiliser")}</div>
+                        <div className="text-[10px] text-zinc-400">{selectedFertilisations.length === 1 ? t("1 time") : t("{n} times", { n: selectedFertilisations.length })}</div>
                       </div>
                       <div className="mt-1.5 space-y-1.5">
                         {selectedFertilisations.map((f) => (
@@ -1464,14 +1466,14 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                   {selectedCompost.length > 0 && (
                     <div className="mt-4">
                       <div className="flex items-baseline justify-between gap-2">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Compost</div>
-                        <div className="text-[10px] text-zinc-400">{selectedCompost.length} time{selectedCompost.length === 1 ? "" : "s"}</div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{t("Compost")}</div>
+                        <div className="text-[10px] text-zinc-400">{selectedCompost.length === 1 ? t("1 time") : t("{n} times", { n: selectedCompost.length })}</div>
                       </div>
                       <div className="mt-1.5 space-y-1.5">
                         {selectedCompost.map((c) => (
                           <div key={c.id} className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-2">
                             <div className="flex items-center justify-between gap-1">
-                              <span className="text-xs font-medium text-emerald-800">{c.compost_type ?? "Compost"}</span>
+                              <span className="text-xs font-medium text-emerald-800">{c.compost_type ?? t("Compost")}</span>
                               <span className="text-[10px] text-emerald-600">{fmtDate(c.date)}</span>
                             </div>
                             {c.materials_used && <div className="mt-0.5 text-[10px] text-emerald-600/70">{c.materials_used}</div>}
@@ -1484,14 +1486,14 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                   {selectedMulch.length > 0 && (
                     <div className="mt-4">
                       <div className="flex items-baseline justify-between gap-2">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Mulch</div>
-                        <div className="text-[10px] text-zinc-400">{selectedMulch.length} time{selectedMulch.length === 1 ? "" : "s"}</div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{t("Mulch")}</div>
+                        <div className="text-[10px] text-zinc-400">{selectedMulch.length === 1 ? t("1 time") : t("{n} times", { n: selectedMulch.length })}</div>
                       </div>
                       <div className="mt-1.5 space-y-1.5">
                         {selectedMulch.map((m) => (
                           <div key={m.id} className="rounded-xl border border-amber-200 bg-amber-100/40 p-2">
                             <div className="flex items-center justify-between gap-1">
-                              <span className="text-xs font-medium text-amber-900">{m.mulch_type ?? "Mulch"}</span>
+                              <span className="text-xs font-medium text-amber-900">{m.mulch_type ?? t("Mulch")}</span>
                               <span className="text-[10px] text-amber-700">{fmtDate(m.date)}</span>
                             </div>
                             {m.source && <div className="mt-0.5 text-[10px] text-amber-700/80">{m.source}</div>}
@@ -1504,22 +1506,22 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                   {selectedPestControls.length > 0 && (
                     <div className="mt-4">
                       <div className="flex items-baseline justify-between gap-2">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Pest control</div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{t("Pest control")}</div>
                         <div className="text-[10px] text-zinc-400">
-                          {selectedPestControls.length} time{selectedPestControls.length === 1 ? "" : "s"}
+                          {selectedPestControls.length === 1 ? t("1 time") : t("{n} times", { n: selectedPestControls.length })}
                         </div>
                       </div>
                       <div className="mt-1.5 space-y-1.5">
                         {selectedPestControls.map((p) => (
                           <div key={p.id} className="rounded-xl border border-rose-100 bg-rose-50/50 p-2">
                             <div className="flex items-center justify-between gap-1">
-                              <span className="text-xs font-medium text-rose-800">{p.product ?? "Pest control"}</span>
+                              <span className="text-xs font-medium text-rose-800">{p.product ?? t("Pest control")}</span>
                               <span className="text-[10px] text-rose-600">{fmtDate(p.date)}</span>
                             </div>
-                            {p.target_pest && <div className="mt-0.5 text-[10px] text-rose-600/70">Target: {p.target_pest}</div>}
+                            {p.target_pest && <div className="mt-0.5 text-[10px] text-rose-600/70">{t("Target: {pest}", { pest: p.target_pest })}</div>}
                             {p.method && <div className="mt-0.5 text-[10px] text-rose-600/70">{p.method}</div>}
                             {p.next_spray_date && (
-                              <div className="mt-0.5 text-[10px] text-rose-600/70">Next: {fmtDate(p.next_spray_date)}</div>
+                              <div className="mt-0.5 text-[10px] text-rose-600/70">{t("Next: {date}", { date: fmtDate(p.next_spray_date) })}</div>
                             )}
                             {p.notes && <div className="mt-0.5 text-[10px] text-rose-600/70">{p.notes}</div>}
                           </div>
@@ -1530,21 +1532,21 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                 </>
               ) : (
                 <div className="mt-2 text-xs text-zinc-400">
-                  This bed is still syncing. Save the map layout to auto-link it.
+                  {t("This bed is still syncing. Save the map layout to auto-link it.")}
                 </div>
               )}
               {selectedHarvestEta && (
                 <div className="mt-4">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Harvest ETA</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{t("Harvest ETA")}</div>
                   <div className="mt-1.5 rounded-xl border border-orange-100 bg-orange-50/50 p-2.5">
                     {selectedHarvestEta.main_crop && (
                       <div className="text-xs font-medium text-orange-800">{selectedHarvestEta.main_crop}</div>
                     )}
                     {selectedHarvestEta.expected_harvest_date && (
-                      <div className="mt-0.5 text-[10px] text-orange-600">Harvest: {selectedHarvestEta.expected_harvest_date}</div>
+                      <div className="mt-0.5 text-[10px] text-orange-600">{t("Harvest: {date}", { date: selectedHarvestEta.expected_harvest_date })}</div>
                     )}
                     {selectedHarvestEta.beneficial_companions && (
-                      <div className="mt-0.5 text-[10px] text-orange-600">Companions: {selectedHarvestEta.beneficial_companions}</div>
+                      <div className="mt-0.5 text-[10px] text-orange-600">{t("Companions: {plants}", { plants: selectedHarvestEta.beneficial_companions })}</div>
                     )}
                     <div className="mt-1.5 grid grid-cols-3 gap-1">
                       {MONTH_KEYS.map((mk, i) => {
@@ -1553,7 +1555,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                         if (!exp && !act) return null;
                         return (
                           <div key={mk} className="rounded-lg bg-white p-1 text-center">
-                            <div className="text-[9px] font-semibold text-zinc-400">{MONTH_LABELS[i]}</div>
+                            <div className="text-[9px] font-semibold text-zinc-400">{t(MONTH_LABELS[i])}</div>
                             {exp && <div className="text-[10px] text-emerald-600">{exp}</div>}
                             {act && <div className="text-[10px] text-blue-600">{act}</div>}
                           </div>
@@ -1569,67 +1571,67 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                 disabled={!onAddCropToBed}
                 className="mt-4 w-full rounded-xl border border-emerald-200 bg-emerald-100 px-3 py-2 text-sm font-bold text-emerald-900 hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                + Add crop to {selectedBed}
+                {t("+ Add crop to {bed}", { bed: selectedBed })}
               </button>
               <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 p-2.5">
                 <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
-                  Quick add action
+                  {t("Quick add action")}
                 </div>
                 <div className="mt-2 space-y-1.5">
                   <Link
                     href={buildQuickActionHref("/fertiliser")}
                     className="block rounded-lg border border-amber-200 bg-amber-100 px-2.5 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-200"
                   >
-                    + Fertiliser
+                    {t("+ Fertiliser")}
                   </Link>
                   <Link
                     href={buildQuickActionHref("/farm/compost")}
                     className="block rounded-lg border border-emerald-200 bg-emerald-100 px-2.5 py-1.5 text-xs font-medium text-emerald-900 hover:bg-emerald-200"
                   >
-                    + Compost
+                    {t("+ Compost")}
                   </Link>
                   <Link
                     href={buildQuickActionHref("/farm/mulch")}
                     className="block rounded-lg border border-orange-200 bg-orange-100 px-2.5 py-1.5 text-xs font-medium text-orange-900 hover:bg-orange-200"
                   >
-                    + Mulch
+                    {t("+ Mulch")}
                   </Link>
                   <Link
                     href={buildQuickActionHref("/farm/pest-control")}
                     className="block rounded-lg border border-rose-200 bg-rose-100 px-2.5 py-1.5 text-xs font-medium text-rose-900 hover:bg-rose-200"
                   >
-                    + Pest control
+                    {t("+ Pest control")}
                   </Link>
                 </div>
               </div>
             </div>
           ) : !editMode ? (
             <div className="rounded-2xl border border-dashed border-zinc-200 p-4 text-center text-xs text-zinc-400">
-              Click a {isVerticalLayout ? "row" : "bed"} on the map to see details
+              {isVerticalLayout ? t("Click a row on the map to see details") : t("Click a bed on the map to see details")}
             </div>
           ) : null}
 
           {/* Legend */}
           <div className="rounded-2xl border border-zinc-200 bg-white p-3">
-            <div className="mb-2 text-xs font-semibold text-zinc-500">Legend</div>
+            <div className="mb-2 text-xs font-semibold text-zinc-500">{t("Legend")}</div>
             <div className="space-y-1.5 text-xs text-zinc-500">
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-zinc-100" /> Unmapped
+                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-zinc-100" /> {t("Unmapped")}
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-sky-100" /> Planned
+                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-sky-100" /> {t("Planned")}
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-yellow-200" /> Planted
+                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-yellow-200" /> {t("Planted")}
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-lime-200" /> Growing
+                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-lime-200" /> {t("Growing")}
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-green-200" /> Harvest ready
+                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-green-200" /> {t("Harvest ready")}
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded-full bg-rose-600" /> Pest control treatments
+                <span className="inline-block h-2.5 w-2.5 rounded-full bg-rose-600" /> {t("Pest control treatments")}
               </span>
             </div>
           </div>

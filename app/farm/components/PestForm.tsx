@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import type { Zone, Crop } from "@/lib/farm";
+import { useT } from "@/lib/i18n";
 
 export type PestFormData = {
   pest_name: string;
@@ -44,6 +45,7 @@ export function PestForm({
   initialData,
   submitLabel = "Log pest issue",
 }: Props) {
+  const t = useT();
   const [form, setForm] = useState<PestFormData>(initialData ?? blank);
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState("");
@@ -97,41 +99,41 @@ export function PestForm({
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
       <div className="mb-5">
-        <h2 className="text-xl font-semibold">{submitLabel}</h2>
+        <h2 className="text-xl font-semibold">{t(submitLabel)}</h2>
         <p className="mt-1 text-sm text-zinc-500">
-          Record what you saw, where, and what you did about it.
+          {t("Record what you saw, where, and what you did about it.")}
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="mb-2 block text-sm font-medium">Pest / issue</label>
+          <label className="mb-2 block text-sm font-medium">{t("Pest / issue")}</label>
           <input
             type="text"
             value={form.pest_name}
             onChange={(e) => setForm((prev) => ({ ...prev, pest_name: e.target.value }))}
             className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            placeholder="Aphids, whitefly, fungal blight…"
+            placeholder={t("Aphids, whitefly, fungal blight…")}
             required
           />
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-2 block text-sm font-medium">Severity</label>
+            <label className="mb-2 block text-sm font-medium">{t("Severity")}</label>
             <select
               value={form.severity}
               onChange={(e) => setForm((prev) => ({ ...prev, severity: e.target.value }))}
               className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
             >
-              <option value="low">low</option>
-              <option value="medium">medium</option>
-              <option value="high">high</option>
+              <option value="low">{t("low")}</option>
+              <option value="medium">{t("medium")}</option>
+              <option value="high">{t("high")}</option>
             </select>
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium">Date spotted</label>
+            <label className="mb-2 block text-sm font-medium">{t("Date spotted")}</label>
             <input
               type="date"
               value={form.logged_date}
@@ -144,13 +146,13 @@ export function PestForm({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-2 block text-sm font-medium">Crop</label>
+            <label className="mb-2 block text-sm font-medium">{t("Crop")}</label>
             <select
               value={form.crop_id}
               onChange={(e) => setForm((prev) => ({ ...prev, crop_id: e.target.value }))}
               className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
             >
-              <option value="">No specific crop</option>
+              <option value="">{t("No specific crop")}</option>
               {crops.map((crop) => (
                 <option key={crop.id} value={crop.id}>
                   {crop.crop_name}{crop.variety ? ` · ${crop.variety}` : ""}
@@ -160,13 +162,13 @@ export function PestForm({
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium">Bed</label>
+            <label className="mb-2 block text-sm font-medium">{t("Bed")}</label>
             <select
               value={form.zone_id}
               onChange={(e) => setForm((prev) => ({ ...prev, zone_id: e.target.value }))}
               className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
             >
-              <option value="">No bed</option>
+              <option value="">{t("No bed")}</option>
               {zones.map((zone) => (
                 <option key={zone.id} value={zone.id}>
                   {zone.name}
@@ -178,7 +180,7 @@ export function PestForm({
 
         <div>
           <label className="mb-2 block text-sm font-medium">
-            Photo <span className="font-normal text-zinc-400">(optional)</span>
+            {t("Photo")} <span className="font-normal text-zinc-400">{t("(optional)")}</span>
           </label>
           <input
             ref={fileInputRef}
@@ -192,28 +194,28 @@ export function PestForm({
         {preview ? (
           <img
             src={preview}
-            alt="Preview"
+            alt={t("Preview")}
             className="h-48 w-full rounded-2xl object-cover"
           />
         ) : null}
 
         <div>
-          <label className="mb-2 block text-sm font-medium">What you saw</label>
+          <label className="mb-2 block text-sm font-medium">{t("What you saw")}</label>
           <textarea
             value={form.description}
             onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
             className="min-h-[80px] w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            placeholder="Yellowing leaves on lower stems, clusters on underside…"
+            placeholder={t("Yellowing leaves on lower stems, clusters on underside…")}
           />
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium">Action taken</label>
+          <label className="mb-2 block text-sm font-medium">{t("Action taken")}</label>
           <textarea
             value={form.action_taken}
             onChange={(e) => setForm((prev) => ({ ...prev, action_taken: e.target.value }))}
             className="min-h-[80px] w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            placeholder="Sprayed neem oil, removed affected leaves…"
+            placeholder={t("Sprayed neem oil, removed affected leaves…")}
           />
         </div>
 
@@ -222,7 +224,7 @@ export function PestForm({
           disabled={saving || !form.pest_name.trim()}
           className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {saving ? "Saving…" : submitLabel}
+          {saving ? t("Saving…") : t(submitLabel)}
         </button>
       </form>
     </div>

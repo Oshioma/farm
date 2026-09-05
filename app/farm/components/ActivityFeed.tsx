@@ -1,17 +1,21 @@
+"use client";
+
 import type { Activity } from "@/lib/farm";
 import { formatDate } from "@/app/farm/utils";
+import { useT } from "@/lib/i18n";
 
 type Props = {
   activities: Activity[];
 };
 
 export function ActivityFeed({ activities }: Props) {
+  const t = useT();
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
-      <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-zinc-500">Recent activity</h2>
+      <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-zinc-500">{t("Recent activity")}</h2>
 
       {activities.length === 0 ? (
-        <p className="mt-3 text-sm text-zinc-500">No activity yet.</p>
+        <p className="mt-3 text-sm text-zinc-500">{t("No activity yet.")}</p>
       ) : (
         <div className="mt-3 grid gap-x-6 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
           {activities.map((item) => (

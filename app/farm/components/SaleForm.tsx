@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Crop } from "@/lib/farm";
+import { useT } from "@/lib/i18n";
 
 export type SaleFormData = {
   crop_id: string;
@@ -31,6 +32,7 @@ type Props = {
 };
 
 export function SaleForm({ crops, onSubmit, initial, submitLabel }: Props) {
+  const t = useT();
   const [form, setForm] = useState<SaleFormData>(initial ?? blank);
   const [saving, setSaving] = useState(false);
 
@@ -64,13 +66,13 @@ export function SaleForm({ crops, onSubmit, initial, submitLabel }: Props) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="mb-2 block text-sm font-medium">Crop</label>
+          <label className="mb-2 block text-sm font-medium">{t("Crop")}</label>
           <select
             value={form.crop_id}
             onChange={(e) => updateField("crop_id", e.target.value)}
             className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
           >
-            <option value="">Not linked to a crop</option>
+            <option value="">{t("Not linked to a crop")}</option>
             {crops.map((crop) => (
               <option key={crop.id} value={crop.id}>
                 {crop.crop_name}
@@ -81,20 +83,20 @@ export function SaleForm({ crops, onSubmit, initial, submitLabel }: Props) {
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium">Buyer name</label>
+          <label className="mb-2 block text-sm font-medium">{t("Buyer name")}</label>
           <input
             type="text"
             value={form.buyer_name}
             onChange={(e) => updateField("buyer_name", e.target.value)}
             className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            placeholder="e.g. Market vendor"
+            placeholder={t("e.g. Market vendor")}
           />
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div>
-          <label className="mb-2 block text-sm font-medium">Quantity (kg)</label>
+          <label className="mb-2 block text-sm font-medium">{t("Quantity (kg)")}</label>
           <input
             type="number"
             step="0.1"
@@ -107,7 +109,7 @@ export function SaleForm({ crops, onSubmit, initial, submitLabel }: Props) {
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium">Price per kg (TZS)</label>
+          <label className="mb-2 block text-sm font-medium">{t("Price per kg (TZS)")}</label>
           <input
             type="number"
             step="1"
@@ -120,7 +122,7 @@ export function SaleForm({ crops, onSubmit, initial, submitLabel }: Props) {
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium">Total (TZS)</label>
+          <label className="mb-2 block text-sm font-medium">{t("Total (TZS)")}</label>
           <input
             type="number"
             step="1"
@@ -128,13 +130,13 @@ export function SaleForm({ crops, onSubmit, initial, submitLabel }: Props) {
             value={form.total_amount}
             onChange={(e) => updateField("total_amount", e.target.value)}
             className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            placeholder="Auto-calculated"
+            placeholder={t("Auto-calculated")}
           />
         </div>
       </div>
 
       <div>
-        <label className="mb-2 block text-sm font-medium">Sale date</label>
+        <label className="mb-2 block text-sm font-medium">{t("Sale date")}</label>
         <input
           type="date"
           value={form.sale_date}
@@ -145,13 +147,13 @@ export function SaleForm({ crops, onSubmit, initial, submitLabel }: Props) {
       </div>
 
       <div>
-        <label className="mb-2 block text-sm font-medium">Notes</label>
+        <label className="mb-2 block text-sm font-medium">{t("Notes")}</label>
         <input
           type="text"
           value={form.notes}
           onChange={(e) => updateField("notes", e.target.value)}
           className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-          placeholder="Any details about the sale"
+          placeholder={t("Any details about the sale")}
         />
       </div>
 
@@ -160,7 +162,7 @@ export function SaleForm({ crops, onSubmit, initial, submitLabel }: Props) {
         disabled={saving}
         className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {saving ? "Saving..." : (submitLabel ?? "Log sale")}
+        {saving ? t("Saving...") : t(submitLabel ?? "Log sale")}
       </button>
     </form>
   );

@@ -11,22 +11,24 @@ import {
   type FarmNotification,
 } from "@/lib/notifications";
 import { FOCUS_EVENT } from "@/hooks/useFocusTarget";
+import { useT, type Translate } from "@/lib/i18n";
 
 const POLL_MS = 45_000;
 
-function timeAgo(iso: string): string {
+function timeAgo(iso: string, t: Translate): string {
   const secs = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
-  if (secs < 60) return "just now";
+  if (secs < 60) return t("just now");
   const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60) return t("{n}m ago", { n: mins });
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return t("{n}h ago", { n: hrs });
   const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
+  if (days < 7) return t("{n}d ago", { n: days });
   return new Date(iso).toLocaleDateString();
 }
 
 export default function NotificationBell() {
+  const t = useT();
   const router = useRouter();
   const [items, setItems] = useState<FarmNotification[]>([]);
   const [unread, setUnread] = useState(0);
@@ -100,7 +102,7 @@ export default function NotificationBell() {
     <div ref={containerRef} className="relative">
       <button
         onClick={handleOpen}
-        aria-label="Notifications"
+        aria-label={t("Notifications")}
         className="relative rounded-full border border-zinc-200 bg-white p-2 text-zinc-700 transition hover:bg-zinc-100"
       >
         <Bell className="h-5 w-5" />
@@ -114,16 +116,16 @@ export default function NotificationBell() {
       {open && (
         <div className="absolute right-0 z-50 mt-2 w-80 max-w-[90vw] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-lg">
           <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-2.5">
-            <span className="text-sm font-semibold text-zinc-900">Notifications</span>
+            <span className="text-sm font-semibold text-zinc-900">{t("Notifications")}</span>
             {unread > 0 && (
               <button onClick={handleMarkAll} className="text-xs font-medium text-emerald-700 hover:underline">
-                Mark all read
+                {t("Mark all read")}
               </button>
             )}
           </div>
 
           {items.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm text-zinc-500">Nothing yet.</div>
+            <div className="px-4 py-8 text-center text-sm text-zinc-500">{t("Nothing yet.")}</div>
           ) : (
             <ul className="max-h-96 divide-y divide-zinc-100 overflow-y-auto">
               {items.map((n) => (
@@ -136,7 +138,7 @@ export default function NotificationBell() {
                   >
                     <span className="text-sm text-zinc-800">{n.title}</span>
                     {n.body && <span className="line-clamp-2 text-xs text-zinc-500">{n.body}</span>}
-                    <span className="text-xs text-zinc-400">{timeAgo(n.created_at)}</span>
+                    <span className="text-xs text-zinc-400">{timeAgo(n.created_at, t)}</span>
                   </button>
                 </li>
               ))}

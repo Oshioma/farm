@@ -8,6 +8,7 @@ import { useFocusTarget } from "@/hooks/useFocusTarget";
 import type { FarmMember } from "@/lib/farm";
 import { ExpandableText } from "@/app/farm/components/ExpandableText";
 import { LogHoursModal } from "@/app/farm/components/LogHoursModal";
+import { useT } from "@/lib/i18n";
 import {
   Moon,
   Sprout,
@@ -171,6 +172,7 @@ type Props = {
 
 export default function LunarPlanner({ embedded = false, farmId, members }: Props) {
   const router = useRouter();
+  const t = useT();
   const [userId, setUserId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"tasks" | "lunar">("tasks");
@@ -700,12 +702,12 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
                     tab === key ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:text-zinc-900"
                   }`}
                 >
-                  {label}
+                  {t(label)}
                 </button>
               ))}
             </div>
             {tab === "lunar" && (
-              <span className="text-sm text-zinc-500">Plan farm goals by the rhythm of the moon.</span>
+              <span className="text-sm text-zinc-500">{t("Plan farm goals by the rhythm of the moon.")}</span>
             )}
           </div>
         ) : (
@@ -731,14 +733,14 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
                           tab === key ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:text-zinc-900"
                         }`}
                       >
-                        {label}
+                        {t(label)}
                       </button>
                     ))}
                   </div>
                 </div>
                 {tab === "lunar" && (
                   <p className="mt-2 text-sm text-zinc-500">
-                    Plan farm tasks by the rhythm of the moon.
+                    {t("Plan farm tasks by the rhythm of the moon.")}
                   </p>
                 )}
               </div>
@@ -747,7 +749,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
                   href="/farm"
                   className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
                 >
-                  ← Farm
+                  ← {t("Farm")}
                 </Link>
                 <button
                   onClick={async () => {
@@ -756,7 +758,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
                   }}
                   className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
                 >
-                  Sign out
+                  {t("Sign out")}
                 </button>
               </div>
             </div>
@@ -765,7 +767,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
 
         {error && (
           <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {error}
+            {t(error)}
           </div>
         )}
 
@@ -786,7 +788,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
                   view === mode ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:text-zinc-900"
                 }`}
               >
-                {label}
+                {t(label)}
               </button>
             ))}
           </div>
@@ -797,7 +799,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
             </span>
             <button
               onClick={() => navigate(-1)}
-              aria-label="Previous period"
+              aria-label={t("Previous period")}
               className="rounded-full border border-zinc-200 p-2 text-zinc-600 transition hover:bg-zinc-100"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -806,11 +808,11 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
               onClick={goToday}
               className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
             >
-              Today
+              {t("Today")}
             </button>
             <button
               onClick={() => navigate(1)}
-              aria-label="Next period"
+              aria-label={t("Next period")}
               className="rounded-full border border-zinc-200 p-2 text-zinc-600 transition hover:bg-zinc-100"
             >
               <ChevronRight className="h-4 w-4" />
@@ -823,7 +825,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
         {/* Day cards / month grid */}
         {loading ? (
           <div className="rounded-3xl border border-zinc-200 bg-white p-8 text-sm text-zinc-500 shadow-sm">
-            Loading…
+            {t("Loading…")}
           </div>
         ) : view === "30day" ? (
           <MonthGrid
@@ -895,7 +897,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
           <section className="mb-6 mt-6 rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-6 shadow-sm">
             <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-indigo-900">
               <BookOpen className="h-5 w-5" />
-              Lunar Farming Guide
+              {t("Lunar Farming Guide")}
             </h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {REFERENCE_GUIDE.map(({ phase, summary }) => {
@@ -904,15 +906,15 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
                   <div key={phase} className={`rounded-2xl border ${theme.ring} bg-white/80 p-4`}>
                     <div className="mb-1.5 flex items-center gap-2">
                       <span>{PHASE_MOON_EMOJI[phase]}</span>
-                      <span className="font-semibold">{phase}</span>
+                      <span className="font-semibold">{t(phase)}</span>
                     </div>
-                    <p className="text-sm leading-relaxed text-zinc-600">{summary}</p>
+                    <p className="text-sm leading-relaxed text-zinc-600">{t(summary)}</p>
                   </div>
                 );
               })}
             </div>
             <p className="mt-4 rounded-2xl bg-indigo-50 px-4 py-3 text-sm italic leading-relaxed text-indigo-800">
-              {REFERENCE_NOTE}
+              {t(REFERENCE_NOTE)}
             </p>
           </section>
         )}
@@ -922,7 +924,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
           <section className="mb-6 rounded-3xl border border-rose-200 bg-rose-50/60 p-5 shadow-sm">
             <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold text-rose-900">
               <Bell className="h-5 w-5" />
-              Reminders due today
+              {t("Reminders due today")}
               <span className="rounded-full bg-rose-200 px-2 py-0.5 text-xs font-semibold text-rose-800">
                 {dueReminders.length}
               </span>
@@ -943,7 +945,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
                     <p className="text-xs text-zinc-500">
                       {r.title}
                       {r.reminder_date && (
-                        <> · due {formatDayLabel(fromISODate(r.reminder_date), { short: true })}</>
+                        <> {t("· due {date}", { date: formatDayLabel(fromISODate(r.reminder_date), { short: true }) })}</>
                       )}
                     </p>
                   </div>
@@ -953,14 +955,14 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
                       disabled={busyReminderId === r.id}
                       className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-700 disabled:opacity-50"
                     >
-                      Done
+                      {t("Done")}
                     </button>
                     <button
                       onClick={() => handleSetReminderStatus(r, "skipped")}
                       disabled={busyReminderId === r.id}
                       className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-50"
                     >
-                      Skip
+                      {t("Skip")}
                     </button>
                   </div>
                 </li>
@@ -974,14 +976,14 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
           <section className="mb-6 rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm">
             <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-emerald-900">
               <Sparkles className="h-5 w-5" />
-              Best Next 3 Days
+              {t("Best Next 3 Days")}
             </h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {bestDays.map(({ tpl, dateISO }) => {
                 const theme = PHASE_THEME[tpl.phase];
                 return (
                   <div key={tpl.key} className={`rounded-2xl border ${theme.ring} bg-white p-4 shadow-sm`}>
-                    <p className="text-sm font-semibold text-zinc-800">{tpl.title}</p>
+                    <p className="text-sm font-semibold text-zinc-800">{t(tpl.title)}</p>
                     {dateISO ? (
                       <button
                         onClick={() => openDay(dateISO)}
@@ -990,21 +992,21 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
                         {formatDayLabel(fromISODate(dateISO), { weekday: true })}
                       </button>
                     ) : (
-                      <p className="mt-1 text-sm text-zinc-400">No suitable day soon</p>
+                      <p className="mt-1 text-sm text-zinc-400">{t("No suitable day soon")}</p>
                     )}
                     <div className="mt-2">
                       <span
                         className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${theme.badge}`}
                       >
                         <span aria-hidden>{PHASE_MOON_EMOJI[tpl.phase]}</span>
-                        {tpl.phase}
+                        {t(tpl.phase)}
                       </span>
                     </div>
                     <ul className="mt-3 space-y-1 text-xs text-zinc-600">
-                      {tpl.tasks.map((t) => (
-                        <li key={t} className="flex gap-1.5">
+                      {tpl.tasks.map((line) => (
+                        <li key={line} className="flex gap-1.5">
                           <span className={`mt-1.5 h-1 w-1 shrink-0 rounded-full ${theme.dot}`} />
-                          <span>{t}</span>
+                          <span>{t(line)}</span>
                         </li>
                       ))}
                     </ul>
@@ -1021,7 +1023,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-6 sm:items-center sm:py-10">
           <div className="flex w-full max-w-lg max-h-[calc(100vh-2rem)] flex-col rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl sm:max-h-[calc(100vh-5rem)]">
             <h2 className="mb-1 text-lg font-semibold">
-              {taskModal.taskId ? "Edit task" : "Add task"}
+              {taskModal.taskId ? t("Edit task") : t("Add task")}
             </h2>
             <p className="mb-5 text-sm text-zinc-500">
               {formatDayLabel(fromISODate(taskForm.date || taskModal.date), {
@@ -1031,17 +1033,17 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
             </p>
             <div className="space-y-3 overflow-y-auto pr-1">
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Title</label>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Title")}</label>
                 <input
                   autoFocus
                   className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                   value={taskForm.title}
                   onChange={(e) => setTaskForm((p) => ({ ...p, title: e.target.value }))}
-                  placeholder="Plant root tubers: ginger, turmeric"
+                  placeholder={t("Plant root tubers: ginger, turmeric")}
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Date</label>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Date")}</label>
                 <input
                   type="date"
                   className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
@@ -1051,7 +1053,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Category</label>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Category")}</label>
                   <select
                     className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                     value={taskForm.category}
@@ -1059,43 +1061,43 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
                   >
                     {TASK_CATEGORIES.map((c) => (
                       <option key={c} value={c}>
-                        {c}
+                        {t(c)}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Status</label>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Status")}</label>
                   <select
                     className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                     value={taskForm.status}
                     onChange={(e) => setTaskForm((p) => ({ ...p, status: e.target.value }))}
                   >
-                    <option value="planned">Planned</option>
-                    <option value="done">Done</option>
+                    <option value="planned">{t("Planned")}</option>
+                    <option value="done">{t("Done")}</option>
                   </select>
                 </div>
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-zinc-600">
-                  Crop / activity <span className="font-normal text-zinc-400">(optional)</span>
+                  {t("Crop / activity")} <span className="font-normal text-zinc-400">{t("(optional)")}</span>
                 </label>
                 <input
                   className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                   value={taskForm.crop_or_activity}
                   onChange={(e) => setTaskForm((p) => ({ ...p, crop_or_activity: e.target.value }))}
-                  placeholder="Ginger, turmeric…"
+                  placeholder={t("Ginger, turmeric…")}
                 />
               </div>
               {members && members.length > 0 && (
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Assign to</label>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Assign to")}</label>
                   <select
                     className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                     value={taskForm.assigned_to}
                     onChange={(e) => setTaskForm((p) => ({ ...p, assigned_to: e.target.value }))}
                   >
-                    <option value="">Unassigned</option>
+                    <option value="">{t("Unassigned")}</option>
                     {members.map((m) => (
                       <option key={m.profile_id} value={m.profile_id}>
                         {m.user_email ?? m.profile_id}
@@ -1105,7 +1107,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
                 </div>
               )}
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Notes</label>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Notes")}</label>
                 <textarea
                   className="min-h-[60px] w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                   value={taskForm.notes}
@@ -1116,12 +1118,12 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
               {/* Reminder */}
               <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
                 <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                  <Bell className="h-3.5 w-3.5" /> Reminder (optional)
+                  <Bell className="h-3.5 w-3.5" /> {t("Reminder (optional)")}
                 </p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label className="mb-1.5 block text-xs font-medium text-zinc-600">
-                      Remind me on
+                      {t("Remind me on")}
                     </label>
                     <input
                       type="date"
@@ -1134,7 +1136,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
                   </div>
                   <div>
                     <label className="mb-1.5 block text-xs font-medium text-zinc-600">
-                      Reminder status
+                      {t("Reminder status")}
                     </label>
                     <select
                       className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900 disabled:bg-zinc-100 disabled:text-zinc-400"
@@ -1144,15 +1146,15 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
                         setTaskForm((p) => ({ ...p, reminder_status: e.target.value }))
                       }
                     >
-                      <option value="pending">Pending</option>
-                      <option value="done">Done</option>
-                      <option value="skipped">Skipped</option>
+                      <option value="pending">{t("Pending")}</option>
+                      <option value="done">{t("Done")}</option>
+                      <option value="skipped">{t("Skipped")}</option>
                     </select>
                   </div>
                 </div>
                 <div className="mt-3">
                   <label className="mb-1.5 block text-xs font-medium text-zinc-600">
-                    Reminder note
+                    {t("Reminder note")}
                   </label>
                   <input
                     className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
@@ -1160,7 +1162,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
                     onChange={(e) =>
                       setTaskForm((p) => ({ ...p, reminder_note: e.target.value }))
                     }
-                    placeholder="Check ginger bed, water seedlings…"
+                    placeholder={t("Check ginger bed, water seedlings…")}
                   />
                 </div>
               </div>
@@ -1171,13 +1173,13 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
                 disabled={savingTask}
                 className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60"
               >
-                {savingTask ? "Saving…" : "Save task"}
+                {savingTask ? t("Saving…") : t("Save task")}
               </button>
               <button
                 onClick={() => setTaskModal(null)}
                 className="rounded-2xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                Cancel
+                {t("Cancel")}
               </button>
             </div>
           </div>
@@ -1204,6 +1206,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
 // Biodynamic icon row
 // ---------------------------------------------------------------------------
 function IconRow({ phase, max }: { phase: MoonPhase; max?: number }) {
+  const t = useT();
   const keys = max ? PHASE_ICONS[phase].slice(0, max) : PHASE_ICONS[phase];
   return (
     <div className="flex flex-wrap gap-1">
@@ -1212,11 +1215,11 @@ function IconRow({ phase, max }: { phase: MoonPhase; max?: number }) {
         return (
           <span
             key={k}
-            title={ic.label}
+            title={t(ic.label)}
             className="inline-flex h-6 items-center rounded-full bg-zinc-100 px-1.5 text-sm leading-none"
           >
             <span aria-hidden>{ic.emoji}</span>
-            <span className="sr-only">{ic.label}</span>
+            <span className="sr-only">{t(ic.label)}</span>
           </span>
         );
       })}
@@ -1228,10 +1231,11 @@ function IconRow({ phase, max }: { phase: MoonPhase; max?: number }) {
 // Today's Lunar Guidance block
 // ---------------------------------------------------------------------------
 function GuidanceBlock({ phase, theme }: { phase: MoonPhase; theme: typeof PHASE_THEME[MoonPhase] }) {
+  const t = useT();
   return (
     <div className={`rounded-2xl ${theme.chip} px-3 py-2.5`}>
       <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide">
-        <Moon className="h-3.5 w-3.5" /> Today&apos;s Lunar Guidance
+        <Moon className="h-3.5 w-3.5" /> {t("Today's Lunar Guidance")}
       </p>
       <ul className="space-y-0.5 text-xs leading-snug">
         {PHASE_GUIDANCE[phase].map((g, i) => {
@@ -1245,7 +1249,7 @@ function GuidanceBlock({ phase, theme }: { phase: MoonPhase; theme: typeof PHASE
               >
                 {advisory ? "⚠" : <span className={`inline-block h-1 w-1 rounded-full ${theme.dot}`} />}
               </span>
-              <span className={advisory ? "italic" : ""}>{g}</span>
+              <span className={advisory ? "italic" : ""}>{t(g)}</span>
             </li>
           );
         })}
@@ -1275,6 +1279,7 @@ interface DayTaskListProps {
 
 function DayTaskList(props: DayTaskListProps) {
   const { tasks, busyTaskId, memberEmailMap, columns = 1, onEditTask, onToggleDone, onDeleteTask } = props;
+  const t = useT();
   /* A lunar task notification links here with ?task=<id>. */
   const focusTaskId = useFocusTarget("task", "lunar-task", true);
   const grid =
@@ -1287,20 +1292,20 @@ function DayTaskList(props: DayTaskListProps) {
     <>
         {tasks.length === 0 ? (
         <p className="rounded-xl border border-dashed border-zinc-200 px-3 py-3 text-center text-xs text-zinc-400">
-          No tasks yet.
+          {t("No tasks yet.")}
         </p>
       ) : (
         <ul className={grid}>
-          {tasks.map((t) => {
-            const Icon = CATEGORY_ICON[t.category ?? "Other"] ?? CircleDot;
-            const done = t.status === "done";
-            const busy = busyTaskId === t.id;
+          {tasks.map((task) => {
+            const Icon = CATEGORY_ICON[task.category ?? "Other"] ?? CircleDot;
+            const done = task.status === "done";
+            const busy = busyTaskId === task.id;
             return (
               <li
-                key={t.id}
-                id={`lunar-task-${t.id}`}
+                key={task.id}
+                id={`lunar-task-${task.id}`}
                 className={`flex items-start gap-2 rounded-xl border px-2.5 py-2 text-sm transition ${
-                  focusTaskId === t.id
+                  focusTaskId === task.id
                     ? "border-emerald-400 bg-emerald-50/60 ring-2 ring-emerald-300"
                     : done
                       ? "border-emerald-100 bg-emerald-50/60"
@@ -1308,9 +1313,9 @@ function DayTaskList(props: DayTaskListProps) {
                 }`}
               >
                 <button
-                  onClick={() => onToggleDone(t)}
+                  onClick={() => onToggleDone(task)}
                   disabled={busy}
-                  aria-label={done ? "Mark as not done" : "Mark as done"}
+                  aria-label={done ? t("Mark as not done") : t("Mark as done")}
                   className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition ${
                     done
                       ? "border-emerald-500 bg-emerald-500 text-white"
@@ -1327,56 +1332,60 @@ function DayTaskList(props: DayTaskListProps) {
                         done ? "text-zinc-400 line-through" : "text-zinc-800"
                       }`}
                     >
-                      {t.title}
+                      {task.title}
                     </span>
                   </div>
                   <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500">
-                    {t.category && (
+                    {task.category && (
                       <span className="rounded-full bg-white px-1.5 py-0.5 ring-1 ring-zinc-200">
-                        {t.category}
+                        {t(task.category)}
                       </span>
                     )}
-                    {t.crop_or_activity && <span>· {t.crop_or_activity}</span>}
-                    {t.reminder_date && t.reminder_status === "pending" && (
+                    {task.crop_or_activity && <span>· {task.crop_or_activity}</span>}
+                    {task.reminder_date && task.reminder_status === "pending" && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-1.5 py-0.5 text-rose-600 ring-1 ring-rose-100">
                         <Bell className="h-3 w-3" />
-                        {formatDayLabel(fromISODate(t.reminder_date), { short: true })}
+                        {formatDayLabel(fromISODate(task.reminder_date), { short: true })}
                       </span>
                     )}
-                    {t.carried_over_from && !done && (
+                    {task.carried_over_from && !done && (
                       <span
                         className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-amber-700 ring-1 ring-amber-100"
-                        title={`Rolled over — originally scheduled for ${formatDayLabel(
-                          fromISODate(t.carried_over_from),
-                          { weekday: true, year: true }
-                        )}`}
+                        title={t("Rolled over — originally scheduled for {date}", {
+                          date: formatDayLabel(fromISODate(task.carried_over_from), {
+                            weekday: true,
+                            year: true,
+                          }),
+                        })}
                       >
-                        ↪ probably for {formatDayLabel(fromISODate(t.carried_over_from), { short: true })}
+                        {t("↪ probably for {date}", {
+                          date: formatDayLabel(fromISODate(task.carried_over_from), { short: true }),
+                        })}
                       </span>
                     )}
-                    {t.assigned_to && (
+                    {task.assigned_to && (
                       <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-indigo-600 ring-1 ring-indigo-100">
-                        {memberEmailMap[t.assigned_to] ?? "Assigned"}
+                        {memberEmailMap[task.assigned_to] ?? t("Assigned")}
                       </span>
                     )}
                   </div>
-                  {t.notes && (
-                    <ExpandableText text={t.notes} className="mt-1 text-[11px] leading-snug text-zinc-500" />
+                  {task.notes && (
+                    <ExpandableText text={task.notes} className="mt-1 text-[11px] leading-snug text-zinc-500" />
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-0.5">
                   <button
-                    onClick={() => onEditTask(t)}
+                    onClick={() => onEditTask(task)}
                     disabled={busy}
-                    aria-label="Edit task"
+                    aria-label={t("Edit task")}
                     className="rounded-lg p-1 text-zinc-400 transition hover:bg-zinc-200 hover:text-zinc-700"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
                   <button
-                    onClick={() => onDeleteTask(t)}
+                    onClick={() => onDeleteTask(task)}
                     disabled={busy}
-                    aria-label="Delete task"
+                    aria-label={t("Delete task")}
                     className="rounded-lg p-1 text-zinc-400 transition hover:bg-rose-100 hover:text-rose-600"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -1435,6 +1444,7 @@ function DayCard(props: DayCardProps) {
     showLunar,
     memberEmailMap,
   } = props;
+  const t = useT();
   const theme = PHASE_THEME[phase];
   const date = fromISODate(dateISO);
   const dayReminders = tasks.filter(
@@ -1456,7 +1466,7 @@ function DayCard(props: DayCardProps) {
             </h3>
             {isToday && (
               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-                Today
+                {t("Today")}
               </span>
             )}
           </div>
@@ -1470,10 +1480,10 @@ function DayCard(props: DayCardProps) {
               className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${theme.badge}`}
             >
               <span aria-hidden>{PHASE_MOON_EMOJI[phase]}</span>
-              {phase}
+              {t(phase)}
             </span>
             <p className="mt-1 text-[10px] text-zinc-400">
-              {overridden ? "Manual override" : "Automatically calculated"}
+              {overridden ? t("Manual override") : t("Automatically calculated")}
             </p>
           </div>
         )}
@@ -1496,7 +1506,7 @@ function DayCard(props: DayCardProps) {
               onChange={(e) => onToggleOverride(e.target.checked)}
               className="rounded border-zinc-300"
             />
-            Override moon phase
+            {t("Override moon phase")}
           </label>
           {overridden && (
             <select
@@ -1506,7 +1516,7 @@ function DayCard(props: DayCardProps) {
             >
               {MOON_PHASES.map((p) => (
                 <option key={p} value={p}>
-                  {p}
+                  {t(p)}
                 </option>
               ))}
             </select>
@@ -1518,13 +1528,13 @@ function DayCard(props: DayCardProps) {
       <div className="mb-3">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">
-            Tasks ({tasks.length})
+            {t("Tasks ({n})", { n: tasks.length })}
           </span>
           <button
             onClick={onAddTask}
             className="inline-flex items-center gap-1 rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-zinc-800"
           >
-            <Plus className="h-3 w-3" /> Add
+            <Plus className="h-3 w-3" /> {t("Add")}
           </button>
         </div>
         <DayTaskList
@@ -1549,7 +1559,7 @@ function DayCard(props: DayCardProps) {
       {large && dayReminders.length > 0 && (
         <div className="mb-3 rounded-2xl border border-rose-100 bg-rose-50/50 px-3 py-2.5">
           <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-rose-700">
-            <Bell className="h-3.5 w-3.5" /> Reminders
+            <Bell className="h-3.5 w-3.5" /> {t("Reminders")}
           </p>
           <ul className="space-y-1 text-xs text-zinc-600">
             {dayReminders.map((t) => (
@@ -1573,13 +1583,13 @@ function DayCard(props: DayCardProps) {
       {/* Notes */}
       <div className="mt-auto">
         <label className="mb-1 flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-zinc-400">
-          Notes {savingNote && <span className="text-zinc-300">saving…</span>}
+          {t("Notes")} {savingNote && <span className="text-zinc-300">{t("saving…")}</span>}
         </label>
         <textarea
           value={noteValue}
           onChange={(e) => onNoteChange(e.target.value)}
           onBlur={onNoteBlur}
-          placeholder="Observations, intentions…"
+          placeholder={t("Observations, intentions…")}
           className={`w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900 ${
             large ? "min-h-[80px]" : "min-h-[52px]"
           }`}
@@ -1609,6 +1619,7 @@ interface DayRowProps {
 
 function DayRow(props: DayRowProps) {
   const { dateISO, phase, tasks, busyTaskId, memberEmailMap, showLunar, onAddTask, onEditTask, onToggleDone, onDeleteTask } = props;
+  const t = useT();
   const [open, setOpen] = useState(false);
   const date = fromISODate(dateISO);
   const done = tasks.filter((t) => t.status === "done").length;
@@ -1629,18 +1640,18 @@ function DayRow(props: DayRowProps) {
           {showLunar && (
             <span className="hidden shrink-0 items-center gap-1.5 text-[11px] text-zinc-500 sm:flex">
               <span aria-hidden>{PHASE_MOON_EMOJI[phase]}</span>
-              {phase}
+              {t(phase)}
             </span>
           )}
           <span className="min-w-0 flex-1 truncate text-sm">
             {tasks.length === 0 ? (
-              <span className="text-zinc-400">Nothing planned</span>
+              <span className="text-zinc-400">{t("Nothing planned")}</span>
             ) : (
               <>
                 <span className="font-medium">
-                  {tasks.length} task{tasks.length === 1 ? "" : "s"}
+                  {tasks.length === 1 ? t("1 task") : t("{n} tasks", { n: tasks.length })}
                 </span>
-                {done > 0 && <span className="text-zinc-400"> · {done} done</span>}
+                {done > 0 && <span className="text-zinc-400"> {t("· {n} done", { n: done })}</span>}
                 <span className="text-zinc-500"> · {preview}</span>
                 {tasks.length > 2 && <span className="text-zinc-400"> +{tasks.length - 2}</span>}
               </>
@@ -1652,12 +1663,12 @@ function DayRow(props: DayRowProps) {
             onClick={onAddTask}
             className="inline-flex items-center gap-1 rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100"
           >
-            <Plus className="h-3 w-3" /> Add
+            <Plus className="h-3 w-3" /> {t("Add")}
           </button>
           {tasks.length > 0 && (
             <button
               onClick={() => setOpen(!open)}
-              aria-label={open ? "Collapse day" : "Expand day"}
+              aria-label={open ? t("Collapse day") : t("Expand day")}
               className="rounded-full p-1.5 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"
             >
               <ChevronRight className={`h-4 w-4 transition-transform ${open ? "rotate-90" : ""}`} />
@@ -1700,6 +1711,7 @@ const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function MonthGrid(props: MonthGridProps) {
   const { dates, todayISO, resolvedPhase, tasksByDate, onOpenDay, onAddTask, showLunar } = props;
+  const t = useT();
   const firstDate = fromISODate(dates[0]);
   const leadingBlanks = (firstDate.getDay() + 6) % 7;
 
@@ -1711,7 +1723,7 @@ function MonthGrid(props: MonthGridProps) {
             key={w}
             className="text-center text-[10px] font-semibold uppercase tracking-wide text-zinc-400 sm:text-xs"
           >
-            {w}
+            {t(w)}
           </div>
         ))}
       </div>
@@ -1739,7 +1751,7 @@ function MonthGrid(props: MonthGridProps) {
               <button
                 onClick={() => onOpenDay(dateISO)}
                 className="flex items-center justify-between text-left"
-                title={showLunar ? `${phase} — open day` : "Open day"}
+                title={showLunar ? t("{phase} — open day", { phase: t(phase) }) : t("Open day")}
               >
                 <span
                   className={`text-xs font-semibold sm:text-sm ${
@@ -1758,10 +1770,10 @@ function MonthGrid(props: MonthGridProps) {
                 <button
                   onClick={() => onOpenDay(dateISO)}
                   className="mt-1 flex flex-1 flex-col text-left"
-                  title={phase}
+                  title={t(phase)}
                 >
                   <p className="hidden text-[10px] font-medium leading-tight text-zinc-500 sm:block">
-                    {PHASE_HEADLINE[phase]}
+                    {t(PHASE_HEADLINE[phase])}
                   </p>
                   <div className="mt-1 hidden sm:block">
                     <IconRow phase={phase} max={4} />
@@ -1772,14 +1784,14 @@ function MonthGrid(props: MonthGridProps) {
               <div className="mt-1 flex items-center justify-between">
                 {dayTasks.length > 0 ? (
                   <span className="rounded-full bg-white/80 px-1.5 text-[9px] font-medium text-zinc-500 ring-1 ring-zinc-200 sm:text-[10px]">
-                    {dayTasks.length} task{dayTasks.length > 1 ? "s" : ""}
+                    {dayTasks.length === 1 ? t("1 task") : t("{n} tasks", { n: dayTasks.length })}
                   </span>
                 ) : (
                   <span />
                 )}
                 <button
                   onClick={() => onAddTask(dateISO)}
-                  aria-label="Add task"
+                  aria-label={t("Add task")}
                   className="rounded-md p-0.5 text-zinc-400 opacity-0 transition hover:bg-white hover:text-zinc-700 group-hover:opacity-100"
                 >
                   <Plus className="h-3.5 w-3.5" />

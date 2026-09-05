@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useT } from "@/lib/i18n";
 
 type Props = {
   text: string;
@@ -10,6 +11,7 @@ type Props = {
 // Clamps text to 2 lines with a "Show more" toggle, so long descriptions
 // don't dominate the card on narrow (mobile) viewports.
 export function ExpandableText({ text, className = "" }: Props) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const [isClamped, setIsClamped] = useState(false);
   const ref = useRef<HTMLParagraphElement>(null);
@@ -32,7 +34,7 @@ export function ExpandableText({ text, className = "" }: Props) {
           onClick={() => setExpanded((v) => !v)}
           className="mt-0.5 text-xs font-medium text-indigo-600 hover:underline"
         >
-          {expanded ? "Show less" : "Show more"}
+          {expanded ? t("Show less") : t("Show more")}
         </button>
       )}
     </div>
