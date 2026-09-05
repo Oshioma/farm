@@ -63,7 +63,10 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    // Remember where the visitor was heading so the login page can return them there.
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirectTo", `${pathname}${new URL(request.url).search}`);
+    return NextResponse.redirect(loginUrl);
   }
 
   return supabaseResponse;
