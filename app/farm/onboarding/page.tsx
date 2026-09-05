@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Check, ChevronRight, Circle, ExternalLink, Languages, Sprout } from "lucide-react";
 import {
   getCrops,
@@ -9,10 +10,10 @@ import {
   getHarvestEta,
   saveActiveFarmId,
   HARVEST_MONTHS,
-  harvestMonthYear,
+  harvestMonthKeyFor,
   harvestSeasonYear,
 } from "@/lib/farm";
-import type { Crop, Farm, HarvestEtaEntry, HarvestMonthKey } from "@/lib/farm";
+import type { Crop, Farm, HarvestEtaEntry } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { supabase } from "@/lib/supabase";
 
@@ -26,22 +27,22 @@ const copy = {
     back: "Enter farm", farm: "Farm", checking: "Checking your farm setup…",
     createTitle: "Name your farm to begin", createBody: "This guide then takes you from the first crop to a public shop.", create: "Create farm", creating: "Creating…",
     joinInstead: "Joining a farm that already exists? Request access instead",
-    complete: "complete", done: "Done", review: "Review", continue: "Continue", edit: "Edit",
-    farmName: "Farm name", location: "Location", acreage: "Farm size (acres)", saveDetails: "Save and continue", savingDetails: "Saving…",
-    detailsSaved: "Farm details saved.", locationPlaceholder: "Village, district or region", acreagePlaceholder: "e.g. 2.5",
-    cropName: "Crop name", variety: "Variety", plantedOn: "Planted on", expectedHarvestStart: "Expected harvest date", pricePerKg: "Expected price per kg", yieldKg: "Estimated yield (kg)",
-    optional: "optional", addCrop: "Add crop", addingCrop: "Adding…", cropAdded: "Crop added. Add another or continue.", cropsSoFar: "Crops on this farm", continueHarvest: "Continue to harvest estimate",
-    chooseCrop: "Crop", harvestMonth: "Harvest month", expectedKg: "Expected kilograms", saveHarvest: "Save estimate", savingHarvest: "Saving…", harvestSaved: "Harvest estimate saved.", estimatesSoFar: "Estimates so far", continueShop: "Continue to the shop", kg: "kg",
+    complete: "complete", done: "Done", review: "Review", continue: "Continue",
+    farmName: "Farm name", location: "Location", saveDetails: "Save and continue", savingDetails: "Saving…",
+    locationPlaceholder: "Village, district or region",
+    cropName: "Crop name", variety: "Variety", plantedOn: "Planted on", expectedHarvestStart: "Expected harvest date", expectedKg: "Expected kilograms", pricePerKg: "Expected price per kg",
+    optional: "optional", addCrop: "Add crop and continue", addingCrop: "Adding…", cropsSoFar: "Crops on this farm", addAnotherCrop: "Add another crop", kg: "kg",
+    cropPlaceholder: "e.g. Tomatoes", varietyPlaceholder: "e.g. Roma",
+    publishQuestion: "Do you want to publish your shop now?", publishBody: "Buyers will be able to find your farm and reserve produce from the crops above.",
+    publishYes: "Yes, publish and open my shop", publishing: "Publishing…", publishNo: "Not yet, take me to the farm",
     skip: "Skip setup for now and go to the farm dashboard",
     live: "Your shop is live", open: "Open public shop",
     privacy: "Publishing stays off until you choose it. Buyers cannot find an unfinished shop.",
-    cropPlaceholder: "e.g. Tomatoes", varietyPlaceholder: "e.g. Roma",
     steps: [
-      ["Describe your farm", "Add a location and farm size so buyers know where their food is grown.", "Add farm details"],
-      ["Add your first crop", "Record what is in the ground, the variety, planting date and expected price.", "Add a crop"],
-      ["Estimate the harvest", "Say which month it should be ready and roughly how many kilograms you expect.", "Add expected harvest"],
+      ["Farm name and location", "", "Add farm name and location"],
+      ["Add your crops", "What is growing, when it should be ready, and how much you expect to harvest.", "Add a crop"],
       ["Prepare the shop", "Add a farm photo, produce photo and price before publishing.", "Prepare shop"],
-      ["Publish when ready", "Turn on the public listing only after the crop and harvest details look right.", "Review and publish"],
+      ["Publish", "Put your shop where buyers can find it.", "Publish"],
     ],
   },
   sw: {
@@ -50,22 +51,22 @@ const copy = {
     back: "Ingia shambani", farm: "Shamba", checking: "Tunakagua maandalizi ya shamba lako…",
     createTitle: "Anza kwa kulipa jina shamba lako", createBody: "Kisha mwongozo huu utakusaidia kutoka zao la kwanza hadi duka la umma.", create: "Unda shamba", creating: "Inaunda…",
     joinInstead: "Unajiunga na shamba lililopo? Omba ruhusa badala yake",
-    complete: "zimekamilika", done: "Imekamilika", review: "Kagua", continue: "Endelea", edit: "Hariri",
-    farmName: "Jina la shamba", location: "Eneo", acreage: "Ukubwa wa shamba (ekari)", saveDetails: "Hifadhi na uendelee", savingDetails: "Inahifadhi…",
-    detailsSaved: "Taarifa za shamba zimehifadhiwa.", locationPlaceholder: "Kijiji, wilaya au mkoa", acreagePlaceholder: "mf. 2.5",
-    cropName: "Jina la zao", variety: "Aina", plantedOn: "Tarehe ya kupanda", expectedHarvestStart: "Tarehe ya mavuno inayotarajiwa", pricePerKg: "Bei inayotarajiwa kwa kilo", yieldKg: "Kadirio la mavuno (kg)",
-    optional: "hiari", addCrop: "Ongeza zao", addingCrop: "Inaongeza…", cropAdded: "Zao limeongezwa. Ongeza lingine au endelea.", cropsSoFar: "Mazao ya shamba hili", continueHarvest: "Endelea kwenye kadirio la mavuno",
-    chooseCrop: "Zao", harvestMonth: "Mwezi wa kuvuna", expectedKg: "Kilo zinazotarajiwa", saveHarvest: "Hifadhi kadirio", savingHarvest: "Inahifadhi…", harvestSaved: "Kadirio la mavuno limehifadhiwa.", estimatesSoFar: "Makadirio yaliyopo", continueShop: "Endelea kwenye duka", kg: "kg",
+    complete: "zimekamilika", done: "Imekamilika", review: "Kagua", continue: "Endelea",
+    farmName: "Jina la shamba", location: "Eneo", saveDetails: "Hifadhi na uendelee", savingDetails: "Inahifadhi…",
+    locationPlaceholder: "Kijiji, wilaya au mkoa",
+    cropName: "Jina la zao", variety: "Aina", plantedOn: "Tarehe ya kupanda", expectedHarvestStart: "Tarehe ya mavuno inayotarajiwa", expectedKg: "Kilo zinazotarajiwa", pricePerKg: "Bei inayotarajiwa kwa kilo",
+    optional: "hiari", addCrop: "Ongeza zao na uendelee", addingCrop: "Inaongeza…", cropsSoFar: "Mazao ya shamba hili", addAnotherCrop: "Ongeza zao lingine", kg: "kg",
+    cropPlaceholder: "mf. Nyanya", varietyPlaceholder: "mf. Roma",
+    publishQuestion: "Unataka kuchapisha duka lako sasa?", publishBody: "Wanunuzi wataweza kuona shamba lako na kuagiza mazao yaliyo hapo juu.",
+    publishYes: "Ndiyo, chapisha na ufungue duka langu", publishing: "Inachapisha…", publishNo: "Bado, nipeleke shambani",
     skip: "Ruka maandalizi kwa sasa na uende kwenye dashibodi ya shamba",
     live: "Duka lako sasa liko hewani", open: "Fungua duka la umma",
     privacy: "Duka halitawekwa hadharani mpaka uchague kufanya hivyo. Wanunuzi hawawezi kuona duka ambalo halijakamilika.",
-    cropPlaceholder: "mf. Nyanya", varietyPlaceholder: "mf. Roma",
     steps: [
-      ["Elezea shamba lako", "Weka eneo na ukubwa wa shamba ili wanunuzi wajue chakula chao kinalimwa wapi.", "Weka taarifa za shamba"],
-      ["Ongeza zao lako la kwanza", "Andika zao lililopandwa, aina yake, tarehe ya kupanda na bei inayotarajiwa.", "Ongeza zao"],
-      ["Kadiria mavuno", "Chagua mwezi wa kuvuna na kadirio la kilo unazotarajia kupata.", "Weka mavuno yanayotarajiwa"],
+      ["Jina na eneo la shamba", "", "Weka jina na eneo la shamba"],
+      ["Ongeza mazao yako", "Kinacholimwa, kitakapokuwa tayari, na kiasi unachotarajia kuvuna.", "Ongeza zao"],
       ["Andaa duka", "Weka picha ya shamba, picha ya mazao na bei kabla ya kuchapisha.", "Andaa duka"],
-      ["Chapisha ukiwa tayari", "Weka duka hadharani baada ya kukagua mazao na makadirio ya mavuno.", "Kagua na uchapishe"],
+      ["Chapisha", "Weka duka lako mahali wanunuzi wanaweza kuliona.", "Chapisha"],
     ],
   },
 } as const;
@@ -74,7 +75,7 @@ const inputClass = "mt-1.5 block w-full rounded-xl border border-zinc-300 bg-whi
 const primaryButton = "rounded-full bg-emerald-700 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50";
 const secondaryButton = "rounded-full border border-emerald-700 px-5 py-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50";
 
-const blankCrop = { name: "", variety: "", plantedOn: "", expectedHarvestStart: "", pricePerKg: "", yieldKg: "" };
+const blankCrop = { name: "", variety: "", plantedOn: "", expectedHarvestStart: "", expectedKg: "", pricePerKg: "" };
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -88,6 +89,7 @@ function expectedTotal(row: HarvestEtaEntry): number {
 }
 
 export default function FarmerOnboardingPage() {
+  const router = useRouter();
   const [lang, setLang] = useState<Lang>("en");
   const [farms, setFarms] = useState<Farm[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
@@ -102,19 +104,15 @@ export default function FarmerOnboardingPage() {
   const [newFarmName, setNewFarmName] = useState("");
   const [creatingFarm, setCreatingFarm] = useState(false);
 
-  const [detailsForm, setDetailsForm] = useState({ name: "", location: "", sizeAcres: "" });
+  const [detailsForm, setDetailsForm] = useState({ name: "", location: "" });
   const [savingDetails, setSavingDetails] = useState(false);
-  const [detailsMessage, setDetailsMessage] = useState("");
 
   const [cropForm, setCropForm] = useState(blankCrop);
   const [savingCrop, setSavingCrop] = useState(false);
-  const [cropMessage, setCropMessage] = useState("");
+
+  const [publishing, setPublishing] = useState(false);
 
   const seasonYear = harvestSeasonYear();
-  const currentMonthKey: HarvestMonthKey = HARVEST_MONTHS.find((m) => m.month === new Date().getMonth() + 1)?.key ?? "mar";
-  const [harvestForm, setHarvestForm] = useState<{ cropId: string; month: HarvestMonthKey; kg: string }>({ cropId: "", month: currentMonthKey, kg: "" });
-  const [savingHarvest, setSavingHarvest] = useState(false);
-  const [harvestMessage, setHarvestMessage] = useState("");
 
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
 
@@ -160,26 +158,20 @@ export default function FarmerOnboardingPage() {
 
   useEffect(() => {
     if (!farm) return;
-    setDetailsForm({
-      name: farm.name,
-      location: farm.location ?? "",
-      sizeAcres: farm.size_acres?.toString() ?? "",
-    });
-    setDetailsMessage("");
-    setCropMessage("");
-    setHarvestMessage("");
+    setDetailsForm({ name: farm.name, location: farm.location ?? "" });
     setActiveStep(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [farm?.id]);
 
-  /* Default the harvest form to the first crop without an estimate. */
+  /* Bring the newly opened step into view once it has rendered. */
   useEffect(() => {
-    if (harvestForm.cropId && crops.some((crop) => crop.id === harvestForm.cropId)) return;
-    const estimated = new Set(harvests.filter((row) => expectedTotal(row) > 0).map((row) => row.crop_id));
-    const candidate = crops.find((crop) => !estimated.has(crop.id)) ?? crops[0];
-    if (candidate) setHarvestForm((current) => ({ ...current, cropId: candidate.id }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [crops, harvests]);
+    if (activeStep === null) return;
+    document.getElementById(`step-${activeStep}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [activeStep]);
+
+  function goToStep(index: number) {
+    setActiveStep(index);
+  }
 
   async function createFarm(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -193,8 +185,7 @@ export default function FarmerOnboardingPage() {
       if (rpcError) throw rpcError;
       if (!farmId) throw new Error("The farm was not created.");
       await saveActiveFarmId(farmId);
-      const farmRows = await getFarms();
-      setFarms(farmRows);
+      setFarms(await getFarms());
       setActiveFarmId(farmId);
       setNewFarmName("");
     } catch (err) {
@@ -204,52 +195,43 @@ export default function FarmerOnboardingPage() {
     }
   }
 
-  function goToStep(index: number) {
-    setActiveStep(index);
-    window.setTimeout(() => {
-      document.getElementById(`step-${index}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 50);
-  }
-
   async function saveFarmDetails(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!farm) return;
     const name = detailsForm.name.trim();
     const location = detailsForm.location.trim();
-    const sizeAcres = Number(detailsForm.sizeAcres);
-    if (!name || !location || !Number.isFinite(sizeAcres) || sizeAcres <= 0) return;
+    if (!name || !location) return;
 
     setSavingDetails(true);
     setError("");
-    setDetailsMessage("");
+    // Farm size is collected later in settings, not during first setup.
     const { error: updateError } = await supabase
       .from("farms")
-      .update({ name, location, size_acres: sizeAcres })
+      .update({ name, location })
       .eq("id", farm.id);
 
     if (updateError) {
       setError(updateError.message);
     } else {
-      setFarms((current) => current.map((item) => item.id === farm.id
-        ? { ...item, name, location, size_acres: sizeAcres }
-        : item));
-      setDetailsMessage(t.detailsSaved);
+      setFarms((current) => current.map((item) => item.id === farm.id ? { ...item, name, location } : item));
       goToStep(1);
     }
     setSavingDetails(false);
   }
 
+  /* One form records the crop and its harvest estimate together, so the
+     farmer is not asked for the harvest date and weight twice. */
   async function addCrop(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!farm) return;
     const cropName = cropForm.name.trim();
-    if (!cropName) return;
+    const kg = Number(cropForm.expectedKg);
+    if (!cropName || !cropForm.expectedHarvestStart || !Number.isFinite(kg) || kg <= 0) return;
 
     setSavingCrop(true);
     setError("");
-    setCropMessage("");
     try {
-      const { error: insertError } = await supabase.from("crops").insert({
+      const { data: inserted, error: insertError } = await supabase.from("crops").insert({
         farm_id: farm.id,
         zone_id: null,
         extra_zone_ids: null,
@@ -257,12 +239,26 @@ export default function FarmerOnboardingPage() {
         variety: cropForm.variety.trim() || null,
         status: cropForm.plantedOn ? "planted" : "planned",
         planted_on: cropForm.plantedOn || null,
-        expected_harvest_start: cropForm.expectedHarvestStart || null,
-        estimated_yield_kg: cropForm.yieldKg ? Number(cropForm.yieldKg) : null,
+        expected_harvest_start: cropForm.expectedHarvestStart,
+        estimated_yield_kg: kg,
         expected_sale_price_per_kg: cropForm.pricePerKg ? Number(cropForm.pricePerKg) : null,
         is_active: true,
-      });
+      }).select("id").single();
       if (insertError) throw insertError;
+
+      const harvestSeason = harvestSeasonYear(cropForm.expectedHarvestStart);
+      const monthColumn = `${harvestMonthKeyFor(cropForm.expectedHarvestStart)}_expected`;
+      const { error: harvestError } = await supabase.from("harvest_eta").insert({
+        farm_id: farm.id,
+        year: harvestSeason,
+        bed_name: cropForm.variety.trim() ? `${cropName} · ${cropForm.variety.trim()}` : cropName,
+        crop_id: inserted.id,
+        zone_id: null,
+        main_crop: cropName,
+        expected_harvest_date: cropForm.expectedHarvestStart,
+        [monthColumn]: String(kg),
+      });
+      if (harvestError) throw harvestError;
 
       await supabase.from("activities").insert({
         farm_id: farm.id,
@@ -271,9 +267,11 @@ export default function FarmerOnboardingPage() {
         meta: "Crop created during setup",
       });
 
-      setCrops(await getCrops(farm.id));
+      const [cropRows, harvestRows] = await Promise.all([getCrops(farm.id), getHarvestEta(farm.id, [seasonYear, seasonYear + 1])]);
+      setCrops(cropRows);
+      setHarvests(harvestRows);
       setCropForm(blankCrop);
-      setCropMessage(t.cropAdded);
+      goToStep(2);
     } catch (err) {
       setError(errMsg(err, "Failed to add crop"));
     } finally {
@@ -281,58 +279,36 @@ export default function FarmerOnboardingPage() {
     }
   }
 
-  async function saveHarvestEstimate(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function publishShop() {
     if (!farm) return;
-    const crop = crops.find((item) => item.id === harvestForm.cropId);
-    const kg = Number(harvestForm.kg);
-    if (!crop || !Number.isFinite(kg) || kg <= 0) return;
-
-    setSavingHarvest(true);
+    setPublishing(true);
     setError("");
-    setHarvestMessage("");
     try {
-      const monthColumn = `${harvestForm.month}_expected`;
-      const existing = harvests.find((row) => row.crop_id === crop.id && row.year === seasonYear);
-      if (existing) {
-        const { error: updateError } = await supabase
-          .from("harvest_eta")
-          .update({ [monthColumn]: String(kg) })
-          .eq("id", existing.id);
-        if (updateError) throw updateError;
-      } else {
-        const { error: insertError } = await supabase.from("harvest_eta").insert({
-          farm_id: farm.id,
-          year: seasonYear,
-          bed_name: crop.variety ? `${crop.crop_name} · ${crop.variety}` : crop.crop_name,
-          crop_id: crop.id,
-          zone_id: crop.zone_id ?? null,
-          main_crop: crop.crop_name,
-          expected_harvest_date: crop.expected_harvest_start,
-          [monthColumn]: String(kg),
-        });
-        if (insertError) throw insertError;
+      const res = await fetch("/api/farm/market-listing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ farmId: farm.id, listed: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not publish the shop");
+      setListing((current) => ({ ...current, listed: true }));
+      if (listing.slug) {
+        router.push(`/${listing.slug}`);
+        return;
       }
-
-      setHarvests(await getHarvestEta(farm.id, [seasonYear, seasonYear + 1]));
-      setHarvestForm((current) => ({ ...current, kg: "" }));
-      setHarvestMessage(t.harvestSaved);
     } catch (err) {
-      setError(errMsg(err, "Failed to save harvest estimate"));
-    } finally {
-      setSavingHarvest(false);
+      setError(errMsg(err, "Could not publish the shop"));
     }
+    setPublishing(false);
   }
 
-  const hasCrop = crops.length > 0;
-  const hasHarvest = harvests.some((row) => expectedTotal(row) > 0);
+  const hasCrop = crops.length > 0 && harvests.some((row) => expectedTotal(row) > 0);
   const hasShopDetails = !!listing.heroUrl && crops.some((crop) => crop.expected_sale_price_per_kg && (crop.produce_image_url || crop.image_url));
-  const done = [!!farm?.location && !!farm?.size_acres, hasCrop, hasHarvest, hasShopDetails, listing.listed];
-  const hrefs = [null, null, null, "/farm/settings#public-shop", "/farm/settings#public-shop"];
+  const done = [!!farm?.location, hasCrop, hasShopDetails, listing.listed];
 
   const steps = useMemo(() => t.steps.map((step, index) => ({
-    title: step[0], detail: step[1], action: step[2], href: hrefs[index], done: done[index],
-  })), [t, farm, hasCrop, hasHarvest, hasShopDetails, listing.listed]); // eslint-disable-line react-hooks/exhaustive-deps
+    title: step[0], detail: step[1], action: step[2], done: done[index],
+  })), [t, farm, hasCrop, hasShopDetails, listing.listed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const completed = steps.filter((step) => step.done).length;
   const progress = Math.round((completed / steps.length) * 100);
@@ -343,8 +319,8 @@ export default function FarmerOnboardingPage() {
 
   if (loading && farms.length === 0) return <main className="mx-auto max-w-3xl px-4 py-12 text-sm text-zinc-500">{t.checking}</main>;
 
-  const monthOptions = HARVEST_MONTHS.map((m) => ({ key: m.key, label: `${m.label} ${harvestMonthYear(m.key, seasonYear)}` }));
-  const cropNameById = new Map(crops.map((crop) => [crop.id, crop.variety ? `${crop.crop_name} · ${crop.variety}` : crop.crop_name]));
+  const cropLabel = (crop: Crop) => (crop.variety ? `${crop.crop_name} · ${crop.variety}` : crop.crop_name);
+  const expectedKgFor = (cropId: string) => harvests.filter((row) => row.crop_id === cropId).reduce((sum, row) => sum + expectedTotal(row), 0);
 
   function stepHeader(index: number) {
     const step = steps[index];
@@ -354,7 +330,7 @@ export default function FarmerOnboardingPage() {
         <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-sm font-semibold text-zinc-600">{step.done ? <Check className="h-4 w-4 text-emerald-700" /> : index + 1}</span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2 font-semibold text-zinc-950">{step.title}{step.done && <span className="text-xs font-medium text-emerald-700">{t.done}</span>}</span>
-          <span className="mt-1 block text-sm leading-6 text-zinc-600">{step.detail}</span>
+          {step.detail && <span className="mt-1 block text-sm leading-6 text-zinc-600">{step.detail}</span>}
           {!isOpen && <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-emerald-700">{step.done ? t.review : step.action}<ChevronRight className="h-4 w-4" /></span>}
         </span>
       </button>
@@ -413,20 +389,18 @@ export default function FarmerOnboardingPage() {
           </section>
 
           <div className="space-y-3">
-            {/* Step 1: farm details */}
+            {/* Step 1: farm name and location */}
             {stepCard(0, (
-              <form onSubmit={saveFarmDetails} className="grid gap-4 sm:grid-cols-2">
-                <label className="text-sm font-medium text-zinc-700 sm:col-span-2">{t.farmName}<input required value={detailsForm.name} onChange={(event) => setDetailsForm((current) => ({ ...current, name: event.target.value }))} className={inputClass} /></label>
+              <form onSubmit={saveFarmDetails} className="grid gap-4">
+                <label className="text-sm font-medium text-zinc-700">{t.farmName}<input required value={detailsForm.name} onChange={(event) => setDetailsForm((current) => ({ ...current, name: event.target.value }))} className={inputClass} /></label>
                 <label className="text-sm font-medium text-zinc-700">{t.location}<input required value={detailsForm.location} onChange={(event) => setDetailsForm((current) => ({ ...current, location: event.target.value }))} placeholder={t.locationPlaceholder} className={inputClass} /></label>
-                <label className="text-sm font-medium text-zinc-700">{t.acreage}<input required type="number" min="0.01" step="0.01" value={detailsForm.sizeAcres} onChange={(event) => setDetailsForm((current) => ({ ...current, sizeAcres: event.target.value }))} placeholder={t.acreagePlaceholder} className={inputClass} /></label>
-                <div className="sm:col-span-2">
-                  <button type="submit" disabled={savingDetails || !detailsForm.name.trim() || !detailsForm.location.trim() || Number(detailsForm.sizeAcres) <= 0} className={"w-full sm:w-auto " + primaryButton}>{savingDetails ? t.savingDetails : t.saveDetails}</button>
-                  {detailsMessage && <p className="mt-3 text-sm font-medium text-emerald-700">{detailsMessage}</p>}
+                <div>
+                  <button type="submit" disabled={savingDetails || !detailsForm.name.trim() || !detailsForm.location.trim()} className={"w-full sm:w-auto " + primaryButton}>{savingDetails ? t.savingDetails : t.saveDetails}</button>
                 </div>
               </form>
             ))}
 
-            {/* Step 2: crops, added right here */}
+            {/* Step 2: crops with their harvest estimate, added right here */}
             {stepCard(1, (
               <div>
                 {crops.length > 0 && (
@@ -435,8 +409,9 @@ export default function FarmerOnboardingPage() {
                     <ul className="mt-2 space-y-1 text-sm text-zinc-800">
                       {crops.map((crop) => (
                         <li key={crop.id} className="flex flex-wrap items-center gap-x-3">
-                          <span className="font-medium">{cropNameById.get(crop.id)}</span>
-                          {crop.planted_on && <span className="text-zinc-500">{t.plantedOn.toLowerCase()} {crop.planted_on}</span>}
+                          <span className="font-medium">{cropLabel(crop)}</span>
+                          {crop.expected_harvest_start && <span className="text-zinc-500">{crop.expected_harvest_start}</span>}
+                          {expectedKgFor(crop.id) > 0 && <span className="text-zinc-500">{expectedKgFor(crop.id)} {t.kg}</span>}
                           {crop.expected_sale_price_per_kg != null && <span className="text-zinc-500">{crop.expected_sale_price_per_kg}/{t.kg}</span>}
                         </li>
                       ))}
@@ -447,57 +422,45 @@ export default function FarmerOnboardingPage() {
                   <label className="text-sm font-medium text-zinc-700">{t.cropName}<input required value={cropForm.name} onChange={(event) => setCropForm((current) => ({ ...current, name: event.target.value }))} placeholder={t.cropPlaceholder} className={inputClass} /></label>
                   <label className="text-sm font-medium text-zinc-700">{t.variety} <span className="font-normal text-zinc-400">({t.optional})</span><input value={cropForm.variety} onChange={(event) => setCropForm((current) => ({ ...current, variety: event.target.value }))} placeholder={t.varietyPlaceholder} className={inputClass} /></label>
                   <label className="text-sm font-medium text-zinc-700">{t.plantedOn} <span className="font-normal text-zinc-400">({t.optional})</span><input type="date" value={cropForm.plantedOn} onChange={(event) => setCropForm((current) => ({ ...current, plantedOn: event.target.value }))} className={inputClass} /></label>
-                  <label className="text-sm font-medium text-zinc-700">{t.expectedHarvestStart} <span className="font-normal text-zinc-400">({t.optional})</span><input type="date" value={cropForm.expectedHarvestStart} onChange={(event) => setCropForm((current) => ({ ...current, expectedHarvestStart: event.target.value }))} className={inputClass} /></label>
+                  <label className="text-sm font-medium text-zinc-700">{t.expectedHarvestStart}<input required type="date" value={cropForm.expectedHarvestStart} onChange={(event) => setCropForm((current) => ({ ...current, expectedHarvestStart: event.target.value }))} className={inputClass} /></label>
+                  <label className="text-sm font-medium text-zinc-700">{t.expectedKg}<input required type="number" min="0.1" step="0.1" value={cropForm.expectedKg} onChange={(event) => setCropForm((current) => ({ ...current, expectedKg: event.target.value }))} className={inputClass} /></label>
                   <label className="text-sm font-medium text-zinc-700">{t.pricePerKg} <span className="font-normal text-zinc-400">({t.optional})</span><input type="number" min="0" step="0.01" value={cropForm.pricePerKg} onChange={(event) => setCropForm((current) => ({ ...current, pricePerKg: event.target.value }))} className={inputClass} /></label>
-                  <label className="text-sm font-medium text-zinc-700">{t.yieldKg} <span className="font-normal text-zinc-400">({t.optional})</span><input type="number" min="0" step="0.1" value={cropForm.yieldKg} onChange={(event) => setCropForm((current) => ({ ...current, yieldKg: event.target.value }))} className={inputClass} /></label>
                   <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
-                    <button type="submit" disabled={savingCrop || !cropForm.name.trim()} className={primaryButton}>{savingCrop ? t.addingCrop : t.addCrop}</button>
-                    {hasCrop && <button type="button" onClick={() => goToStep(2)} className={secondaryButton}>{t.continueHarvest}<ChevronRight className="ml-1 inline h-4 w-4" /></button>}
+                    <button type="submit" disabled={savingCrop || !cropForm.name.trim() || !cropForm.expectedHarvestStart || Number(cropForm.expectedKg) <= 0} className={primaryButton}>{savingCrop ? t.addingCrop : t.addCrop}</button>
+                    {hasCrop && <button type="button" onClick={() => goToStep(2)} className={secondaryButton}>{t.continue}<ChevronRight className="ml-1 inline h-4 w-4" /></button>}
                   </div>
-                  {cropMessage && <p className="text-sm font-medium text-emerald-700 sm:col-span-2">{cropMessage}</p>}
                 </form>
               </div>
             ))}
 
-            {/* Step 3: harvest estimate, also inline */}
+            {/* Step 3: shop photos and prices live on the settings page */}
             {stepCard(2, (
-              <div>
-                {harvests.filter((row) => expectedTotal(row) > 0).length > 0 && (
-                  <div className="mb-4 rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">{t.estimatesSoFar}</p>
-                    <ul className="mt-2 space-y-1 text-sm text-zinc-800">
-                      {harvests.filter((row) => expectedTotal(row) > 0).map((row) => (
-                        <li key={row.id}><span className="font-medium">{(row.crop_id && cropNameById.get(row.crop_id)) || row.bed_name}</span> <span className="text-zinc-500">{expectedTotal(row)} {t.kg}</span></li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {!hasCrop ? (
-                  <button type="button" onClick={() => goToStep(1)} className={secondaryButton}>{steps[1].action}<ChevronRight className="ml-1 inline h-4 w-4" /></button>
-                ) : (
-                  <form onSubmit={saveHarvestEstimate} className="grid gap-4 sm:grid-cols-3">
-                    <label className="text-sm font-medium text-zinc-700">{t.chooseCrop}<select value={harvestForm.cropId} onChange={(event) => setHarvestForm((current) => ({ ...current, cropId: event.target.value }))} className={inputClass}>{crops.map((crop) => <option key={crop.id} value={crop.id}>{cropNameById.get(crop.id)}</option>)}</select></label>
-                    <label className="text-sm font-medium text-zinc-700">{t.harvestMonth}<select value={harvestForm.month} onChange={(event) => setHarvestForm((current) => ({ ...current, month: event.target.value as HarvestMonthKey }))} className={inputClass}>{monthOptions.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}</select></label>
-                    <label className="text-sm font-medium text-zinc-700">{t.expectedKg}<input required type="number" min="0.1" step="0.1" value={harvestForm.kg} onChange={(event) => setHarvestForm((current) => ({ ...current, kg: event.target.value }))} className={inputClass} /></label>
-                    <div className="flex flex-wrap items-center gap-3 sm:col-span-3">
-                      <button type="submit" disabled={savingHarvest || !harvestForm.cropId || Number(harvestForm.kg) <= 0} className={primaryButton}>{savingHarvest ? t.savingHarvest : t.saveHarvest}</button>
-                      {hasHarvest && <button type="button" onClick={() => goToStep(3)} className={secondaryButton}>{t.continueShop}<ChevronRight className="ml-1 inline h-4 w-4" /></button>}
-                    </div>
-                    {harvestMessage && <p className="text-sm font-medium text-emerald-700 sm:col-span-3">{harvestMessage}</p>}
-                  </form>
-                )}
+              <div className="flex flex-wrap items-center gap-3">
+                <Link href="/farm/settings#public-shop" className="inline-flex items-center gap-1 rounded-full bg-emerald-700 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-800">{steps[2].done ? t.review : steps[2].action}<ChevronRight className="h-4 w-4" /></Link>
+                <button type="button" onClick={() => goToStep(1)} className={secondaryButton}>{t.addAnotherCrop}</button>
+                <button type="button" onClick={() => goToStep(3)} className={secondaryButton}>{t.continue}<ChevronRight className="ml-1 inline h-4 w-4" /></button>
               </div>
             ))}
 
-            {/* Steps 4 and 5 live on the settings page (photo upload, publish toggle). */}
-            {[3, 4].map((index) => stepCard(index, (
-              <Link href={`${steps[index].href}`} className="inline-flex items-center gap-1 rounded-full bg-emerald-700 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-800">{steps[index].done ? t.review : steps[index].action}<ChevronRight className="h-4 w-4" /></Link>
-            )))}
+            {/* Step 4: publish, then straight to the public shop */}
+            {stepCard(3, listing.listed ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <div className="flex items-center gap-2 font-semibold text-emerald-950"><Check className="h-5 w-5" />{t.live}</div>
+                {listing.slug && <Link href={`/${listing.slug}`} className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-emerald-800">{t.open} <ExternalLink className="h-4 w-4" /></Link>}
+              </div>
+            ) : (
+              <div>
+                <p className="font-semibold text-zinc-950">{t.publishQuestion}</p>
+                <p className="mt-1 text-sm leading-6 text-zinc-600">{t.publishBody}</p>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <button type="button" onClick={publishShop} disabled={publishing || !hasCrop} className={primaryButton}>{publishing ? t.publishing : t.publishYes}</button>
+                  <Link href="/farm" className={secondaryButton}>{t.publishNo}</Link>
+                </div>
+              </div>
+            ))}
           </div>
 
-          {completed === steps.length ? (
-            <section className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-6"><div className="flex items-center gap-2 font-semibold text-emerald-950"><Check className="h-5 w-5" />{t.live}</div>{listing.slug && <Link href={`/${listing.slug}`} target="_blank" className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-emerald-800">{t.open} <ExternalLink className="h-4 w-4" /></Link>}</section>
-          ) : next && nextIndex !== expanded ? (
+          {completed < steps.length && next && nextIndex !== expanded ? (
             <button type="button" onClick={() => goToStep(nextIndex)} className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 py-3.5 text-sm font-semibold text-white hover:bg-emerald-800">{t.continue}: {next.title}<ChevronRight className="h-4 w-4" /></button>
           ) : null}
 
