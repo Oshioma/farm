@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { CROP_DETAIL_FIELDS } from "@/lib/cropDetails";
 import { useT } from "@/lib/i18n";
-import { ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import type { Zone } from "@/lib/farm";
 
 export type CropFormData = {
@@ -52,16 +52,14 @@ type Props = {
   onSubmit: (data: CropFormData) => Promise<boolean>;
 };
 
-/* Three short stages instead of one long form. The crop can be saved from any
-   stage: the basics are enough to create it, the other two are optional. */
-type Stage = 1 | 2 | 3;
+/* Three short sections, one under the other: the basics are enough to create
+   the crop, the other two are optional and can be left blank. */
 
 const inputClass = "w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900";
 
 export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
   const t = useT();
   const [form, setForm] = useState<CropFormData>(blank);
-  const [stage, setStage] = useState<Stage>(1);
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -111,7 +109,6 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
       if (preview && preview.startsWith("blob:")) URL.revokeObjectURL(preview);
       setPreview("");
       setForm({ ...blank, zone_ids: defaultZoneId ? [defaultZoneId] : [] });
-      setStage(1);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
@@ -122,7 +119,6 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
   }
 
   const selectedZoneIds = new Set(form.zone_ids.filter(Boolean));
-  const stageTitle = stage === 1 ? t("Basics") : stage === 2 ? t("Growing details") : t("For the shop");
 
   const field = (label: React.ReactNode, control: React.ReactNode) => (
     <div>
@@ -135,23 +131,13 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
       <div className="mb-5">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-xl font-semibold">{t("Create crop")}</h2>
-          <span className="text-xs font-medium text-zinc-500">{t("Step {n} of 3", { n: stage })}</span>
-        </div>
-        <div className="mt-2 flex gap-1">
-          {[1, 2, 3].map((n) => (
-            <span key={n} className={"h-1.5 flex-1 rounded-full " + (n <= stage ? "bg-emerald-600" : "bg-zinc-200")} />
-          ))}
-        </div>
-        <p className="mt-2 text-sm text-zinc-500">
-          {stageTitle}{stage > 1 && <> · {t("optional")}</>}
-        </p>
+        <h2 className="text-xl font-semibold">{t("Create crop")}</h2>
+        <p className="mt-1 text-sm text-zinc-500">{t("The basics are enough to create the crop. The rest is optional.")}</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {stage === 1 && (
-          <>
+        <section className="space-y-4">
+          <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">{t("Basics")}</h3>
             {field(t("Crop name"), (
               <input type="text" value={form.crop_name} onChange={(e) => setForm((prev) => ({ ...prev, crop_name: e.target.value }))} className={inputClass} placeholder={t("Tomatoes")} required autoFocus />
             ))}
@@ -167,11 +153,10 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
             {field(t("Expected price per kg"), (
               <input type="number" step="0.01" min="0" inputMode="decimal" value={form.expected_sale_price_per_kg} onChange={(e) => setForm((prev) => ({ ...prev, expected_sale_price_per_kg: e.target.value }))} className={inputClass} placeholder="3000" />
             ))}
-          </>
-        )}
+        </section>
 
-        {stage === 2 && (
-          <>
+        <section className="space-y-4 border-t border-zinc-200 pt-5">
+          <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">{t("Growing details")}{" · "}{t("optional")}</h3>
             {field(<>{t("Photo")} {optional}</>, (
               <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="w-full text-sm text-zinc-600 file:mr-3 file:rounded-full file:border-0 file:bg-zinc-100 file:px-4 file:py-2 file:text-sm file:font-medium hover:file:bg-zinc-200" />
             ))}
@@ -222,11 +207,10 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
             {field(<>{t("Notes")} {optional}</>, (
               <textarea value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} className={"min-h-[80px] " + inputClass} placeholder={t("Growing conditions, observations…")} />
             ))}
-          </>
-        )}
+        </section>
 
-        {stage === 3 && (
-          <>
+        <section className="space-y-4 border-t border-zinc-200 pt-5">
+          <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">{t("For the shop")}{" · "}{t("optional")}</h3>
             <p className="text-xs text-zinc-500">
               {t("Whatever you fill in here is shown to customers on the shopfront. Anything left blank simply is not shown.")}
             </p>
@@ -243,15 +227,9 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
             {field(<>{t("Medicinal properties")} {optional}</>, (
               <textarea value={form.medicinal_properties} onChange={(e) => setForm((prev) => ({ ...prev, medicinal_properties: e.target.value }))} className={"min-h-[80px] " + inputClass} placeholder={t("Known medicinal uses, healing properties…")} />
             ))}
-          </>
-        )}
+        </section>
 
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          {stage > 1 && (
-            <button type="button" onClick={() => setStage((s) => (s - 1) as Stage)} className="inline-flex items-center gap-1 rounded-2xl border border-zinc-200 px-4 py-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
-              <ChevronLeft size={16} /> {t("Back")}
-            </button>
-          )}
+        <div className="pt-1">
           <button
             type="submit"
             disabled={saving || !canSave}
@@ -259,11 +237,6 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
           >
             {saving ? t("Creating crop...") : t("Create crop")}
           </button>
-          {stage < 3 && (
-            <button type="button" onClick={() => setStage((s) => (s + 1) as Stage)} disabled={!canSave} className="inline-flex items-center gap-1 rounded-2xl border border-emerald-700 px-4 py-3 text-sm font-medium text-emerald-800 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50">
-              {stage === 1 ? t("Next: growing details") : t("Next: for the shop")} <ChevronRight size={16} />
-            </button>
-          )}
         </div>
         {!canSave && <p className="text-xs text-zinc-500">{t("Enter a crop name to continue.")}</p>}
       </form>
