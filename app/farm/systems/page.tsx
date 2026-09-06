@@ -9,6 +9,8 @@ import { getFarms } from "@/lib/farm";
 import type { Farm } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { useFarmRole } from "@/hooks/useFarmRole";
+import { useT, useLanguage } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -60,6 +62,8 @@ function getPreviewUrl(url: string): string | null {
 }
 
 export default function SystemsPage() {
+  const t = useT();
+  const [lang, setLang] = useLanguage();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [docs, setDocs] = useState<SystemDoc[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
@@ -108,7 +112,7 @@ export default function SystemsPage() {
         const farmRows = await getFarms();
         setFarms(farmRows);
       } catch (err) {
-        setError(errMsg(err, "Failed to load"));
+        setError(errMsg(err, t("Failed to load")));
       } finally {
         setLoading(false);
       }
@@ -119,7 +123,7 @@ export default function SystemsPage() {
     if (!activeFarmId) return;
     setLoading(true);
     loadDocs(activeFarmId)
-      .catch((err) => setError(errMsg(err, "Failed to load")))
+      .catch((err) => setError(errMsg(err, t("Failed to load"))))
       .finally(() => setLoading(false));
   }, [activeFarmId]);
 
@@ -138,13 +142,13 @@ export default function SystemsPage() {
         category: form.category,
       });
       if (err) throw err;
-      setSuccess("Document added.");
+      setSuccess(t("Document added."));
       setForm({ title: "", url: "", description: "", category: tab });
       setShowForm(false);
       await loadDocs(activeFarmId);
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
-      setError(errMsg(err, "Failed to add"));
+      setError(errMsg(err, t("Failed to add")));
     } finally {
       setSaving(false);
     }
@@ -162,19 +166,19 @@ export default function SystemsPage() {
         category: editForm.category,
       }).eq("id", id);
       if (err) throw err;
-      setSuccess("Document updated.");
+      setSuccess(t("Document updated."));
       setEditingId(null);
       await loadDocs(activeFarmId);
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
-      setError(errMsg(err, "Failed to update"));
+      setError(errMsg(err, t("Failed to update")));
     } finally {
       setSavingEditId(null);
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this document?")) return;
+    if (!confirm(t("Delete this document?"))) return;
     try {
       setDeletingId(id);
       const { error: err } = await supabase.from("system_docs").delete().eq("id", id);
@@ -183,7 +187,7 @@ export default function SystemsPage() {
       if (editingId === id) { setEditingId(null); }
       if (previewDoc?.id === id) setPreviewDoc(null);
     } catch (err) {
-      setError(errMsg(err, "Failed to delete"));
+      setError(errMsg(err, t("Failed to delete")));
     } finally {
       setDeletingId(null);
     }
@@ -241,8 +245,8 @@ export default function SystemsPage() {
         <header className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Shamba Farm Manager</p>
-              <h1 className="mt-1 text-3xl font-semibold tracking-tight">Systems & Docs</h1>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">{t("Shamba Farm Manager")}</p>
+              <h1 className="mt-1 text-3xl font-semibold tracking-tight">{t("Systems & Docs")}</h1>
               {activeFarm && <p className="mt-1 text-sm text-zinc-500">{activeFarm.name}</p>}
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -258,14 +262,15 @@ export default function SystemsPage() {
                 </button>
               ))}
               <Link href="/farm" className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
-                ← Farm
+                {t("← Farm")}
               </Link>
               <button
                 onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                Sign out
+                {t("Sign out")}
               </button>
+              <LanguageToggle lang={lang} onChange={setLang} />
             </div>
           </div>
         </header>
@@ -274,20 +279,20 @@ export default function SystemsPage() {
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              {tab === "crop_guide" ? "Crop Guides" : "SOPs"}
+              {tab === "crop_guide" ? t("Crop Guides") : t("SOPs")}
             </p>
             <p className="mt-1 text-2xl font-bold">{tabDocs.length}</p>
-            <p className="text-xs text-zinc-400">Documents</p>
+            <p className="text-xs text-zinc-400">{t("Documents")}</p>
           </div>
           <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">With Content</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{t("With Content")}</p>
             <p className="mt-1 text-2xl font-bold">{withContent}</p>
-            <p className="text-xs text-zinc-400">Description or Google Doc</p>
+            <p className="text-xs text-zinc-400">{t("Description or Google Doc")}</p>
           </div>
           <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Google Docs</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{t("Google Docs")}</p>
             <p className="mt-1 text-2xl font-bold">{withGoogleDoc}</p>
-            <p className="text-xs text-zinc-400">Linked documents</p>
+            <p className="text-xs text-zinc-400">{t("Linked documents")}</p>
           </div>
         </div>
 
@@ -305,13 +310,13 @@ export default function SystemsPage() {
               onClick={() => { setTab("crop_guide"); setForm((p) => ({ ...p, category: "crop_guide" })); setPreviewDoc(null); }}
               className={`rounded-full px-5 py-2 text-sm font-medium transition ${tab === "crop_guide" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-700"}`}
             >
-              Crop guides
+              {t("Crop guides")}
             </button>
             <button
               onClick={() => { setTab("sop"); setForm((p) => ({ ...p, category: "sop" })); setPreviewDoc(null); }}
               className={`rounded-full px-5 py-2 text-sm font-medium transition ${tab === "sop" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-700"}`}
             >
-              SOPs
+              {t("SOPs")}
             </button>
           </div>
           <div className="flex items-center gap-3">
@@ -321,7 +326,7 @@ export default function SystemsPage() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search..."
+                placeholder={t("Search...")}
                 className="rounded-full border border-zinc-200 bg-white py-2 pl-9 pr-4 text-sm outline-none focus:border-zinc-400"
               />
             </div>
@@ -333,7 +338,7 @@ export default function SystemsPage() {
                 }`}
               >
                 <Plus size={15} />
-                Add {tab === "crop_guide" ? "crop guide" : "SOP"}
+                {tab === "crop_guide" ? t("Add crop guide") : t("Add SOP")}
               </button>
             )}
           </div>
@@ -344,45 +349,45 @@ export default function SystemsPage() {
         {isManager && showForm && (
           <div className="mb-6">
             <form onSubmit={editingId ? (e) => { e.preventDefault(); handleSaveEdit(editingId); } : handleAdd} className="max-w-2xl rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm space-y-4">
-              <h2 className="text-lg font-semibold">{editingId ? "Edit Document" : `Add ${tab === "crop_guide" ? "Crop Guide" : "SOP"}`}</h2>
+              <h2 className="text-lg font-semibold">{editingId ? t("Edit Document") : tab === "crop_guide" ? t("Add Crop Guide") : t("Add SOP")}</h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Title</label>
+                  <label className="mb-2 block text-sm font-medium">{t("Title")}</label>
                   <input
                     className={inp}
                     value={editingId ? editForm.title : form.title}
                     onChange={(e) => editingId ? setEditForm((p) => ({ ...p, title: e.target.value })) : setForm((p) => ({ ...p, title: e.target.value }))}
-                    placeholder="Irrigation system, Planting calendar…"
+                    placeholder={t("Irrigation system, Planting calendar…")}
                     required
                   />
                 </div>
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Category</label>
+                  <label className="mb-2 block text-sm font-medium">{t("Category")}</label>
                   <select
                     className={inp}
                     value={editingId ? editForm.category : form.category}
                     onChange={(e) => editingId ? setEditForm((p) => ({ ...p, category: e.target.value })) : setForm((p) => ({ ...p, category: e.target.value }))}
                   >
-                    <option value="crop_guide">Crop guide</option>
-                    <option value="sop">SOP</option>
+                    <option value="crop_guide">{t("Crop guide")}</option>
+                    <option value="sop">{t("SOP")}</option>
                   </select>
                 </div>
               </div>
               <div>
-                <label className="mb-2 block text-sm font-medium">Description / SOP Content</label>
+                <label className="mb-2 block text-sm font-medium">{t("Description / SOP Content")}</label>
                 <textarea
                   className={`${inp} min-h-[120px]`}
                   rows={8}
                   value={editingId ? editForm.description : form.description}
                   onChange={(e) => editingId ? setEditForm((p) => ({ ...p, description: e.target.value })) : setForm((p) => ({ ...p, description: e.target.value }))}
-                  placeholder="Write the SOP steps, instructions, or notes here… No Google Doc needed."
+                  placeholder={t("Write the SOP steps, instructions, or notes here… No Google Doc needed.")}
                   style={{ resize: "vertical", lineHeight: 1.6 }}
                 />
-                <p className="mt-1 text-[11px] text-zinc-400">Write your SOP directly here, or link a Google Doc below (or both).</p>
+                <p className="mt-1 text-[11px] text-zinc-400">{t("Write your SOP directly here, or link a Google Doc below (or both).")}</p>
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium">
-                  Google Doc / Drive URL <span className="font-normal text-zinc-400">(optional)</span>
+                  {t("Google Doc / Drive URL")} <span className="font-normal text-zinc-400">{t("(optional)")}</span>
                 </label>
                 <input
                   type="text"
@@ -398,14 +403,14 @@ export default function SystemsPage() {
                   disabled={saving || savingEditId !== null}
                   className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60"
                 >
-                  {saving || savingEditId ? "Saving…" : editingId ? "Save Changes" : "Add document"}
+                  {saving || savingEditId ? t("Saving…") : editingId ? t("Save Changes") : t("Add document")}
                 </button>
                 <button
                   type="button"
                   onClick={resetForm}
                   className="rounded-2xl border border-zinc-200 px-5 py-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
                 >
-                  Cancel
+                  {t("Cancel")}
                 </button>
               </div>
             </form>
@@ -417,14 +422,14 @@ export default function SystemsPage() {
           {/* List */}
           <div>
             {loading ? (
-              <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">Loading...</div>
+              <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">{t("Loading...")}</div>
             ) : filteredDocs.length === 0 ? (
               <div className="rounded-3xl border border-zinc-200 bg-white p-10 text-center shadow-sm">
                 <FileText className="mx-auto mb-3 text-zinc-300" size={32} />
                 <p className="text-sm text-zinc-500">
                   {search.trim()
-                    ? `No ${tab === "crop_guide" ? "crop guides" : "SOPs"} match your search.`
-                    : `No ${tab === "crop_guide" ? "crop guides" : "SOPs"} yet. Add one above.`}
+                    ? (tab === "crop_guide" ? t("No crop guides match your search.") : t("No SOPs match your search."))
+                    : (tab === "crop_guide" ? t("No crop guides yet. Add one above.") : t("No SOPs yet. Add one above."))}
                 </p>
               </div>
             ) : (
@@ -459,14 +464,14 @@ export default function SystemsPage() {
                               {doc.title}
                             </h3>
                             <p className="mt-0.5 text-xs text-zinc-400">
-                              {doc.category === "sop" ? "SOP" : "Crop guide"}
+                              {doc.category === "sop" ? t("SOP") : t("Crop guide")}
                               {hasDescription && hasGoogleDoc
-                                ? " · Has description & Google Doc"
+                                ? t(" · Has description & Google Doc")
                                 : hasDescription
-                                ? " · Tap to view description"
+                                ? t(" · Tap to view description")
                                 : hasGoogleDoc
-                                ? " · Tap to preview doc"
-                                : " · No content yet"}
+                                ? t(" · Tap to preview doc")
+                                : t(" · No content yet")}
                             </p>
                           </div>
                         </div>
@@ -476,7 +481,7 @@ export default function SystemsPage() {
                               onClick={() => toggleExpand(doc.id)}
                               className="flex items-center gap-1 rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100"
                             >
-                              {isExpanded ? "Collapse" : "View"}
+                              {isExpanded ? t("Collapse") : t("View")}
                               {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                             </button>
                           )}
@@ -489,7 +494,7 @@ export default function SystemsPage() {
                                   : "border-zinc-200 text-zinc-600 hover:bg-zinc-100"
                               }`}
                             >
-                              {isPreviewing ? "Hide Doc" : "Doc"}
+                              {isPreviewing ? t("Hide Doc") : t("Doc")}
                             </button>
                           )}
                           {doc.url && (
@@ -499,14 +504,14 @@ export default function SystemsPage() {
                               rel="noopener noreferrer"
                               className="flex items-center gap-1.5 rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100"
                             >
-                              Open <ExternalLink size={12} />
+                              {t("Open")} <ExternalLink size={12} />
                             </a>
                           )}
                           {isManager && (
                             <>
-                              <button onClick={() => startEdit(doc)} className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">Edit</button>
+                              <button onClick={() => startEdit(doc)} className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">{t("Edit")}</button>
                               <button onClick={() => handleDelete(doc.id)} disabled={deletingId === doc.id} className="rounded-xl border border-rose-200 px-3 py-1.5 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">
-                                {deletingId === doc.id ? "…" : "Del"}
+                                {deletingId === doc.id ? "…" : t("Del")}
                               </button>
                             </>
                           )}
@@ -536,13 +541,13 @@ export default function SystemsPage() {
               <div className="mb-4 flex items-center justify-between">
                 <div>
                   <h2 className="font-semibold">{previewDoc.title}</h2>
-                  <p className="text-xs text-zinc-400">{previewDoc.category === "sop" ? "SOP" : "Crop guide"}</p>
+                  <p className="text-xs text-zinc-400">{previewDoc.category === "sop" ? t("SOP") : t("Crop guide")}</p>
                 </div>
                 <button
                   onClick={() => setPreviewDoc(null)}
                   className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100"
                 >
-                  Close
+                  {t("Close")}
                 </button>
               </div>
               <iframe

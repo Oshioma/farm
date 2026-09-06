@@ -8,6 +8,8 @@ import { getFarms, getPlantingPlan } from "@/lib/farm";
 import type { Farm, PlantingPlanEntry } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { useFarmRole } from "@/hooks/useFarmRole";
+import { useT, useLanguage } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 /* ── Types ────────────────────────────────────────────────── */
 
@@ -49,6 +51,8 @@ function entryToForm(e: PlantingPlanEntry): FormData {
 /* ── Page ─────────────────────────────────────────────────── */
 
 export default function PlantingPlanPage() {
+  const t = useT();
+  const [lang, setLang] = useLanguage();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [activeFarmId, setActiveFarmId] = useState<string>("");
   const [entries, setEntries] = useState<PlantingPlanEntry[]>([]);
@@ -78,7 +82,7 @@ export default function PlantingPlanPage() {
         const farmRows = await getFarms();
         setFarms(farmRows);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load farms");
+        setError(err instanceof Error ? err.message : t("Failed to load farms"));
       }
     }
     load();
@@ -91,7 +95,7 @@ export default function PlantingPlanPage() {
     setError("");
     getPlantingPlan(activeFarmId)
       .then((rows) => { if (!cancelled) setEntries(rows); })
-      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load planting plan"); })
+      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : t("Failed to load planting plan")); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => {
       cancelled = true;
@@ -147,7 +151,7 @@ export default function PlantingPlanPage() {
       await reload();
       closeModal();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save");
+      setError(err instanceof Error ? err.message : t("Failed to save"));
       setSaving(false);
     }
   }
@@ -160,7 +164,7 @@ export default function PlantingPlanPage() {
       if (e) throw e;
       await reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete");
+      setError(err instanceof Error ? err.message : t("Failed to delete"));
     } finally {
       setDeletingId(null);
     }
@@ -178,9 +182,9 @@ export default function PlantingPlanPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                Shamba Farm Manager
+                {t("Shamba Farm Manager")}
               </p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight">Syntropic Planting Plan</h1>
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight">{t("Syntropic Planting Plan")}</h1>
               {activeFarm && <p className="mt-1 text-sm text-zinc-500">{activeFarm.name}</p>}
             </div>
             <div className="flex flex-wrap gap-2">
@@ -198,14 +202,15 @@ export default function PlantingPlanPage() {
                 </button>
               ))}
               <Link href="/farm" className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
-                ← Farm
+                {t("← Farm")}
               </Link>
               <button
                 onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                Sign out
+                {t("Sign out")}
               </button>
+              <LanguageToggle lang={lang} onChange={setLang} />
             </div>
           </div>
         </header>
@@ -219,17 +224,17 @@ export default function PlantingPlanPage() {
         {/* Tabs + Add button */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex gap-2">
-            {(["tree", "support"] as const).map((t) => (
+            {(["tree", "support"] as const).map((tabKey) => (
               <button
-                key={t}
-                onClick={() => setTab(t)}
+                key={tabKey}
+                onClick={() => setTab(tabKey)}
                 className={`rounded-full px-5 py-2 text-sm font-medium transition ${
-                  tab === t ? "bg-zinc-900 text-white" : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
+                  tab === tabKey ? "bg-zinc-900 text-white" : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
                 }`}
               >
-                {t === "tree" ? "Trees & Fruiting plants" : "Support species"}
+                {tabKey === "tree" ? t("Trees & Fruiting plants") : t("Support species")}
                 <span className="ml-2 text-xs opacity-60">
-                  {t === "tree" ? trees.length : support.length}
+                  {tabKey === "tree" ? trees.length : support.length}
                 </span>
               </button>
             ))}
@@ -239,13 +244,13 @@ export default function PlantingPlanPage() {
               onClick={openAdd}
               className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
             >
-              + Add entry
+              {t("+ Add entry")}
             </button>
           )}
         </div>
 
         {loading ? (
-          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">Loading...</div>
+          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">{t("Loading...")}</div>
         ) : tab === "tree" ? (
           <TreesTable trees={trees} expandedId={expandedId} setExpandedId={setExpandedId} onEdit={openEdit} onDelete={handleDelete} deletingId={deletingId} isManager={isManager} />
         ) : (
@@ -258,40 +263,40 @@ export default function PlantingPlanPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-lg rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl">
             <h2 className="text-lg font-semibold mb-5">
-              {modalEntry === "new" ? "Add entry" : `Edit — ${(modalEntry as PlantingPlanEntry).species_name}`}
+              {modalEntry === "new" ? t("Add entry") : t("Edit — {name}", { name: (modalEntry as PlantingPlanEntry).species_name })}
             </h2>
 
             <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
-              <Field label="Species name *">
-                <input className={input} value={form.species_name} onChange={(e) => setForm((p) => ({ ...p, species_name: e.target.value }))} placeholder="Coconut" />
+              <Field label={t("Species name *")}>
+                <input className={input} value={form.species_name} onChange={(e) => setForm((p) => ({ ...p, species_name: e.target.value }))} placeholder={t("Coconut")} />
               </Field>
-              <Field label="Category">
+              <Field label={t("Category")}>
                 <select className={input} value={form.category} onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}>
-                  <option value="tree">Tree / Fruiting plant</option>
-                  <option value="support">Support species</option>
+                  <option value="tree">{t("Tree / Fruiting plant")}</option>
+                  <option value="support">{t("Support species")}</option>
                 </select>
               </Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Strata / Height">
-                  <input className={input} value={form.strata} onChange={(e) => setForm((p) => ({ ...p, strata: e.target.value }))} placeholder="Medium / 3m–5m" />
+                <Field label={t("Strata / Height")}>
+                  <input className={input} value={form.strata} onChange={(e) => setForm((p) => ({ ...p, strata: e.target.value }))} placeholder={t("Medium / 3m–5m")} />
                 </Field>
-                <Field label="Role">
-                  <input className={input} value={form.role} onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))} placeholder="Cash crop" />
+                <Field label={t("Role")}>
+                  <input className={input} value={form.role} onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))} placeholder={t("Cash crop")} />
                 </Field>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Seedlings to start">
+                <Field label={t("Seedlings to start")}>
                   <input className={input} type="number" min="0" value={form.seedlings_to_start} onChange={(e) => setForm((p) => ({ ...p, seedlings_to_start: e.target.value }))} placeholder="32" />
                 </Field>
-                <Field label="Target count">
-                  <input className={input} value={form.target_count} onChange={(e) => setForm((p) => ({ ...p, target_count: e.target.value }))} placeholder="25 or 8 + 10 temporary" />
+                <Field label={t("Target count")}>
+                  <input className={input} value={form.target_count} onChange={(e) => setForm((p) => ({ ...p, target_count: e.target.value }))} placeholder={t("25 or 8 + 10 temporary")} />
                 </Field>
               </div>
-              <Field label="Propagation method">
-                <input className={input} value={form.propagation_method} onChange={(e) => setForm((p) => ({ ...p, propagation_method: e.target.value }))} placeholder="Grafted rootstock" />
+              <Field label={t("Propagation method")}>
+                <input className={input} value={form.propagation_method} onChange={(e) => setForm((p) => ({ ...p, propagation_method: e.target.value }))} placeholder={t("Grafted rootstock")} />
               </Field>
-              <Field label="Notes">
-                <textarea className={`${input} min-h-[100px]`} value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} placeholder="Management notes, spacing, timing..." />
+              <Field label={t("Notes")}>
+                <textarea className={`${input} min-h-[100px]`} value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} placeholder={t("Management notes, spacing, timing...")} />
               </Field>
             </div>
 
@@ -301,13 +306,13 @@ export default function PlantingPlanPage() {
                 disabled={saving || !form.species_name.trim()}
                 className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60"
               >
-                {saving ? "Saving..." : "Save"}
+                {saving ? t("Saving...") : t("Save")}
               </button>
               <button
                 onClick={closeModal}
                 className="rounded-2xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                Cancel
+                {t("Cancel")}
               </button>
             </div>
           </div>
@@ -362,8 +367,9 @@ function TreesTable({
   deletingId: string | null;
   isManager: boolean;
 }) {
+  const t = useT();
   if (trees.length === 0) {
-    return <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">No trees added yet.</div>;
+    return <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">{t("No trees added yet.")}</div>;
   }
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
@@ -371,13 +377,13 @@ function TreesTable({
         <table className="w-full min-w-[820px] text-sm">
           <thead>
             <tr className="border-b border-zinc-200 bg-zinc-50 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
-              <th className="px-4 py-3 text-left">Species</th>
-              <th className="px-4 py-3 text-left">Strata / Height</th>
-              <th className="px-4 py-3 text-left">Role</th>
-              <th className="px-4 py-3 text-right">Seedlings</th>
-              <th className="px-4 py-3 text-right">Target</th>
-              <th className="px-4 py-3 text-left">Propagation</th>
-              <th className="px-4 py-3 text-left">Notes</th>
+              <th className="px-4 py-3 text-left">{t("Species")}</th>
+              <th className="px-4 py-3 text-left">{t("Strata / Height")}</th>
+              <th className="px-4 py-3 text-left">{t("Role")}</th>
+              <th className="px-4 py-3 text-right">{t("Seedlings")}</th>
+              <th className="px-4 py-3 text-right">{t("Target")}</th>
+              <th className="px-4 py-3 text-left">{t("Propagation")}</th>
+              <th className="px-4 py-3 text-left">{t("Notes")}</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
@@ -419,14 +425,14 @@ function TreesTable({
                           onClick={() => onEdit(entry)}
                           className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100"
                         >
-                          Edit
+                          {t("Edit")}
                         </button>
                         <button
                           onClick={() => onDelete(entry.id)}
                           disabled={isDeleting}
                           className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
                         >
-                          {isDeleting ? "…" : "Delete"}
+                          {isDeleting ? "…" : t("Delete")}
                         </button>
                       </div>
                     )}
@@ -454,8 +460,9 @@ function SupportCards({
   deletingId: string | null;
   isManager: boolean;
 }) {
+  const t = useT();
   if (support.length === 0) {
-    return <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">No support species added yet.</div>;
+    return <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">{t("No support species added yet.")}</div>;
   }
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -482,7 +489,7 @@ function SupportCards({
 
             {entry.propagation_method && (
               <p className="mt-3 text-xs text-zinc-500">
-                <span className="font-medium text-zinc-700">Propagation: </span>
+                <span className="font-medium text-zinc-700">{t("Propagation:")} </span>
                 {entry.propagation_method}
               </p>
             )}
@@ -497,7 +504,7 @@ function SupportCards({
                     onClick={() => setExpandedId(isExpanded ? null : entry.id)}
                     className="mt-2 text-xs font-medium text-zinc-400 hover:text-zinc-700 transition text-left"
                   >
-                    {isExpanded ? "Show less" : "Show more"}
+                    {isExpanded ? t("Show less") : t("Show more")}
                   </button>
                 )}
               </>
@@ -509,14 +516,14 @@ function SupportCards({
                   onClick={() => onEdit(entry)}
                   className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100"
                 >
-                  Edit
+                  {t("Edit")}
                 </button>
                 <button
                   onClick={() => onDelete(entry.id)}
                   disabled={isDeleting}
                   className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
                 >
-                  {isDeleting ? "Deleting..." : "Delete"}
+                  {isDeleting ? t("Deleting...") : t("Delete")}
                 </button>
               </div>
             )}

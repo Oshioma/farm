@@ -3,8 +3,12 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { useT, useLanguage } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 function ResetPasswordInner() {
+  const t = useT();
+  const [lang, setLang] = useLanguage();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -37,11 +41,11 @@ function ResetPasswordInner() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (password !== confirm) {
-      setError("Passwords do not match.");
+      setError(t("Passwords do not match."));
       return;
     }
     if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+      setError(t("Password must be at least 6 characters."));
       return;
     }
     setLoading(true);
@@ -61,8 +65,11 @@ function ResetPasswordInner() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-stone-50 px-4">
         <div className="w-full max-w-sm">
+          <div className="mb-4 flex justify-end">
+            <LanguageToggle lang={lang} onChange={setLang} />
+          </div>
           <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-center text-sm text-zinc-500">
-            Verifying reset link…
+            {t("Verifying reset link…")}
           </div>
         </div>
       </main>
@@ -73,6 +80,9 @@ function ResetPasswordInner() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-stone-50 px-4">
         <div className="w-full max-w-sm">
+          <div className="mb-4 flex justify-end">
+            <LanguageToggle lang={lang} onChange={setLang} />
+          </div>
           <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-center">
             {error ? (
               <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -80,14 +90,14 @@ function ResetPasswordInner() {
               </div>
             ) : (
               <p className="text-sm text-zinc-700">
-                This reset link is invalid or has expired.
+                {t("This reset link is invalid or has expired.")}
               </p>
             )}
             <a
               href="/forgot-password"
               className="mt-4 inline-block text-sm font-medium text-zinc-900 hover:underline"
             >
-              Request a new reset link
+              {t("Request a new reset link")}
             </a>
           </div>
         </div>
@@ -98,14 +108,17 @@ function ResetPasswordInner() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-stone-50 px-4">
       <div className="w-full max-w-sm">
+        <div className="mb-4 flex justify-end">
+          <LanguageToggle lang={lang} onChange={setLang} />
+        </div>
         <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-            Shamba Farm Manager
+            {t("Shamba Farm Manager")}
           </p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight">New password</h1>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight">{t("New password")}</h1>
           {userEmail && (
             <p className="mt-2 text-sm text-zinc-500">
-              Setting password for <strong>{userEmail}</strong>
+              {t("Setting password for")} <strong>{userEmail}</strong>
             </p>
           )}
 
@@ -117,7 +130,7 @@ function ResetPasswordInner() {
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
-              <label className="mb-2 block text-sm font-medium">New password</label>
+              <label className="mb-2 block text-sm font-medium">{t("New password")}</label>
               <input
                 type="password"
                 value={password}
@@ -130,7 +143,7 @@ function ResetPasswordInner() {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium">Confirm password</label>
+              <label className="mb-2 block text-sm font-medium">{t("Confirm password")}</label>
               <input
                 type="password"
                 value={confirm}
@@ -147,7 +160,7 @@ function ResetPasswordInner() {
               disabled={loading}
               className="w-full rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? "Updating..." : "Update password"}
+              {loading ? t("Updating...") : t("Update password")}
             </button>
           </form>
         </div>
@@ -157,11 +170,12 @@ function ResetPasswordInner() {
 }
 
 export default function ResetPasswordPage() {
+  const t = useT();
   return (
     <Suspense
       fallback={
         <main className="flex min-h-screen items-center justify-center bg-stone-50">
-          <p className="text-sm text-zinc-500">Loading…</p>
+          <p className="text-sm text-zinc-500">{t("Loading…")}</p>
         </main>
       }
     >
