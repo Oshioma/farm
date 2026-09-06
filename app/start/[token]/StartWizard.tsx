@@ -172,7 +172,7 @@ export function StartWizard({ initial }: { initial: InviteState }) {
       <div className="mx-auto max-w-md">
         <div className="mb-6 flex items-center justify-between gap-3">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">{t.brand}</p>
-          <LanguageToggle lang={lang} onChange={setLang} />
+          <LanguageToggle lang={lang} onChange={(value) => { setLang(value); void post("lang", { lang: value }); }} />
         </div>
 
         {state.step !== "done" && (

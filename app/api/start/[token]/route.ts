@@ -65,7 +65,7 @@ async function ensureUser(admin: ReturnType<typeof getSupabaseAdmin>, invite: In
       email,
       email_confirm: true,
       password: crypto.randomUUID() + crypto.randomUUID(),
-      user_metadata: { full_name: invite.farmer_name, phone: invite.phone, signed_up_via: "whatsapp_invite" },
+      user_metadata: { full_name: invite.farmer_name, phone: invite.phone, signed_up_via: "whatsapp_invite", lang: invite.lang },
     });
     if (error && !/already/i.test(error.message)) throw error;
     userId = data?.user?.id ?? (await findUserIdByEmail(admin, email));
@@ -210,6 +210,16 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       if (error) throw error;
       await admin.from("whatsapp_invites").update({ step: "done", completed_at: invite.completed_at ?? new Date().toISOString() }).eq("id", invite.id);
       invite.step = "done";
+      return NextResponse.json(await inviteState(admin, invite));
+    }
+
+    if (action === "lang") {
+      const lang = body.lang === "en" ? "en" : "sw";
+      await admin.from("whatsapp_invites").update({ lang }).eq("id", invite.id);
+      invite.lang = lang;
+      if (invite.user_id) {
+        await admin.auth.admin.updateUserById(invite.user_id, { user_metadata: { lang } }).catch(() => {});
+      }
       return NextResponse.json(await inviteState(admin, invite));
     }
 
