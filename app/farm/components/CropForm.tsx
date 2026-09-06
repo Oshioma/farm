@@ -135,9 +135,9 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
         <p className="mt-1 text-sm text-zinc-500">{t("The basics are enough to create the crop. The rest is optional.")}</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="grid gap-6 md:grid-cols-3">
         <section className="space-y-4">
-          <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">{t("Basics")}</h3>
+          <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-900 text-[11px] font-bold text-white">1</span>{t("Basics")}</h3>
             {field(t("Crop name"), (
               <input type="text" value={form.crop_name} onChange={(e) => setForm((prev) => ({ ...prev, crop_name: e.target.value }))} className={inputClass} placeholder={t("Tomatoes")} required autoFocus />
             ))}
@@ -155,8 +155,8 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
             ))}
         </section>
 
-        <section className="space-y-4 border-t border-zinc-200 pt-5">
-          <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">{t("Growing details")}{" · "}{t("optional")}</h3>
+        <section className="space-y-4 border-t border-zinc-200 pt-5 md:border-l md:border-t-0 md:pl-6 md:pt-0">
+          <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-900 text-[11px] font-bold text-white">2</span>{t("Growing details")}{" · "}{t("optional")}</h3>
             {field(<>{t("Photo")} {optional}</>, (
               <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="w-full text-sm text-zinc-600 file:mr-3 file:rounded-full file:border-0 file:bg-zinc-100 file:px-4 file:py-2 file:text-sm file:font-medium hover:file:bg-zinc-200" />
             ))}
@@ -209,8 +209,8 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
             ))}
         </section>
 
-        <section className="space-y-4 border-t border-zinc-200 pt-5">
-          <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">{t("For the shop")}{" · "}{t("optional")}</h3>
+        <section className="space-y-4 border-t border-zinc-200 pt-5 md:border-l md:border-t-0 md:pl-6 md:pt-0">
+          <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-900 text-[11px] font-bold text-white">3</span>{t("For the shop")}{" · "}{t("optional")}</h3>
             <p className="text-xs text-zinc-500">
               {t("Whatever you fill in here is shown to customers on the shopfront. Anything left blank simply is not shown.")}
             </p>
@@ -229,7 +229,7 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
             ))}
         </section>
 
-        <div className="pt-1">
+        <div className="pt-1 md:col-span-3">
           <button
             type="submit"
             disabled={saving || !canSave}
@@ -238,7 +238,7 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
             {saving ? t("Creating crop...") : t("Create crop")}
           </button>
         </div>
-        {!canSave && <p className="text-xs text-zinc-500">{t("Enter a crop name to continue.")}</p>}
+        {!canSave && <p className="text-xs text-zinc-500 md:col-span-3">{t("Enter a crop name to continue.")}</p>}
       </form>
     </div>
   );

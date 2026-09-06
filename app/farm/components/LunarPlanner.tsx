@@ -685,32 +685,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
   return (
     <main className={embedded ? "" : "min-h-screen bg-stone-50 text-zinc-900"}>
       <div className={embedded ? "" : "mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8"}>
-        {embedded ? (
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <Moon className="h-5 w-5 shrink-0 text-indigo-500" />
-            <div className="inline-flex rounded-full border border-zinc-200 bg-zinc-50 p-1">
-              {(
-                [
-                  ["tasks", "Planner"],
-                  ["lunar", "Lunar Farming Planner"],
-                ] as [typeof tab, string][]
-              ).map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => setTab(key)}
-                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
-                    tab === key ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:text-zinc-900"
-                  }`}
-                >
-                  {t(label)}
-                </button>
-              ))}
-            </div>
-            {tab === "lunar" && (
-              <span className="text-sm text-zinc-500">{t("Plan farm goals by the rhythm of the moon.")}</span>
-            )}
-          </div>
-        ) : (
+        {embedded ? null : (
           <header className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -771,8 +746,31 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
           </div>
         )}
 
-        {/* View switch & navigation */}
-        <div className="mb-5 flex flex-col gap-3 rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        {/* View switch & navigation; when embedded, the planner tabs share this line. */}
+        <div className="mb-5 flex flex-wrap items-center gap-3 rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm">
+          {embedded && (
+            <>
+              <Moon className="h-5 w-5 shrink-0 text-indigo-500" />
+              <div className="inline-flex rounded-full border border-zinc-200 bg-zinc-50 p-1">
+                {(
+                  [
+                    ["tasks", "Planner"],
+                    ["lunar", "Lunar Farming Planner"],
+                  ] as [typeof tab, string][]
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => setTab(key)}
+                    className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                      tab === key ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:text-zinc-900"
+                    }`}
+                  >
+                    {t(label)}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           <div className="inline-flex rounded-full border border-zinc-200 bg-zinc-50 p-1">
             {(
               [
@@ -793,7 +791,7 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
             ))}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-2">
             <span className="mr-1 hidden text-sm font-medium text-zinc-600 sm:inline">
               {periodLabel}
             </span>
@@ -821,6 +819,9 @@ export default function LunarPlanner({ embedded = false, farmId, members }: Prop
         </div>
 
         <p className="mb-4 text-sm font-medium text-zinc-500 sm:hidden">{periodLabel}</p>
+        {embedded && tab === "lunar" && (
+          <p className="-mt-2 mb-4 text-sm text-zinc-500">{t("Plan farm goals by the rhythm of the moon.")}</p>
+        )}
 
         {/* Day cards / month grid */}
         {loading ? (
