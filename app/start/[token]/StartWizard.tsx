@@ -27,7 +27,7 @@ const copy = {
     expectedKg: "How many kilograms do you expect?",
     pricePerKg: "Price per kg", optional: "optional",
     cropsSoFar: "Your crops",
-    addCrop: "Add crop", addAnother: "Add another crop",
+    addCrop: "Add crop",
     openShop: "Open my shop", opening: "Opening…",
     next: "Next", saving: "Saving…",
     need: "Fill in the fields above to continue.",
@@ -56,7 +56,7 @@ const copy = {
     expectedKg: "Unatarajia kilo ngapi?",
     pricePerKg: "Bei kwa kilo", optional: "hiari",
     cropsSoFar: "Mazao yako",
-    addCrop: "Ongeza zao", addAnother: "Ongeza zao lingine",
+    addCrop: "Ongeza zao",
     openShop: "Fungua duka langu", opening: "Inafungua…",
     next: "Endelea", saving: "Inahifadhi…",
     need: "Jaza sehemu zilizo hapo juu ili kuendelea.",
@@ -229,7 +229,6 @@ export function StartWizard({ initial }: { initial: InviteState }) {
               ) : (
                 <div className="mt-5 grid gap-3">
                   <button type="button" onClick={openShop} disabled={busy === "open"} className={primary}>{busy === "open" ? t.opening : t.openShop}<ChevronRight className="h-5 w-5" /></button>
-                  <button type="button" onClick={() => setShowCropForm(true)} className={secondary}>{t.addAnother}</button>
                 </div>
               )}
             </div>
