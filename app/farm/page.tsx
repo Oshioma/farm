@@ -43,7 +43,7 @@ import { useFocusTarget } from "@/hooks/useFocusTarget";
 import { blankCropDetails, cropDetailsToForm, cropDetailsPayload } from "@/lib/cropDetails";
 import { LogHoursModal } from "@/app/farm/components/LogHoursModal";
 import { ExpandableText } from "@/app/farm/components/ExpandableText";
-import { ArrowUp, Bug, CalendarDays, ChartColumn, ClipboardList, Clock, Droplets, FlaskConical, Flower2, Heart, HeartHandshake, Home, Images, Layers, LayoutDashboard, Leaf, Map as MapIcon, Package, Plus, Receipt, Recycle, RefreshCw, Settings, ShoppingBag, Shovel, SlidersHorizontal, Sprout, Target, TreeDeciduous, TrendingUp, Users, Wallet, Wheat, X } from "lucide-react";
+import { ArrowUp, Bug, CalendarDays, ChartColumn, ClipboardList, Clock, Droplets, FlaskConical, Flower2, Heart, HeartHandshake, Home, Images, Layers, LayoutDashboard, Leaf, Map as MapIcon, Package, Plus, Receipt, Recycle, Settings, ShoppingBag, Shovel, Sprout, Target, TreeDeciduous, TrendingUp, Users, Wallet, Wheat, X } from "lucide-react";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
 import NotificationBell from "@/components/NotificationBell";
 import { NavMenu } from "@/app/farm/components/NavMenu";
@@ -161,7 +161,6 @@ export default function FarmPage() {
   const [userRoleOnFarm, setUserRoleOnFarm] = useState<string | null>(null);
   const [deleteFarmStep, setDeleteFarmStep] = useState<0 | 1 | 2>(0);
   const [deletingFarm, setDeletingFarm] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1516,18 +1515,6 @@ export default function FarmPage() {
   function toggleCreateFarm() {
     setNoFarmMode(noFarmMode === "create" ? "idle" : "create");
   }
-  async function handleRefresh() {
-    setIsRefreshing(true);
-    try {
-      if (activeFarmId) {
-        await loadFarmData(activeFarmId);
-      }
-    } catch (err) {
-      setError(errMsg(err, t("Failed to refresh farm data")));
-    } finally {
-      setIsRefreshing(false);
-    }
-  }
   const farmMenuItems = [
     ...farms.map((farm) => ({ key: farm.id, label: farm.name, active: farm.id === activeFarmId, onSelect: () => setActiveFarmId(farm.id) })),
     { key: "join", label: t("Join a farm"), onSelect: toggleJoinFarm, dividerBefore: true },
@@ -1548,7 +1535,6 @@ export default function FarmPage() {
     ] },
     { key: "farm", label: "Farm", icon: <Sprout className={iconClass} />, items: [
       leaf("#map", "Map", <MapIcon className={iconClass} />),
-      leaf(withFarmContext("/farm/onboarding"), "Farm setup", <SlidersHorizontal className={iconClass} />, "/farm/onboarding", true),
       leaf(withFarmContext("/farm/systems"), "Systems", <Layers className={iconClass} />, "/farm/systems"),
       leaf(withFarmContext("/farm/work-hours"), "Work hours", <Clock className={iconClass} />, "/farm/work-hours", true),
       leaf("#assets", "Assets", <Package className={iconClass} />),
@@ -1715,12 +1701,6 @@ export default function FarmPage() {
                 items={farmMenuItems}
               />
               {!hideChrome && (<>
-              <Link
-                href={withFarmContext("/farm/invite")}
-                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-              >
-                {t("Invite")}
-              </Link>
               {isSuperAdmin && (
                 <Link
                   href="/admin"
@@ -1729,14 +1709,6 @@ export default function FarmPage() {
                   {t("Admin")}
                 </Link>
               )}
-              <button
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-                className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-60"
-              >
-                <RefreshCw className={"h-4 w-4 " + (isRefreshing ? "animate-spin" : "")} aria-hidden="true" />
-                {isRefreshing ? t("Refreshing...") : t("Refresh")}
-              </button>
               <NotificationBell />
               </>)}
               {userEmail && (
