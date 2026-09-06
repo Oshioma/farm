@@ -5,6 +5,11 @@ export const shop: Record<string, string> = {
   /* ── top bar ── */
   "Manage farm": "Simamia shamba",
   "Add crops": "Ongeza mazao",
+  "Add photos and delivery details": "Weka picha na maelezo ya usafirishaji",
+  "Share on WhatsApp": "Shiriki kwenye WhatsApp",
+  "Copy link": "Nakili kiungo",
+  "Copied": "Imenakiliwa",
+  "{farm} is now on Shamba Online. Reserve fresh produce here: {link}": "{farm} sasa lipo Shamba Online. Agiza mazao mapya hapa: {link}",
   "Your pre-order · {n}": "Oda yako ya awali · {n}",
   "Nothing reserved yet": "Bado hujahifadhi chochote",
 
