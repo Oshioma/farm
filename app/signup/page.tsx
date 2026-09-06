@@ -81,7 +81,7 @@ function SignUpInner() {
       const { error: authError, data } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo },
+        options: { emailRedirectTo, data: { lang } },
       });
 
       if (authError) {

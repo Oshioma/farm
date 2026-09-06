@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { sw } from "@/lib/i18n/sw";
+import { supabase } from "@/lib/supabase";
 
 export type Lang = "en" | "sw";
 
@@ -21,17 +22,42 @@ function readSaved(): Lang | null {
   }
 }
 
+function asLang(value: unknown): Lang | null {
+  return value === "sw" || value === "en" ? value : null;
+}
+
 /**
- * Site-wide English / Kiswahili choice, remembered in the browser. Defaults to
- * Kiswahili when the browser itself is set to it, English otherwise.
+ * Site-wide English / Kiswahili choice. Order of precedence: a choice made on
+ * this device, then the language saved on the signed-in account (so a farmer
+ * who set up in Kiswahili on WhatsApp gets Kiswahili on any device), then the
+ * browser's own language. Toggling saves to both the device and the account.
  */
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>("en");
 
   useEffect(() => {
     const saved = readSaved();
-    if (saved) setLangState(saved);
-    else if (navigator.language.toLowerCase().startsWith("sw")) setLangState("sw");
+    if (saved) {
+      setLangState(saved);
+      return;
+    }
+    if (navigator.language.toLowerCase().startsWith("sw")) setLangState("sw");
+
+    // No choice on this device yet: use the account's, now and on sign-in.
+    let cancelled = false;
+    supabase.auth.getSession().then(({ data }) => {
+      const fromAccount = asLang(data.session?.user?.user_metadata?.lang);
+      if (!cancelled && fromAccount) setLangState(fromAccount);
+    }).catch(() => {});
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (readSaved()) return;
+      const fromAccount = asLang(session?.user?.user_metadata?.lang);
+      if (fromAccount) setLangState(fromAccount);
+    });
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -48,6 +74,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       } catch {
         /* Private mode or blocked storage: the choice just lasts for this page. */
       }
+      // Best effort: remember it on the account so other devices follow.
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session && data.session.user.user_metadata?.lang !== next) {
+          return supabase.auth.updateUser({ data: { lang: next } });
+        }
+      }).catch(() => {});
     },
   }), [lang]);
 
