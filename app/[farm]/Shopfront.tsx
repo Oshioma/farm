@@ -31,7 +31,7 @@ function ManageFarmLink({ farmId, farmName, slug }: { farmId: string; farmName: 
   const shopLink = typeof window === "undefined" ? `/${slug}` : `${window.location.origin}/${slug}`;
   return (
     <>
-      <a href={`/farm/onboarding?farmId=${id}`} style={pill}>{t("Add crops")}</a>
+      <a href={`/farm/add-crop?farmId=${id}&back=${encodeURIComponent(`/${slug}`)}`} style={pill}>{t("Add crops")}</a>
       <a href={`/farm/prepare?farmId=${id}`} style={pill}>{t("Add photos and delivery details")}</a>
       <a href={`/farm?farmId=${id}`} style={pill}>{t("Manage farm")}</a>
       <ShareWhatsAppButton
