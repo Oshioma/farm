@@ -154,7 +154,7 @@ export function Shopfront({ shop }: { shop: ShopData }) {
         }}
       >
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, minWidth: 0 }}>
-          <span style={{ fontFamily: serif, fontSize: 24, letterSpacing: "-0.01em" }}>{shop.farm.name}</span>
+          <span style={{ fontFamily: sans, fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.05 }}>{shop.farm.name}</span>
           <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#a8a29e" }}>
             Shamba Online
           </span>

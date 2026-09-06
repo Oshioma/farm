@@ -43,7 +43,7 @@ import { useFocusTarget } from "@/hooks/useFocusTarget";
 import { blankCropDetails, cropDetailsToForm, cropDetailsPayload } from "@/lib/cropDetails";
 import { LogHoursModal } from "@/app/farm/components/LogHoursModal";
 import { ExpandableText } from "@/app/farm/components/ExpandableText";
-import { ArrowUp, Bug, CalendarDays, ChartColumn, ClipboardList, Clock, Droplets, FlaskConical, Flower2, Heart, HeartHandshake, Home, Images, Layers, LayoutDashboard, Leaf, Map as MapIcon, Package, Plus, Receipt, Recycle, Settings, ShoppingBag, Shovel, Sprout, Target, TreeDeciduous, TrendingUp, Users, Wallet, Wheat, X } from "lucide-react";
+import { ArrowUp, Bug, CalendarDays, ChartColumn, ChevronDown, ChevronUp, ClipboardList, Clock, Droplets, FlaskConical, Flower2, Heart, HeartHandshake, Home, Images, Layers, LayoutDashboard, Leaf, Map as MapIcon, Package, Plus, Receipt, Recycle, Settings, ShoppingBag, Shovel, Sprout, Target, TreeDeciduous, TrendingUp, Users, Wallet, Wheat, X } from "lucide-react";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
 import NotificationBell from "@/components/NotificationBell";
 import { NavMenu } from "@/app/farm/components/NavMenu";
@@ -68,6 +68,14 @@ export default function FarmPage() {
   const t = useT();
   const [lang, setLang] = useLanguage();
   const [onboardingMode, setOnboardingMode] = useState(false);
+  /* The beds map sits under the navigation; a big toggle shrinks it away. */
+  const [mapExpanded, setMapExpanded] = useState(true);
+  useEffect(() => {
+    try { if (window.localStorage.getItem("shamba_map_expanded") === "0") setMapExpanded(false); } catch {}
+  }, []);
+  useEffect(() => {
+    try { window.localStorage.setItem("shamba_map_expanded", mapExpanded ? "1" : "0"); } catch {}
+  }, [mapExpanded]);
   const [farms, setFarms] = useState<Farm[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
   const [crops, setCrops] = useState<Crop[]>([]);
@@ -1992,6 +2000,50 @@ export default function FarmPage() {
 
         {activeFarm ? (
           <>
+            <section id="map" className="mb-6 scroll-mt-4 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-semibold">{t("Beds map")}</h2>
+                  <p className="mt-1 text-sm text-zinc-500">{t("Planting areas and what is growing in each.")} · {t("{n} mapped beds", { n: zones.length })}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMapExpanded((value) => !value)}
+                  aria-expanded={mapExpanded}
+                  aria-controls="map-body"
+                  className={"inline-flex items-center gap-2 rounded-full px-6 py-3 text-base font-semibold transition " + (mapExpanded ? "border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-100" : "bg-emerald-700 text-white hover:bg-emerald-800")}
+                >
+                  {mapExpanded ? <ChevronUp className="h-5 w-5" aria-hidden="true" /> : <ChevronDown className="h-5 w-5" aria-hidden="true" />}
+                  {mapExpanded ? t("Shrink map") : t("Expand map")}
+                </button>
+              </div>
+              <div id="map-body" className="mt-5" hidden={!mapExpanded}>
+                <FarmMap
+                  zones={zones}
+                  crops={crops}
+                  plants={plants}
+                  fertilisations={fertilisations}
+                  compostEntries={compostEntries}
+                  mulchEntries={mulchEntries}
+                  pestControls={pestControls}
+                  harvestEta={harvestEtaEntries}
+                  farmName={activeFarm?.name}
+                  farmId={activeFarm?.id}
+                  onSelectBed={handleMapBedSelection}
+                  onAddCropToBed={handleAddCropFromMap}
+                  onBedsSaved={async () => {
+                    if (activeFarm?.id) {
+                      const zoneRows = await getZones(activeFarm.id);
+                      setZones(zoneRows);
+                    }
+                  }}
+                />
+                <p className="mt-2 text-xs text-zinc-400">
+                  {t("Click a bed to see details, add crops, or quickly log fertiliser, compost, mulch, and pest control. The red dot on a bed counts its pest control treatments.")}
+                </p>
+              </div>
+            </section>
+
             {activeForm && ["crop", "task", "harvest", "expense", "asset", "pest", "sale", "want"].includes(activeForm) ? (
               <div className={activeForm === "crop" ? "mb-6" : "mb-6 max-w-sm"}>
                 {activeForm === "crop" && (
@@ -2481,41 +2533,6 @@ export default function FarmPage() {
                   )}
                 </div>
               ) : null}
-            </section>
-
-            <section id="map" className="mb-6 scroll-mt-4 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-xl font-semibold">{t("Beds map")}</h2>
-                  <p className="mt-1 text-sm text-zinc-500">{t("Planting areas and what is growing in each.")}</p>
-                </div>
-                <span className="text-sm text-zinc-500">{t("{n} mapped beds", { n: zones.length })}</span>
-              </div>
-              <div className="mt-5">
-                <FarmMap
-                  zones={zones}
-                  crops={crops}
-                  plants={plants}
-                  fertilisations={fertilisations}
-                  compostEntries={compostEntries}
-                  mulchEntries={mulchEntries}
-                  pestControls={pestControls}
-                  harvestEta={harvestEtaEntries}
-                  farmName={activeFarm?.name}
-                  farmId={activeFarm?.id}
-                  onSelectBed={handleMapBedSelection}
-                  onAddCropToBed={handleAddCropFromMap}
-                  onBedsSaved={async () => {
-                    if (activeFarm?.id) {
-                      const zoneRows = await getZones(activeFarm.id);
-                      setZones(zoneRows);
-                    }
-                  }}
-                />
-                <p className="mt-2 text-xs text-zinc-400">
-                  {t("Click a bed to see details, add crops, or quickly log fertiliser, compost, mulch, and pest control. The red dot on a bed counts its pest control treatments.")}
-                </p>
-              </div>
             </section>
 
             <div id="crops" className="scroll-mt-4 space-y-6">
