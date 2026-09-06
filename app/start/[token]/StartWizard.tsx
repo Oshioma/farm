@@ -5,7 +5,7 @@ import { Check, ChevronRight, ExternalLink } from "lucide-react";
 import type { InviteState } from "@/lib/invites";
 import { useLanguage } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/LanguageToggle";
-import { whatsappLink } from "@/lib/whatsapp";
+import { ShareWhatsAppButton } from "@/components/ShareWhatsAppButton";
 
 /* One question per screen, big controls, no account. Copy lives here rather
    than in the shared dictionary because the page has to work before the
@@ -34,7 +34,7 @@ const copy = {
     liveTitle: "Your shop is live",
     liveBody: (farm: string) => `Buyers can now find ${farm} and reserve your produce. Share the link below.`,
     viewShop: "See my shop",
-    shareShop: "Share on WhatsApp",
+    shareShop: "Share on WhatsApp", sharing: "Opening…", copyLink: "Copy link", copied: "Copied",
     shareText: (farm: string, link: string) => `${farm} is now on Shamba Online. Reserve fresh produce here: ${link}`,
     enterFarm: "Add photos, prices and delivery details",
     entering: "Opening your farm…",
@@ -63,7 +63,7 @@ const copy = {
     liveTitle: "Duka lako liko hewani",
     liveBody: (farm: string) => `Wanunuzi sasa wanaweza kuona ${farm} na kuagiza mazao yako. Shiriki kiungo hapa chini.`,
     viewShop: "Ona duka langu",
-    shareShop: "Shiriki kwenye WhatsApp",
+    shareShop: "Shiriki kwenye WhatsApp", sharing: "Inafungua…", copyLink: "Nakili kiungo", copied: "Imenakiliwa",
     shareText: (farm: string, link: string) => `${farm} sasa lipo Shamba Online. Agiza mazao mapya hapa: ${link}`,
     enterFarm: "Weka picha, bei na maelezo ya usafirishaji",
     entering: "Inafungua shamba lako…",
@@ -241,7 +241,15 @@ export function StartWizard({ initial }: { initial: InviteState }) {
               <p className="mt-2 text-sm text-zinc-600">{t.liveBody(state.farm.name)}</p>
               <div className="mt-5 grid gap-3">
                 <button type="button" onClick={viewShop} disabled={busy === "enter"} className={primary}>{busy === "enter" ? t.entering : t.viewShop} <ExternalLink className="h-5 w-5" /></button>
-                <a href={whatsappLink("", t.shareText(state.farm.name, shopLink))} target="_blank" rel="noreferrer" className={secondary}>{t.shareShop}</a>
+                <ShareWhatsAppButton
+                  text={t.shareText(state.farm.name, shopLink)}
+                  label={t.shareShop}
+                  sharingLabel={t.sharing}
+                  copyLabel={t.copyLink}
+                  copiedLabel={t.copied}
+                  className={secondary}
+                  copyClassName="inline-flex items-center justify-center gap-1 text-sm font-semibold text-zinc-600 hover:text-zinc-900"
+                />
                 <button type="button" onClick={enterFarm} disabled={busy === "enter"} className="text-sm font-semibold text-emerald-800 hover:underline">{busy === "enter" ? t.entering : t.enterFarm}</button>
               </div>
             </div>

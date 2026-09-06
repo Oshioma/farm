@@ -1,7 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Copy, MessageCircle, RefreshCw } from "lucide-react";
+import { Copy, MessageCircle, RefreshCw, Share2 } from "lucide-react";
+
+function canShare() {
+  return typeof navigator !== "undefined" && typeof navigator.share === "function";
+}
+
+/* wa.me with a number opens either WhatsApp app, but on some phones with
+   WhatsApp Business it does nothing. The share sheet lets the admin pick the
+   app and the contact instead. */
+async function shareSheet(text: string) {
+  try {
+    await navigator.share({ text });
+  } catch {
+    /* Closed without sending. */
+  }
+}
 
 type Invite = {
   id: string;
@@ -141,6 +156,7 @@ export function InviteFarmers() {
           <pre className="mt-2 whitespace-pre-wrap rounded-xl bg-zinc-50 p-3 text-sm text-zinc-800">{latest.message}</pre>
           <div className="mt-3 flex flex-wrap gap-2">
             <a href={latest.whatsapp} target="_blank" rel="noreferrer" className={waButton}><MessageCircle className="h-4 w-4" /> Send on WhatsApp</a>
+            {canShare() && <button type="button" onClick={() => shareSheet(latest.message)} className={ghostButton}><Share2 className="h-4 w-4" /> Share via…</button>}
             <button type="button" onClick={() => copy(latest.message, "latest-msg")} className={ghostButton}><Copy className="h-4 w-4" /> {copied === "latest-msg" ? "Copied" : "Copy message"}</button>
             <button type="button" onClick={() => copy(latest.link, "latest-link")} className={ghostButton}><Copy className="h-4 w-4" /> {copied === "latest-link" ? "Copied" : "Copy link"}</button>
           </div>
@@ -183,6 +199,7 @@ export function InviteFarmers() {
                     <td className="py-2">
                       <div className="flex flex-wrap justify-end gap-1.5">
                         <a href={invite.whatsapp} target="_blank" rel="noreferrer" className={waButton} title={invite.message}><MessageCircle className="h-4 w-4" /> {invite.step === "done" ? "Send shop link" : invite.openedAt ? "Nudge" : "Send"}</a>
+                        {canShare() && <button type="button" onClick={() => shareSheet(invite.message)} className={ghostButton} title="Pick the app and contact yourself"><Share2 className="h-4 w-4" /></button>}
                         <button type="button" onClick={() => copy(invite.link, invite.id)} className={ghostButton}><Copy className="h-4 w-4" /> {copied === invite.id ? "Copied" : "Link"}</button>
                       </div>
                     </td>
