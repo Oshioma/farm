@@ -184,7 +184,19 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
     return NextResponse.json({ error: "Unknown action." }, { status: 400 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Something went wrong.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error(`[start] action "${action}" failed for invite ${invite.id}:`, err);
+    return NextResponse.json({ error: describeError(err) }, { status: 500 });
   }
+}
+
+/* Supabase errors are objects with message/details/hint; not all are Error
+   instances, so read the fields directly rather than trusting instanceof. */
+function describeError(err: unknown): string {
+  if (typeof err === "object" && err !== null) {
+    const e = err as { message?: unknown; details?: unknown; hint?: unknown; code?: unknown };
+    const parts = [e.message, e.details, e.hint].filter((v): v is string => typeof v === "string" && v.length > 0);
+    if (parts.length) return `${parts.join(" — ")}${typeof e.code === "string" ? ` (${e.code})` : ""}`;
+  }
+  if (err instanceof Error) return err.message;
+  return "Something went wrong.";
 }
