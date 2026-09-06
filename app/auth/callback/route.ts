@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     // Handle token_hash flow (non-PKCE / email OTP verification)
     const { error } = await supabase.auth.verifyOtp({
       token_hash,
-      type: type as "recovery" | "signup" | "email",
+      type: type as "recovery" | "signup" | "email" | "magiclink",
     });
     if (error) exchangeError = error.message;
   } else if (!code) {
@@ -63,8 +63,8 @@ export async function GET(request: NextRequest) {
   }
 
   if (!exchangeError) {
-    const destination = new URL(next, request.url);
-    const supabaseResponse = NextResponse.redirect(destination);
+    // supabaseResponse was rebuilt by setAll() with the session cookies attached;
+    // a fresh redirect here would drop them and leave the visitor signed out.
     return supabaseResponse;
   }
 

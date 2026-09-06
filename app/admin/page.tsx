@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { InviteFarmers } from "./InviteFarmers";
 
 type Farm = {
   id: string;
@@ -193,6 +194,8 @@ export default function AdminPage() {
           </div>
         ) : (
           <div className="space-y-6">
+
+            <InviteFarmers />
 
             {/* All Users section */}
             <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">

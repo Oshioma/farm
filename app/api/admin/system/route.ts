@@ -496,6 +496,11 @@ const MIGRATIONS: { version: string; name: string; probes: string[]; note?: stri
     probes: [],
     note: "Authenticated RPC function only — not visible from here.",
   },
+  {
+    version: "20260906120000",
+    name: "create_farm_invites",
+    probes: ["farm_invites.token", "farm_invites.step"],
+  },
 ];
 
 type ProbeResult = { status: Status; detail: string };
