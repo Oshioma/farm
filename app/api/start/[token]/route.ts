@@ -26,7 +26,7 @@ async function ensureUser(admin: ReturnType<typeof getSupabaseAdmin>, invite: In
 
   // Another invite for the same phone may already have made the account.
   const { data: earlier } = await admin
-    .from("farm_invites")
+    .from("whatsapp_invites")
     .select("user_id")
     .eq("phone", invite.phone)
     .not("user_id", "is", null)
@@ -51,7 +51,7 @@ async function ensureUser(admin: ReturnType<typeof getSupabaseAdmin>, invite: In
   }
   if (!userId) throw new Error("Could not create the farmer's account.");
 
-  await admin.from("farm_invites").update({ user_id: userId }).eq("id", invite.id);
+  await admin.from("whatsapp_invites").update({ user_id: userId }).eq("id", invite.id);
   invite.user_id = userId;
   return userId;
 }
@@ -61,7 +61,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   const admin = getSupabaseAdmin();
   const invite = await loadInviteByToken(admin, token);
   if (!invite) return invalid();
-  if (!invite.opened_at) await admin.from("farm_invites").update({ opened_at: new Date().toISOString() }).eq("id", invite.id);
+  if (!invite.opened_at) await admin.from("whatsapp_invites").update({ opened_at: new Date().toISOString() }).eq("id", invite.id);
   return NextResponse.json(await inviteState(admin, invite));
 }
 
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         invite.farm_id = farm.id;
       }
       const step = invite.step === "farm" ? "location" : invite.step;
-      await admin.from("farm_invites").update({ farm_id: invite.farm_id, step }).eq("id", invite.id);
+      await admin.from("whatsapp_invites").update({ farm_id: invite.farm_id, step }).eq("id", invite.id);
       invite.step = step;
       return NextResponse.json(await inviteState(admin, invite));
     }
@@ -112,7 +112,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       const { error } = await admin.from("farms").update({ location }).eq("id", invite.farm_id);
       if (error) throw error;
       const step = invite.step === "location" ? "crop" : invite.step;
-      await admin.from("farm_invites").update({ step }).eq("id", invite.id);
+      await admin.from("whatsapp_invites").update({ step }).eq("id", invite.id);
       invite.step = step;
       return NextResponse.json(await inviteState(admin, invite));
     }
@@ -160,7 +160,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       if (!count) return NextResponse.json({ error: "Add at least one crop before opening the shop." }, { status: 400 });
       const { error } = await admin.from("farms").update({ list_in_market: true }).eq("id", invite.farm_id);
       if (error) throw error;
-      await admin.from("farm_invites").update({ step: "done", completed_at: invite.completed_at ?? new Date().toISOString() }).eq("id", invite.id);
+      await admin.from("whatsapp_invites").update({ step: "done", completed_at: invite.completed_at ?? new Date().toISOString() }).eq("id", invite.id);
       invite.step = "done";
       return NextResponse.json(await inviteState(admin, invite));
     }

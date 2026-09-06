@@ -1,9 +1,9 @@
--- WhatsApp onboarding invites. The admin creates a row, sends its link by
+-- WhatsApp onboarding invites (farm_invites already holds member invites for /join). The admin creates a row, sends its link by
 -- WhatsApp (a wa.me deep link the admin taps), and the farmer completes the
 -- first setup on a public page keyed by the token, with no login. Only the
 -- service role reads or writes this table: RLS is on and no policies exist.
 
-CREATE TABLE IF NOT EXISTS public.farm_invites (
+CREATE TABLE IF NOT EXISTS public.whatsapp_invites (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   token text NOT NULL UNIQUE DEFAULT encode(gen_random_bytes(24), 'hex'),
   farmer_name text NOT NULL,
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS public.farm_invites (
   completed_at timestamptz
 );
 
-CREATE INDEX IF NOT EXISTS farm_invites_phone_idx ON public.farm_invites (phone);
-CREATE INDEX IF NOT EXISTS farm_invites_created_at_idx ON public.farm_invites (created_at DESC);
+CREATE INDEX IF NOT EXISTS whatsapp_invites_phone_idx ON public.whatsapp_invites (phone);
+CREATE INDEX IF NOT EXISTS whatsapp_invites_created_at_idx ON public.whatsapp_invites (created_at DESC);
 
-ALTER TABLE public.farm_invites ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.whatsapp_invites ENABLE ROW LEVEL SECURITY;

@@ -30,7 +30,7 @@ export default async function StartPage({ params }: Props) {
   }
 
   if (!invite.opened_at) {
-    await admin.from("farm_invites").update({ opened_at: new Date().toISOString() }).eq("id", invite.id);
+    await admin.from("whatsapp_invites").update({ opened_at: new Date().toISOString() }).eq("id", invite.id);
   }
   const state = await inviteState(admin, invite);
   return <StartWizard initial={state} />;
