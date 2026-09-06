@@ -152,7 +152,7 @@ export const crops: Record<string, string> = {
   "Crop name, expected harvest date and expected kilograms are needed.": "Jina la zao, tarehe ya mavuno inayotarajiwa na kilo zinazotarajiwa vinahitajika.",
   "{crop} is now in your shop.": "{crop} sasa lipo dukani mwako.",
   "Continue to my shop": "Endelea kwenye duka langu",
-  "Add more details about this crop": "Ongeza maelezo zaidi kuhusu zao hili",
+  "Optional. Fill in what you can; you can come back later.": "Hiari. Jaza unachoweza; unaweza kurudi baadaye.",
   "No photo": "Hakuna picha",
   "Swap photo": "Badilisha picha",
   "Add photo": "Weka picha",

@@ -16,7 +16,7 @@ import { supabase } from "@/lib/supabase";
    pages collect the rest (growing details, then what the shop shows). Every
    page ends with a way straight back to the shop. */
 
-type Step = "quick" | "saved" | "growing" | "shop" | "done";
+type Step = "quick" | "growing" | "shop";
 
 const inputClass = "mt-1.5 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-3 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
 const primaryButton = "inline-flex items-center justify-center gap-1 rounded-full bg-emerald-700 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50";
@@ -106,7 +106,7 @@ function AddCropInner() {
 
       setCropId(inserted.id);
       setCropLabel(variety ? `${name} · ${variety}` : name);
-      setStep("saved");
+      setStep("growing");
     } catch (err) {
       setError(errMsg(err, t("Failed to add crop")));
     } finally {
@@ -177,8 +177,9 @@ function AddCropInner() {
     }));
   }
 
-  const pageTitle = step === "growing" ? t("Growing details") : step === "shop" ? t("For the shop") : t("Add crop");
+  const pageTitle = t("Add crop");
   const pageNumber = step === "growing" ? 1 : step === "shop" ? 2 : 0;
+  const sectionTitle = step === "growing" ? t("Growing details") : step === "shop" ? t("For the shop") : "";
 
   return (
     <main className="min-h-screen bg-stone-50 px-4 py-6 text-zinc-900">
@@ -195,7 +196,6 @@ function AddCropInner() {
             <h1 className="text-2xl font-semibold tracking-tight">{pageTitle}</h1>
             {pageNumber > 0 && <span className="text-xs font-medium text-zinc-500">{t("More details {n} of 2", { n: pageNumber })}</span>}
           </div>
-          {cropLabel && step !== "quick" && <p className="mt-1 text-sm text-zinc-500">{cropLabel}</p>}
 
           {!farm ? (
             <p className="mt-4 text-sm text-zinc-500">{t("Loading…")}</p>
@@ -209,62 +209,68 @@ function AddCropInner() {
               <button type="submit" disabled={busy || !quickReady} className={"w-full " + primaryButton}>{busy ? t("Saving…") : t("Add crop")}<ChevronRight className="h-4 w-4" /></button>
               {!quickReady && <p className="text-xs text-zinc-500">{t("Crop name, expected harvest date and expected kilograms are needed.")}</p>}
             </form>
-          ) : step === "saved" ? (
+          ) : (
             <div className="mt-4">
               <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900"><Check className="h-5 w-5" />{t("{crop} is now in your shop.", { crop: cropLabel })}</div>
-              <div className="mt-5 grid gap-3">
-                <a href={shopHref} className={"w-full " + primaryButton}>{t("Continue to my shop")}<ChevronRight className="h-4 w-4" /></a>
-                <button type="button" onClick={() => setStep("growing")} className={"w-full " + secondaryButton}>{t("Add more details about this crop")}</button>
+              <a href={shopHref} className={"mt-4 w-full " + primaryButton}>{t("Continue to my shop")}<ChevronRight className="h-4 w-4" /></a>
+
+              <div className="mt-6 border-t border-zinc-200 pt-5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h2 className="text-lg font-semibold">{sectionTitle}</h2>
+                  <span className="text-xs font-medium text-zinc-500">{t("More details {n} of 2", { n: pageNumber })}</span>
+                </div>
+                <p className="mt-1 text-sm text-zinc-500">{t("Optional. Fill in what you can; you can come back later.")}</p>
+
+                {step === "growing" ? (
+                  <form onSubmit={saveGrowing} className="mt-4 grid gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-zinc-700">{t("Produce photo")}</p>
+                      <div className="mt-1.5 flex items-center gap-3">
+                        {photoPreview ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={photoPreview} alt="" className="h-16 w-16 rounded-xl object-cover" />
+                        ) : (
+                          <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-dashed border-zinc-300 text-[10px] text-zinc-400">{t("No photo")}</div>
+                        )}
+                        <input ref={fileInput} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { choosePhoto(e.target.files?.[0] ?? null); e.target.value = ""; }} />
+                        <button type="button" onClick={() => fileInput.current?.click()} className={secondaryButton}>{photo ? t("Swap photo") : t("Add photo")}</button>
+                      </div>
+                    </div>
+                    <label className="text-sm font-medium text-zinc-700">{t("Status")}
+                      <select value={growing.status} onChange={(e) => setGrowing((g) => ({ ...g, status: e.target.value }))} className={inputClass}>
+                        {["planned", "planted", "germinating", "growing", "harvest_ready"].map((value) => <option key={value} value={value}>{t(value)}</option>)}
+                      </select>
+                    </label>
+                    <label className="text-sm font-medium text-zinc-700">{t("Planted on")}<input type="date" value={growing.plantedOn} onChange={(e) => setGrowing((g) => ({ ...g, plantedOn: e.target.value }))} className={inputClass} /></label>
+                    {zones.length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium text-zinc-700">{t("Beds")}</p>
+                        <div className="mt-1.5 flex flex-wrap gap-2">
+                          {zones.map((zone) => (
+                            <button key={zone.id} type="button" onClick={() => toggleZone(zone.id)} className={"rounded-full border px-3 py-1.5 text-sm " + (growing.zoneIds.includes(zone.id) ? "border-emerald-700 bg-emerald-700 text-white" : "border-zinc-300 bg-white text-zinc-700")}>{zone.name}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <label className="text-sm font-medium text-zinc-700">{t("Notes")}<textarea rows={3} value={growing.notes} onChange={(e) => setGrowing((g) => ({ ...g, notes: e.target.value }))} placeholder={t("Growing conditions, observations…")} className={inputClass} /></label>
+                    <button type="submit" disabled={busy} className={"w-full " + primaryButton}>{busy ? t("Saving…") : t("Save and continue")}<ChevronRight className="h-4 w-4" /></button>
+                  </form>
+                ) : (
+                  <form onSubmit={saveShopDetails} className="mt-4 grid gap-4">
+                    <p className="text-sm text-zinc-600">{t("Whatever you fill in here is shown to customers on the shopfront. Anything left blank simply is not shown.")}</p>
+                    {CROP_DETAIL_FIELDS.map((field) => (
+                      <label key={field.key} className="text-sm font-medium text-zinc-700">{t(field.label)}
+                        {field.long
+                          ? <textarea rows={2} value={details[field.key]} onChange={(e) => setDetails((d) => ({ ...d, [field.key]: e.target.value }))} placeholder={t(field.placeholder)} className={inputClass} />
+                          : <input value={details[field.key]} onChange={(e) => setDetails((d) => ({ ...d, [field.key]: e.target.value }))} placeholder={t(field.placeholder)} className={inputClass} />}
+                      </label>
+                    ))}
+                    <label className="text-sm font-medium text-zinc-700">{t("Medicinal properties")}<textarea rows={2} value={details.medicinal_properties} onChange={(e) => setDetails((d) => ({ ...d, medicinal_properties: e.target.value }))} placeholder={t("Known medicinal uses, healing properties…")} className={inputClass} /></label>
+                    <button type="submit" disabled={busy} className={"w-full " + primaryButton}>{busy ? t("Saving…") : t("Save and go to my shop")}<ChevronRight className="h-4 w-4" /></button>
+                  </form>
+                )}
               </div>
             </div>
-          ) : step === "growing" ? (
-            <form onSubmit={saveGrowing} className="mt-4 grid gap-4">
-              <div>
-                <p className="text-sm font-medium text-zinc-700">{t("Produce photo")} <span className="font-normal text-zinc-400">({t("optional")})</span></p>
-                <div className="mt-1.5 flex items-center gap-3">
-                  {photoPreview ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={photoPreview} alt="" className="h-16 w-16 rounded-xl object-cover" />
-                  ) : (
-                    <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-dashed border-zinc-300 text-[10px] text-zinc-400">{t("No photo")}</div>
-                  )}
-                  <input ref={fileInput} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { choosePhoto(e.target.files?.[0] ?? null); e.target.value = ""; }} />
-                  <button type="button" onClick={() => fileInput.current?.click()} className={secondaryButton}>{photo ? t("Swap photo") : t("Add photo")}</button>
-                </div>
-              </div>
-              <label className="text-sm font-medium text-zinc-700">{t("Status")}
-                <select value={growing.status} onChange={(e) => setGrowing((g) => ({ ...g, status: e.target.value }))} className={inputClass}>
-                  {["planned", "planted", "germinating", "growing", "harvest_ready"].map((value) => <option key={value} value={value}>{t(value)}</option>)}
-                </select>
-              </label>
-              <label className="text-sm font-medium text-zinc-700">{t("Planted on")} <span className="font-normal text-zinc-400">({t("optional")})</span><input type="date" value={growing.plantedOn} onChange={(e) => setGrowing((g) => ({ ...g, plantedOn: e.target.value }))} className={inputClass} /></label>
-              {zones.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium text-zinc-700">{t("Beds")} <span className="font-normal text-zinc-400">({t("optional")})</span></p>
-                  <div className="mt-1.5 flex flex-wrap gap-2">
-                    {zones.map((zone) => (
-                      <button key={zone.id} type="button" onClick={() => toggleZone(zone.id)} className={"rounded-full border px-3 py-1.5 text-sm " + (growing.zoneIds.includes(zone.id) ? "border-emerald-700 bg-emerald-700 text-white" : "border-zinc-300 bg-white text-zinc-700")}>{zone.name}</button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <label className="text-sm font-medium text-zinc-700">{t("Notes")} <span className="font-normal text-zinc-400">({t("optional")})</span><textarea rows={3} value={growing.notes} onChange={(e) => setGrowing((g) => ({ ...g, notes: e.target.value }))} placeholder={t("Growing conditions, observations…")} className={inputClass} /></label>
-              <button type="submit" disabled={busy} className={"w-full " + primaryButton}>{busy ? t("Saving…") : t("Save and continue")}<ChevronRight className="h-4 w-4" /></button>
-              <a href={shopHref} className="text-center text-sm font-medium text-zinc-500 hover:text-zinc-900 hover:underline">{t("Skip, back to my shop")}</a>
-            </form>
-          ) : (
-            <form onSubmit={saveShopDetails} className="mt-4 grid gap-4">
-              <p className="text-sm text-zinc-600">{t("Whatever you fill in here is shown to customers on the shopfront. Anything left blank simply is not shown.")}</p>
-              {CROP_DETAIL_FIELDS.map((field) => (
-                <label key={field.key} className="text-sm font-medium text-zinc-700">{t(field.label)}
-                  {field.long
-                    ? <textarea rows={2} value={details[field.key]} onChange={(e) => setDetails((d) => ({ ...d, [field.key]: e.target.value }))} placeholder={t(field.placeholder)} className={inputClass} />
-                    : <input value={details[field.key]} onChange={(e) => setDetails((d) => ({ ...d, [field.key]: e.target.value }))} placeholder={t(field.placeholder)} className={inputClass} />}
-                </label>
-              ))}
-              <label className="text-sm font-medium text-zinc-700">{t("Medicinal properties")} <span className="font-normal text-zinc-400">({t("optional")})</span><textarea rows={2} value={details.medicinal_properties} onChange={(e) => setDetails((d) => ({ ...d, medicinal_properties: e.target.value }))} placeholder={t("Known medicinal uses, healing properties…")} className={inputClass} /></label>
-              <button type="submit" disabled={busy} className={"w-full " + primaryButton}>{busy ? t("Saving…") : t("Save and go to my shop")}<ChevronRight className="h-4 w-4" /></button>
-            </form>
           )}
         </div>
       </div>
