@@ -10,11 +10,15 @@ import { downloadCsvFile, toFileSlug } from "@/app/farm/utils";
 import { Download, ImagePlus } from "lucide-react";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { ManagerOnly } from "@/components/ManagerOnly";
+import { useT, useLanguage } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 type CsvValue = string | number | boolean | null | undefined;
 
 export default function SettingsPage() {
   const router = useRouter();
+  const t = useT();
+  const [lang, setLang] = useLanguage();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -65,7 +69,7 @@ export default function SettingsPage() {
         const f = await getFarms();
         setFarms(f);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load farms");
+        setError(err instanceof Error ? err.message : t("Failed to load farms"));
       } finally {
         setLoading(false);
       }
@@ -107,7 +111,7 @@ export default function SettingsPage() {
       localStorage.removeItem("activeFarmId");
       router.push("/farm");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete farm");
+      setError(err instanceof Error ? err.message : t("Failed to delete farm"));
       setDeletingFarm(false);
     }
   }
@@ -192,13 +196,13 @@ export default function SettingsPage() {
       }
 
       if (allRows.length === 0) {
-        setSuccess("No farm data found to export.");
+        setSuccess(t("No farm data found to export."));
       } else {
         downloadCsvFile(`${farmSlug}-farm-data-all-${stamp}.csv`, headers, allRows);
-        setSuccess(`Export complete. Downloaded 1 CSV file with ${allRows.length} rows.`);
+        setSuccess(t("Export complete. Downloaded 1 CSV file with {n} rows.", { n: allRows.length }));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to export data");
+      setError(err instanceof Error ? err.message : t("Failed to export data"));
     } finally {
       setExporting(false);
     }
@@ -267,11 +271,11 @@ export default function SettingsPage() {
         body: JSON.stringify({ farmId: activeFarmId, heroUrl: url }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not save the picture");
+      if (!res.ok) throw new Error(data.error || t("Could not save the picture"));
       setHeroUrl(url);
-      setSuccess("Shop picture updated.");
+      setSuccess(t("Shop picture updated."));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save the picture");
+      setError(err instanceof Error ? err.message : t("Could not save the picture"));
     } finally {
       setUploading(null);
     }
@@ -286,11 +290,11 @@ export default function SettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ farmId: activeFarmId, heroUrl: null }),
       });
-      if (!res.ok) throw new Error((await res.json()).error || "Could not remove the picture");
+      if (!res.ok) throw new Error((await res.json()).error || t("Could not remove the picture"));
       setHeroUrl(null);
-      setSuccess("Shop picture removed.");
+      setSuccess(t("Shop picture removed."));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not remove the picture");
+      setError(err instanceof Error ? err.message : t("Could not remove the picture"));
     } finally {
       setUploading(null);
     }
@@ -308,19 +312,19 @@ export default function SettingsPage() {
       const { error: updateError } = await supabase.from("crops").update({ produce_image_url: url }).eq("id", cropId);
       if (updateError) throw updateError;
       setShopCrops((prev) => prev.map((c) => (c.id === cropId ? { ...c, produce_image_url: url } : c)));
-      setSuccess("Produce photo updated.");
+      setSuccess(t("Produce photo updated."));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save that photo");
+      setError(err instanceof Error ? err.message : t("Could not save that photo"));
     } finally {
       setUploading(null);
     }
   }
 
   function captureCoordinates() {
-    if (!navigator.geolocation) { setError("Location is not available on this device."); return; }
+    if (!navigator.geolocation) { setError(t("Location is not available on this device.")); return; }
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => setCoordinates({ latitude: coords.latitude, longitude: coords.longitude }),
-      () => setError("Allow location access to save the farm position.")
+      () => setError(t("Allow location access to save the farm position."))
     );
   }
 
@@ -330,9 +334,9 @@ export default function SettingsPage() {
     try {
       const res = await fetch("/api/farm/market-listing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ farmId: activeFarmId, ...coordinates }) });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not save location");
-      setSuccess("Farm position saved for nearest-farm sorting.");
-    } catch (err) { setError(err instanceof Error ? err.message : "Could not save location"); }
+      if (!res.ok) throw new Error(data.error || t("Could not save location"));
+      setSuccess(t("Farm position saved for nearest-farm sorting."));
+    } catch (err) { setError(err instanceof Error ? err.message : t("Could not save location")); }
     finally { setSavingCoordinates(false); }
   }
 
@@ -348,11 +352,11 @@ export default function SettingsPage() {
         body: JSON.stringify({ farmId: activeFarmId, ...practice }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not save growing practices");
+      if (!res.ok) throw new Error(data.error || t("Could not save growing practices"));
       setPractice((value) => ({ ...value, certificationVerifiedAt: null }));
-      setSuccess("Growing practice information saved. Certification evidence must be independently verified before a verified badge appears.");
+      setSuccess(t("Growing practice information saved. Certification evidence must be independently verified before a verified badge appears."));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save growing practices");
+      setError(err instanceof Error ? err.message : t("Could not save growing practices"));
     } finally {
       setSavingPractice(false);
     }
@@ -370,10 +374,10 @@ export default function SettingsPage() {
         body: JSON.stringify({ farmId: activeFarmId, ...fulfilment }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not save collection and delivery details");
-      setSuccess("Buyer collection and delivery details saved.");
+      if (!res.ok) throw new Error(data.error || t("Could not save collection and delivery details"));
+      setSuccess(t("Buyer collection and delivery details saved."));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save collection and delivery details");
+      setError(err instanceof Error ? err.message : t("Could not save collection and delivery details"));
     } finally {
       setSavingFulfilment(false);
     }
@@ -391,11 +395,11 @@ export default function SettingsPage() {
         body: JSON.stringify({ farmId: activeFarmId, listed: next }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not change the listing");
+      if (!res.ok) throw new Error(data.error || t("Could not change the listing"));
       setListed(next);
-      setSuccess(next ? "This farm is now public." : "This farm is no longer public.");
+      setSuccess(next ? t("This farm is now public.") : t("This farm is no longer public."));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not change the listing");
+      setError(err instanceof Error ? err.message : t("Could not change the listing"));
     } finally {
       setSavingListing(false);
     }
@@ -404,26 +408,29 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <p className="text-zinc-500">Loading…</p>
+        <p className="text-zinc-500">{t("Loading…")}</p>
       </div>
     );
   }
 
   const isManager = userRole === "owner" || userRole === "manager";
   if (activeFarmId && !isManager) {
-    return <ManagerOnly title="Settings — managers only" />;
+    return <ManagerOnly title={t("Settings — managers only")} />;
   }
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Settings</h1>
-        <Link href="/farm" className="text-sm text-zinc-500 hover:text-zinc-700">
-          ← Back to farm
-        </Link>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">{t("Settings")}</h1>
+        <div className="flex items-center gap-3">
+          <Link href="/farm" className="text-sm text-zinc-500 hover:text-zinc-700">
+            {t("← Back to farm")}
+          </Link>
+          <LanguageToggle lang={lang} onChange={setLang} />
+        </div>
       </div>
 
-      {activeFarm && <p className="mb-6 text-sm text-zinc-500">Farm: {activeFarm.name}</p>}
+      {activeFarm && <p className="mb-6 text-sm text-zinc-500">{t("Farm: {name}", { name: activeFarm.name })}</p>}
 
       {error && (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -438,59 +445,57 @@ export default function SettingsPage() {
       )}
 
       <section className="mb-6 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">Growing practices</h2>
-        <p className="mt-1 text-sm text-zinc-500">Tell buyers how you grow. “Organic practices” is a farmer declaration; Shamba only shows a verified certification badge after the evidence is independently checked.</p>
+        <h2 className="text-lg font-semibold">{t("Growing practices")}</h2>
+        <p className="mt-1 text-sm text-zinc-500">{t("Tell buyers how you grow. “Organic practices” is a farmer declaration; Shamba only shows a verified certification badge after the evidence is independently checked.")}</p>
         <div className="mt-5 grid gap-4">
           <label className="text-sm font-medium text-zinc-700">
-            Growing approach
+            {t("Growing approach")}
             <select value={practice.growingPractice} onChange={(event) => setPractice((value) => ({ ...value, growingPractice: event.target.value }))} className="mt-2 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5">
-              <option value="unspecified">Not specified</option>
-              <option value="organic_practices">Uses organic practices</option>
-              <option value="regenerative">Regenerative practices</option>
-              <option value="conventional">Conventional farming</option>
+              <option value="unspecified">{t("Not specified")}</option>
+              <option value="organic_practices">{t("Uses organic practices")}</option>
+              <option value="regenerative">{t("Regenerative practices")}</option>
+              <option value="conventional">{t("Conventional farming")}</option>
             </select>
           </label>
           <label className="text-sm font-medium text-zinc-700">
-            How you grow
-            <textarea value={practice.practiceNotes} onChange={(event) => setPractice((value) => ({ ...value, practiceNotes: event.target.value }))} placeholder="For example: compost inputs, pest controls, seed sources and what you do not use" rows={4} className="mt-2 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5" />
+            {t("How you grow")}
+            <textarea value={practice.practiceNotes} onChange={(event) => setPractice((value) => ({ ...value, practiceNotes: event.target.value }))} placeholder={t("For example: compost inputs, pest controls, seed sources and what you do not use")} rows={4} className="mt-2 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5" />
           </label>
           <div className="rounded-2xl bg-zinc-50 p-4">
-            <h3 className="text-sm font-semibold text-zinc-900">Optional certification evidence</h3>
+            <h3 className="text-sm font-semibold text-zinc-900">{t("Optional certification evidence")}</h3>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <input value={practice.certificationBody} onChange={(event) => setPractice((value) => ({ ...value, certificationBody: event.target.value }))} placeholder="Certifying organisation" className="rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm" />
-              <input value={practice.certificationReference} onChange={(event) => setPractice((value) => ({ ...value, certificationReference: event.target.value }))} placeholder="Certificate reference" className="rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm" />
-              <input type="url" value={practice.certificationUrl} onChange={(event) => setPractice((value) => ({ ...value, certificationUrl: event.target.value }))} placeholder="Evidence link (https://…)" className="rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm" />
+              <input value={practice.certificationBody} onChange={(event) => setPractice((value) => ({ ...value, certificationBody: event.target.value }))} placeholder={t("Certifying organisation")} className="rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm" />
+              <input value={practice.certificationReference} onChange={(event) => setPractice((value) => ({ ...value, certificationReference: event.target.value }))} placeholder={t("Certificate reference")} className="rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm" />
+              <input type="url" value={practice.certificationUrl} onChange={(event) => setPractice((value) => ({ ...value, certificationUrl: event.target.value }))} placeholder={t("Evidence link (https://…)")} className="rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm" />
               <input type="date" value={practice.certificationExpiresOn} onChange={(event) => setPractice((value) => ({ ...value, certificationExpiresOn: event.target.value }))} className="rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-sm" />
             </div>
-            <p className="mt-3 text-xs text-zinc-500">{practice.certificationVerifiedAt ? "Certification currently verified. Editing and saving these details will require verification again." : "Evidence supplied here is not presented as verified until an administrator checks it."}</p>
+            <p className="mt-3 text-xs text-zinc-500">{practice.certificationVerifiedAt ? t("Certification currently verified. Editing and saving these details will require verification again.") : t("Evidence supplied here is not presented as verified until an administrator checks it.")}</p>
           </div>
           <button onClick={savePractice} disabled={savingPractice} className="justify-self-start rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
-            {savingPractice ? "Saving…" : "Save growing practices"}
+            {savingPractice ? t("Saving…") : t("Save growing practices")}
           </button>
         </div>
       </section>
 
       <section id="public-shop" className="mb-6 scroll-mt-6 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">Public shop</h2>
+        <h2 className="text-lg font-semibold">{t("Public shop")}</h2>
         <p className="mt-1 text-sm text-zinc-500">
-          Off by default. While it is off, this farm appears nowhere public — not in the market, and not at its own
-          shop address either. Turning it on publishes the crops that have an expected harvest, the weight expected,
-          and how much is unclaimed. Customer details are never shown.
+          {t("Off by default. While it is off, this farm appears nowhere public — not in the market, and not at its own shop address either. Turning it on publishes the crops that have an expected harvest, the weight expected, and how much is unclaimed. Customer details are never shown.")}
         </p>
 
         <div className="mt-5 rounded-2xl border border-zinc-200 p-4">
-          <h3 className="text-sm font-semibold">Position for nearest-farm sorting</h3>
-          <p className="mt-1 text-xs leading-5 text-zinc-500">Save the farm’s approximate public position. Buyers only use their own location after tapping “Sort by nearest”.</p>
+          <h3 className="text-sm font-semibold">{t("Position for nearest-farm sorting")}</h3>
+          <p className="mt-1 text-xs leading-5 text-zinc-500">{t("Save the farm’s approximate public position. Buyers only use their own location after tapping “Sort by nearest”.")}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button type="button" onClick={captureCoordinates} className="rounded-xl border border-zinc-300 px-4 py-2.5 text-sm font-semibold">Use this device’s location</button>
-            <button type="button" onClick={saveCoordinates} disabled={savingCoordinates || coordinates.latitude == null} className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40">{savingCoordinates ? "Saving…" : "Save position"}</button>
+            <button type="button" onClick={captureCoordinates} className="rounded-xl border border-zinc-300 px-4 py-2.5 text-sm font-semibold">{t("Use this device’s location")}</button>
+            <button type="button" onClick={saveCoordinates} disabled={savingCoordinates || coordinates.latitude == null} className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40">{savingCoordinates ? t("Saving…") : t("Save position")}</button>
             {coordinates.latitude != null && <span className="text-xs text-zinc-500">{coordinates.latitude.toFixed(4)}, {coordinates.longitude?.toFixed(4)}</span>}
           </div>
         </div>
 
         <div className="mt-5 grid gap-4 rounded-2xl bg-zinc-50 p-4">
           <label className="text-sm font-medium text-zinc-700">
-            Public phone or WhatsApp number
+            {t("Public phone or WhatsApp number")}
             <input
               value={fulfilment.contactPhone}
               onChange={(event) => setFulfilment((value) => ({ ...value, contactPhone: event.target.value }))}
@@ -499,24 +504,24 @@ export default function SettingsPage() {
             />
           </label>
           <label className="text-sm font-medium text-zinc-700">
-            How buyers receive orders
+            {t("How buyers receive orders")}
             <select
               value={fulfilment.fulfilmentMethod}
               onChange={(event) => setFulfilment((value) => ({ ...value, fulfilmentMethod: event.target.value }))}
               className="mt-2 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5"
             >
-              <option value="collection">Collection only</option>
-              <option value="delivery">Delivery only</option>
-              <option value="both">Collection or delivery</option>
+              <option value="collection">{t("Collection only")}</option>
+              <option value="delivery">{t("Delivery only")}</option>
+              <option value="both">{t("Collection or delivery")}</option>
             </select>
           </label>
           {fulfilment.fulfilmentMethod !== "delivery" && (
             <label className="text-sm font-medium text-zinc-700">
-              Collection instructions
+              {t("Collection instructions")}
               <textarea
                 value={fulfilment.collectionInstructions}
                 onChange={(event) => setFulfilment((value) => ({ ...value, collectionInstructions: event.target.value }))}
-                placeholder="Where to collect, useful directions and available times"
+                placeholder={t("Where to collect, useful directions and available times")}
                 rows={3}
                 className="mt-2 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5"
               />
@@ -524,11 +529,11 @@ export default function SettingsPage() {
           )}
           {fulfilment.fulfilmentMethod !== "collection" && (
             <label className="text-sm font-medium text-zinc-700">
-              Delivery area and arrangements
+              {t("Delivery area and arrangements")}
               <textarea
                 value={fulfilment.deliveryArea}
                 onChange={(event) => setFulfilment((value) => ({ ...value, deliveryArea: event.target.value }))}
-                placeholder="Areas covered, delivery days and whether a fee applies"
+                placeholder={t("Areas covered, delivery days and whether a fee applies")}
                 rows={3}
                 className="mt-2 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5"
               />
@@ -539,13 +544,13 @@ export default function SettingsPage() {
             disabled={savingFulfilment}
             className="justify-self-start rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
           >
-            {savingFulfilment ? "Saving…" : "Save buyer information"}
+            {savingFulfilment ? t("Saving…") : t("Save buyer information")}
           </button>
         </div>
 
         {!listingAvailable ? (
           <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            The database does not have the market column yet. Run the pending migration and this switch will work.
+            {t("The database does not have the market column yet. Run the pending migration and this switch will work.")}
           </p>
         ) : (
           <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -556,14 +561,14 @@ export default function SettingsPage() {
                 listed ? "border border-zinc-200 text-zinc-700 hover:bg-zinc-100" : "bg-zinc-900 text-white hover:bg-zinc-800"
               }`}
             >
-              {savingListing ? "Saving..." : listed ? "Take this farm off the market" : "Publish this farm to the market"}
+              {savingListing ? t("Saving...") : listed ? t("Take this farm off the market") : t("Publish this farm to the market")}
             </button>
             <span className={`rounded-full px-3 py-1 text-xs font-medium ${listed ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-500"}`}>
-              {listed === null ? "…" : listed ? "Public" : "Not public"}
+              {listed === null ? "…" : listed ? t("Public") : t("Not public")}
             </span>
             {listed && listingSlug && (
               <a href={`/${listingSlug}`} className="text-sm text-zinc-500 underline hover:text-zinc-700" target="_blank" rel="noreferrer">
-                View the shop
+                {t("View the shop")}
               </a>
             )}
           </div>
@@ -571,29 +576,27 @@ export default function SettingsPage() {
       </section>
 
       <section className="mb-6 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">Shop pictures</h2>
+        <h2 className="text-lg font-semibold">{t("Shop pictures")}</h2>
         <p className="mt-1 text-sm text-zinc-500">
-          One picture for the top of the shop, and a photo of the produce for each crop — the harvested vegetable
-          rather than the plant in the ground. Where a crop has no produce photo, the shop falls back to its plant
-          photo from the Crops page.
+          {t("One picture for the top of the shop, and a photo of the produce for each crop — the harvested vegetable rather than the plant in the ground. Where a crop has no produce photo, the shop falls back to its plant photo from the Crops page.")}
         </p>
 
         {/* Hero */}
         <div className="mt-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">Top of the shop</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">{t("Top of the shop")}</p>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             {heroUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={heroUrl} alt="Shop header" className="h-24 w-40 rounded-xl object-cover" />
+              <img src={heroUrl} alt={t("Shop header")} className="h-24 w-40 rounded-xl object-cover" />
             ) : (
               <div className="flex h-24 w-40 items-center justify-center rounded-xl border border-dashed border-zinc-300 text-xs text-zinc-400">
-                No picture
+                {t("No picture")}
               </div>
             )}
             <div className="flex flex-wrap gap-2">
               <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
                 <ImagePlus className="h-4 w-4" />
-                {uploading === "hero" ? "Uploading..." : heroUrl ? "Swap picture" : "Add picture"}
+                {uploading === "hero" ? t("Uploading...") : heroUrl ? t("Swap picture") : t("Add picture")}
                 <input
                   type="file"
                   accept="image/*"
@@ -608,7 +611,7 @@ export default function SettingsPage() {
                   disabled={uploading !== null}
                   className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-500 transition hover:bg-zinc-100 disabled:opacity-60"
                 >
-                  Remove
+                  {t("Remove")}
                 </button>
               )}
             </div>
@@ -617,9 +620,9 @@ export default function SettingsPage() {
 
         {/* Per crop */}
         <div className="mt-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">Produce photos</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">{t("Produce photos")}</p>
           {shopCrops.length === 0 ? (
-            <p className="mt-2 text-sm text-zinc-400">No crops on this farm yet.</p>
+            <p className="mt-2 text-sm text-zinc-400">{t("No crops on this farm yet.")}</p>
           ) : (
             <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
               {shopCrops.map((crop) => (
@@ -636,17 +639,17 @@ export default function SettingsPage() {
                     />
                   ) : (
                     <div className="flex h-24 w-full items-center justify-center bg-zinc-50 text-xs text-zinc-400">
-                      No photo
+                      {t("No photo")}
                     </div>
                   )}
                   <div className="flex items-center justify-between gap-2 px-3 py-2">
                     <span className="truncate text-xs font-medium">{crop.crop_name}</span>
                     <span className="shrink-0 text-[10px] text-zinc-400">
-                      {uploading === crop.id ? "…" : crop.produce_image_url ? "Swap" : "Add"}
+                      {uploading === crop.id ? "…" : crop.produce_image_url ? t("Swap") : t("Add")}
                     </span>
                   </div>
                   {!crop.produce_image_url && crop.image_url && (
-                    <p className="px-3 pb-2 text-[10px] text-amber-700">Showing the plant photo</p>
+                    <p className="px-3 pb-2 text-[10px] text-amber-700">{t("Showing the plant photo")}</p>
                   )}
                   <input
                     type="file"
@@ -660,16 +663,15 @@ export default function SettingsPage() {
             </div>
           )}
           <p className="mt-3 text-xs text-zinc-400">
-            Only crops with an expected harvest appear in the shop, so a photo here shows up once that crop has an
-            estimate on the Harvest ETA sheet. Plant photos are taken on the Crops page.
+            {t("Only crops with an expected harvest appear in the shop, so a photo here shows up once that crop has an estimate on the Harvest ETA sheet. Plant photos are taken on the Crops page.")}
           </p>
         </div>
       </section>
 
       <section className="mb-6 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">Data Export</h2>
+        <h2 className="text-lg font-semibold">{t("Data Export")}</h2>
         <p className="mt-1 text-sm text-zinc-500">
-          Download all data for this farm in a single CSV file for backup, reporting, or offline work.
+          {t("Download all data for this farm in a single CSV file for backup, reporting, or offline work.")}
         </p>
         <button
           onClick={handleExportFarmData}
@@ -677,16 +679,16 @@ export default function SettingsPage() {
           className="mt-4 inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60"
         >
           <Download className="h-4 w-4" />
-          {exporting ? "Exporting..." : "Export farm data (CSV)"}
+          {exporting ? t("Exporting...") : t("Export farm data (CSV)")}
         </button>
       </section>
 
       {/* Delete Farm */}
       {activeFarm && userRole === "owner" && (
         <section className="mt-6 rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-red-700">Danger Zone</h2>
+          <h2 className="text-lg font-semibold text-red-700">{t("Danger Zone")}</h2>
           <p className="mt-1 text-sm text-zinc-500">
-            Permanently delete this farm and all its data.
+            {t("Permanently delete this farm and all its data.")}
           </p>
 
           {deleteFarmStep === 0 && (
@@ -694,41 +696,41 @@ export default function SettingsPage() {
               onClick={() => setDeleteFarmStep(1)}
               className="mt-4 rounded-xl border border-red-200 px-5 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
             >
-              Delete farm
+              {t("Delete farm")}
             </button>
           )}
           {deleteFarmStep === 1 && (
             <div className="mt-4 flex items-center gap-3">
-              <span className="text-sm text-red-600 font-medium">Are you sure you want to delete &ldquo;{activeFarm.name}&rdquo;?</span>
+              <span className="text-sm text-red-600 font-medium">{t("Are you sure you want to delete “{name}”?", { name: activeFarm.name })}</span>
               <button
                 onClick={() => setDeleteFarmStep(2)}
                 className="rounded-xl bg-red-100 border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-200"
               >
-                Yes, delete
+                {t("Yes, delete")}
               </button>
               <button
                 onClick={() => setDeleteFarmStep(0)}
                 className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-100"
               >
-                Cancel
+                {t("Cancel")}
               </button>
             </div>
           )}
           {deleteFarmStep === 2 && (
             <div className="mt-4 flex items-center gap-3">
-              <span className="text-sm text-red-700 font-semibold">This cannot be undone. All farm data will be lost.</span>
+              <span className="text-sm text-red-700 font-semibold">{t("This cannot be undone. All farm data will be lost.")}</span>
               <button
                 onClick={handleDeleteFarm}
                 disabled={deletingFarm}
                 className="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
               >
-                {deletingFarm ? "Deleting…" : "Permanently delete"}
+                {deletingFarm ? t("Deleting…") : t("Permanently delete")}
               </button>
               <button
                 onClick={() => setDeleteFarmStep(0)}
                 className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-100"
               >
-                Cancel
+                {t("Cancel")}
               </button>
             </div>
           )}

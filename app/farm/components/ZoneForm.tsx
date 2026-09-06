@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/lib/i18n";
 
 export type ZoneFormData = {
   name: string;
@@ -15,6 +16,7 @@ type Props = {
 };
 
 export function ZoneForm({ onSubmit }: Props) {
+  const t = useT();
   const [form, setForm] = useState<ZoneFormData>(blank);
   const [saving, setSaving] = useState(false);
 
@@ -31,28 +33,28 @@ export function ZoneForm({ onSubmit }: Props) {
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
       <div className="mb-5">
-        <h2 className="text-xl font-semibold">Add zone</h2>
+        <h2 className="text-xl font-semibold">{t("Add zone")}</h2>
         <p className="mt-1 text-sm text-zinc-500">
-          Name a planting area — Bed 1, Greenhouse A, North Field, etc.
+          {t("Name a planting area — Bed 1, Greenhouse A, North Field, etc.")}
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="mb-2 block text-sm font-medium">Zone name</label>
+          <label className="mb-2 block text-sm font-medium">{t("Zone name")}</label>
           <input
             type="text"
             value={form.name}
             onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
             className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            placeholder="Bed 1, Greenhouse A, North Field…"
+            placeholder={t("Bed 1, Greenhouse A, North Field…")}
             required
           />
         </div>
 
         <div>
           <label className="mb-2 block text-sm font-medium">
-            Size (acres) <span className="font-normal text-zinc-400">(optional)</span>
+            {t("Size (acres)")} <span className="font-normal text-zinc-400">{t("(optional)")}</span>
           </label>
           <input
             type="number"
@@ -70,7 +72,7 @@ export function ZoneForm({ onSubmit }: Props) {
           disabled={saving || !form.name.trim()}
           className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {saving ? "Adding zone…" : "Add zone"}
+          {saving ? t("Adding zone…") : t("Add zone")}
         </button>
       </form>
     </div>

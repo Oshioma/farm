@@ -1,7 +1,38 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ShopData, ShopMonth, ShopProduce } from "@/lib/shop";
+import { getFarms } from "@/lib/farm";
+import { useT, useLanguage } from "@/lib/i18n";
+import type { Translate } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
+
+/* Shown only to signed-in members of this farm: a way back to the farm
+   manager from the public shop. Buyers never see it. */
+function ManageFarmLink({ farmId }: { farmId: string }) {
+  const t = useT();
+  const [isMember, setIsMember] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    getFarms()
+      .then((farms) => { if (!cancelled) setIsMember(farms.some((farm) => farm.id === farmId)); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [farmId]);
+  if (!isMember) return null;
+  return (
+    <a
+      href={`/farm?farmId=${encodeURIComponent(farmId)}`}
+      style={{
+        color: GREEN, border: `1px solid ${GREEN}`, borderRadius: 999, padding: "10px 16px",
+        fontSize: 13, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap", minHeight: 44,
+        display: "inline-flex", alignItems: "center",
+      }}
+    >
+      {t("Manage farm")}
+    </a>
+  );
+}
 
 /* ── shared styling ───────────────────────────────────────────
    The shopfront's own palette: the app's brand green over warm paper. */
@@ -42,6 +73,8 @@ type BasketLine = {
 };
 
 export function Shopfront({ shop }: { shop: ShopData }) {
+  const t = useT();
+  const [lang, setLang] = useLanguage();
   const [basket, setBasket] = useState<BasketLine[]>([]);
   const [open, setOpen] = useState<ShopProduce | null>(null);
   const [checkout, setCheckout] = useState(false);
@@ -87,12 +120,12 @@ export function Shopfront({ shop }: { shop: ShopData }) {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not send your pre-order.");
+      if (!res.ok) throw new Error(data.error || t("Could not send your pre-order."));
       setSent({ lines: data.summary ?? [], reference: data.reference ?? null, trackingUrl: data.trackingUrl ?? null });
       setBasket([]);
       setCheckout(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not send your pre-order.");
+      setError(err instanceof Error ? err.message : t("Could not send your pre-order."));
     } finally {
       setSaving(false);
     }
@@ -114,6 +147,9 @@ export function Shopfront({ shop }: { shop: ShopData }) {
             Shamba Online
           </span>
         </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <LanguageToggle lang={lang} onChange={setLang} />
+        <ManageFarmLink farmId={shop.farm.id} />
         <button
           onClick={() => { setSent(null); setCheckout(true); }}
           disabled={basket.length === 0}
@@ -123,8 +159,9 @@ export function Shopfront({ shop }: { shop: ShopData }) {
             padding: "12px 22px", borderRadius: 999, cursor: basket.length ? "pointer" : "default", minHeight: 44,
           }}
         >
-          {basket.length ? `Your pre-order · ${basket.length}` : "Nothing reserved yet"}
+          {basket.length ? t("Your pre-order · {n}", { n: basket.length }) : t("Nothing reserved yet")}
         </button>
+        </div>
       </header>
 
       {/* Hero */}
@@ -139,22 +176,21 @@ export function Shopfront({ shop }: { shop: ShopData }) {
             {shop.farm.name}{shop.farm.location ? ` · ${shop.farm.location}` : ""}
           </span>
           <h1 style={{ fontFamily: serif, fontWeight: 400, fontSize: "clamp(38px, 5vw, 60px)", lineHeight: 1.05, letterSpacing: "-0.02em", margin: 0, textWrap: "pretty" }}>
-            Claim your share before it is picked.
+            {t("Claim your share before it is picked.")}
           </h1>
           <p style={{ fontSize: 18, lineHeight: 1.6, color: "#57534e", maxWidth: "46ch", margin: 0, textWrap: "pretty" }}>
-            Everything on this page is already in the ground with a harvest expected against it. Reserve the kilos
-            you want, and collect them the week they come out.
+            {t("Everything on this page is already in the ground with a harvest expected against it. Reserve the kilos you want, and collect them the week they come out.")}
           </p>
           <a
             href="#produce"
             style={{ background: GREEN, color: "#ffffff", fontSize: 15, fontWeight: 600, padding: "15px 28px", borderRadius: 999, textDecoration: "none", minHeight: 44, display: "inline-flex", alignItems: "center" }}
           >
-            See what&rsquo;s coming
+            {t("See what’s coming")}
           </a>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 32, paddingTop: 8 }}>
-            <Stat value={String(shop.produce.length)} label="crops with a harvest date" />
-            <Stat value={fmtKg(seasonTotal)} label="expected this season" />
-            <Stat value={`${reservedPct}%`} label="already reserved" color={OCHRE} />
+            <Stat value={String(shop.produce.length)} label={t("crops with a harvest date")} />
+            <Stat value={fmtKg(seasonTotal)} label={t("expected this season")} />
+            <Stat value={`${reservedPct}%`} label={t("already reserved")} color={OCHRE} />
           </div>
         </div>
 
@@ -163,18 +199,18 @@ export function Shopfront({ shop }: { shop: ShopData }) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={shop.farm.heroUrl}
-              alt={`Produce from ${shop.farm.name}`}
+              alt={t("Produce from {farm}", { farm: shop.farm.name })}
               style={{ display: "block", width: "100%", height: "clamp(280px, 34vw, 460px)", objectFit: "cover" }}
             />
             <p style={{ position: "absolute", left: 0, right: 0, bottom: 0, margin: 0, padding: "48px 24px 20px", fontSize: 13, color: "#ffffff", background: "linear-gradient(to top, rgba(5,46,22,0.85), rgba(5,46,22,0))" }}>
-              Picked to order, never held in cold store.
+              {t("Picked to order, never held in cold store.")}
             </p>
           </div>
         ) : (
           <div style={{ borderRadius: 24, background: DEEP, padding: "clamp(24px, 3vw, 36px)" }}>
             <BedsIllustration />
             <p style={{ fontSize: 13, color: "#a7d3b4", paddingTop: 20, margin: 0 }}>
-              Picked to order, never held in cold store.
+              {t("Picked to order, never held in cold store.")}
             </p>
           </div>
         )}
@@ -190,31 +226,31 @@ export function Shopfront({ shop }: { shop: ShopData }) {
           }}>
             {shop.farm.growingPractice === "regenerative" ? (
               <>
-                <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: GREEN, margin: 0 }}>Farming that restores the land</p>
+                <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: GREEN, margin: 0 }}>{t("Farming that restores the land")}</p>
                 <h2 style={{ fontFamily: serif, fontSize: "clamp(38px, 6vw, 68px)", fontWeight: 400, lineHeight: 1, letterSpacing: "-0.025em", color: DEEP, margin: "12px 0 0", maxWidth: "14ch" }}>
-                  Regenerative practices
+                  {t("Regenerative practices")}
                 </h2>
                 <p style={{ margin: "18px 0 0", maxWidth: "58ch", color: "#365342", fontSize: "clamp(17px, 2vw, 21px)", lineHeight: 1.6 }}>
-                  This farm says it grows to rebuild soil, encourage biodiversity and leave the land healthier for the next harvest.
+                  {t("This farm says it grows to rebuild soil, encourage biodiversity and leave the land healthier for the next harvest.")}
                 </p>
               </>
             ) : (
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: GREEN, margin: 0 }}>
                 {shop.farm.certificationVerifiedAt && (!shop.farm.certificationExpiresOn || shop.farm.certificationExpiresOn >= new Date().toISOString().slice(0, 10))
-                  ? "Organic certification verified"
+                  ? t("Organic certification verified")
                   : shop.farm.growingPractice === "organic_practices"
-                    ? "Farmer-declared organic practices"
-                    : "Conventional farming"}
+                    ? t("Farmer-declared organic practices")
+                    : t("Conventional farming")}
               </p>
             )}
             {shop.farm.practiceNotes && <p style={{ margin: shop.farm.growingPractice === "regenerative" ? "22px 0 0" : "10px 0 0", maxWidth: "70ch", color: "#57534e", fontSize: shop.farm.growingPractice === "regenerative" ? 16 : 14, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{shop.farm.practiceNotes}</p>}
             {shop.farm.certificationBody && (
               <p style={{ margin: "12px 0 0", fontSize: 13, color: "#78716c" }}>
-                Certification evidence: {shop.farm.certificationBody}{shop.farm.certificationReference ? ` · ${shop.farm.certificationReference}` : ""}
-                {shop.farm.certificationUrl && <> · <a href={shop.farm.certificationUrl} target="_blank" rel="noreferrer" style={{ color: GREEN }}>View evidence</a></>}
+                {t("Certification evidence:")} {shop.farm.certificationBody}{shop.farm.certificationReference ? ` · ${shop.farm.certificationReference}` : ""}
+                {shop.farm.certificationUrl && <> · <a href={shop.farm.certificationUrl} target="_blank" rel="noreferrer" style={{ color: GREEN }}>{t("View evidence")}</a></>}
               </p>
             )}
-            {!shop.farm.certificationVerifiedAt && shop.farm.certificationBody && <p style={{ margin: "6px 0 0", fontSize: 12, color: OCHRE }}>Evidence supplied by the farmer; not yet independently verified by Shamba.</p>}
+            {!shop.farm.certificationVerifiedAt && shop.farm.certificationBody && <p style={{ margin: "6px 0 0", fontSize: 12, color: OCHRE }}>{t("Evidence supplied by the farmer; not yet independently verified by Shamba.")}</p>}
           </div>
         </section>
       )}
@@ -223,9 +259,9 @@ export function Shopfront({ shop }: { shop: ShopData }) {
       {shop.months.some((m) => m.crops > 0) && (
         <section style={{ padding: "8px clamp(20px, 5vw, 64px) 24px" }}>
           <SectionHead
-            eyebrow="The season ahead"
-            title="What is coming, and when"
-            note="Weights are the farm's own estimates, updated as the crop grows."
+            eyebrow={t("The season ahead")}
+            title={t("What is coming, and when")}
+            note={t("Weights are the farm's own estimates, updated as the crop grows.")}
           />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14 }}>
             {shop.months.filter((m) => m.crops > 0).map((m) => {
@@ -233,11 +269,11 @@ export function Shopfront({ shop }: { shop: ShopData }) {
               return (
                 <div key={`${m.season}:${m.key}`} style={{ border: `1px solid ${now ? GREEN : LINE}`, background: "#ffffff", borderRadius: 20, padding: 20 }}>
                   <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: now ? GREEN : "#a8a29e", margin: 0 }}>
-                    {m.label} &rsquo;{String(m.calendarYear).slice(-2)}
+                    {t(m.label)} &rsquo;{String(m.calendarYear).slice(-2)}
                   </p>
                   <p style={{ fontFamily: serif, fontSize: 30, paddingTop: 8, margin: 0 }}>{fmtKg(m.expectedKg)}</p>
                   <p style={{ fontSize: 12, color: "#78716c", paddingTop: 4, margin: 0 }}>
-                    {m.crops} crop{m.crops === 1 ? "" : "s"}{now ? " · picking now" : ""}
+                    {t(m.crops === 1 ? "{n} crop" : "{n} crops", { n: m.crops })}{now ? ` · ${t("picking now")}` : ""}
                   </p>
                 </div>
               );
@@ -249,13 +285,13 @@ export function Shopfront({ shop }: { shop: ShopData }) {
       {/* Produce */}
       <section id="produce" style={{ padding: "40px clamp(20px, 5vw, 64px) 24px", scrollMarginTop: 90 }}>
         <SectionHead
-          eyebrow="Open for pre-order"
-          title="Produce with a harvest date"
-          note="If a crop has no expected harvest against it, it is not listed here. Nothing is sold on a maybe."
+          eyebrow={t("Open for pre-order")}
+          title={t("Produce with a harvest date")}
+          note={t("If a crop has no expected harvest against it, it is not listed here. Nothing is sold on a maybe.")}
         />
         {shop.produce.length === 0 ? (
           <div style={{ background: "#ffffff", border: `1px solid ${LINE}`, borderRadius: 24, padding: 40, textAlign: "center", color: "#78716c" }}>
-            Nothing is expected out of the ground just now. Check back next season.
+            {t("Nothing is expected out of the ground just now. Check back next season.")}
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 20 }}>
@@ -270,21 +306,21 @@ export function Shopfront({ shop }: { shop: ShopData }) {
       <section style={{ padding: "40px clamp(20px, 5vw, 64px) 8px" }}>
         <div style={{ background: "#ffffff", border: `1px solid ${LINE}`, borderRadius: 28, padding: "clamp(28px, 4vw, 44px)" }}>
           <h2 style={{ fontFamily: serif, fontWeight: 400, fontSize: 34, letterSpacing: "-0.01em", margin: 0, paddingBottom: 28 }}>
-            Three steps, no card needed
+            {t("Three steps, no card needed")}
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 32 }}>
-            <Step n="Step one" title="Reserve your kilos" body="Pick a crop, pick the month it is coming out, and say how many kilos you want from it." />
-            <Step n="Step two" title="We pick to your order" body="You hear from us the week it is ready with the real weight. Short of a good crop, we tell you early rather than late." />
-            <Step n="Step three" title="Collect and settle" body="Collect on the agreed day and pay then. Nothing is charged when you reserve." />
+            <Step n={t("Step one")} title={t("Reserve your kilos")} body={t("Pick a crop, pick the month it is coming out, and say how many kilos you want from it.")} />
+            <Step n={t("Step two")} title={t("We pick to your order")} body={t("You hear from us the week it is ready with the real weight. Short of a good crop, we tell you early rather than late.")} />
+            <Step n={t("Step three")} title={t("Collect and settle")} body={t("Collect on the agreed day and pay then. Nothing is charged when you reserve.")} />
           </div>
         </div>
       </section>
 
       <section style={{ padding: "40px clamp(20px, 5vw, 64px) 8px" }}>
         <div style={{ background: DEEP, color: "#ffffff", borderRadius: 28, padding: "clamp(28px, 4vw, 44px)" }}>
-          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "#86efac", margin: 0 }}>Getting your order</p>
+          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "#86efac", margin: 0 }}>{t("Getting your order")}</p>
           <h2 style={{ fontFamily: serif, fontWeight: 400, fontSize: 34, margin: "8px 0 0" }}>
-            {shop.farm.fulfilmentMethod === "collection" ? "Collect from the farm" : shop.farm.fulfilmentMethod === "delivery" ? "Delivery is available" : "Collect or arrange delivery"}
+            {shop.farm.fulfilmentMethod === "collection" ? t("Collect from the farm") : shop.farm.fulfilmentMethod === "delivery" ? t("Delivery is available") : t("Collect or arrange delivery")}
           </h2>
           {shop.farm.collectionInstructions && shop.farm.fulfilmentMethod !== "delivery" && (
             <p style={{ maxWidth: "65ch", lineHeight: 1.6, color: "#d1fae5", margin: "16px 0 0", whiteSpace: "pre-wrap" }}>{shop.farm.collectionInstructions}</p>
@@ -299,7 +335,7 @@ export function Shopfront({ shop }: { shop: ShopData }) {
               rel="noreferrer"
               style={{ marginTop: 20, display: "inline-flex", minHeight: 44, alignItems: "center", borderRadius: 999, background: "#22c55e", color: DEEP, padding: "12px 22px", fontWeight: 700, textDecoration: "none" }}
             >
-              Ask the farm on WhatsApp
+              {t("Ask the farm on WhatsApp")}
             </a>
           )}
         </div>
@@ -311,8 +347,7 @@ export function Shopfront({ shop }: { shop: ShopData }) {
           {shop.farm.location && <p style={{ fontSize: 14, color: "#78716c", margin: 0 }}>{shop.farm.location}</p>}
         </div>
         <p style={{ fontSize: 13, color: "#a8a29e", maxWidth: "44ch", margin: 0, textWrap: "pretty" }}>
-          Prices are per kilo and settled on the day at the weighed amount. Estimates move with the weather — we would
-          rather say so than promise a number we cannot pick.
+          {t("Prices are per kilo and settled on the day at the weighed amount. Estimates move with the weather — we would rather say so than promise a number we cannot pick.")}
         </p>
       </footer>
 
@@ -379,12 +414,13 @@ function Step({ n, title, body }: { n: string; title: string; body: string }) {
   );
 }
 
-function monthRange(p: ShopProduce): string {
-  if (p.months.length === 1) return p.months[0].label;
-  return `${p.months[0].label}–${p.months[p.months.length - 1].label}`;
+function monthRange(p: ShopProduce, t: Translate): string {
+  if (p.months.length === 1) return t(p.months[0].label);
+  return `${t(p.months[0].label)}–${t(p.months[p.months.length - 1].label)}`;
 }
 
 function ProduceCard({ produce, onOpen }: { produce: ShopProduce; onOpen: () => void }) {
+  const t = useT();
   const claimed = produce.totalExpectedKg > 0
     ? Math.min(100, Math.round(((produce.totalExpectedKg - produce.totalAvailableKg) / produce.totalExpectedKg) * 100))
     : 0;
@@ -403,11 +439,11 @@ function ProduceCard({ produce, onOpen }: { produce: ShopProduce; onOpen: () => 
         <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
           <span style={{ fontFamily: serif, fontSize: 24 }}>{produce.name}</span>
           <span style={{ fontSize: 13, color: "#78716c" }}>
-            {[produce.variety, produce.beds && `bed ${produce.beds}`].filter(Boolean).join(" · ") || " "}
+            {[produce.variety, produce.beds && t("bed {beds}", { beds: produce.beds })].filter(Boolean).join(" · ") || " "}
           </span>
         </div>
         <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: GREEN, background: "#ecfdf3", padding: "6px 10px", borderRadius: 999, whiteSpace: "nowrap" }}>
-          {monthRange(produce)}
+          {monthRange(produce, t)}
         </span>
       </div>
 
@@ -420,10 +456,10 @@ function ProduceCard({ produce, onOpen }: { produce: ShopProduce; onOpen: () => 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
           <span style={{ fontSize: 13, color: "#57534e" }}>
-            {produce.totalExpectedKg > 0 ? `${fmtKg(produce.totalExpectedKg)} expected` : produce.months[0].expectedText}
+            {produce.totalExpectedKg > 0 ? t("{kg} expected", { kg: fmtKg(produce.totalExpectedKg) }) : produce.months[0].expectedText}
           </span>
           {produce.totalExpectedKg > 0 && (
-            <span style={{ fontSize: 13, fontWeight: 600, color: OCHRE }}>{fmtKg(produce.totalAvailableKg)} free</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: OCHRE }}>{t("{kg} free", { kg: fmtKg(produce.totalAvailableKg) })}</span>
           )}
         </div>
         <div style={{ height: 6, borderRadius: 999, background: "#f0e9dd", overflow: "hidden" }}>
@@ -434,16 +470,16 @@ function ProduceCard({ produce, onOpen }: { produce: ShopProduce; onOpen: () => 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, paddingTop: 2 }}>
         <span style={{ fontSize: 14 }}>
           {produce.pricePerKg !== null ? (
-            <><strong>{money(produce.pricePerKg)}</strong> <span style={{ color: "#a8a29e" }}>/ kg</span></>
+            <><strong>{money(produce.pricePerKg)}</strong> <span style={{ color: "#a8a29e" }}>{t("/ kg")}</span></>
           ) : (
-            <span style={{ color: "#a8a29e" }}>Price on collection</span>
+            <span style={{ color: "#a8a29e" }}>{t("Price on collection")}</span>
           )}
         </span>
         <button
           onClick={onOpen}
           style={{ fontFamily: sans, fontSize: 13, fontWeight: 600, color: GREEN, background: "#ffffff", border: "1px solid #cfe6d7", padding: "11px 18px", borderRadius: 999, cursor: "pointer", minHeight: 44 }}
         >
-          Reserve
+          {t("Reserve")}
         </button>
       </div>
     </div>
@@ -452,6 +488,7 @@ function ProduceCard({ produce, onOpen }: { produce: ShopProduce; onOpen: () => 
 
 /* The reserve sheet: pick a month, then say how many kilos. */
 function ProduceSheet({ produce, onClose, onAdd }: { produce: ShopProduce; onClose: () => void; onAdd: (l: BasketLine) => void }) {
+  const t = useT();
   const [monthIdx, setMonthIdx] = useState(0);
   const [kg, setKg] = useState("");
 
@@ -477,7 +514,7 @@ function ProduceSheet({ produce, onClose, onAdd }: { produce: ShopProduce; onClo
         )}
         <div>
           <h2 style={{ fontFamily: serif, fontWeight: 400, fontSize: 30, margin: 0 }}>{produceName(produce)}</h2>
-          {produce.beds && <p style={{ fontSize: 13, color: "#78716c", margin: "4px 0 0" }}>Bed {produce.beds}</p>}
+          {produce.beds && <p style={{ fontSize: 13, color: "#78716c", margin: "4px 0 0" }}>{t("Bed {beds}", { beds: produce.beds })}</p>}
         </div>
 
         {produce.notes && (
@@ -497,7 +534,7 @@ function ProduceSheet({ produce, onClose, onAdd }: { produce: ShopProduce; onClo
           </dl>
         )}
 
-        <Labelled label="Harvest month">
+        <Labelled label={t("Harvest month")}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {produce.months.map((m, i) => (
               <button
@@ -509,21 +546,21 @@ function ProduceSheet({ produce, onClose, onAdd }: { produce: ShopProduce; onClo
                   border: `1px solid ${i === monthIdx ? GREEN : "#ded6c9"}`, borderRadius: 14, padding: "12px 10px",
                 }}
               >
-                {m.label} &rsquo;{String(m.calendarYear).slice(-2)}
+                {t(m.label)} &rsquo;{String(m.calendarYear).slice(-2)}
               </button>
             ))}
           </div>
         </Labelled>
 
         <div style={{ background: "#f7f3ec", borderRadius: 18, padding: 16, display: "flex", justifyContent: "space-between", gap: 12 }}>
-          <span style={{ fontSize: 14, color: "#57534e" }}>Expected in {month.label}</span>
+          <span style={{ fontSize: 14, color: "#57534e" }}>{t("Expected in {month}", { month: t(month.label) })}</span>
           <span style={{ fontSize: 14, fontWeight: 700 }}>
             {month.expectedKg !== null ? fmtKg(month.expectedKg) : month.expectedText}
-            {month.availableKg !== null && <span style={{ color: OCHRE, fontWeight: 600 }}> · {fmtKg(month.availableKg)} free</span>}
+            {month.availableKg !== null && <span style={{ color: OCHRE, fontWeight: 600 }}> · {t("{kg} free", { kg: fmtKg(month.availableKg) })}</span>}
           </span>
         </div>
 
-        <Labelled label="How many kilos">
+        <Labelled label={t("How many kilos")}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
             {picks.map((v) => (
               <button
@@ -546,7 +583,7 @@ function ProduceSheet({ produce, onClose, onAdd }: { produce: ShopProduce; onClo
                   color: INK, background: "#ffffff", border: "1px solid #ded6c9", borderRadius: 12,
                 }}
               >
-                All {fmtKg(month.availableKg)}
+                {t("All {kg}", { kg: fmtKg(month.availableKg) })}
               </button>
             )}
             <input
@@ -559,24 +596,23 @@ function ProduceSheet({ produce, onClose, onAdd }: { produce: ShopProduce; onClo
         <div style={{ background: "#f7f3ec", borderRadius: 18, padding: 18, display: "flex", flexDirection: "column", gap: 6 }}>
           {tooMuch ? (
             <span style={{ fontSize: 14, color: "#9f1239" }}>
-              Only {fmtKg(month.availableKg ?? 0)} is still unclaimed that month.
+              {t("Only {kg} is still unclaimed that month.", { kg: fmtKg(month.availableKg ?? 0) })}
             </span>
           ) : wanted !== null ? (
             <>
               <span style={{ fontSize: 15 }}>
-                <strong>{fmtKg(wanted)}</strong> of {produce.name} in {month.label}
-                {produce.pricePerKg !== null && <> · about {money(wanted * produce.pricePerKg)}</>}
+                <strong>{fmtKg(wanted)}</strong> {t("of {crop} in {month}", { crop: produce.name, month: t(month.label) })}
+                {produce.pricePerKg !== null && <> · {t("about {amount}", { amount: money(wanted * produce.pricePerKg) })}</>}
               </span>
               <span style={{ fontSize: 13, color: "#78716c", textWrap: "pretty" }}>
-                We pick to the weight you reserve and weigh it on the day. If the crop falls short, we tell you early
-                rather than late.
+                {t("We pick to the weight you reserve and weigh it on the day. If the crop falls short, we tell you early rather than late.")}
               </span>
             </>
           ) : (
             <span style={{ fontSize: 14, color: "#78716c" }}>
               {month.expectedKg === null
-                ? `The farm expects "${month.expectedText}" that month, so say how many kilos you would like and they will confirm.`
-                : "Say how many kilos you would like."}
+                ? t("The farm expects \"{expected}\" that month, so say how many kilos you would like and they will confirm.", { expected: month.expectedText })
+                : t("Say how many kilos you would like.")}
             </span>
           )}
         </div>
@@ -602,10 +638,10 @@ function ProduceSheet({ produce, onClose, onAdd }: { produce: ShopProduce; onClo
               cursor: valid ? "pointer" : "default", minHeight: 44,
             }}
           >
-            Add to pre-order
+            {t("Add to pre-order")}
           </button>
           <button onClick={onClose} style={{ fontFamily: sans, fontSize: 15, fontWeight: 600, background: "#ffffff", border: `1px solid ${LINE}`, padding: "16px 24px", borderRadius: 999, cursor: "pointer", minHeight: 44 }}>
-            Cancel
+            {t("Cancel")}
           </button>
         </div>
       </div>
@@ -622,11 +658,12 @@ function Checkout({
   saving: boolean; error: string;
   onRemove: (id: string) => void; onClose: () => void; onSubmit: () => void;
 }) {
+  const t = useT();
   const canSend = form.name.trim() !== "" && (form.phone.trim() !== "" || form.email.trim() !== "") && basket.length > 0;
   return (
     <Overlay onClose={onClose} wide>
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        <h2 style={{ fontFamily: serif, fontWeight: 400, fontSize: 30, margin: 0 }}>Your pre-order</h2>
+        <h2 style={{ fontFamily: serif, fontWeight: 400, fontSize: 30, margin: 0 }}>{t("Your pre-order")}</h2>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {basket.map((l) => (
@@ -634,13 +671,13 @@ function Checkout({
               <div style={{ display: "flex", flexDirection: "column", gap: 2, flexGrow: 1, minWidth: 0 }}>
                 <span style={{ fontSize: 16, fontWeight: 600 }}>{l.cropName}</span>
                 <span style={{ fontSize: 13, color: "#78716c" }}>
-                  {fmtKg(l.quantityKg)} · {l.monthLabel}
+                  {fmtKg(l.quantityKg)} · {l.monthLabel.replace(/^\S+/, (month) => t(month))}
                 </span>
               </div>
               <span style={{ fontSize: 15, fontWeight: 700, whiteSpace: "nowrap" }}>
                 {l.pricePerKg !== null ? money(l.quantityKg * l.pricePerKg) : fmtKg(l.quantityKg)}
               </span>
-              <button onClick={() => onRemove(l.id)} aria-label="Remove" style={{ background: "none", border: "none", color: "#a8a29e", fontSize: 20, cursor: "pointer", padding: 8, minHeight: 44 }}>
+              <button onClick={() => onRemove(l.id)} aria-label={t("Remove")} style={{ background: "none", border: "none", color: "#a8a29e", fontSize: 20, cursor: "pointer", padding: 8, minHeight: 44 }}>
                 ×
               </button>
             </div>
@@ -649,40 +686,40 @@ function Checkout({
 
         <div style={{ display: "flex", justifyContent: "space-between", gap: 16, background: "#f7f3ec", borderRadius: 18, padding: 18 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontSize: 14, color: "#57534e" }}>Reserved weight</span>
+            <span style={{ fontSize: 14, color: "#57534e" }}>{t("Reserved weight")}</span>
             <span style={{ fontSize: 15, fontWeight: 700 }}>{fmtKg(basketKg)}</span>
           </div>
           {basketValue > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontSize: 14, color: "#57534e" }}>Indicative value</span>
+              <span style={{ fontSize: 14, color: "#57534e" }}>{t("Indicative value")}</span>
               <span style={{ fontSize: 15, fontWeight: 700 }}>{money(basketValue)}</span>
             </div>
           )}
           <div style={{ display: "flex", flexDirection: "column", gap: 4, textAlign: "right" }}>
-            <span style={{ fontSize: 14, color: "#57534e" }}>To pay now</span>
-            <span style={{ fontFamily: serif, fontSize: 22, color: GREEN }}>Nothing</span>
+            <span style={{ fontSize: 14, color: "#57534e" }}>{t("To pay now")}</span>
+            <span style={{ fontFamily: serif, fontSize: 22, color: GREEN }}>{t("Nothing")}</span>
           </div>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
-          <Labelled label="Name or business *">
-            <Input value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="Green Grocer Ltd" />
+          <Labelled label={t("Name or business *")}>
+            <Input value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder={t("Green Grocer Ltd")} />
           </Labelled>
-          <Labelled label="Who we ask for">
+          <Labelled label={t("Who we ask for")}>
             <Input value={form.contactName} onChange={(v) => setForm({ ...form, contactName: v })} placeholder="Jane Wanjiku" />
           </Labelled>
-          <Labelled label="Telephone">
+          <Labelled label={t("Telephone")}>
             <Input value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} placeholder="+254…" type="tel" />
           </Labelled>
-          <Labelled label="Email">
+          <Labelled label={t("Email")}>
             <Input value={form.email} onChange={(v) => setForm({ ...form, email: v })} placeholder="orders@example.com" type="email" />
           </Labelled>
         </div>
-        <Labelled label="Anything we should know">
-          <Input value={form.notes} onChange={(v) => setForm({ ...form, notes: v })} placeholder="Collection day, packing, delivery…" />
+        <Labelled label={t("Anything we should know")}>
+          <Input value={form.notes} onChange={(v) => setForm({ ...form, notes: v })} placeholder={t("Collection day, packing, delivery…")} />
         </Labelled>
         <p style={{ fontSize: 13, color: "#78716c", margin: 0 }}>
-          Leave a telephone number or an email address so the farm can confirm.
+          {t("Leave a telephone number or an email address so the farm can confirm.")}
         </p>
 
         {error && (
@@ -701,10 +738,10 @@ function Checkout({
               cursor: canSend && !saving ? "pointer" : "default", minHeight: 44,
             }}
           >
-            {saving ? "Sending…" : "Send reservation"}
+            {saving ? t("Sending…") : t("Send reservation")}
           </button>
           <button onClick={onClose} style={{ fontFamily: sans, fontSize: 15, fontWeight: 600, background: "#ffffff", border: `1px solid ${LINE}`, padding: "17px 24px", borderRadius: 999, cursor: "pointer", minHeight: 44 }}>
-            Keep looking
+            {t("Keep looking")}
           </button>
         </div>
       </div>
@@ -725,6 +762,7 @@ function Confirmation({
   farm: string;
   onClose: () => void;
 }) {
+  const t = useT();
   return (
     <Overlay onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -735,10 +773,10 @@ function Confirmation({
             </svg>
           </span>
           <div>
-            <h2 style={{ fontFamily: serif, fontWeight: 400, fontSize: 28, margin: 0 }}>Reserved. We will pick it for you.</h2>
+            <h2 style={{ fontFamily: serif, fontWeight: 400, fontSize: 28, margin: 0 }}>{t("Reserved. We will pick it for you.")}</h2>
             {reference && (
               <p style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", color: GREEN, margin: "5px 0 0" }}>
-                Reference {reference}
+                {t("Reference {reference}", { reference })}
               </p>
             )}
           </div>
@@ -752,19 +790,18 @@ function Confirmation({
           ))}
         </div>
         <p style={{ fontSize: 15, lineHeight: 1.6, color: "#57534e", margin: 0, textWrap: "pretty" }}>
-          {farm} will be in touch to confirm. Nothing has been charged — you settle on collection, for the weight
-          actually picked.
+          {t("{farm} will be in touch to confirm. Nothing has been charged — you settle on collection, for the weight actually picked.", { farm })}
         </p>
         {trackingUrl && (
           <a
             href={trackingUrl}
             style={{ fontFamily: sans, fontSize: 15, fontWeight: 700, color: "#ffffff", background: GREEN, padding: 16, borderRadius: 999, textDecoration: "none", minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center" }}
           >
-            Track your reservation
+            {t("Track your reservation")}
           </a>
         )}
         <button onClick={onClose} style={{ fontFamily: sans, fontSize: 15, fontWeight: 700, color: GREEN, background: "#ffffff", border: `1px solid ${LINE}`, padding: 16, borderRadius: 999, cursor: "pointer", minHeight: 44 }}>
-          Done
+          {t("Done")}
         </button>
       </div>
     </Overlay>
@@ -809,8 +846,9 @@ function Input({ value, onChange, placeholder, type }: { value: string; onChange
 }
 
 function BedsIllustration() {
+  const t = useT();
   return (
-    <svg viewBox="0 0 520 420" width="100%" height="auto" role="img" aria-label="Illustration of planted beds">
+    <svg viewBox="0 0 520 420" width="100%" height="auto" role="img" aria-label={t("Illustration of planted beds")}>
       <defs>
         <linearGradient id="shopsky" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#134e2a" />

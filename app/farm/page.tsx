@@ -46,6 +46,8 @@ import { ExpandableText } from "@/app/farm/components/ExpandableText";
 import { ArrowUp, Images, Plus, Settings, X } from "lucide-react";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
 import NotificationBell from "@/components/NotificationBell";
+import { useT, useLanguage } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 import type { CropFormData } from "@/app/farm/components/CropForm";
 import type { TaskFormData } from "@/app/farm/components/TaskForm";
 import type { HarvestFormData } from "@/app/farm/components/HarvestForm";
@@ -62,6 +64,8 @@ function errMsg(err: unknown, fallback: string): string {
 }
 
 export default function FarmPage() {
+  const t = useT();
+  const [lang, setLang] = useLanguage();
   const [onboardingMode, setOnboardingMode] = useState(false);
   const [farms, setFarms] = useState<Farm[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
@@ -92,6 +96,10 @@ export default function FarmPage() {
   const [deletingWantId, setDeletingWantId] = useState<string | null>(null);
   const [convertingWantId, setConvertingWantId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  /* True once the first farms query has answered, so we know whether this
+     account has a farm at all. */
+  const [farmsLoaded, setFarmsLoaded] = useState(false);
+  const [joinIntent, setJoinIntent] = useState(false);
   const [editingFarm, setEditingFarm] = useState(false);
   const [farmEditForm, setFarmEditForm] = useState({ name: "", location: "", size_acres: "" });
   const [savingFarm, setSavingFarm] = useState(false);
@@ -158,6 +166,7 @@ export default function FarmPage() {
     setOnboardingMode(params.get("onboarding") === "1");
     // The setup wizard links here with ?join=1 for people joining an existing farm.
     if (params.get("join") === "1") {
+      setJoinIntent(true);
       setNoFarmMode("join");
       loadAllFarms();
     }
@@ -193,7 +202,7 @@ export default function FarmPage() {
       setSavingFarm(true);
       setError("");
       const name = farmEditForm.name.trim();
-      if (!name) throw new Error("Farm name is required.");
+      if (!name) throw new Error(t("Farm name is required."));
 
       const { error: updateError } = await supabase
         .from("farms")
@@ -208,7 +217,7 @@ export default function FarmPage() {
       await loadFarms();
       setEditingFarm(false);
     } catch (err) {
-      setError(errMsg(err, "Failed to save farm"));
+      setError(errMsg(err, t("Failed to save farm")));
     } finally {
       setSavingFarm(false);
     }
@@ -222,21 +231,21 @@ export default function FarmPage() {
     setError("");
     try {
       const user = await getCurrentUser();
-      if (!user) throw new Error("You must be signed in to create a farm.");
+      if (!user) throw new Error(t("You must be signed in to create a farm."));
       const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
       const { data: farmId, error: farmErr } = await supabase.rpc("create_farm_with_owner", {
         p_name: name,
         p_slug: slug,
       });
       if (farmErr) throw farmErr;
-      if (!farmId) throw new Error("The farm was not created.");
+      if (!farmId) throw new Error(t("The farm was not created."));
       setNewFarmName("");
       setNoFarmMode("idle");
       await saveActiveFarmId(farmId);
       await loadFarms();
       router.push("/farm/onboarding");
     } catch (err) {
-      setError(errMsg(err, "Failed to create farm"));
+      setError(errMsg(err, t("Failed to create farm")));
     } finally {
       setCreatingFarm(false);
     }
@@ -259,7 +268,7 @@ export default function FarmPage() {
     setError("");
     const user = await getCurrentUser();
     if (!user) {
-      setError("Please log in to request access.");
+      setError(t("Please log in to request access."));
       setRequestingId(null);
       return;
     }
@@ -290,7 +299,7 @@ export default function FarmPage() {
           user_email: user.email,
           status: "pending",
         });
-    if (err) setError(errMsg(err, "Failed to send request"));
+    if (err) setError(errMsg(err, t("Failed to send request")));
     else setRequestSent(farmId);
     setRequestingId(null);
   }
@@ -415,7 +424,7 @@ export default function FarmPage() {
       setDeletingFarm(false);
       await refreshAll();
     } catch (err) {
-      setError(errMsg(err, "Failed to delete farm"));
+      setError(errMsg(err, t("Failed to delete farm")));
       setDeletingFarm(false);
     }
   }
@@ -426,7 +435,7 @@ export default function FarmPage() {
       setLoading(true);
       await loadFarms();
     } catch (err) {
-      setError(errMsg(err, "Failed to load farms"));
+      setError(errMsg(err, t("Failed to load farms")));
     } finally {
       setLoading(false);
     }
@@ -439,6 +448,7 @@ export default function FarmPage() {
       });
 
       await refreshAll();
+      setFarmsLoaded(true);
 
       // Only load the last active farm once per app session
       // Don't reload it when navigating between pages, to preserve farm selection during a session
@@ -463,7 +473,7 @@ export default function FarmPage() {
         setLoading(true);
         await loadFarmData(activeFarmId);
       } catch (err) {
-        setError(errMsg(err, "Failed to load farm data"));
+        setError(errMsg(err, t("Failed to load farm data")));
       } finally {
         setLoading(false);
       }
@@ -701,7 +711,7 @@ export default function FarmPage() {
       if (updateError) throw updateError;
       await loadFarmData(activeFarmId);
     } catch (err) {
-      setError(errMsg(err, "Failed to assign crop to the selected bed"));
+      setError(errMsg(err, t("Failed to assign crop to the selected bed")));
     } finally {
       setAssigningCropId(null);
     }
@@ -718,7 +728,7 @@ export default function FarmPage() {
     try {
       setError("");
       const cropName = data.crop_name.trim();
-      if (!cropName) throw new Error("Crop name is required.");
+      if (!cropName) throw new Error(t("Crop name is required."));
 
       const zoneIds = data.zone_ids.filter(Boolean);
       const primaryZoneId = zoneIds[0] || null;
@@ -786,7 +796,7 @@ export default function FarmPage() {
       await loadFarmData(activeFarmId);
       return true;
     } catch (err) {
-      setError(errMsg(err, "Failed to create crop"));
+      setError(errMsg(err, t("Failed to create crop")));
       return false;
     }
   }
@@ -858,12 +868,12 @@ export default function FarmPage() {
       const res = await supabase.from("crops").update(payload).eq("id", id).select();
       console.log("Crop update response:", JSON.stringify(res));
       if (res.error) throw res.error;
-      if (!res.data || res.data.length === 0) throw new Error("Update returned no rows — RLS may be blocking updates.");
+      if (!res.data || res.data.length === 0) throw new Error(t("Update returned no rows — RLS may be blocking updates."));
       setEditingCropId(null);
       setCropImagePreview("");
       await loadFarmData(activeFarmId);
     } catch (err) {
-      setError(errMsg(err, "Failed to update crop"));
+      setError(errMsg(err, t("Failed to update crop")));
     } finally {
       setSavingCropId(null);
     }
@@ -932,7 +942,7 @@ export default function FarmPage() {
       if (err) throw err;
       setCrops((prev) => prev.map((c) => c.id === id ? { ...c, notes: cropNoteText.trim() || null, medicinal_properties: cropMedicinalText.trim() || null } : c));
     } catch (err) {
-      setError(errMsg(err, "Failed to save note"));
+      setError(errMsg(err, t("Failed to save note")));
     } finally {
       setSavingCropNote(false);
     }
@@ -940,15 +950,15 @@ export default function FarmPage() {
 
   async function handleDeleteCrop(id: string) {
     const crop = crops.find((c) => c.id === id);
-    const label = crop ? `"${crop.crop_name}"` : "this crop";
-    if (!window.confirm(`Delete ${label}? This can't be undone from the UI.`)) return;
+    const label = crop ? `"${crop.crop_name}"` : t("this crop");
+    if (!window.confirm(t("Delete {label}? This can't be undone from the UI.", { label }))) return;
     try {
       setDeletingCropId(id);
       const { error: err } = await supabase.from("crops").update({ is_active: false }).eq("id", id);
       if (err) throw err;
       setCrops((prev) => prev.filter((c) => c.id !== id));
     } catch (err) {
-      setError(errMsg(err, "Failed to delete crop"));
+      setError(errMsg(err, t("Failed to delete crop")));
     } finally {
       setDeletingCropId(null);
     }
@@ -959,7 +969,7 @@ export default function FarmPage() {
     try {
       setError("");
       const title = data.title.trim();
-      if (!title) throw new Error("Goal title is required.");
+      if (!title) throw new Error(t("Goal title is required."));
 
       const { error: insertError } = await supabase.from("tasks").insert({
         farm_id: activeFarmId,
@@ -986,7 +996,7 @@ export default function FarmPage() {
       await loadFarmData(activeFarmId);
       return true;
     } catch (err) {
-      setError(errMsg(err, "Failed to create goal"));
+      setError(errMsg(err, t("Failed to create goal")));
       return false;
     }
   }
@@ -1014,7 +1024,7 @@ export default function FarmPage() {
 
       await loadFarmData(activeFarmId);
     } catch (err) {
-      setError(errMsg(err, "Failed to complete goal"));
+      setError(errMsg(err, t("Failed to complete goal")));
     } finally {
       setCompletingTaskId(null);
     }
@@ -1041,7 +1051,7 @@ export default function FarmPage() {
       await completeTaskNow(hoursPromptTask);
       setHoursPromptTask(null);
     } catch (err) {
-      setError(errMsg(err, "Failed to log hours"));
+      setError(errMsg(err, t("Failed to log hours")));
     } finally {
       setLoggingHours(false);
     }
@@ -1060,7 +1070,7 @@ export default function FarmPage() {
       setSavingTaskId(id);
       setError("");
       const title = data.title.trim();
-      if (!title) throw new Error("Goal title is required.");
+      if (!title) throw new Error(t("Goal title is required."));
 
       const { error: updateError } = await supabase
         .from("tasks")
@@ -1084,7 +1094,7 @@ export default function FarmPage() {
       setEditingTaskForm(null);
       return true;
     } catch (err) {
-      setError(errMsg(err, "Failed to update goal"));
+      setError(errMsg(err, t("Failed to update goal")));
       return false;
     } finally {
       setSavingTaskId(null);
@@ -1100,7 +1110,7 @@ export default function FarmPage() {
       if (deleteError) throw deleteError;
       await loadFarmData(activeFarmId);
     } catch (err) {
-      setError(errMsg(err, "Failed to delete task"));
+      setError(errMsg(err, t("Failed to delete task")));
     } finally {
       setDeletingTaskId(null);
     }
@@ -1110,9 +1120,9 @@ export default function FarmPage() {
     if (!activeFarmId) return false;
     try {
       setError("");
-      if (!data.crop_id) throw new Error("Choose a crop before logging harvest.");
-      if (!data.harvest_date) throw new Error("Harvest date is required.");
-      if (!data.quantity_kg) throw new Error("Harvest quantity is required.");
+      if (!data.crop_id) throw new Error(t("Choose a crop before logging harvest."));
+      if (!data.harvest_date) throw new Error(t("Harvest date is required."));
+      if (!data.quantity_kg) throw new Error(t("Harvest quantity is required."));
 
       const selectedCrop = crops.find((crop) => crop.id === data.crop_id) ?? null;
       const harvestQty = Number(data.quantity_kg);
@@ -1152,7 +1162,7 @@ export default function FarmPage() {
       await loadFarmData(activeFarmId);
       return true;
     } catch (err) {
-      setError(errMsg(err, "Failed to log harvest"));
+      setError(errMsg(err, t("Failed to log harvest")));
       return false;
     }
   }
@@ -1161,7 +1171,7 @@ export default function FarmPage() {
     if (!activeFarmId) return false;
     try {
       setError("");
-      if (!data.expense_date) throw new Error("Expense date is required.");
+      if (!data.expense_date) throw new Error(t("Expense date is required."));
 
       const { error: insertError } = await supabase.from("expenses").insert({
         farm_id: activeFarmId,
@@ -1185,7 +1195,7 @@ export default function FarmPage() {
       await loadFarmData(activeFarmId);
       return true;
     } catch (err) {
-      setError(errMsg(err, "Failed to log expense"));
+      setError(errMsg(err, t("Failed to log expense")));
       return false;
     }
   }
@@ -1209,7 +1219,7 @@ export default function FarmPage() {
       setEditingExpenseForm(null);
       return true;
     } catch (err) {
-      setError(errMsg(err, "Failed to update expense"));
+      setError(errMsg(err, t("Failed to update expense")));
       return false;
     } finally {
       setSavingExpenseId(null);
@@ -1225,7 +1235,7 @@ export default function FarmPage() {
       await loadFarmData(activeFarmId);
       setConfirmDeleteExpenseId(null);
     } catch (err) {
-      setError(errMsg(err, "Failed to delete expense"));
+      setError(errMsg(err, t("Failed to delete expense")));
     } finally {
       setDeletingExpenseId(null);
     }
@@ -1235,7 +1245,7 @@ export default function FarmPage() {
     if (!activeFarmId) return false;
     try {
       setError("");
-      if (!data.name.trim()) throw new Error("Asset name is required.");
+      if (!data.name.trim()) throw new Error(t("Asset name is required."));
 
       const { error: insertError } = await supabase.from("assets").insert({
         farm_id: activeFarmId,
@@ -1261,7 +1271,7 @@ export default function FarmPage() {
       await loadFarmData(activeFarmId);
       return true;
     } catch (err) {
-      setError(errMsg(err, "Failed to log asset"));
+      setError(errMsg(err, t("Failed to log asset")));
       return false;
     }
   }
@@ -1271,7 +1281,7 @@ export default function FarmPage() {
     try {
       setError("");
       const name = data.name.trim();
-      if (!name) throw new Error("Want name is required.");
+      if (!name) throw new Error(t("Want name is required."));
 
       const user = await getCurrentUser();
       const { error: insertError } = await supabase.from("wants").insert({
@@ -1293,7 +1303,7 @@ export default function FarmPage() {
       await loadFarmData(activeFarmId);
       return true;
     } catch (err) {
-      setError(errMsg(err, "Failed to add want"));
+      setError(errMsg(err, t("Failed to add want")));
       return false;
     }
   }
@@ -1306,7 +1316,7 @@ export default function FarmPage() {
       if (deleteError) throw deleteError;
       if (activeFarmId) await loadFarmData(activeFarmId);
     } catch (err) {
-      setError(errMsg(err, "Failed to delete want"));
+      setError(errMsg(err, t("Failed to delete want")));
     } finally {
       setDeletingWantId(null);
     }
@@ -1344,7 +1354,7 @@ export default function FarmPage() {
 
       await loadFarmData(activeFarmId);
     } catch (err) {
-      setError(errMsg(err, "Failed to convert want to asset"));
+      setError(errMsg(err, t("Failed to convert want to asset")));
     } finally {
       setConvertingWantId(null);
     }
@@ -1363,8 +1373,8 @@ export default function FarmPage() {
     if (!activeFarmId) return false;
     try {
       setError("");
-      if (!data.pest_name.trim()) throw new Error("Pest name is required.");
-      if (!data.logged_date) throw new Error("Date spotted is required.");
+      if (!data.pest_name.trim()) throw new Error(t("Pest name is required."));
+      if (!data.logged_date) throw new Error(t("Date spotted is required."));
 
       let imageUrl: string | null = data.image_url || null;
       if (data.image_file) {
@@ -1412,7 +1422,7 @@ export default function FarmPage() {
       await loadFarmData(activeFarmId);
       return true;
     } catch (err) {
-      setError(errMsg(err, "Failed to log pest issue"));
+      setError(errMsg(err, t("Failed to log pest issue")));
       return false;
     }
   }
@@ -1441,7 +1451,7 @@ export default function FarmPage() {
       await loadFarmData(activeFarmId);
       return true;
     } catch (err) {
-      setError(errMsg(err, "Failed to update pest log"));
+      setError(errMsg(err, t("Failed to update pest log")));
       return false;
     }
   }
@@ -1454,7 +1464,7 @@ export default function FarmPage() {
       if (deleteError) throw deleteError;
       await loadFarmData(activeFarmId);
     } catch (err) {
-      setError(errMsg(err, "Failed to delete pest log"));
+      setError(errMsg(err, t("Failed to delete pest log")));
     } finally {
       setDeletingPestId(null);
       setConfirmDeletePestId(null);
@@ -1465,7 +1475,7 @@ export default function FarmPage() {
     if (!activeFarmId) return false;
     try {
       setError("");
-      if (!data.sale_date) throw new Error("Sale date is required.");
+      if (!data.sale_date) throw new Error(t("Sale date is required."));
 
       const { error: insertError } = await supabase.from("sales").insert({
         farm_id: activeFarmId,
@@ -1489,9 +1499,25 @@ export default function FarmPage() {
       await loadFarmData(activeFarmId);
       return true;
     } catch (err) {
-      setError(errMsg(err, "Failed to log sale"));
+      setError(errMsg(err, t("Failed to log sale")));
       return false;
     }
+  }
+
+  /* An account with no farm belongs in the setup wizard, unless it came here
+     to join an existing farm. Until the farms query answers we show a blank
+     loading screen rather than flashing the dashboard shell. */
+  const noFarmYet = farms.length === 0 && !joinIntent;
+  useEffect(() => {
+    if (farmsLoaded && noFarmYet) router.replace("/farm/onboarding");
+  }, [farmsLoaded, noFarmYet, router]);
+
+  if (noFarmYet) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-stone-50 text-sm text-zinc-500">
+        {t("Loading…")}
+      </main>
+    );
   }
 
   return (
@@ -1500,7 +1526,7 @@ export default function FarmPage() {
         <header className="relative mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
           {!hideChrome && <Link
             href={withFarmContext("/farm/settings")}
-            aria-label="Settings"
+            aria-label={t("Settings")}
             className="absolute right-4 top-4 rounded-full border border-zinc-200 bg-white p-2 text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900"
           >
             <Settings className="h-5 w-5" />
@@ -1508,7 +1534,7 @@ export default function FarmPage() {
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                Shamba Farm Manager
+                {t("Shamba Farm Manager")}
               </p>
               {editingFarm ? (
                 <div className="mt-2 space-y-2">
@@ -1517,7 +1543,7 @@ export default function FarmPage() {
                     value={farmEditForm.name}
                     onChange={(e) => setFarmEditForm((prev) => ({ ...prev, name: e.target.value }))}
                     className="w-full rounded-2xl border border-zinc-300 px-4 py-2 text-2xl font-semibold outline-none focus:border-zinc-900"
-                    placeholder="Farm name"
+                    placeholder={t("Farm name")}
                   />
                   <div className="flex gap-2">
                     <input
@@ -1525,7 +1551,7 @@ export default function FarmPage() {
                       value={farmEditForm.location}
                       onChange={(e) => setFarmEditForm((prev) => ({ ...prev, location: e.target.value }))}
                       className="flex-1 rounded-2xl border border-zinc-300 px-4 py-2 text-sm outline-none focus:border-zinc-900"
-                      placeholder="Location"
+                      placeholder={t("Location")}
                     />
                     <input
                       type="number"
@@ -1534,7 +1560,7 @@ export default function FarmPage() {
                       value={farmEditForm.size_acres}
                       onChange={(e) => setFarmEditForm((prev) => ({ ...prev, size_acres: e.target.value }))}
                       className="w-32 rounded-2xl border border-zinc-300 px-4 py-2 text-sm outline-none focus:border-zinc-900"
-                      placeholder="Acres"
+                      placeholder={t("Acres")}
                     />
                   </div>
                   <div className="flex gap-2">
@@ -1543,30 +1569,47 @@ export default function FarmPage() {
                       disabled={savingFarm || !farmEditForm.name.trim()}
                       className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60"
                     >
-                      {savingFarm ? "Saving..." : "Save"}
+                      {savingFarm ? t("Saving...") : t("Save")}
                     </button>
                     <button
                       onClick={() => setEditingFarm(false)}
                       className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
                     >
-                      Cancel
+                      {t("Cancel")}
                     </button>
                   </div>
                 </div>
               ) : (
                 <>
                   <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-                    {activeFarm?.name ?? "Farm Manager"}
+                    {activeFarm?.name ?? t("Farm Manager")}
                   </h1>
                   <p className="mt-3 text-sm text-zinc-600 sm:text-base">
-                    {activeFarm?.location || "No location set"}
-                    {activeFarm?.size_acres ? ` · ${activeFarm.size_acres} acres` : ""}
+                    {activeFarm?.location || t("No location set")}
+                    {activeFarm?.size_acres ? ` · ${activeFarm.size_acres} ${t("acres")}` : ""}
                   </p>
+                  {activeFarm && (
+                    activeFarm.list_in_market && activeFarm.slug ? (
+                      <Link
+                        href={`/${activeFarm.slug}`}
+                        className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:underline"
+                      >
+                        {t("View your shop ↗")}
+                      </Link>
+                    ) : (
+                      <Link
+                        href="/farm/onboarding"
+                        className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:underline"
+                      >
+                        {t("Publish your shop →")}
+                      </Link>
+                    )
+                  )}
                   {activeFarm && <button
                     onClick={startEditFarm}
                     className="mt-3 rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100"
                   >
-                    Edit
+                    {t("Edit")}
                   </button>}
                 </>
               )}
@@ -1597,26 +1640,26 @@ export default function FarmPage() {
                 }}
                 className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100"
               >
-                Join a farm
+                {t("Join a farm")}
               </button>
               <button
                 onClick={() => setNoFarmMode(noFarmMode === "create" ? "idle" : "create")}
                 className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
               >
-                Create a farm
+                {t("Create a farm")}
               </button>
               <Link
                 href={withFarmContext("/farm/invite")}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                Invite
+                {t("Invite")}
               </Link>
               {userEmail && userEmail === process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAIL && (
                 <Link
                   href="/admin"
                   className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
                 >
-                  Admin
+                  {t("Admin")}
                 </Link>
               )}
               <button
@@ -1627,7 +1670,7 @@ export default function FarmPage() {
                       await loadFarmData(activeFarmId);
                     }
                   } catch (err) {
-                    setError(errMsg(err, "Failed to refresh farm data"));
+                    setError(errMsg(err, t("Failed to refresh farm data")));
                   } finally {
                     setIsRefreshing(false);
                   }
@@ -1635,18 +1678,19 @@ export default function FarmPage() {
                 disabled={isRefreshing}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-60"
               >
-                {isRefreshing ? "Refreshing..." : "Refresh"}
+                {isRefreshing ? t("Refreshing...") : t("Refresh")}
               </button>
               <NotificationBell />
               </>)}
               {userEmail && (
                 <span className="text-sm text-zinc-500">{userEmail}</span>
               )}
+              <LanguageToggle lang={lang} onChange={setLang} />
               <button
                 onClick={handleSignOut}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                Sign out
+                {t("Sign out")}
               </button>
             </div>
           </div>
@@ -1684,7 +1728,7 @@ export default function FarmPage() {
                 href={href}
                 className="rounded-full border border-zinc-100 px-3 py-1.5 font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900"
               >
-                {label}
+                {t(label)}
               </Link>
             ))}
           </div>
@@ -1693,7 +1737,7 @@ export default function FarmPage() {
         {onboardingMode && (
           <div className="mb-6 flex justify-end">
             <Link href="/farm/onboarding" className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">
-              Back to setup / Rudi kwenye maandalizi
+              {t("Back to setup")}
             </Link>
           </div>
         )}
@@ -1701,15 +1745,15 @@ export default function FarmPage() {
         {noFarmMode === "create" && activeFarm && (
           <div className="mb-6 mx-auto max-w-md rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold">New farm</h2>
-              <button onClick={() => setNoFarmMode("idle")} className="text-sm text-zinc-400 hover:text-zinc-600">Close</button>
+              <h2 className="text-base font-semibold">{t("New farm")}</h2>
+              <button onClick={() => setNoFarmMode("idle")} className="text-sm text-zinc-400 hover:text-zinc-600">{t("Close")}</button>
             </div>
             <form onSubmit={handleCreateFarm} className="mt-4 space-y-4">
               <input
                 type="text"
                 value={newFarmName}
                 onChange={(e) => setNewFarmName(e.target.value)}
-                placeholder="Farm name"
+                placeholder={t("Farm name")}
                 required
                 className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
               />
@@ -1718,7 +1762,7 @@ export default function FarmPage() {
                 disabled={creatingFarm}
                 className="w-full rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
               >
-                {creatingFarm ? "Creating…" : "Create farm"}
+                {creatingFarm ? t("Creating…") : t("Create farm")}
               </button>
             </form>
           </div>
@@ -1727,19 +1771,19 @@ export default function FarmPage() {
         {noFarmMode === "join" && activeFarm && (
           <div className="mb-6 mx-auto max-w-md rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold">Request to join a farm</h2>
-              <button onClick={() => setNoFarmMode("idle")} className="text-sm text-zinc-400 hover:text-zinc-600">Close</button>
+              <h2 className="text-base font-semibold">{t("Request to join a farm")}</h2>
+              <button onClick={() => setNoFarmMode("idle")} className="text-sm text-zinc-400 hover:text-zinc-600">{t("Close")}</button>
             </div>
-            <p className="mt-1 text-sm text-zinc-500">Browse available farms or filter by name.</p>
+            <p className="mt-1 text-sm text-zinc-500">{t("Browse available farms or filter by name.")}</p>
             <input
               type="text"
               value={joinSearch}
               onChange={(e) => setJoinSearch(e.target.value)}
-              placeholder="Filter farms…"
+              placeholder={t("Filter farms…")}
               className="mt-4 w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
             />
             {loadingAllFarms ? (
-              <p className="mt-4 text-sm text-zinc-500">Loading farms…</p>
+              <p className="mt-4 text-sm text-zinc-500">{t("Loading farms…")}</p>
             ) : (
               <>
                 {(() => {
@@ -1750,8 +1794,8 @@ export default function FarmPage() {
                     return (
                       <p className="mt-4 text-sm text-zinc-500">
                         {allFarms.length === 0
-                          ? "No farms on the system yet."
-                          : "No farms match your filter."}
+                          ? t("No farms on the system yet.")
+                          : t("No farms match your filter.")}
                       </p>
                     );
                   }
@@ -1761,14 +1805,14 @@ export default function FarmPage() {
                         <div key={f.id} className="flex items-center justify-between rounded-2xl border border-zinc-100 px-4 py-3">
                           <span className="text-sm font-medium">{f.name}</span>
                           {requestSent === f.id ? (
-                            <span className="text-xs text-green-600 font-medium">Request sent</span>
+                            <span className="text-xs text-green-600 font-medium">{t("Request sent")}</span>
                           ) : (
                             <button
                               onClick={() => handleRequestJoin(f.id)}
                               disabled={requestingId === f.id}
                               className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
                             >
-                              {requestingId === f.id ? "Sending…" : "Request to join"}
+                              {requestingId === f.id ? t("Sending…") : t("Request to join")}
                             </button>
                           )}
                         </div>
@@ -1789,21 +1833,21 @@ export default function FarmPage() {
 
         {loading && !activeFarm ? (
           <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
-            Loading...
+            {t("Loading...")}
           </div>
         ) : null}
 
         {!loading && !activeFarm ? (
           <div className="mx-auto max-w-md space-y-4">
             <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-center">
-              <p className="text-lg font-semibold">Welcome to Shamba</p>
-              <p className="mt-1 text-sm text-zinc-500">Create a new farm or request to join an existing one.</p>
+              <p className="text-lg font-semibold">{t("Welcome to Shamba")}</p>
+              <p className="mt-1 text-sm text-zinc-500">{t("Create a new farm or request to join an existing one.")}</p>
               <div className="mt-6 flex flex-col gap-3">
                 <button
                   onClick={() => setNoFarmMode(noFarmMode === "create" ? "idle" : "create")}
                   className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white hover:bg-zinc-800"
                 >
-                  Create a farm
+                  {t("Create a farm")}
                 </button>
                 <button
                   onClick={() => {
@@ -1813,20 +1857,20 @@ export default function FarmPage() {
                   }}
                   className="rounded-2xl border border-zinc-200 px-5 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
                 >
-                  Request to join a farm
+                  {t("Request to join a farm")}
                 </button>
               </div>
             </div>
 
             {noFarmMode === "create" && (
               <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-                <h2 className="text-base font-semibold">New farm</h2>
+                <h2 className="text-base font-semibold">{t("New farm")}</h2>
                 <form onSubmit={handleCreateFarm} className="mt-4 space-y-4">
                   <input
                     type="text"
                     value={newFarmName}
                     onChange={(e) => setNewFarmName(e.target.value)}
-                    placeholder="Farm name"
+                    placeholder={t("Farm name")}
                     required
                     className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
                   />
@@ -1835,7 +1879,7 @@ export default function FarmPage() {
                     disabled={creatingFarm}
                     className="w-full rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
                   >
-                    {creatingFarm ? "Creating…" : "Create farm"}
+                    {creatingFarm ? t("Creating…") : t("Create farm")}
                   </button>
                 </form>
               </div>
@@ -1843,17 +1887,17 @@ export default function FarmPage() {
 
             {noFarmMode === "join" && (
               <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-                <h2 className="text-base font-semibold">Request to join</h2>
-                <p className="mt-1 text-sm text-zinc-500">Browse available farms or filter by name.</p>
+                <h2 className="text-base font-semibold">{t("Request to join")}</h2>
+                <p className="mt-1 text-sm text-zinc-500">{t("Browse available farms or filter by name.")}</p>
                 <input
                   type="text"
                   value={joinSearch}
                   onChange={(e) => setJoinSearch(e.target.value)}
-                  placeholder="Filter farms…"
+                  placeholder={t("Filter farms…")}
                   className="mt-4 w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
                 />
                 {loadingAllFarms ? (
-                  <p className="mt-4 text-sm text-zinc-500">Loading farms…</p>
+                  <p className="mt-4 text-sm text-zinc-500">{t("Loading farms…")}</p>
                 ) : (
                   <>
                     {(() => {
@@ -1864,8 +1908,8 @@ export default function FarmPage() {
                         return (
                           <p className="mt-4 text-sm text-zinc-500">
                             {allFarms.length === 0
-                              ? "No farms on the system yet."
-                              : "No farms match your filter."}
+                              ? t("No farms on the system yet.")
+                              : t("No farms match your filter.")}
                           </p>
                         );
                       }
@@ -1875,14 +1919,14 @@ export default function FarmPage() {
                             <div key={f.id} className="flex items-center justify-between rounded-2xl border border-zinc-100 px-4 py-3">
                               <span className="text-sm font-medium">{f.name}</span>
                               {requestSent === f.id ? (
-                                <span className="text-xs text-green-600 font-medium">Request sent ✓</span>
+                                <span className="text-xs text-green-600 font-medium">{t("Request sent ✓")}</span>
                               ) : (
                                 <button
                                   onClick={() => handleRequestJoin(f.id)}
                                   disabled={requestingId === f.id}
                                   className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
                                 >
-                                  {requestingId === f.id ? "Sending…" : "Request to join"}
+                                  {requestingId === f.id ? t("Sending…") : t("Request to join")}
                                 </button>
                               )}
                             </div>
@@ -1923,7 +1967,7 @@ export default function FarmPage() {
                       : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
                   }`}
                 >
-                  {label}
+                  {t(label)}
                 </button>
               ))}
             </div>
@@ -2028,21 +2072,21 @@ export default function FarmPage() {
             <section className="mb-6 grid gap-4 sm:grid-cols-3">
               <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
-                  Goals today
+                  {t("Goals today")}
                 </p>
                 <p className="mt-3 text-3xl font-semibold">{tasksToday.length}</p>
               </div>
 
               <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
-                  Open goals
+                  {t("Open goals")}
                 </p>
                 <p className="mt-3 text-3xl font-semibold">{openTasks.length}</p>
               </div>
 
               <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
-                  Ready to harvest
+                  {t("Ready to harvest")}
                 </p>
                 <p className="mt-3 text-3xl font-semibold">{readyToHarvest.length}</p>
               </div>
@@ -2051,44 +2095,44 @@ export default function FarmPage() {
             <section className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-semibold">Open goals</h2>
+                  <h2 className="text-xl font-semibold">{t("Open goals")}</h2>
                   <p className="mt-1 text-sm text-zinc-500">
-                    All todo and in-progress month goals, due soonest first.
+                    {t("All todo and in-progress month goals, due soonest first.")}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-zinc-500">{openTasks.length} open</span>
+                  <span className="text-sm text-zinc-500">{t("{n} open", { n: openTasks.length })}</span>
                   {((groupedOpenTasks.find(g => g.isCurrentUser)?.tasks.length) ?? 0) > 3 && (
                     <button
                       onClick={() => setExpandAllTasks(!expandAllTasks)}
                       className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 transition"
                     >
-                      {expandAllTasks ? "Show less" : "Show all"}
+                      {expandAllTasks ? t("Show less") : t("Show all")}
                     </button>
                   )}
                   <button
                     onClick={() => setActiveForm(activeForm === "task" ? null : "task")}
                     className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
                   >
-                    {activeForm === "task" ? "Cancel" : "+ New goal"}
+                    {activeForm === "task" ? t("Cancel") : t("+ New goal")}
                   </button>
                   <Link
                     href={workerGoalsHref}
                     className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
                   >
-                    Worker view
+                    {t("Worker view")}
                   </Link>
                 </div>
               </div>
 
               <div className="mt-5 space-y-6">
                 {openTasks.length === 0 ? (
-                  <p className="text-sm text-zinc-500">No open tasks.</p>
+                  <p className="text-sm text-zinc-500">{t("No open tasks.")}</p>
                 ) : (
                   displayedTaskGroups.map((group) => (
                     <div key={group.key}>
                       <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
-                        {group.label}
+                        {t(group.label)}
                         <span className="ml-2 text-xs font-normal">({group.tasks.length}{!expandAllTasks && group.isCurrentUser && group.tasks.length < groupedOpenTasks.find(g => g.isCurrentUser)?.tasks.length! ? `/${groupedOpenTasks.find(g => g.isCurrentUser)?.tasks.length}` : ''})</span>
                       </h3>
                       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -2116,13 +2160,13 @@ export default function FarmPage() {
                               value={editingTaskForm.title}
                               onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, title: e.target.value } : prev)}
                               className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
-                              placeholder="Goal title"
+                              placeholder={t("Goal title")}
                             />
                             <textarea
                               value={editingTaskForm.description}
                               onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, description: e.target.value } : prev)}
                               className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
-                              placeholder="Description"
+                              placeholder={t("Description")}
                               rows={2}
                             />
                             <div className="grid grid-cols-2 gap-2">
@@ -2131,19 +2175,19 @@ export default function FarmPage() {
                                 onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, status: e.target.value } : prev)}
                                 className="rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                               >
-                                <option value="todo">todo</option>
-                                <option value="in_progress">in_progress</option>
-                                <option value="done">done</option>
+                                <option value="todo">{t("todo")}</option>
+                                <option value="in_progress">{t("in_progress")}</option>
+                                <option value="done">{t("done")}</option>
                               </select>
                               <select
                                 value={editingTaskForm.priority}
                                 onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, priority: e.target.value } : prev)}
                                 className="rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                               >
-                                <option value="low">low</option>
-                                <option value="medium">medium</option>
-                                <option value="high">high</option>
-                                <option value="urgent">urgent</option>
+                                <option value="low">{t("low")}</option>
+                                <option value="medium">{t("medium")}</option>
+                                <option value="high">{t("high")}</option>
+                                <option value="urgent">{t("urgent")}</option>
                               </select>
                             </div>
                             <select
@@ -2151,9 +2195,9 @@ export default function FarmPage() {
                               onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, goal_timeframe: e.target.value as typeof prev.goal_timeframe } : prev)}
                               className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                             >
-                              <option value="month">Month goal</option>
-                              <option value="year">Year goal</option>
-                              <option value="3year">3-year goal</option>
+                              <option value="month">{t("Month goal")}</option>
+                              <option value="year">{t("Year goal")}</option>
+                              <option value="3year">{t("3-year goal")}</option>
                             </select>
                             <div className="grid grid-cols-2 gap-2">
                               <select
@@ -2161,7 +2205,7 @@ export default function FarmPage() {
                                 onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, zone_id: e.target.value } : prev)}
                                 className="rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                               >
-                                <option value="">No bed</option>
+                                <option value="">{t("No bed")}</option>
                                 {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
                               </select>
                               <select
@@ -2169,7 +2213,7 @@ export default function FarmPage() {
                                 onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, crop_id: e.target.value } : prev)}
                                 className="rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                               >
-                                <option value="">General goal</option>
+                                <option value="">{t("General goal")}</option>
                                 {crops.map((c) => <option key={c.id} value={c.id}>{c.crop_name}{c.variety ? ` · ${c.variety}` : ""}</option>)}
                               </select>
                             </div>
@@ -2178,7 +2222,7 @@ export default function FarmPage() {
                               onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, assigned_to: e.target.value } : prev)}
                               className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                             >
-                              <option value="">Unassigned</option>
+                              <option value="">{t("Unassigned")}</option>
                               {members.map((m) => <option key={m.profile_id} value={m.profile_id}>{m.user_email ?? m.profile_id}</option>)}
                             </select>
                             <input
@@ -2193,7 +2237,7 @@ export default function FarmPage() {
                                 checked={editingTaskForm.proof_required}
                                 onChange={(e) => setEditingTaskForm((prev) => prev ? { ...prev, proof_required: e.target.checked } : prev)}
                               />
-                              Photo proof required
+                              {t("Photo proof required")}
                             </label>
                             <div className="flex gap-2">
                               <button
@@ -2201,13 +2245,13 @@ export default function FarmPage() {
                                 disabled={isSaving || !editingTaskForm.title.trim()}
                                 className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60"
                               >
-                                {isSaving ? "Saving..." : "Save"}
+                                {isSaving ? t("Saving...") : t("Save")}
                               </button>
                               <button
                                 onClick={() => { setEditingTaskId(null); setEditingTaskForm(null); }}
                                 className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
                               >
-                                Cancel
+                                {t("Cancel")}
                               </button>
                             </div>
                           </div>
@@ -2215,19 +2259,19 @@ export default function FarmPage() {
                           <>
                             <div className="flex flex-wrap items-center gap-2">
                               <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass(task.status)}`}>
-                                {task.status}
+                                {t(task.status ?? "")}
                               </span>
                               <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
-                                {task.priority}
+                                {t(task.priority ?? "")}
                               </span>
                               {isToday ? (
                                 <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
-                                  today
+                                  {t("today")}
                                 </span>
                               ) : null}
                               {task.proof_required ? (
                                 <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
-                                  photo proof
+                                  {t("photo proof")}
                                 </span>
                               ) : null}
                             </div>
@@ -2235,9 +2279,9 @@ export default function FarmPage() {
                             <h3 className="mt-3 text-base font-semibold">{task.title}</h3>
 
                             <div className="mt-2 text-sm text-zinc-600">
-                              {task.zone?.[0]?.name ?? "No bed"}
+                              {task.zone?.[0]?.name ?? t("No bed")}
                               <span className="mx-2">·</span>
-                              {task.crop?.[0]?.crop_name ?? "General goal"}
+                              {task.crop?.[0]?.crop_name ?? t("General goal")}
                               <span className="mx-2">·</span>
                               {formatDate(task.due_date)}
                             </div>
@@ -2256,7 +2300,7 @@ export default function FarmPage() {
                                 disabled={isCompleting || isDeleting}
                                 className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                               >
-                                {isCompleting ? "Completing..." : "Mark done"}
+                                {isCompleting ? t("Completing...") : t("Mark done")}
                               </button>
                               <button
                                 onClick={() => {
@@ -2277,14 +2321,14 @@ export default function FarmPage() {
                                 disabled={isCompleting || isDeleting}
                                 className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-60"
                               >
-                                Edit
+                                {t("Edit")}
                               </button>
                               <button
                                 onClick={() => handleDeleteTask(task.id)}
                                 disabled={isCompleting || isDeleting}
                                 className="rounded-2xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
                               >
-                                {isDeleting ? "Deleting..." : "Delete"}
+                                {isDeleting ? t("Deleting...") : t("Delete")}
                               </button>
                             </div>
                           </>
@@ -2302,16 +2346,16 @@ export default function FarmPage() {
             <section className="mb-6 rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-base font-semibold">Longer-term goals</h2>
+                  <h2 className="text-base font-semibold">{t("Longer-term goals")}</h2>
                   <p className="mt-1 text-sm text-zinc-500">
-                    {yearGoals.length} year goal{yearGoals.length === 1 ? "" : "s"} · {threeYearGoals.length} 3-year goal{threeYearGoals.length === 1 ? "" : "s"}
+                    {yearGoals.length === 1 ? t("1 year goal") : t("{n} year goals", { n: yearGoals.length })} · {threeYearGoals.length === 1 ? t("1 3-year goal") : t("{n} 3-year goals", { n: threeYearGoals.length })}
                   </p>
                 </div>
                 <Link
                   href={workerGoalsHref}
                   className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
                 >
-                  View year & 3-year goals
+                  {t("View year & 3-year goals")}
                 </Link>
               </div>
 
@@ -2329,7 +2373,7 @@ export default function FarmPage() {
                             : "bg-purple-100 text-purple-700"
                         }`}
                       >
-                        {task.goal_timeframe === "year" ? "Year" : "3-Year"}
+                        {task.goal_timeframe === "year" ? t("Year") : t("3-Year")}
                       </span>
                       <span className="min-w-0 flex-1 break-words text-sm font-medium text-zinc-800">
                         {task.title}
@@ -2341,16 +2385,16 @@ export default function FarmPage() {
                       )}
                       {task.assigned_to && (
                         <span className="rounded-full bg-white px-2 py-0.5 text-[11px] text-indigo-600 ring-1 ring-indigo-100">
-                          {memberEmailMap[task.assigned_to] ?? "Assigned"}
+                          {memberEmailMap[task.assigned_to] ?? t("Assigned")}
                         </span>
                       )}
                     </li>
                   ))}
                   {longTermOpen.length > 6 && (
                     <li className="px-1 pt-1 text-xs text-zinc-500">
-                      + {longTermOpen.length - 6} more —{" "}
+                      {t("+ {n} more —", { n: longTermOpen.length - 6 })}{" "}
                       <Link href={workerGoalsHref} className="font-medium text-zinc-700 underline">
-                        view all
+                        {t("view all")}
                       </Link>
                     </li>
                   )}
@@ -2364,16 +2408,16 @@ export default function FarmPage() {
                 className="flex w-full items-center justify-between gap-4 text-left"
               >
                 <div>
-                  <h2 className="text-xl font-semibold">Completed goals</h2>
-                  <p className="mt-1 text-sm text-zinc-500">{completedTasks.length} done or cancelled</p>
+                  <h2 className="text-xl font-semibold">{t("Completed goals")}</h2>
+                  <p className="mt-1 text-sm text-zinc-500">{t("{n} done or cancelled", { n: completedTasks.length })}</p>
                 </div>
-                <span className="text-sm text-zinc-500">{showCompleted ? "Hide" : "Show"}</span>
+                <span className="text-sm text-zinc-500">{showCompleted ? t("Hide") : t("Show")}</span>
               </button>
 
               {showCompleted ? (
                 <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {completedTasks.length === 0 ? (
-                    <p className="text-sm text-zinc-500">No completed tasks yet.</p>
+                    <p className="text-sm text-zinc-500">{t("No completed tasks yet.")}</p>
                   ) : (
                     completedTasks.map((task) => {
                       const isDeleting = deletingTaskId === task.id;
@@ -2381,19 +2425,19 @@ export default function FarmPage() {
                         <div key={task.id} className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass(task.status)}`}>
-                              {task.status}
+                              {t(task.status ?? "")}
                             </span>
                             <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-500">
-                              {task.priority}
+                              {t(task.priority ?? "")}
                             </span>
                           </div>
 
                           <h3 className="mt-3 text-base font-medium text-zinc-600 line-through">{task.title}</h3>
 
                           <div className="mt-2 text-sm text-zinc-400">
-                            {task.zone?.[0]?.name ?? "No bed"}
+                            {task.zone?.[0]?.name ?? t("No bed")}
                             <span className="mx-2">·</span>
-                            {task.crop?.[0]?.crop_name ?? "General goal"}
+                            {task.crop?.[0]?.crop_name ?? t("General goal")}
                             <span className="mx-2">·</span>
                             {formatDate(task.due_date)}
                           </div>
@@ -2408,7 +2452,7 @@ export default function FarmPage() {
                               disabled={isDeleting}
                               className="rounded-2xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
                             >
-                              {isDeleting ? "Deleting..." : "Delete"}
+                              {isDeleting ? t("Deleting...") : t("Delete")}
                             </button>
                           </div>
                         </div>
@@ -2422,10 +2466,10 @@ export default function FarmPage() {
             <section id="map" className="mb-6 scroll-mt-4 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-semibold">Beds map</h2>
-                  <p className="mt-1 text-sm text-zinc-500">Planting areas and what is growing in each.</p>
+                  <h2 className="text-xl font-semibold">{t("Beds map")}</h2>
+                  <p className="mt-1 text-sm text-zinc-500">{t("Planting areas and what is growing in each.")}</p>
                 </div>
-                <span className="text-sm text-zinc-500">{zones.length} mapped beds</span>
+                <span className="text-sm text-zinc-500">{t("{n} mapped beds", { n: zones.length })}</span>
               </div>
               <div className="mt-5">
                 <FarmMap
@@ -2449,8 +2493,7 @@ export default function FarmPage() {
                   }}
                 />
                 <p className="mt-2 text-xs text-zinc-400">
-                  Click a bed to see details, add crops, or quickly log fertiliser, compost, mulch,
-                  and pest control. The red dot on a bed counts its pest control treatments.
+                  {t("Click a bed to see details, add crops, or quickly log fertiliser, compost, mulch, and pest control. The red dot on a bed counts its pest control treatments.")}
                 </p>
               </div>
             </section>
@@ -2460,34 +2503,34 @@ export default function FarmPage() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between gap-4">
                       <div>
-                        <h2 className="text-xl font-semibold">Crop tracker</h2>
+                        <h2 className="text-xl font-semibold">{t("Crop tracker")}</h2>
                         <p className="mt-1 text-sm text-zinc-500">
-                          What is planted, where it is, and how much it is really yielding.
+                          {t("What is planted, where it is, and how much it is really yielding.")}
                         </p>
                         {selectedMapBedId ? (
                           <p className="mt-2 text-xs text-emerald-700">
-                            Bed {selectedMapBedId} selected{selectedMapZone ? ` · mapped bed ${selectedMapZone.name}` : " · bed not mapped yet"}.
+                            {t("Bed {bed} selected", { bed: selectedMapBedId })}{selectedMapZone ? t(" · mapped bed {name}", { name: selectedMapZone.name }) : t(" · bed not mapped yet")}.
                           </p>
                         ) : null}
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-zinc-500">{filteredCrops.length} of {crops.length} crops</span>
+                        <span className="text-sm text-zinc-500">{t("{shown} of {total} crops", { shown: filteredCrops.length, total: crops.length })}</span>
                         {filteredCrops.length > 3 && (
                           <button
                             onClick={() => setExpandAllCrops(!expandAllCrops)}
                             className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 transition"
                           >
-                            {expandAllCrops ? "Show less" : "Show all"}
+                            {expandAllCrops ? t("Show less") : t("Show all")}
                           </button>
                         )}
                         <Link
                           href={withFarmContext("/crops")}
-                          title="Open crops photo gallery"
-                          aria-label="Open crops photo gallery"
+                          title={t("Open crops photo gallery")}
+                          aria-label={t("Open crops photo gallery")}
                           className="flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100"
                         >
                           <Images size={14} />
-                          Gallery
+                          {t("Gallery")}
                         </Link>
                       </div>
                     </div>
@@ -2496,7 +2539,7 @@ export default function FarmPage() {
                         type="text"
                         value={cropSearch}
                         onChange={(e) => setCropSearch(e.target.value)}
-                        placeholder="Search crops, variety, status, or bed…"
+                        placeholder={t("Search crops, variety, status, or bed…")}
                         className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                       />
                       {cropSearch ? (
@@ -2505,7 +2548,7 @@ export default function FarmPage() {
                           onClick={() => setCropSearch("")}
                           className="rounded-xl border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-100"
                         >
-                          Clear
+                          {t("Clear")}
                         </button>
                       ) : null}
                     </div>
@@ -2516,20 +2559,20 @@ export default function FarmPage() {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-zinc-200 bg-zinc-50 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                            <th className="px-4 py-3 text-left">Crop</th>
-                            <th className="px-4 py-3 text-left">Bed</th>
-                            <th className="px-4 py-3 text-left">Status</th>
-                            <th className="px-4 py-3 text-left">Planted</th>
-                            <th className="px-4 py-3 text-left">Harvest</th>
-                            <th className="px-4 py-3 text-left">Yield</th>
+                            <th className="px-4 py-3 text-left">{t("Crop")}</th>
+                            <th className="px-4 py-3 text-left">{t("Bed")}</th>
+                            <th className="px-4 py-3 text-left">{t("Status")}</th>
+                            <th className="px-4 py-3 text-left">{t("Planted")}</th>
+                            <th className="px-4 py-3 text-left">{t("Harvest")}</th>
+                            <th className="px-4 py-3 text-left">{t("Yield")}</th>
                             <th className="px-4 py-3" />
                           </tr>
                         </thead>
                         <tbody>
                           {crops.length === 0 ? (
-                            <tr><td colSpan={7} className="px-4 py-6 text-zinc-500">No crops yet.</td></tr>
+                            <tr><td colSpan={7} className="px-4 py-6 text-zinc-500">{t("No crops yet.")}</td></tr>
                           ) : filteredCrops.length === 0 ? (
-                            <tr><td colSpan={7} className="px-4 py-6 text-zinc-500">No crops match your search.</td></tr>
+                            <tr><td colSpan={7} className="px-4 py-6 text-zinc-500">{t("No crops match your search.")}</td></tr>
                           ) : (
                             visibleCrops.map((crop) =>
                               editingCropId === crop.id ? (
@@ -2538,7 +2581,7 @@ export default function FarmPage() {
                                     <input type="text" value={editingCropForm.crop_name}
                                       onChange={(e) => setEditingCropForm((p) => ({ ...p, crop_name: e.target.value }))}
                                       className="w-full min-w-[100px] rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
-                                    <input type="text" value={editingCropForm.variety} placeholder="Variety"
+                                    <input type="text" value={editingCropForm.variety} placeholder={t("Variety")}
                                       onChange={(e) => setEditingCropForm((p) => ({ ...p, variety: e.target.value }))}
                                       className="mt-1 w-full min-w-[100px] rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
                                   </td>
@@ -2553,7 +2596,7 @@ export default function FarmPage() {
                                               return { ...p, zone_ids: next };
                                             })}
                                             className="flex-1 rounded-xl border border-zinc-300 px-3 py-2 text-base sm:text-sm outline-none focus:border-zinc-900">
-                                            <option value="">Select bed</option>
+                                            <option value="">{t("Select bed")}</option>
                                             {zones.map((z) => (
                                               <option key={z.id} value={z.id}
                                                 disabled={editingCropForm.zone_ids.includes(z.id) && z.id !== zid}>
@@ -2570,7 +2613,7 @@ export default function FarmPage() {
                                       {editingCropForm.zone_ids.length < zones.length && (
                                         <button type="button" onClick={() => setEditingCropForm((p) => ({ ...p, zone_ids: [...p.zone_ids, ""] }))}
                                           className="flex items-center gap-1 rounded-lg border border-dashed border-zinc-300 px-2 py-2 sm:py-1 text-sm sm:text-xs text-zinc-500 hover:border-zinc-400 hover:text-zinc-700">
-                                          <Plus size={16} className="sm:w-3 sm:h-3" /> {editingCropForm.zone_ids.length === 0 ? "Add bed" : "Add bed"}
+                                          <Plus size={16} className="sm:w-3 sm:h-3" /> {editingCropForm.zone_ids.length === 0 ? t("Add bed") : t("Add bed")}
                                         </button>
                                       )}
                                     </div>
@@ -2579,11 +2622,11 @@ export default function FarmPage() {
                                     <select value={editingCropForm.status}
                                       onChange={(e) => setEditingCropForm((p) => ({ ...p, status: e.target.value }))}
                                       className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900">
-                                      <option value="planned">planned</option>
-                                      <option value="planted">planted</option>
-                                      <option value="germinating">germinating</option>
-                                      <option value="growing">growing</option>
-                                      <option value="harvest_ready">harvest_ready</option>
+                                      <option value="planned">{t("planned")}</option>
+                                      <option value="planted">{t("planted")}</option>
+                                      <option value="germinating">{t("germinating")}</option>
+                                      <option value="growing">{t("growing")}</option>
+                                      <option value="harvest_ready">{t("harvest_ready")}</option>
                                     </select>
                                   </td>
                                   <td className="px-3 py-2">
@@ -2597,27 +2640,27 @@ export default function FarmPage() {
                                       className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
                                   </td>
                                   <td className="px-3 py-2">
-                                    <input type="number" step="0.01" value={editingCropForm.estimated_yield_kg} placeholder="kg"
+                                    <input type="number" step="0.01" value={editingCropForm.estimated_yield_kg} placeholder={t("kg")}
                                       onChange={(e) => setEditingCropForm((p) => ({ ...p, estimated_yield_kg: e.target.value }))}
                                       className="w-full min-w-[70px] rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
                                   </td>
                                   <td className="px-3 py-2" colSpan={2}>
                                     <div className="space-y-2">
-                                      <label className="block text-xs font-medium text-zinc-500">Notes</label>
+                                      <label className="block text-xs font-medium text-zinc-500">{t("Notes")}</label>
                                       <textarea
                                         value={editingCropForm.notes}
                                         onChange={(e) => setEditingCropForm((p) => ({ ...p, notes: e.target.value }))}
                                         className="min-h-[60px] w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
-                                        placeholder="Growing conditions, observations…"
+                                        placeholder={t("Growing conditions, observations…")}
                                       />
-                                      <label className="block text-xs font-medium text-zinc-500">Medicinal properties</label>
+                                      <label className="block text-xs font-medium text-zinc-500">{t("Medicinal properties")}</label>
                                       <textarea
                                         value={editingCropForm.medicinal_properties}
                                         onChange={(e) => setEditingCropForm((p) => ({ ...p, medicinal_properties: e.target.value }))}
                                         className="min-h-[60px] w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
-                                        placeholder="Known medicinal uses, healing properties…"
+                                        placeholder={t("Known medicinal uses, healing properties…")}
                                       />
-                                      <label className="block text-xs font-medium text-zinc-500">Photo</label>
+                                      <label className="block text-xs font-medium text-zinc-500">{t("Photo")}</label>
                                       <input
                                         type="file"
                                         accept="image/*"
@@ -2627,18 +2670,18 @@ export default function FarmPage() {
                                       {cropImagePreview && (
                                         <img
                                           src={cropImagePreview}
-                                          alt="Preview"
+                                          alt={t("Preview")}
                                           className="mt-2 h-24 w-full rounded-lg object-cover"
                                         />
                                       )}
                                       <div className="flex gap-1">
                                         <button onClick={() => handleSaveCrop(crop.id)} disabled={savingCropId === crop.id}
                                           className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-60">
-                                          {savingCropId === crop.id ? "\u2026" : "Save"}
+                                          {savingCropId === crop.id ? "\u2026" : t("Save")}
                                         </button>
                                         <button onClick={() => setEditingCropId(null)}
                                           className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100">
-                                          Cancel
+                                          {t("Cancel")}
                                         </button>
                                       </div>
                                     </div>
@@ -2662,24 +2705,24 @@ export default function FarmPage() {
                                     </div>
                                     {(crop.notes || crop.medicinal_properties) && expandedCropId !== crop.id && (
                                       <div className="mt-1 ml-5 space-y-0.5">
-                                        {crop.notes && <div className="text-xs text-zinc-400 truncate max-w-[180px]">📝 Has notes</div>}
+                                        {crop.notes && <div className="text-xs text-zinc-400 truncate max-w-[180px]">📝 {t("Has notes")}</div>}
                                         {crop.medicinal_properties && <div className="text-xs text-emerald-600 truncate max-w-[180px]">🌿 {crop.medicinal_properties}</div>}
                                       </div>
                                     )}
                                   </td>
                                   <td className="px-4 py-4">{
                                     crop.zone_ids?.length
-                                      ? crop.zone_ids.map((zid) => zones.find((z) => z.id === zid)?.name).filter(Boolean).join(", ") || "Unknown bed"
-                                      : crop.zone?.[0]?.name || (crop.zone_id ? zones.find((z) => z.id === crop.zone_id)?.name ?? "Unknown bed" : "No bed")
+                                      ? crop.zone_ids.map((zid) => zones.find((z) => z.id === zid)?.name).filter(Boolean).join(", ") || t("Unknown bed")
+                                      : crop.zone?.[0]?.name || (crop.zone_id ? zones.find((z) => z.id === crop.zone_id)?.name ?? t("Unknown bed") : t("No bed"))
                                   }</td>
                                   <td className="px-4 py-4">
                                     <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass(crop.status)}`}>
-                                      {crop.status}
+                                      {t(crop.status ?? "")}
                                     </span>
                                   </td>
                                   <td className="px-4 py-4">{formatDate(crop.planted_on)}</td>
                                   <td className="px-4 py-4">{formatDate(crop.expected_harvest_start)}</td>
-                                  <td className="px-4 py-4">{crop.actual_yield_kg ?? 0} kg</td>
+                                  <td className="px-4 py-4">{crop.actual_yield_kg ?? 0} {t("kg")}</td>
                                   <td className="px-4 py-4">
                                     <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                                       {selectedMapZoneId ? (
@@ -2688,16 +2731,16 @@ export default function FarmPage() {
                                           disabled={assigningCropId === crop.id}
                                           className="rounded-lg border border-emerald-200 px-2.5 py-1 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
                                         >
-                                          {assigningCropId === crop.id ? "Assigning…" : `Assign to ${selectedMapBedId || "bed"}`}
+                                          {assigningCropId === crop.id ? t("Assigning…") : t("Assign to {bed}", { bed: selectedMapBedId || t("bed") })}
                                         </button>
                                       ) : null}
                                       <button onClick={() => startEditCrop(crop)}
                                         className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">
-                                        Edit
+                                        {t("Edit")}
                                       </button>
                                       <button onClick={() => handleDeleteCrop(crop.id)} disabled={deletingCropId === crop.id}
                                         className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">
-                                        {deletingCropId === crop.id ? "\u2026" : "Del"}
+                                        {deletingCropId === crop.id ? "\u2026" : t("Del")}
                                       </button>
                                     </div>
                                   </td>
@@ -2706,31 +2749,31 @@ export default function FarmPage() {
                                   <tr className="border-b border-zinc-100 bg-zinc-50/60">
                                     <td colSpan={7} className="px-4 py-4">
                                       <div className="ml-5 space-y-3">
-                                        <label className="block text-sm font-medium text-zinc-700">Notes</label>
+                                        <label className="block text-sm font-medium text-zinc-700">{t("Notes")}</label>
                                         <textarea
                                           value={cropNoteText}
                                           onChange={(e) => setCropNoteText(e.target.value)}
                                           className="min-h-[100px] w-full max-w-lg rounded-2xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-900"
-                                          placeholder="Add notes — growing conditions, observations…"
+                                          placeholder={t("Add notes — growing conditions, observations…")}
                                         />
-                                        <label className="block text-sm font-medium text-zinc-700">Medicinal properties</label>
+                                        <label className="block text-sm font-medium text-zinc-700">{t("Medicinal properties")}</label>
                                         <textarea
                                           value={cropMedicinalText}
                                           onChange={(e) => setCropMedicinalText(e.target.value)}
                                           className="min-h-[80px] w-full max-w-lg rounded-2xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-900"
-                                          placeholder="Known medicinal uses, healing properties…"
+                                          placeholder={t("Known medicinal uses, healing properties…")}
                                         />
                                         <div className="flex gap-2">
                                           <button
                                             onClick={() => handleSaveCropNote(crop.id)}
                                             disabled={savingCropNote}
                                             className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-60">
-                                            {savingCropNote ? "Saving…" : "Save note"}
+                                            {savingCropNote ? t("Saving…") : t("Save note")}
                                           </button>
                                           <button
                                             onClick={() => { setExpandedCropId(null); setCropNoteText(""); }}
                                             className="rounded-xl border border-zinc-200 px-4 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-100">
-                                            Close
+                                            {t("Close")}
                                           </button>
                                         </div>
                                       </div>
@@ -2754,17 +2797,17 @@ export default function FarmPage() {
                     className="flex w-full items-center justify-between gap-4 text-left"
                   >
                     <div>
-                      <h2 className="text-xl font-semibold">Assets</h2>
-                      <p className="mt-1 text-sm text-zinc-500">{assets.length} logged</p>
+                      <h2 className="text-xl font-semibold">{t("Assets")}</h2>
+                      <p className="mt-1 text-sm text-zinc-500">{t("{n} logged", { n: assets.length })}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <button
                         onClick={(e) => { e.stopPropagation(); setActiveForm(activeForm === "asset" ? null : "asset"); }}
                         className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
                       >
-                        {activeForm === "asset" ? "Cancel" : "+ Log asset"}
+                        {activeForm === "asset" ? t("Cancel") : t("+ Log asset")}
                       </button>
-                      <span className="text-sm text-zinc-500">{showAssets ? "Hide" : "Show"}</span>
+                      <span className="text-sm text-zinc-500">{showAssets ? t("Hide") : t("Show")}</span>
                     </div>
                   </button>
 
@@ -2783,15 +2826,15 @@ export default function FarmPage() {
                   {showAssets ? (
                   <div className="mt-5 overflow-hidden rounded-2xl border border-zinc-200">
                     <div className="grid grid-cols-5 gap-4 border-b border-zinc-200 bg-zinc-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                      <div>Name</div>
-                      <div>Category</div>
-                      <div>Paid by</div>
-                      <div>Price</div>
-                      <div>Condition</div>
+                      <div>{t("Name")}</div>
+                      <div>{t("Category")}</div>
+                      <div>{t("Paid by")}</div>
+                      <div>{t("Price")}</div>
+                      <div>{t("Condition")}</div>
                     </div>
 
                     {assets.length === 0 ? (
-                      <div className="px-4 py-6 text-sm text-zinc-500">No assets logged yet.</div>
+                      <div className="px-4 py-6 text-sm text-zinc-500">{t("No assets logged yet.")}</div>
                     ) : (
                       assets.map((asset) => (
                         <div
@@ -2804,10 +2847,10 @@ export default function FarmPage() {
                               <div className="text-zinc-500">{asset.notes}</div>
                             ) : null}
                           </div>
-                          <div className="capitalize">{asset.category}</div>
+                          <div className="capitalize">{t(asset.category)}</div>
                           <div>{asset.paid_by ?? "—"}</div>
                           <div>{asset.purchase_price ? formatMoney(asset.purchase_price) : "—"}</div>
-                          <div className="capitalize">{asset.condition ?? "—"}</div>
+                          <div className="capitalize">{asset.condition ? t(asset.condition) : "—"}</div>
                         </div>
                       ))
                     )}
@@ -2819,31 +2862,31 @@ export default function FarmPage() {
                 <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                   <div className="flex items-center justify-between gap-4">
                     <div>
-                      <h2 className="text-xl font-semibold">New plants added</h2>
+                      <h2 className="text-xl font-semibold">{t("New plants added")}</h2>
                       <p className="mt-1 text-sm text-zinc-500">
-                        Recently added to the plants gallery.
+                        {t("Recently added to the plants gallery.")}
                       </p>
                     </div>
                     <Link href={withFarmContext("/plants")} className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100">
-                      View all
+                      {t("View all")}
                     </Link>
                   </div>
 
                   {plants.length === 0 ? (
-                    <div className="mt-5 rounded-2xl border border-zinc-200 px-4 py-6 text-sm text-zinc-500">No plants added yet.</div>
+                    <div className="mt-5 rounded-2xl border border-zinc-200 px-4 py-6 text-sm text-zinc-500">{t("No plants added yet.")}</div>
                   ) : (
                     <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                       {plants.slice(0, 8).map((plant) => (
                         <Link key={plant.id} href={withFarmContext("/plants")} className="group overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm transition hover:shadow-md">
                           {plant.image_url ? (
-                            <img src={plant.image_url} alt={plant.name ?? "Plant"} className="aspect-square w-full object-cover" />
+                            <img src={plant.image_url} alt={plant.name ?? t("Plant")} className="aspect-square w-full object-cover" />
                           ) : (
                             <div className="flex aspect-square w-full items-center justify-center bg-zinc-100">
                               <span className="text-2xl text-zinc-300">🌱</span>
                             </div>
                           )}
                           <div className="p-3">
-                            <div className="text-sm font-medium truncate">{plant.name ?? "Unnamed"}</div>
+                            <div className="text-sm font-medium truncate">{plant.name ?? t("Unnamed")}</div>
                             {plant.notes && <p className="mt-0.5 text-xs text-zinc-400 line-clamp-1">{plant.notes}</p>}
                           </div>
                         </Link>
@@ -2855,20 +2898,20 @@ export default function FarmPage() {
                 <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                   <div className="flex items-center justify-between gap-4">
                     <div>
-                      <h2 className="text-xl font-semibold">Pest log</h2>
+                      <h2 className="text-xl font-semibold">{t("Pest log")}</h2>
                       <p className="mt-1 text-sm text-zinc-500">
-                        Issues spotted and actions taken. Sprays and treatments live in the{" "}
+                        {t("Issues spotted and actions taken. Sprays and treatments live in the")}{" "}
                         <Link href={withFarmContext("/farm/pest-control")} className="underline hover:text-zinc-700">
-                          pest control log
+                          {t("pest control log")}
                         </Link>
                         .
                       </p>
                     </div>
-                    <span className="text-sm text-zinc-500">{pests.length} logged</span>
+                    <span className="text-sm text-zinc-500">{t("{n} logged", { n: pests.length })}</span>
                   </div>
 
                   {pests.length === 0 ? (
-                    <div className="mt-5 rounded-2xl border border-zinc-200 px-4 py-6 text-sm text-zinc-500">No pest issues logged yet.</div>
+                    <div className="mt-5 rounded-2xl border border-zinc-200 px-4 py-6 text-sm text-zinc-500">{t("No pest issues logged yet.")}</div>
                   ) : (
                     <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                       {pests.map((pest) => {
@@ -2882,7 +2925,7 @@ export default function FarmPage() {
                                 zones={zones}
                                 crops={crops}
                                 defaultZoneId=""
-                                submitLabel="Save changes"
+                                submitLabel={t("Save changes")}
                                 initialData={{
                                   pest_name: pest.pest_name,
                                   severity: pest.severity,
@@ -2900,7 +2943,7 @@ export default function FarmPage() {
                                 onClick={() => setEditingPestId(null)}
                                 className="mt-2 rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
                               >
-                                Cancel
+                                {t("Cancel")}
                               </button>
                             </div>
                           );
@@ -2928,7 +2971,7 @@ export default function FarmPage() {
                                     ? "bg-amber-100 text-amber-700"
                                     : "bg-emerald-100 text-emerald-700"
                                 }`}>
-                                  {pest.severity}
+                                  {t(pest.severity)}
                                 </span>
                               </div>
                               <div className="mt-1 text-xs text-zinc-400">
@@ -2937,13 +2980,13 @@ export default function FarmPage() {
                                 {pest.crop?.[0]?.crop_name ?? ""}{pest.crop?.[0]?.crop_name && pest.zone?.[0]?.name ? " · " : ""}{pest.zone?.[0]?.name ?? ""}
                               </div>
                               {pest.description && <p className="mt-1 text-xs text-zinc-500 line-clamp-2">{pest.description}</p>}
-                              {pest.action_taken && <p className="mt-1 text-xs text-zinc-400 line-clamp-2">Action: {pest.action_taken}</p>}
+                              {pest.action_taken && <p className="mt-1 text-xs text-zinc-400 line-clamp-2">{t("Action:")} {pest.action_taken}</p>}
                               <div className="mt-2 flex gap-1">
                                 <button
                                   onClick={() => setEditingPestId(pest.id)}
                                   className="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] font-medium text-zinc-600 hover:bg-zinc-50"
                                 >
-                                  Edit
+                                  {t("Edit")}
                                 </button>
                                 {confirmDeletePestId === pest.id ? (
                                   <button
@@ -2951,14 +2994,14 @@ export default function FarmPage() {
                                     disabled={isDeleting}
                                     className="rounded-lg bg-rose-600 px-2 py-1 text-[10px] font-medium text-white hover:bg-rose-700 disabled:opacity-60"
                                   >
-                                    {isDeleting ? "…" : "Confirm"}
+                                    {isDeleting ? "…" : t("Confirm")}
                                   </button>
                                 ) : (
                                   <button
                                     onClick={() => setConfirmDeletePestId(pest.id)}
                                     className="rounded-lg border border-rose-200 px-2 py-1 text-[10px] font-medium text-rose-600 hover:bg-rose-50"
                                   >
-                                    Delete
+                                    {t("Delete")}
                                   </button>
                                 )}
                               </div>
@@ -2977,42 +3020,42 @@ export default function FarmPage() {
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
-                    Total sales
+                    {t("Total sales")}
                   </p>
                   <p className="mt-3 text-3xl font-semibold">{formatMoney(totalSales)}</p>
-                  <p className="mt-1 text-xs text-zinc-400">Actual revenue from logged sales</p>
+                  <p className="mt-1 text-xs text-zinc-400">{t("Actual revenue from logged sales")}</p>
                 </div>
                 <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
-                    Total expenses
+                    {t("Total expenses")}
                   </p>
                   <p className="mt-3 text-3xl font-semibold">{formatMoney(totalExpenses)}</p>
                   <p className="mt-1 text-xs text-zinc-400">
-                    Net: {formatMoney(totalSales - totalExpenses)}
+                    {t("Net: {amount}", { amount: formatMoney(totalSales - totalExpenses) })}
                   </p>
                 </div>
                 <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
-                    Expected income
+                    {t("Expected income")}
                   </p>
                   <p className="mt-3 text-3xl font-semibold">{formatMoney(forecastRevenue)}</p>
-                  <p className="mt-1 text-xs text-zinc-400">Based on estimated yield × price per kg</p>
+                  <p className="mt-1 text-xs text-zinc-400">{t("Based on estimated yield × price per kg")}</p>
                 </div>
               </div>
 
               <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <h2 className="text-xl font-semibold">Sales</h2>
-                    <p className="mt-1 text-sm text-zinc-500">Most recent 20 sales.</p>
+                    <h2 className="text-xl font-semibold">{t("Sales")}</h2>
+                    <p className="mt-1 text-sm text-zinc-500">{t("Most recent 20 sales.")}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm text-zinc-500">{sales.length} logged</span>
+                    <span className="text-sm text-zinc-500">{t("{n} logged", { n: sales.length })}</span>
                     <button
                       onClick={() => setActiveForm(activeForm === "sale" ? null : "sale")}
                       className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
                     >
-                      {activeForm === "sale" ? "Cancel" : "+ Log sale"}
+                      {activeForm === "sale" ? t("Cancel") : t("+ Log sale")}
                     </button>
                   </div>
                 </div>
@@ -3032,7 +3075,7 @@ export default function FarmPage() {
 
                 <div className="mt-5 space-y-2">
                   {sales.length === 0 ? (
-                    <div className="rounded-2xl border border-zinc-200 px-4 py-6 text-sm text-zinc-500">No sales yet.</div>
+                    <div className="rounded-2xl border border-zinc-200 px-4 py-6 text-sm text-zinc-500">{t("No sales yet.")}</div>
                   ) : (
                     sales.map((sale) => (
                       <div key={sale.id} className="rounded-2xl border border-zinc-200 bg-white">
@@ -3047,12 +3090,12 @@ export default function FarmPage() {
                             </div>
                             {sale.quantity_kg != null && (
                               <p className="mt-1 text-sm text-zinc-600">
-                                {sale.quantity_kg} kg
+                                {sale.quantity_kg} {t("kg")}
                                 {sale.price_per_kg != null ? ` @ ${formatMoney(sale.price_per_kg)}/kg` : ""}
                               </p>
                             )}
                             {sale.notes && <p className="mt-1 text-sm text-zinc-500">{sale.notes}</p>}
-                            <p className="mt-1 text-sm font-semibold">{sale.total_amount != null ? formatMoney(sale.total_amount) : <span className="text-zinc-400 font-normal">Amount TBC</span>}</p>
+                            <p className="mt-1 text-sm font-semibold">{sale.total_amount != null ? formatMoney(sale.total_amount) : <span className="text-zinc-400 font-normal">{t("Amount TBC")}</span>}</p>
                           </div>
                         </div>
                       </div>
@@ -3067,17 +3110,17 @@ export default function FarmPage() {
                   className="flex w-full items-center justify-between gap-4 text-left"
                 >
                   <div>
-                    <h2 className="text-xl font-semibold">Expenses</h2>
-                    <p className="mt-1 text-sm text-zinc-500">{expenses.length} logged</p>
+                    <h2 className="text-xl font-semibold">{t("Expenses")}</h2>
+                    <p className="mt-1 text-sm text-zinc-500">{t("{n} logged", { n: expenses.length })}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <button
                       onClick={(e) => { e.stopPropagation(); setActiveForm(activeForm === "expense" ? null : "expense"); }}
                       className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
                     >
-                      {activeForm === "expense" ? "Cancel" : "+ Log expense"}
+                      {activeForm === "expense" ? t("Cancel") : t("+ Log expense")}
                     </button>
-                    <span className="text-sm text-zinc-500">{showExpenses ? "Hide" : "Show"}</span>
+                    <span className="text-sm text-zinc-500">{showExpenses ? t("Hide") : t("Show")}</span>
                   </div>
                 </button>
 
@@ -3099,7 +3142,7 @@ export default function FarmPage() {
                 {showExpenses ? (
                 <div className="mt-5 space-y-2" id="expenses-list">
                   {expenses.length === 0 ? (
-                    <div className="rounded-2xl border border-zinc-200 px-4 py-6 text-sm text-zinc-500">No expenses yet.</div>
+                    <div className="rounded-2xl border border-zinc-200 px-4 py-6 text-sm text-zinc-500">{t("No expenses yet.")}</div>
                   ) : (
                     expenses.map((expense) => (
                       <div key={expense.id} className="rounded-2xl border border-zinc-200 bg-white">
@@ -3110,43 +3153,43 @@ export default function FarmPage() {
                               crops={crops}
                               defaultZoneId={defaultZoneId}
                               initial={editingExpenseForm}
-                              submitLabel="Save changes"
+                              submitLabel={t("Save changes")}
                               onSubmit={async (data) => handleUpdateExpense(expense.id, data)}
                             />
                             <button
                               onClick={() => { setEditingExpenseId(null); setEditingExpenseForm(null); }}
                               className="mt-2 text-sm text-zinc-500 hover:text-zinc-800"
                             >
-                              Cancel
+                              {t("Cancel")}
                             </button>
                           </div>
                         ) : (
                           <div className="flex items-start justify-between gap-3 px-4 py-4">
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium capitalize text-zinc-700">{expense.category}</span>
+                                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium capitalize text-zinc-700">{t(expense.category)}</span>
                                 <span className="text-xs text-zinc-400">{formatDate(expense.expense_date)}</span>
                                 {expense.vendor_name && <span className="text-xs text-zinc-400">· {expense.vendor_name}</span>}
                               </div>
                               {expense.notes && <p className="mt-1 text-sm text-zinc-700">{expense.notes}</p>}
-                              <p className="mt-1 text-sm font-semibold">{expense.amount != null ? formatMoney(expense.amount) : <span className="text-zinc-400 font-normal">Amount TBC</span>}</p>
+                              <p className="mt-1 text-sm font-semibold">{expense.amount != null ? formatMoney(expense.amount) : <span className="text-zinc-400 font-normal">{t("Amount TBC")}</span>}</p>
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
                               {confirmDeleteExpenseId === expense.id ? (
                                 <>
-                                  <span className="text-xs text-red-600">Sure?</span>
+                                  <span className="text-xs text-red-600">{t("Sure?")}</span>
                                   <button
                                     onClick={() => handleDeleteExpense(expense.id)}
                                     disabled={deletingExpenseId === expense.id}
                                     className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60"
                                   >
-                                    {deletingExpenseId === expense.id ? "Deleting…" : "Yes, delete"}
+                                    {deletingExpenseId === expense.id ? t("Deleting…") : t("Yes, delete")}
                                   </button>
                                   <button
                                     onClick={() => setConfirmDeleteExpenseId(null)}
                                     className="rounded-xl border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
                                   >
-                                    Cancel
+                                    {t("Cancel")}
                                   </button>
                                 </>
                               ) : (
@@ -3166,13 +3209,13 @@ export default function FarmPage() {
                                     }}
                                     className="rounded-xl border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
                                   >
-                                    Edit
+                                    {t("Edit")}
                                   </button>
                                   <button
                                     onClick={() => setConfirmDeleteExpenseId(expense.id)}
                                     className="rounded-xl border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
                                   >
-                                    Delete
+                                    {t("Delete")}
                                   </button>
                                 </>
                               )}
@@ -3192,17 +3235,17 @@ export default function FarmPage() {
                   className="flex w-full items-center justify-between gap-4 text-left"
                 >
                   <div>
-                    <h2 className="text-xl font-semibold">Wants</h2>
-                    <p className="mt-1 text-sm text-zinc-500">{wants.length} on the wishlist</p>
+                    <h2 className="text-xl font-semibold">{t("Wants")}</h2>
+                    <p className="mt-1 text-sm text-zinc-500">{t("{n} on the wishlist", { n: wants.length })}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <button
                       onClick={(e) => { e.stopPropagation(); setActiveForm(activeForm === "want" ? null : "want"); }}
                       className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
                     >
-                      {activeForm === "want" ? "Cancel" : "+ Add want"}
+                      {activeForm === "want" ? t("Cancel") : t("+ Add want")}
                     </button>
-                    <span className="text-sm text-zinc-500">{showWants ? "Hide" : "Show"}</span>
+                    <span className="text-sm text-zinc-500">{showWants ? t("Hide") : t("Show")}</span>
                   </div>
                 </button>
 
@@ -3222,7 +3265,7 @@ export default function FarmPage() {
                   <div className="mt-5 space-y-2">
                     {wants.length === 0 ? (
                       <div className="rounded-2xl border border-zinc-200 px-4 py-6 text-sm text-zinc-500">
-                        Nothing on the wishlist yet. Add something you want.
+                        {t("Nothing on the wishlist yet. Add something you want.")}
                       </div>
                     ) : (
                       wants.map((want) => (
@@ -3231,7 +3274,7 @@ export default function FarmPage() {
                             <div className="font-medium">{want.name}</div>
                             {want.notes && <p className="mt-0.5 text-sm text-zinc-500">{want.notes}</p>}
                             <p className="mt-1 text-sm font-semibold">
-                              {want.price != null ? formatMoney(want.price) : <span className="font-normal text-zinc-400">Price TBC</span>}
+                              {want.price != null ? formatMoney(want.price) : <span className="font-normal text-zinc-400">{t("Price TBC")}</span>}
                             </p>
                           </div>
                           <div className="flex shrink-0 items-center gap-2">
@@ -3239,16 +3282,16 @@ export default function FarmPage() {
                               onClick={() => handleConvertWantToAsset(want)}
                               disabled={convertingWantId === want.id}
                               className="rounded-xl border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
-                              title="Log as an asset and remove from wants"
+                              title={t("Log as an asset and remove from wants")}
                             >
-                              {convertingWantId === want.id ? "Adding…" : "Add as asset"}
+                              {convertingWantId === want.id ? t("Adding…") : t("Add as asset")}
                             </button>
                             <button
                               onClick={() => handleDeleteWant(want.id)}
                               disabled={deletingWantId === want.id}
                               className="rounded-xl border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
                             >
-                              {deletingWantId === want.id ? "…" : "Delete"}
+                              {deletingWantId === want.id ? "…" : t("Delete")}
                             </button>
                           </div>
                         </div>
@@ -3261,17 +3304,17 @@ export default function FarmPage() {
               <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <h2 className="text-xl font-semibold">Other farms' wants</h2>
+                    <h2 className="text-xl font-semibold">{t("Other farms' wants")}</h2>
                     <p className="mt-1 text-sm text-zinc-500">
-                      Wishlists from the other farms you belong to. Read-only — click &ldquo;Add as asset&rdquo; to log one for this farm.
+                      {t("Wishlists from the other farms you belong to. Read-only — click “Add as asset” to log one for this farm.")}
                     </p>
                   </div>
-                  <span className="text-sm text-zinc-500">{otherFarmsWants.length} across other farms</span>
+                  <span className="text-sm text-zinc-500">{t("{n} across other farms", { n: otherFarmsWants.length })}</span>
                 </div>
 
                 {otherFarmsWants.length === 0 ? (
                   <div className="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-6 text-sm text-zinc-400">
-                    No wants from other farms you belong to.
+                    {t("No wants from other farms you belong to.")}
                   </div>
                 ) : (
                   <div className="mt-5 space-y-2">
@@ -3289,7 +3332,7 @@ export default function FarmPage() {
                           </div>
                           {want.notes && <p className="mt-0.5 text-sm">{want.notes}</p>}
                           <p className="mt-1 text-sm font-semibold text-zinc-500">
-                            {want.price != null ? formatMoney(want.price) : <span className="font-normal">Price TBC</span>}
+                            {want.price != null ? formatMoney(want.price) : <span className="font-normal">{t("Price TBC")}</span>}
                           </p>
                         </div>
                         <div className="flex shrink-0 items-center">
@@ -3297,9 +3340,9 @@ export default function FarmPage() {
                             onClick={() => handleConvertWantToAsset(want)}
                             disabled={convertingWantId === want.id}
                             className="rounded-xl border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-60"
-                            title={`Log "${want.name}" as an asset on this farm`}
+                            title={t("Log {name} as an asset on this farm", { name: `"${want.name}"` })}
                           >
-                            {convertingWantId === want.id ? "Adding…" : "Add as asset"}
+                            {convertingWantId === want.id ? t("Adding…") : t("Add as asset")}
                           </button>
                         </div>
                       </div>
@@ -3329,8 +3372,8 @@ export default function FarmPage() {
 
       <button
         onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        aria-label="Scroll to top"
-        title="Back to top"
+        aria-label={t("Scroll to top")}
+        title={t("Back to top")}
         style={{ bottom: "max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem))" }}
         className="fixed left-4 z-[60] flex h-11 w-11 items-center justify-center rounded-full bg-zinc-900 text-white shadow-lg transition hover:bg-zinc-800"
       >

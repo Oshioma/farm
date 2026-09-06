@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Zone, Crop } from "@/lib/farm";
+import { useT } from "@/lib/i18n";
 
 export type HarvestFormData = {
   crop_id: string;
@@ -30,6 +31,7 @@ type Props = {
 };
 
 export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubmit }: Props) {
+  const t = useT();
   const [form, setForm] = useState<HarvestFormData>(blank);
   const [saving, setSaving] = useState(false);
 
@@ -54,15 +56,15 @@ export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubm
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
       <div className="mb-5">
-        <h2 className="text-xl font-semibold">Log harvest</h2>
+        <h2 className="text-xl font-semibold">{t("Log harvest")}</h2>
         <p className="mt-1 text-sm text-zinc-500">
-          Record actual yield and push the crop into real production data.
+          {t("Record actual yield and push the crop into real production data.")}
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="mb-2 block text-sm font-medium">Crop</label>
+          <label className="mb-2 block text-sm font-medium">{t("Crop")}</label>
           <select
             value={form.crop_id}
             onChange={(e) => {
@@ -76,7 +78,7 @@ export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubm
             className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
             required
           >
-            <option value="">Select crop</option>
+            <option value="">{t("Select crop")}</option>
             {crops.map((crop) => (
               <option key={crop.id} value={crop.id}>
                 {crop.crop_name}
@@ -87,13 +89,13 @@ export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubm
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium">Bed</label>
+          <label className="mb-2 block text-sm font-medium">{t("Bed")}</label>
           <select
             value={form.zone_id}
             onChange={(e) => setForm((prev) => ({ ...prev, zone_id: e.target.value }))}
             className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
           >
-            <option value="">No bed</option>
+            <option value="">{t("No bed")}</option>
             {zones.map((zone) => (
               <option key={zone.id} value={zone.id}>
                 {zone.name}
@@ -103,7 +105,7 @@ export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubm
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium">Harvest date</label>
+          <label className="mb-2 block text-sm font-medium">{t("Harvest date")}</label>
           <input
             type="date"
             value={form.harvest_date}
@@ -114,7 +116,7 @@ export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubm
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium">Quantity (kg)</label>
+          <label className="mb-2 block text-sm font-medium">{t("Quantity (kg)")}</label>
           <input
             type="number"
             step="0.01"
@@ -128,26 +130,26 @@ export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubm
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium">Quality</label>
+          <label className="mb-2 block text-sm font-medium">{t("Quality")}</label>
           <select
             value={form.quality}
             onChange={(e) => setForm((prev) => ({ ...prev, quality: e.target.value }))}
             className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
           >
-            <option value="premium">premium</option>
-            <option value="standard">standard</option>
-            <option value="lower_grade">lower_grade</option>
-            <option value="mixed">mixed</option>
+            <option value="premium">{t("premium")}</option>
+            <option value="standard">{t("standard")}</option>
+            <option value="lower_grade">{t("lower_grade")}</option>
+            <option value="mixed">{t("mixed")}</option>
           </select>
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium">Notes</label>
+          <label className="mb-2 block text-sm font-medium">{t("Notes")}</label>
           <textarea
             value={form.notes}
             onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
             className="min-h-[100px] w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            placeholder="Any notes on quality, weather, or batch."
+            placeholder={t("Any notes on quality, weather, or batch.")}
           />
         </div>
 
@@ -156,7 +158,7 @@ export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubm
           disabled={saving || !form.crop_id}
           className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {saving ? "Logging harvest..." : "Log harvest"}
+          {saving ? t("Logging harvest...") : t("Log harvest")}
         </button>
       </form>
     </div>

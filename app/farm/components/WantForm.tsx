@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/lib/i18n";
 
 export type WantFormData = {
   name: string;
@@ -21,6 +22,7 @@ type Props = {
 };
 
 export function WantForm({ onSubmit, initial, submitLabel }: Props) {
+  const t = useT();
   const [form, setForm] = useState<WantFormData>(initial ?? blank);
   const [saving, setSaving] = useState(false);
 
@@ -35,19 +37,19 @@ export function WantForm({ onSubmit, initial, submitLabel }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="mb-2 block text-sm font-medium">Name</label>
+        <label className="mb-2 block text-sm font-medium">{t("Name")}</label>
         <input
           type="text"
           value={form.name}
           onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
           className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-          placeholder="e.g. Drip irrigation kit"
+          placeholder={t("e.g. Drip irrigation kit")}
           required
         />
       </div>
 
       <div>
-        <label className="mb-2 block text-sm font-medium">Price (TZS)</label>
+        <label className="mb-2 block text-sm font-medium">{t("Price (TZS)")}</label>
         <input
           type="number"
           step="1"
@@ -55,18 +57,18 @@ export function WantForm({ onSubmit, initial, submitLabel }: Props) {
           value={form.price}
           onChange={(e) => setForm((prev) => ({ ...prev, price: e.target.value }))}
           className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-          placeholder="Leave blank if unknown"
+          placeholder={t("Leave blank if unknown")}
         />
       </div>
 
       <div>
-        <label className="mb-2 block text-sm font-medium">Notes</label>
+        <label className="mb-2 block text-sm font-medium">{t("Notes")}</label>
         <input
           type="text"
           value={form.notes}
           onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
           className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-          placeholder="Supplier, model, why we want it…"
+          placeholder={t("Supplier, model, why we want it…")}
         />
       </div>
 
@@ -75,7 +77,7 @@ export function WantForm({ onSubmit, initial, submitLabel }: Props) {
         disabled={saving || !form.name.trim()}
         className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {saving ? "Saving..." : (submitLabel ?? "Add want")}
+        {saving ? t("Saving...") : t(submitLabel ?? "Add want")}
       </button>
     </form>
   );

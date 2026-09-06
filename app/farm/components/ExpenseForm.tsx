@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Zone, Crop } from "@/lib/farm";
+import { useT } from "@/lib/i18n";
 
 export type ExpenseFormData = {
   category: string;
@@ -50,6 +51,7 @@ type Props = {
 };
 
 export function ExpenseForm({ zones, crops, defaultZoneId, onSubmit, initial, submitLabel }: Props) {
+  const t = useT();
   const [form, setForm] = useState<ExpenseFormData>(initial ?? blank);
   const [saving, setSaving] = useState(false);
 
@@ -73,7 +75,7 @@ export function ExpenseForm({ zones, crops, defaultZoneId, onSubmit, initial, su
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="mb-2 block text-sm font-medium">Category</label>
+          <label className="mb-2 block text-sm font-medium">{t("Category")}</label>
           <select
             value={form.category}
             onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
@@ -81,14 +83,14 @@ export function ExpenseForm({ zones, crops, defaultZoneId, onSubmit, initial, su
           >
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>
-                {c}
+                {t(c)}
               </option>
             ))}
           </select>
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium">Amount (TZS)</label>
+          <label className="mb-2 block text-sm font-medium">{t("Amount (TZS)")}</label>
           <input
             type="number"
             step="1"
@@ -96,14 +98,14 @@ export function ExpenseForm({ zones, crops, defaultZoneId, onSubmit, initial, su
             value={form.amount}
             onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
             className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            placeholder="Leave blank if unknown"
+            placeholder={t("Leave blank if unknown")}
           />
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="mb-2 block text-sm font-medium">Date</label>
+          <label className="mb-2 block text-sm font-medium">{t("Date")}</label>
           <input
             type="date"
             value={form.expense_date}
@@ -114,37 +116,37 @@ export function ExpenseForm({ zones, crops, defaultZoneId, onSubmit, initial, su
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium">Paid by</label>
+          <label className="mb-2 block text-sm font-medium">{t("Paid by")}</label>
           <input
             type="text"
             value={form.vendor_name}
             onChange={(e) => setForm((prev) => ({ ...prev, vendor_name: e.target.value }))}
             className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            placeholder="e.g. Eh"
+            placeholder={t("e.g. Eh")}
           />
         </div>
       </div>
 
       <div>
-        <label className="mb-2 block text-sm font-medium">Notes</label>
+        <label className="mb-2 block text-sm font-medium">{t("Notes")}</label>
         <input
           type="text"
           value={form.notes}
           onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
           className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-          placeholder="What was purchased?"
+          placeholder={t("What was purchased?")}
         />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="mb-2 block text-sm font-medium">Crop</label>
+          <label className="mb-2 block text-sm font-medium">{t("Crop")}</label>
           <select
             value={form.crop_id}
             onChange={(e) => setForm((prev) => ({ ...prev, crop_id: e.target.value }))}
             className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
           >
-            <option value="">Not linked to a crop</option>
+            <option value="">{t("Not linked to a crop")}</option>
             {crops.map((crop) => (
               <option key={crop.id} value={crop.id}>
                 {crop.crop_name}
@@ -155,13 +157,13 @@ export function ExpenseForm({ zones, crops, defaultZoneId, onSubmit, initial, su
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium">Bed</label>
+          <label className="mb-2 block text-sm font-medium">{t("Bed")}</label>
           <select
             value={form.zone_id}
             onChange={(e) => setForm((prev) => ({ ...prev, zone_id: e.target.value }))}
             className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
           >
-            <option value="">No bed</option>
+            <option value="">{t("No bed")}</option>
             {zones.map((zone) => (
               <option key={zone.id} value={zone.id}>
                 {zone.name}
@@ -176,7 +178,7 @@ export function ExpenseForm({ zones, crops, defaultZoneId, onSubmit, initial, su
         disabled={saving}
         className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {saving ? "Saving..." : (submitLabel ?? "Log expense")}
+        {saving ? t("Saving...") : t(submitLabel ?? "Log expense")}
       </button>
     </form>
   );
