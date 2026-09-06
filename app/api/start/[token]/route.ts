@@ -51,9 +51,34 @@ async function ensureUser(admin: ReturnType<typeof getSupabaseAdmin>, invite: In
   }
   if (!userId) throw new Error("Could not create the farmer's account.");
 
+  await ensureProfile(admin, userId, email, invite.farmer_name);
   await admin.from("whatsapp_invites").update({ user_id: userId }).eq("id", invite.id);
   invite.user_id = userId;
   return userId;
+}
+
+/* farms.created_by and farm_members.profile_id point at public.profiles, a
+   table the app never writes itself: a database trigger fills it for web
+   signups, but an account made here through the admin API arrived without
+   one. The table is not in this repo's migrations, so its exact columns are
+   unknown: try the usual shape first, then fall back to the id alone. */
+async function ensureProfile(admin: ReturnType<typeof getSupabaseAdmin>, userId: string, email: string, fullName: string) {
+  const { data: existing } = await admin.from("profiles").select("id").eq("id", userId).maybeSingle();
+  if (existing) return;
+  const attempts: Record<string, unknown>[] = [
+    { id: userId, email, full_name: fullName },
+    { id: userId, email },
+    { id: userId },
+  ];
+  let lastError: unknown = null;
+  for (const row of attempts) {
+    const { error } = await admin.from("profiles").upsert(row, { onConflict: "id", ignoreDuplicates: true });
+    if (!error) return;
+    lastError = error;
+    // A missing column means this shape is wrong; anything else is final.
+    if (!/column|schema cache/i.test(error.message)) break;
+  }
+  throw lastError ?? new Error("Could not create the farmer's profile.");
 }
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
