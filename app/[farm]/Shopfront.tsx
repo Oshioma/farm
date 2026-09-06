@@ -33,6 +33,7 @@ function ManageFarmLink({ farmId, farmName, slug }: { farmId: string; farmName: 
     <>
       <a href={`/farm/onboarding?farmId=${id}`} style={pill}>{t("Add crops")}</a>
       <a href={`/farm/prepare?farmId=${id}`} style={pill}>{t("Add photos and delivery details")}</a>
+      <a href={`/farm?farmId=${id}`} style={pill}>{t("Manage farm")}</a>
       <ShareWhatsAppButton
         text={t("{farm} is now on Shamba Online. Reserve fresh produce here: {link}", { farm: farmName, link: shopLink })}
         label={t("Share on WhatsApp")}
