@@ -21,8 +21,12 @@ function phoneEmail(phone: string) {
 
 /** Find or create the Supabase user behind an invite, remembering it on the row. */
 async function ensureUser(admin: ReturnType<typeof getSupabaseAdmin>, invite: InviteRow): Promise<string> {
-  if (invite.user_id) return invite.user_id;
   const email = phoneEmail(invite.phone);
+  if (invite.user_id) {
+    // The account exists from an earlier attempt; the profile row may still be missing.
+    await ensureProfile(admin, invite.user_id, email, invite.farmer_name);
+    return invite.user_id;
+  }
 
   // Another invite for the same phone may already have made the account.
   const { data: earlier } = await admin
