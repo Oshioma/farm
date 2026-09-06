@@ -1656,10 +1656,10 @@ export default function FarmPage() {
                 </div>
               ) : (
                 <>
-                  <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl lg:mt-1 lg:text-2xl">
+                  <h1 className="mt-1 text-4xl font-bold tracking-tight sm:text-5xl lg:text-5xl">
                     {activeFarm?.name ?? t("Farm Manager")}
                   </h1>
-                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-600 sm:text-base lg:mt-1 lg:text-sm">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-600 sm:text-base">
                     <span>
                       {activeFarm?.location || t("No location set")}
                       {activeFarm?.size_acres ? ` · ${activeFarm.size_acres} ${t("acres")}` : ""}
