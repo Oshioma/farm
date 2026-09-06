@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ShopData, ShopMonth, ShopProduce } from "@/lib/shop";
 import { getFarms } from "@/lib/farm";
+import { ShareWhatsAppButton } from "@/components/ShareWhatsAppButton";
 import { useT, useLanguage } from "@/lib/i18n";
 import type { Translate } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/LanguageToggle";
 
-/* Shown only to signed-in members of this farm: a way back to the farm
-   manager from the public shop. Buyers never see it. */
-function ManageFarmLink({ farmId }: { farmId: string }) {
+/* Shown only to signed-in members of this farm: the farmer's own controls on
+   the public shop. Buyers never see them. */
+function ManageFarmLink({ farmId, farmName, slug }: { farmId: string; farmName: string; slug: string }) {
   const t = useT();
   const [isMember, setIsMember] = useState(false);
   useEffect(() => {
@@ -23,13 +24,23 @@ function ManageFarmLink({ farmId }: { farmId: string }) {
   const pill: React.CSSProperties = {
     color: GREEN, border: `1px solid ${GREEN}`, borderRadius: 999, padding: "10px 16px",
     fontSize: 13, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap", minHeight: 44,
-    display: "inline-flex", alignItems: "center",
+    display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", cursor: "pointer", fontFamily: sans,
   };
+  const pillClass = "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[#166534] px-4 py-2.5 text-[13px] font-semibold text-[#166534] min-h-[44px] bg-transparent";
   const id = encodeURIComponent(farmId);
+  const shopLink = typeof window === "undefined" ? `/${slug}` : `${window.location.origin}/${slug}`;
   return (
     <>
       <a href={`/farm/onboarding?farmId=${id}`} style={pill}>{t("Add crops")}</a>
-      <a href={`/farm/prepare?farmId=${id}`} style={pill}>{t("Manage farm")}</a>
+      <a href={`/farm/prepare?farmId=${id}`} style={pill}>{t("Add photos and delivery details")}</a>
+      <ShareWhatsAppButton
+        text={t("{farm} is now on Shamba Online. Reserve fresh produce here: {link}", { farm: farmName, link: shopLink })}
+        label={t("Share on WhatsApp")}
+        copyLabel={t("Copy link")}
+        copiedLabel={t("Copied")}
+        className={pillClass}
+        copyClassName={pillClass}
+      />
     </>
   );
 }
@@ -147,9 +158,9 @@ export function Shopfront({ shop }: { shop: ShopData }) {
             Shamba Online
           </span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
         <LanguageToggle lang={lang} onChange={setLang} />
-        <ManageFarmLink farmId={shop.farm.id} />
+        <ManageFarmLink farmId={shop.farm.id} farmName={shop.farm.name} slug={shop.farm.slug} />
         <button
           onClick={() => { setSent(null); setCheckout(true); }}
           disabled={basket.length === 0}

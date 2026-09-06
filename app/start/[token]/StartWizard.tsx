@@ -27,7 +27,7 @@ const copy = {
     expectedKg: "How many kilograms do you expect?",
     pricePerKg: "Price per kg", optional: "optional",
     cropsSoFar: "Your crops",
-    addCrop: "Add crop", addAnother: "Add another crop",
+    addCrop: "Add crop and open my shop",
     openShop: "Open my shop", opening: "Opening…",
     next: "Next", saving: "Saving…",
     need: "Fill in the fields above to continue.",
@@ -56,7 +56,7 @@ const copy = {
     expectedKg: "Unatarajia kilo ngapi?",
     pricePerKg: "Bei kwa kilo", optional: "hiari",
     cropsSoFar: "Mazao yako",
-    addCrop: "Ongeza zao", addAnother: "Ongeza zao lingine",
+    addCrop: "Ongeza zao na ufungue duka",
     openShop: "Fungua duka langu", opening: "Inafungua…",
     next: "Endelea", saving: "Inahifadhi…",
     need: "Jaza sehemu zilizo hapo juu ili kuendelea.",
@@ -130,19 +130,27 @@ export function StartWizard({ initial }: { initial: InviteState }) {
     if (next) setState(next);
   }
 
+  /* Saving the first crop is the last question: publish the shop and take the
+     farmer straight there, signed in so the Add crops and Manage farm buttons
+     show. Any later visit to this link lands on the finished screen instead. */
   async function saveCrop(event: React.FormEvent) {
     event.preventDefault();
     const next = await post("crop", { ...crop, name: crop.name.trim(), variety: crop.variety.trim() });
-    if (next) {
-      setState(next);
-      setCrop(blankCrop);
-      setShowCropForm(false);
-    }
+    if (!next) return;
+    setState(next);
+    setCrop(blankCrop);
+    setShowCropForm(false);
+    await openShop(next);
   }
 
-  async function openShop() {
-    const next = await post("open");
-    if (next) setState(next);
+  async function openShop(current: InviteState = state) {
+    const opened = await post("open");
+    if (!opened) return;
+    setState(opened);
+    const slug = opened.farm?.slug ?? current.farm?.slug;
+    if (!slug) return;
+    const data = await post("enter", { next: `/${slug}` });
+    window.location.href = data?.url ?? `${window.location.origin}/${slug}`;
   }
 
   async function enterFarm() {
@@ -223,13 +231,12 @@ export function StartWizard({ initial }: { initial: InviteState }) {
                   <label className="block text-sm font-medium text-zinc-700">{t.harvestDate}<input required type="date" value={crop.harvestDate} onChange={(event) => setCrop((c) => ({ ...c, harvestDate: event.target.value }))} className={input} /></label>
                   <label className="block text-sm font-medium text-zinc-700">{t.expectedKg}<input required type="number" min="0.1" step="0.1" inputMode="decimal" value={crop.expectedKg} onChange={(event) => setCrop((c) => ({ ...c, expectedKg: event.target.value }))} className={input} /></label>
                   <label className="block text-sm font-medium text-zinc-700">{t.pricePerKg} <span className="font-normal text-zinc-400">({t.optional})</span><input type="number" min="0" step="0.01" inputMode="decimal" value={crop.pricePerKg} onChange={(event) => setCrop((c) => ({ ...c, pricePerKg: event.target.value }))} className={input} /></label>
-                  <button type="submit" disabled={busy === "crop" || !cropReady} className={"w-full " + primary}>{busy === "crop" ? t.saving : t.addCrop}</button>
+                  <button type="submit" disabled={busy !== null || !cropReady} className={"w-full " + primary}>{busy ? t.opening : t.addCrop}<ChevronRight className="h-5 w-5" /></button>
                   {!cropReady && <p className="text-xs text-zinc-500">{t.need}</p>}
                 </form>
               ) : (
                 <div className="mt-5 grid gap-3">
-                  <button type="button" onClick={openShop} disabled={busy === "open"} className={primary}>{busy === "open" ? t.opening : t.openShop}<ChevronRight className="h-5 w-5" /></button>
-                  <button type="button" onClick={() => setShowCropForm(true)} className={secondary}>{t.addAnother}</button>
+                  <button type="button" onClick={() => openShop()} disabled={busy !== null} className={primary}>{busy ? t.opening : t.openShop}<ChevronRight className="h-5 w-5" /></button>
                 </div>
               )}
             </div>
