@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { CROP_DETAIL_FIELDS } from "@/lib/cropDetails";
 import { useT } from "@/lib/i18n";
-import { Plus, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import type { Zone } from "@/lib/farm";
 
 export type CropFormData = {
@@ -52,9 +52,16 @@ type Props = {
   onSubmit: (data: CropFormData) => Promise<boolean>;
 };
 
+/* Three short stages instead of one long form. The crop can be saved from any
+   stage: the basics are enough to create it, the other two are optional. */
+type Stage = 1 | 2 | 3;
+
+const inputClass = "w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900";
+
 export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
   const t = useT();
   const [form, setForm] = useState<CropFormData>(blank);
+  const [stage, setStage] = useState<Stage>(1);
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -91,10 +98,12 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
     }));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  const canSave = !!form.crop_name.trim();
+
+  /* Any stage can save; the form only submits from a button that says so. */
+  async function save() {
+    if (!canSave || saving) return;
     setSaving(true);
-    // Filter out empty zone selections before submitting
     const cleanedForm = { ...form, zone_ids: form.zone_ids.filter(Boolean) };
     const ok = await onSubmit(cleanedForm);
     setSaving(false);
@@ -102,239 +111,161 @@ export function CropForm({ zones, defaultZoneId, onSubmit }: Props) {
       if (preview && preview.startsWith("blob:")) URL.revokeObjectURL(preview);
       setPreview("");
       setForm({ ...blank, zone_ids: defaultZoneId ? [defaultZoneId] : [] });
+      setStage(1);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
 
-  // Zones already selected (to filter from dropdowns)
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    void save();
+  }
+
   const selectedZoneIds = new Set(form.zone_ids.filter(Boolean));
+  const stageTitle = stage === 1 ? t("Basics") : stage === 2 ? t("Growing details") : t("For the shop");
+
+  const field = (label: React.ReactNode, control: React.ReactNode) => (
+    <div>
+      <label className="mb-2 block text-sm font-medium">{label}</label>
+      {control}
+    </div>
+  );
+  const optional = <span className="font-normal text-zinc-400">{t("(optional)")}</span>;
 
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
       <div className="mb-5">
-        <h2 className="text-xl font-semibold">{t("Create crop")}</h2>
-        <p className="mt-1 text-sm text-zinc-500">
-          {t("Add the crop cycle and link it to one or more beds.")}
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-xl font-semibold">{t("Create crop")}</h2>
+          <span className="text-xs font-medium text-zinc-500">{t("Step {n} of 3", { n: stage })}</span>
+        </div>
+        <div className="mt-2 flex gap-1">
+          {[1, 2, 3].map((n) => (
+            <span key={n} className={"h-1.5 flex-1 rounded-full " + (n <= stage ? "bg-emerald-600" : "bg-zinc-200")} />
+          ))}
+        </div>
+        <p className="mt-2 text-sm text-zinc-500">
+          {stageTitle}{stage > 1 && <> · {t("optional")}</>}
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="mb-2 block text-sm font-medium">{t("Crop name")}</label>
-          <input
-            type="text"
-            value={form.crop_name}
-            onChange={(e) => setForm((prev) => ({ ...prev, crop_name: e.target.value }))}
-            className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            placeholder={t("Tomatoes")}
-            required
-          />
-        </div>
-
-        <div>
-          <label className="mb-2 block text-sm font-medium">{t("Variety")}</label>
-          <input
-            type="text"
-            value={form.variety}
-            onChange={(e) => setForm((prev) => ({ ...prev, variety: e.target.value }))}
-            className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            placeholder={t("Roma")}
-          />
-        </div>
-
-        <div>
-          <label className="mb-2 block text-sm font-medium">
-            {t("Photo")} <span className="font-normal text-zinc-400">{t("(optional)")}</span>
-          </label>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="w-full text-sm text-zinc-600 file:mr-3 file:rounded-full file:border-0 file:bg-zinc-100 file:px-4 file:py-2 file:text-sm file:font-medium hover:file:bg-zinc-200"
-          />
-        </div>
-
-        {preview ? (
-          <img
-            src={preview}
-            alt={t("Preview")}
-            className="h-48 w-full rounded-2xl object-cover"
-          />
-        ) : null}
-
-        <div>
-          <label className="mb-2 block text-sm font-medium">{t("Beds")}</label>
-          <div className="space-y-2">
-            {form.zone_ids.map((zoneId, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <select
-                  value={zoneId}
-                  onChange={(e) => handleZoneChange(index, e.target.value)}
-                  className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                >
-                  <option value="">{t("Select bed")}</option>
-                  {zones.map((zone) => (
-                    <option
-                      key={zone.id}
-                      value={zone.id}
-                      disabled={selectedZoneIds.has(zone.id) && zone.id !== zoneId}
-                    >
-                      {zone.name}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => removeZone(index)}
-                  className="flex-shrink-0 rounded-xl border border-zinc-200 p-2 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"
-                  title={t("Remove bed")}
-                >
-                  <X size={16} />
-                </button>
-              </div>
+        {stage === 1 && (
+          <>
+            {field(t("Crop name"), (
+              <input type="text" value={form.crop_name} onChange={(e) => setForm((prev) => ({ ...prev, crop_name: e.target.value }))} className={inputClass} placeholder={t("Tomatoes")} required autoFocus />
             ))}
-            {form.zone_ids.length < zones.length && (
-              <button
-                type="button"
-                onClick={addZone}
-                className="flex items-center gap-1.5 rounded-xl border border-dashed border-zinc-300 px-3 py-2 text-sm text-zinc-500 transition hover:border-zinc-400 hover:text-zinc-700"
-              >
-                <Plus size={14} />
-                {form.zone_ids.length === 0 ? t("Add bed") : t("Add another bed")}
-              </button>
-            )}
-          </div>
-        </div>
+            {field(<>{t("Variety")} {optional}</>, (
+              <input type="text" value={form.variety} onChange={(e) => setForm((prev) => ({ ...prev, variety: e.target.value }))} className={inputClass} placeholder={t("Roma")} />
+            ))}
+            {field(t("Expected harvest"), (
+              <input type="date" value={form.expected_harvest_start} onChange={(e) => setForm((prev) => ({ ...prev, expected_harvest_start: e.target.value }))} className={inputClass} />
+            ))}
+            {field(t("Estimated yield (kg)"), (
+              <input type="number" step="0.01" min="0" inputMode="decimal" value={form.estimated_yield_kg} onChange={(e) => setForm((prev) => ({ ...prev, estimated_yield_kg: e.target.value }))} className={inputClass} placeholder="900" />
+            ))}
+            {field(t("Expected price per kg"), (
+              <input type="number" step="0.01" min="0" inputMode="decimal" value={form.expected_sale_price_per_kg} onChange={(e) => setForm((prev) => ({ ...prev, expected_sale_price_per_kg: e.target.value }))} className={inputClass} placeholder="3000" />
+            ))}
+          </>
+        )}
 
-        <div>
-          <label className="mb-2 block text-sm font-medium">{t("Status")}</label>
-          <select
-            value={form.status}
-            onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))}
-            className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-          >
-            <option value="planned">{t("planned")}</option>
-            <option value="planted">{t("planted")}</option>
-            <option value="germinating">{t("germinating")}</option>
-            <option value="growing">{t("growing")}</option>
-            <option value="harvest_ready">{t("harvest_ready")}</option>
-          </select>
-        </div>
+        {stage === 2 && (
+          <>
+            {field(<>{t("Photo")} {optional}</>, (
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="w-full text-sm text-zinc-600 file:mr-3 file:rounded-full file:border-0 file:bg-zinc-100 file:px-4 file:py-2 file:text-sm file:font-medium hover:file:bg-zinc-200" />
+            ))}
+            {preview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={preview} alt={t("Preview")} className="h-48 w-full rounded-2xl object-cover" />
+            ) : null}
 
-        <div>
-          <label className="mb-2 block text-sm font-medium">{t("Planted on")}</label>
-          <input
-            type="date"
-            value={form.planted_on}
-            onChange={(e) => setForm((prev) => ({ ...prev, planted_on: e.target.value }))}
-            className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-          />
-        </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium">{t("Beds")}</label>
+              <div className="space-y-2">
+                {form.zone_ids.map((zoneId, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <select value={zoneId} onChange={(e) => handleZoneChange(index, e.target.value)} className={inputClass}>
+                      <option value="">{t("Select bed")}</option>
+                      {zones.map((zone) => (
+                        <option key={zone.id} value={zone.id} disabled={selectedZoneIds.has(zone.id) && zone.id !== zoneId}>
+                          {zone.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button type="button" onClick={() => removeZone(index)} className="flex-shrink-0 rounded-xl border border-zinc-200 p-2 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600" title={t("Remove bed")}>
+                      <X size={16} />
+                    </button>
+                  </div>
+                ))}
+                {form.zone_ids.length < zones.length && (
+                  <button type="button" onClick={addZone} className="flex items-center gap-1.5 rounded-xl border border-dashed border-zinc-300 px-3 py-2 text-sm text-zinc-500 transition hover:border-zinc-400 hover:text-zinc-700">
+                    <Plus size={14} />
+                    {form.zone_ids.length === 0 ? t("Add bed") : t("Add another bed")}
+                  </button>
+                )}
+              </div>
+            </div>
 
-        <div>
-          <label className="mb-2 block text-sm font-medium">{t("Expected harvest")}</label>
-          <input
-            type="date"
-            value={form.expected_harvest_start}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, expected_harvest_start: e.target.value }))
-            }
-            className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-          />
-        </div>
+            {field(t("Status"), (
+              <select value={form.status} onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))} className={inputClass}>
+                <option value="planned">{t("planned")}</option>
+                <option value="planted">{t("planted")}</option>
+                <option value="germinating">{t("germinating")}</option>
+                <option value="growing">{t("growing")}</option>
+                <option value="harvest_ready">{t("harvest_ready")}</option>
+              </select>
+            ))}
+            {field(t("Planted on"), (
+              <input type="date" value={form.planted_on} onChange={(e) => setForm((prev) => ({ ...prev, planted_on: e.target.value }))} className={inputClass} />
+            ))}
+            {field(<>{t("Notes")} {optional}</>, (
+              <textarea value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} className={"min-h-[80px] " + inputClass} placeholder={t("Growing conditions, observations…")} />
+            ))}
+          </>
+        )}
 
-        <div>
-          <label className="mb-2 block text-sm font-medium">{t("Estimated yield (kg)")}</label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={form.estimated_yield_kg}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, estimated_yield_kg: e.target.value }))
-            }
-            className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            placeholder="900"
-          />
-        </div>
-
-        <div>
-          <label className="mb-2 block text-sm font-medium">{t("Expected price per kg")}</label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={form.expected_sale_price_per_kg}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, expected_sale_price_per_kg: e.target.value }))
-            }
-            className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            placeholder="3000"
-          />
-        </div>
-
-        <div>
-          <label className="mb-2 block text-sm font-medium">
-            {t("Notes")} <span className="font-normal text-zinc-400">{t("(optional)")}</span>
-          </label>
-          <textarea
-            value={form.notes}
-            onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
-            className="min-h-[80px] w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            placeholder={t("Growing conditions, observations…")}
-          />
-        </div>
-
-        <div>
-          <label className="mb-2 block text-sm font-medium">
-            {t("Medicinal properties")} <span className="font-normal text-zinc-400">{t("(optional)")}</span>
-          </label>
-          <textarea
-            value={form.medicinal_properties}
-            onChange={(e) => setForm((prev) => ({ ...prev, medicinal_properties: e.target.value }))}
-            className="min-h-[80px] w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            placeholder={t("Known medicinal uses, healing properties…")}
-          />
-        </div>
-
-        <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 p-4">
-          <p className="text-sm font-medium">{t("For the shop")} <span className="font-normal text-zinc-400">{t("(all optional)")}</span></p>
-          <p className="mt-1 text-xs text-zinc-500">
-            {t("Whatever you fill in here is shown to customers on the shopfront. Anything left blank simply is not shown.")}
-          </p>
-          <div className="mt-3 space-y-3">
-            {CROP_DETAIL_FIELDS.map((field) => (
-              <div key={field.key}>
-                <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t(field.label)}</label>
-                {field.long ? (
-                  <textarea
-                    value={form[field.key]}
-                    onChange={(e) => setForm((prev) => ({ ...prev, [field.key]: e.target.value }))}
-                    className="min-h-[70px] w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
-                    placeholder={t(field.placeholder)}
-                  />
+        {stage === 3 && (
+          <>
+            <p className="text-xs text-zinc-500">
+              {t("Whatever you fill in here is shown to customers on the shopfront. Anything left blank simply is not shown.")}
+            </p>
+            {CROP_DETAIL_FIELDS.map((f) => (
+              <div key={f.key}>
+                <label className="mb-1.5 block text-sm font-medium">{t(f.label)}</label>
+                {f.long ? (
+                  <textarea value={form[f.key]} onChange={(e) => setForm((prev) => ({ ...prev, [f.key]: e.target.value }))} className={"min-h-[70px] " + inputClass} placeholder={t(f.placeholder)} />
                 ) : (
-                  <input
-                    type="text"
-                    value={form[field.key]}
-                    onChange={(e) => setForm((prev) => ({ ...prev, [field.key]: e.target.value }))}
-                    className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
-                    placeholder={t(field.placeholder)}
-                  />
+                  <input type="text" value={form[f.key]} onChange={(e) => setForm((prev) => ({ ...prev, [f.key]: e.target.value }))} className={inputClass} placeholder={t(f.placeholder)} />
                 )}
               </div>
             ))}
-          </div>
-        </div>
+            {field(<>{t("Medicinal properties")} {optional}</>, (
+              <textarea value={form.medicinal_properties} onChange={(e) => setForm((prev) => ({ ...prev, medicinal_properties: e.target.value }))} className={"min-h-[80px] " + inputClass} placeholder={t("Known medicinal uses, healing properties…")} />
+            ))}
+          </>
+        )}
 
-        <button
-          type="submit"
-          disabled={saving || !form.crop_name.trim()}
-          className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {saving ? t("Creating crop...") : t("Create crop")}
-        </button>
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          {stage > 1 && (
+            <button type="button" onClick={() => setStage((s) => (s - 1) as Stage)} className="inline-flex items-center gap-1 rounded-2xl border border-zinc-200 px-4 py-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
+              <ChevronLeft size={16} /> {t("Back")}
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={saving || !canSave}
+            className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {saving ? t("Creating crop...") : t("Create crop")}
+          </button>
+          {stage < 3 && (
+            <button type="button" onClick={() => setStage((s) => (s + 1) as Stage)} disabled={!canSave} className="inline-flex items-center gap-1 rounded-2xl border border-emerald-700 px-4 py-3 text-sm font-medium text-emerald-800 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50">
+              {stage === 1 ? t("Next: growing details") : t("Next: for the shop")} <ChevronRight size={16} />
+            </button>
+          )}
+        </div>
+        {!canSave && <p className="text-xs text-zinc-500">{t("Enter a crop name to continue.")}</p>}
       </form>
     </div>
   );
