@@ -18,6 +18,8 @@ import { TaskForm } from "@/app/farm/components/TaskForm";
 import type { TaskFormData } from "@/app/farm/components/TaskForm";
 import { ExpandableText } from "@/app/farm/components/ExpandableText";
 import { LogHoursModal } from "@/app/farm/components/LogHoursModal";
+import { useT, useLanguage } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -34,6 +36,8 @@ const MONTH_NAMES = [
 const now = new Date();
 
 export default function WorkerGoalsPage() {
+  const t = useT();
+  const [lang, setLang] = useLanguage();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
   const [crops, setCrops] = useState<Crop[]>([]);
@@ -78,7 +82,7 @@ export default function WorkerGoalsPage() {
         if (user) setUserId(user.id);
         setFarms(farmRows);
       } catch (err) {
-        setError(errMsg(err, "Failed to load farms"));
+        setError(errMsg(err, t("Failed to load farms")));
       } finally {
         setLoading(false);
       }
@@ -110,7 +114,7 @@ export default function WorkerGoalsPage() {
         setTasks(taskRows);
         setMembers(memberRows);
       } catch (err) {
-        if (!cancelled) setError(errMsg(err, "Failed to load goals"));
+        if (!cancelled) setError(errMsg(err, t("Failed to load goals")));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -145,9 +149,9 @@ export default function WorkerGoalsPage() {
 
   const periodLabel =
     timeframeTab === "all"
-      ? "All goals"
+      ? t("All goals")
       : timeframeTab === "month"
-      ? `${MONTH_NAMES[monthCursor.month - 1]} ${monthCursor.year}`
+      ? `${t(MONTH_NAMES[monthCursor.month - 1])} ${monthCursor.year}`
       : timeframeTab === "year"
       ? `${yearCursor}`
       : `${threeYearStart} – ${threeYearStart + 2}`;
@@ -174,17 +178,17 @@ export default function WorkerGoalsPage() {
   // a specific member) before splitting into open + completed.
   const scopedTasks = useMemo(() => {
     if (assigneeFilter === "all") return periodTasks;
-    if (assigneeFilter === "__unassigned__") return periodTasks.filter((t) => !t.assigned_to);
-    return periodTasks.filter((t) => t.assigned_to === assigneeFilter);
+    if (assigneeFilter === "__unassigned__") return periodTasks.filter((task) => !task.assigned_to);
+    return periodTasks.filter((task) => task.assigned_to === assigneeFilter);
   }, [periodTasks, assigneeFilter]);
 
   const openTasks = useMemo(() => {
     const open = scopedTasks.filter(
-      (t) => t.status === "todo" || t.status === "in_progress"
+      (task) => task.status === "todo" || task.status === "in_progress"
     );
     if (timeframeTab === "month") {
-      if (filter === "today") return open.filter((t) => t.due_date === today);
-      if (filter === "overdue") return open.filter((t) => t.due_date && t.due_date < today);
+      if (filter === "today") return open.filter((task) => task.due_date === today);
+      if (filter === "overdue") return open.filter((task) => task.due_date && task.due_date < today);
     }
     return open;
   }, [scopedTasks, filter, today, timeframeTab]);
@@ -211,7 +215,7 @@ export default function WorkerGoalsPage() {
     }
 
     if (unassigned.length > 0) {
-      groups.push({ label: "General (unassigned)", key: "__unassigned__", tasks: unassigned });
+      groups.push({ label: t("General (unassigned)"), key: "__unassigned__", tasks: unassigned });
     }
     for (const [assignee, assigneeTasks] of Object.entries(byAssignee).sort(([a], [b]) =>
       (memberEmailMap[a] ?? a).localeCompare(memberEmailMap[b] ?? b)
@@ -219,10 +223,10 @@ export default function WorkerGoalsPage() {
       groups.push({ label: memberEmailMap[assignee] ?? assignee, key: assignee, tasks: assigneeTasks });
     }
     return groups;
-  }, [openTasks, groupBy, memberEmailMap]);
+  }, [openTasks, groupBy, memberEmailMap, t]);
 
   const completedTasks = scopedTasks.filter(
-    (t) => t.status === "done" || t.status === "cancelled"
+    (task) => task.status === "done" || task.status === "cancelled"
   );
 
   async function handleCreateGoal(data: TaskFormData): Promise<boolean> {
@@ -230,7 +234,7 @@ export default function WorkerGoalsPage() {
     try {
       setError("");
       const title = data.title.trim();
-      if (!title) throw new Error("Goal title is required.");
+      if (!title) throw new Error(t("Goal title is required."));
 
       const { error: insertError } = await supabase.from("tasks").insert({
         farm_id: activeFarmId,
@@ -250,23 +254,23 @@ export default function WorkerGoalsPage() {
       await reloadTasks(activeFarmId);
       return true;
     } catch (err) {
-      setError(errMsg(err, "Failed to create goal"));
+      setError(errMsg(err, t("Failed to create goal")));
       return false;
     }
   }
 
-  function goalToForm(t: Task): TaskFormData {
+  function goalToForm(goal: Task): TaskFormData {
     return {
-      title: t.title,
-      description: t.description ?? "",
-      zone_id: t.zone_id ?? "",
-      crop_id: t.crop_id ?? "",
-      assigned_to: t.assigned_to ?? "",
-      status: t.status ?? "todo",
-      priority: t.priority ?? "medium",
-      due_date: t.due_date ?? "",
-      proof_required: !!t.proof_required,
-      goal_timeframe: t.goal_timeframe ?? "month",
+      title: goal.title,
+      description: goal.description ?? "",
+      zone_id: goal.zone_id ?? "",
+      crop_id: goal.crop_id ?? "",
+      assigned_to: goal.assigned_to ?? "",
+      status: goal.status ?? "todo",
+      priority: goal.priority ?? "medium",
+      due_date: goal.due_date ?? "",
+      proof_required: !!goal.proof_required,
+      goal_timeframe: goal.goal_timeframe ?? "month",
     };
   }
 
@@ -275,7 +279,7 @@ export default function WorkerGoalsPage() {
     try {
       setError("");
       const title = data.title.trim();
-      if (!title) throw new Error("Goal title is required.");
+      if (!title) throw new Error(t("Goal title is required."));
 
       const { error: updateError } = await supabase
         .from("tasks")
@@ -297,7 +301,7 @@ export default function WorkerGoalsPage() {
       await reloadTasks(activeFarmId);
       return true;
     } catch (err) {
-      setError(errMsg(err, "Failed to update goal"));
+      setError(errMsg(err, t("Failed to update goal")));
       return false;
     }
   }
@@ -311,7 +315,7 @@ export default function WorkerGoalsPage() {
       if (deleteError) throw deleteError;
       await reloadTasks(activeFarmId);
     } catch (err) {
-      setError(errMsg(err, "Failed to delete goal"));
+      setError(errMsg(err, t("Failed to delete goal")));
     } finally {
       setDeletingId(null);
     }
@@ -339,7 +343,7 @@ export default function WorkerGoalsPage() {
 
       await reloadTasks(activeFarmId);
     } catch (err) {
-      setError(errMsg(err, "Failed to complete goal"));
+      setError(errMsg(err, t("Failed to complete goal")));
     } finally {
       setCompletingTaskId(null);
     }
@@ -366,7 +370,7 @@ export default function WorkerGoalsPage() {
       await completeTaskNow(hoursPromptTask);
       setHoursPromptTask(null);
     } catch (err) {
-      setError(errMsg(err, "Failed to log hours"));
+      setError(errMsg(err, t("Failed to log hours")));
     } finally {
       setLoggingHours(false);
     }
@@ -390,7 +394,7 @@ export default function WorkerGoalsPage() {
       if (updateError) throw updateError;
       await reloadTasks(activeFarmId);
     } catch (err) {
-      setError(errMsg(err, "Failed to start goal"));
+      setError(errMsg(err, t("Failed to start goal")));
     }
   }
 
@@ -401,18 +405,21 @@ export default function WorkerGoalsPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                Worker Goal View
+                {t("Worker Goal View")}
               </p>
               <h1 className="mt-2 text-2xl font-semibold tracking-tight">
-                {activeFarm?.name ?? "Goals"}
+                {activeFarm?.name ?? t("Goals")}
               </h1>
             </div>
-            <Link
-              href="/farm"
-              className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-            >
-              Back to dashboard
-            </Link>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <LanguageToggle lang={lang} onChange={setLang} />
+              <Link
+                href="/farm"
+                className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+              >
+                {t("Back to dashboard")}
+              </Link>
+            </div>
           </div>
 
           {farms.length > 1 && (
@@ -441,7 +448,7 @@ export default function WorkerGoalsPage() {
         )}
 
         {loading && !activeFarm ? (
-          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">Loading...</div>
+          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">{t("Loading...")}</div>
         ) : null}
 
         {activeFarm && (
@@ -464,7 +471,7 @@ export default function WorkerGoalsPage() {
                       : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
                   }`}
                 >
-                  {label}
+                  {t(label)}
                 </button>
               ))}
             </div>
@@ -476,7 +483,7 @@ export default function WorkerGoalsPage() {
                 <>
                   <button
                     onClick={() => navigatePeriod(-1)}
-                    aria-label="Previous period"
+                    aria-label={t("Previous period")}
                     className="rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100"
                   >
                     ‹
@@ -484,7 +491,7 @@ export default function WorkerGoalsPage() {
                   <span className="text-sm font-semibold">{periodLabel}</span>
                   <button
                     onClick={() => navigatePeriod(1)}
-                    aria-label="Next period"
+                    aria-label={t("Next period")}
                     className="rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100"
                   >
                     ›
@@ -498,9 +505,9 @@ export default function WorkerGoalsPage() {
                   <>
                     {(
                       [
-                        { key: "all", label: `All open (${scopedTasks.filter((t) => t.status === "todo" || t.status === "in_progress").length})` },
-                        { key: "today", label: `Due today (${scopedTasks.filter((t) => t.due_date === today && t.status !== "done" && t.status !== "cancelled").length})` },
-                        { key: "overdue", label: `Overdue (${scopedTasks.filter((t) => t.due_date && t.due_date < today && t.status !== "done" && t.status !== "cancelled").length})` },
+                        { key: "all", label: t("All open ({n})", { n: scopedTasks.filter((task) => task.status === "todo" || task.status === "in_progress").length }) },
+                        { key: "today", label: t("Due today ({n})", { n: scopedTasks.filter((task) => task.due_date === today && task.status !== "done" && task.status !== "cancelled").length }) },
+                        { key: "overdue", label: t("Overdue ({n})", { n: scopedTasks.filter((task) => task.due_date && task.due_date < today && task.status !== "done" && task.status !== "cancelled").length }) },
                       ] as const
                     ).map(({ key, label }) => (
                       <button
@@ -521,11 +528,11 @@ export default function WorkerGoalsPage() {
                 <select
                   value={assigneeFilter}
                   onChange={(e) => setAssigneeFilter(e.target.value)}
-                  aria-label="Filter goals by person"
+                  aria-label={t("Filter goals by person")}
                   className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 outline-none transition hover:bg-zinc-100 focus:border-zinc-900"
                 >
-                  <option value="all">Everyone</option>
-                  <option value="__unassigned__">Unassigned</option>
+                  <option value="all">{t("Everyone")}</option>
+                  <option value="__unassigned__">{t("Unassigned")}</option>
                   {members.map((m) => (
                     <option key={m.profile_id} value={m.profile_id}>
                       {m.user_email ?? m.profile_id}
@@ -540,14 +547,14 @@ export default function WorkerGoalsPage() {
                       : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
                   }`}
                 >
-                  Group by person
+                  {t("Group by person")}
                 </button>
                 {isManager && (
                   <button
                     onClick={() => setShowCreateForm((v) => !v)}
                     className="ml-auto rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
                   >
-                    {showCreateForm ? "Cancel" : "+ New goal"}
+                    {showCreateForm ? t("Cancel") : t("+ New goal")}
                   </button>
                 )}
             </div>
@@ -573,7 +580,7 @@ export default function WorkerGoalsPage() {
             <div className="space-y-6">
               {openTasks.length === 0 ? (
                 <div className="rounded-3xl border border-zinc-200 bg-white p-8 text-center text-sm text-zinc-500">
-                  No goals match this view.
+                  {t("No goals match this view.")}
                 </div>
               ) : (
                 groupedOpenTasks.map((group) => (
@@ -607,24 +614,24 @@ export default function WorkerGoalsPage() {
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass(task.status)}`}>
-                          {task.status}
+                          {task.status ? t(task.status) : null}
                         </span>
                         <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
-                          {task.priority}
+                          {task.priority ? t(task.priority) : null}
                         </span>
                         {timeframeTab === "month" && isToday && (
                           <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
-                            today
+                            {t("today")}
                           </span>
                         )}
                         {timeframeTab === "month" && isOverdue && (
                           <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700">
-                            overdue
+                            {t("overdue")}
                           </span>
                         )}
                         {task.proof_required && (
                           <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
-                            photo proof
+                            {t("photo proof")}
                           </span>
                         )}
                       </div>
@@ -632,9 +639,9 @@ export default function WorkerGoalsPage() {
                       <h3 className="mt-3 text-lg font-semibold">{task.title}</h3>
 
                       <div className="mt-2 text-sm text-zinc-600">
-                        {task.zone?.[0]?.name ?? "No zone"}
+                        {task.zone?.[0]?.name ?? t("No zone")}
                         <span className="mx-2">·</span>
-                        {task.crop?.[0]?.crop_name ?? "General goal"}
+                        {task.crop?.[0]?.crop_name ?? t("General goal")}
                         <span className="mx-2">·</span>
                         {formatDate(task.due_date)}
                       </div>
@@ -654,7 +661,7 @@ export default function WorkerGoalsPage() {
                               onClick={() => handleStartTask(task)}
                               className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
                             >
-                              Start goal
+                              {t("Start goal")}
                             </button>
                           )}
                           {(canAct || isManager) && (
@@ -663,7 +670,7 @@ export default function WorkerGoalsPage() {
                               disabled={isCompleting}
                               className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-60"
                             >
-                              {isCompleting ? "Completing..." : "Mark done"}
+                              {isCompleting ? t("Completing...") : t("Mark done")}
                             </button>
                           )}
                           {/* Editing and deleting goals is a manager action. */}
@@ -672,7 +679,7 @@ export default function WorkerGoalsPage() {
                               onClick={() => setEditingGoal(task)}
                               className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
                             >
-                              Edit
+                              {t("Edit")}
                             </button>
                           )}
                           {isManager && (
@@ -681,13 +688,13 @@ export default function WorkerGoalsPage() {
                               disabled={isDeleting}
                               className="rounded-2xl border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
                             >
-                              {isDeleting ? "Deleting..." : "Delete"}
+                              {isDeleting ? t("Deleting...") : t("Delete")}
                             </button>
                           )}
                         </div>
                       ) : (
                         <p className="mt-4 text-xs text-zinc-400">
-                          Assigned to {task.assigned_to ? memberEmailMap[task.assigned_to] ?? "someone else" : "someone else"} — view only
+                          {t("Assigned to {name} — view only", { name: task.assigned_to ? memberEmailMap[task.assigned_to] ?? t("someone else") : t("someone else") })}
                         </p>
                       )}
                     </div>
@@ -702,7 +709,7 @@ export default function WorkerGoalsPage() {
             {completedTasks.length > 0 && (
               <div className="mt-8">
                 <h2 className="mb-3 text-lg font-semibold text-zinc-500">
-                  Recently completed ({completedTasks.length})
+                  {t("Recently completed ({n})", { n: completedTasks.length })}
                 </h2>
                 <div className="space-y-2">
                   {completedTasks.slice(0, 10).map((task) => (
@@ -712,16 +719,16 @@ export default function WorkerGoalsPage() {
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass(task.status)}`}>
-                          {task.status}
+                          {task.status ? t(task.status) : null}
                         </span>
                       </div>
                       <h3 className="mt-2 text-base font-medium text-zinc-500 line-through">
                         {task.title}
                       </h3>
                       <div className="mt-1 text-sm text-zinc-400">
-                        {task.zone?.[0]?.name ?? "No zone"}
+                        {task.zone?.[0]?.name ?? t("No zone")}
                         <span className="mx-2">·</span>
-                        {task.crop?.[0]?.crop_name ?? "General goal"}
+                        {task.crop?.[0]?.crop_name ?? t("General goal")}
                         <span className="mx-2">·</span>
                         {formatDate(task.due_date)}
                       </div>
@@ -757,10 +764,10 @@ export default function WorkerGoalsPage() {
               members={members}
               defaultZoneId=""
               initial={goalToForm(editingGoal)}
-              heading="Edit goal"
-              subheading="Update this goal's details and save."
-              submitLabel="Save changes"
-              savingLabel="Saving..."
+              heading={t("Edit goal")}
+              subheading={t("Update this goal's details and save.")}
+              submitLabel={t("Save changes")}
+              savingLabel={t("Saving...")}
               resetOnSuccess={false}
               onSubmit={async (data) => {
                 const ok = await handleUpdateGoal(data);
@@ -772,7 +779,7 @@ export default function WorkerGoalsPage() {
               onClick={() => setEditingGoal(null)}
               className="mt-3 w-full rounded-2xl border border-zinc-200 bg-white px-5 py-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
             >
-              Cancel
+              {t("Cancel")}
             </button>
           </div>
         </div>

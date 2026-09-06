@@ -11,6 +11,8 @@ import type { Crop, Farm, Zone } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { useFarmRole } from "@/hooks/useFarmRole";
 import { badgeClass, formatDate } from "@/app/farm/utils";
+import { useT, useLanguage } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -28,6 +30,8 @@ export default function CropsGalleryPage() {
   const [activeFarmId, setActiveFarmId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const t = useT();
+  const [lang, setLang] = useLanguage();
 
   // Which card currently has its details overlay flipped open
   const [detailsId, setDetailsId] = useState<string | null>(null);
@@ -86,7 +90,7 @@ export default function CropsGalleryPage() {
         setLoading(true);
         await loadFarms();
       } catch (err) {
-        setError(errMsg(err, "Failed to load farms"));
+        setError(errMsg(err, t("Failed to load farms")));
       } finally {
         setLoading(false);
       }
@@ -101,7 +105,7 @@ export default function CropsGalleryPage() {
         setLoading(true);
         await Promise.all([loadCrops(activeFarmId), loadZones(activeFarmId)]);
       } catch (err) {
-        setError(errMsg(err, "Failed to load crops"));
+        setError(errMsg(err, t("Failed to load crops")));
       } finally {
         setLoading(false);
       }
@@ -140,7 +144,7 @@ export default function CropsGalleryPage() {
       if (updateError) throw updateError;
       setCrops((prev) => prev.map((c) => (c.id === cropId ? { ...c, image_url: imageUrl } : c)));
     } catch (err) {
-      setError(errMsg(err, "Failed to update photo"));
+      setError(errMsg(err, t("Failed to update photo")));
     } finally {
       setQuickPhotoId(null);
     }
@@ -237,7 +241,7 @@ export default function CropsGalleryPage() {
       setEditCrop(null);
       setEditPreview("");
     } catch (err) {
-      setError(errMsg(err, "Failed to save crop"));
+      setError(errMsg(err, t("Failed to save crop")));
     } finally {
       setSavingEdit(false);
     }
@@ -254,12 +258,12 @@ export default function CropsGalleryPage() {
         crop.zone_ids
           .map((zid) => zones.find((z) => z.id === zid)?.name)
           .filter(Boolean)
-          .join(", ") || "No bed"
+          .join(", ") || t("No bed")
       );
     }
     if (crop.zone?.[0]?.name) return crop.zone[0].name;
-    if (crop.zone_id) return zones.find((z) => z.id === crop.zone_id)?.name ?? "No bed";
-    return "No bed";
+    if (crop.zone_id) return zones.find((z) => z.id === crop.zone_id)?.name ?? t("No bed");
+    return t("No bed");
   }
 
   const activeFarm = farms.find((f) => f.id === activeFarmId) ?? null;
@@ -283,11 +287,11 @@ export default function CropsGalleryPage() {
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                Shamba Farm Manager
+                {t("Shamba Farm Manager")}
               </p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight">Crops gallery</h1>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight">{t("Crops gallery")}</h1>
               <p className="mt-1 text-sm text-zinc-500">
-                {activeFarm?.name ?? "—"} · Tap the camera to snap a fresh photo, the pencil to edit, or the info dot for details.
+                {activeFarm?.name ?? "—"} · {t("Tap the camera to snap a fresh photo, the pencil to edit, or the info dot for details.")}
               </p>
             </div>
 
@@ -312,14 +316,15 @@ export default function CropsGalleryPage() {
                 href={withFarmContext("/farm")}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                ← Farm
+                {t("← Farm")}
               </Link>
               <button
                 onClick={handleSignOut}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                Sign out
+                {t("Sign out")}
               </button>
+              <LanguageToggle lang={lang} onChange={setLang} />
             </div>
           </div>
         </header>
@@ -331,16 +336,16 @@ export default function CropsGalleryPage() {
         ) : null}
 
         {loading && crops.length === 0 ? (
-          <p className="text-sm text-zinc-500">Loading…</p>
+          <p className="text-sm text-zinc-500">{t("Loading…")}</p>
         ) : crops.length === 0 ? (
           <div className="rounded-3xl border border-zinc-200 bg-white p-10 text-center shadow-sm">
             <Sprout className="mx-auto mb-3 text-zinc-300" size={32} />
-            <p className="text-sm text-zinc-500">No crops yet.</p>
+            <p className="text-sm text-zinc-500">{t("No crops yet.")}</p>
             <Link
               href={withFarmContext("/farm")}
               className="mt-3 inline-block rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
             >
-              Add a crop
+              {t("Add a crop")}
             </Link>
           </div>
         ) : (
@@ -375,14 +380,14 @@ export default function CropsGalleryPage() {
                           crop.status
                         )}`}
                       >
-                        {crop.status.replace(/_/g, " ")}
+                        {t(crop.status.replace(/_/g, " "))}
                       </span>
                     ) : null}
 
                     {/* Uploading overlay */}
                     {isUploading ? (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-sm font-medium text-white">
-                        Uploading…
+                        {t("Uploading…")}
                       </div>
                     ) : null}
 
@@ -392,16 +397,16 @@ export default function CropsGalleryPage() {
                         <>
                           <button
                             onClick={() => triggerQuickPhoto(crop.id)}
-                            title="Take / upload a photo"
-                            aria-label="Take or upload a photo"
+                            title={t("Take / upload a photo")}
+                            aria-label={t("Take or upload a photo")}
                             className="rounded-full bg-white/90 p-2 text-zinc-700 shadow hover:bg-white"
                           >
                             <Camera size={15} />
                           </button>
                           <button
                             onClick={() => openEdit(crop)}
-                            title="Edit crop"
-                            aria-label="Edit crop"
+                            title={t("Edit crop")}
+                            aria-label={t("Edit crop")}
                             className="rounded-full bg-white/90 p-2 text-zinc-700 shadow hover:bg-white"
                           >
                             <Pencil size={15} />
@@ -410,8 +415,8 @@ export default function CropsGalleryPage() {
                       ) : null}
                       <button
                         onClick={() => setDetailsId(showDetails ? null : crop.id)}
-                        title="Crop details"
-                        aria-label="Crop details"
+                        title={t("Crop details")}
+                        aria-label={t("Crop details")}
                         className={`rounded-full p-2 shadow transition ${
                           showDetails ? "bg-zinc-900 text-white" : "bg-white/90 text-zinc-700 hover:bg-white"
                         }`}
@@ -428,7 +433,7 @@ export default function CropsGalleryPage() {
                     >
                       <button
                         onClick={() => setDetailsId(null)}
-                        aria-label="Close details"
+                        aria-label={t("Close details")}
                         className="absolute right-2 top-2 rounded-full bg-white/20 p-1.5 hover:bg-white/30"
                       >
                         <X size={14} />
@@ -437,19 +442,19 @@ export default function CropsGalleryPage() {
                       {crop.variety ? <p className="text-xs text-white/80">{crop.variety}</p> : null}
                       <dl className="mt-2 space-y-1 text-[12px] leading-snug">
                         <div className="flex justify-between gap-2">
-                          <dt className="text-white/70">Bed</dt>
+                          <dt className="text-white/70">{t("Bed")}</dt>
                           <dd className="text-right font-medium">{zoneNames(crop)}</dd>
                         </div>
                         <div className="flex justify-between gap-2">
-                          <dt className="text-white/70">Planted</dt>
+                          <dt className="text-white/70">{t("Planted")}</dt>
                           <dd className="text-right font-medium">{formatDate(crop.planted_on)}</dd>
                         </div>
                         <div className="flex justify-between gap-2">
-                          <dt className="text-white/70">Harvest</dt>
+                          <dt className="text-white/70">{t("Harvest")}</dt>
                           <dd className="text-right font-medium">{formatDate(crop.expected_harvest_start)}</dd>
                         </div>
                         <div className="flex justify-between gap-2">
-                          <dt className="text-white/70">Yield</dt>
+                          <dt className="text-white/70">{t("Yield")}</dt>
                           <dd className="text-right font-medium">
                             {crop.actual_yield_kg ?? crop.estimated_yield_kg ?? "—"}
                             {crop.actual_yield_kg || crop.estimated_yield_kg ? " kg" : ""}
@@ -463,7 +468,7 @@ export default function CropsGalleryPage() {
                         href={`${withFarmContext("/farm")}#crop-${crop.id}`}
                         className="mt-3 inline-flex items-center justify-center rounded-full bg-white px-3 py-1.5 text-[12px] font-medium text-zinc-900 hover:bg-zinc-100"
                       >
-                        Open full details →
+                        {t("Open full details →")}
                       </Link>
                     </div>
                   </div>
@@ -488,7 +493,7 @@ export default function CropsGalleryPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Edit crop</h2>
+              <h2 className="text-lg font-semibold">{t("Edit crop")}</h2>
               <button onClick={() => setEditCrop(null)} className="rounded-full p-1 hover:bg-zinc-100">
                 <X size={18} />
               </button>
@@ -511,11 +516,11 @@ export default function CropsGalleryPage() {
               {/* Photo — take or upload */}
               <div>
                 <label className="mb-2 block text-sm font-medium">
-                  Plant photo <span className="font-normal text-zinc-400">(the crop growing)</span>
+                  {t("Plant photo")} <span className="font-normal text-zinc-400">{t("(the crop growing)")}</span>
                 </label>
                 <div className="flex gap-2">
                   <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-zinc-300 px-3 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100">
-                    <Camera size={15} /> Take photo
+                    <Camera size={15} /> {t("Take photo")}
                     <input
                       type="file"
                       accept="image/*"
@@ -525,7 +530,7 @@ export default function CropsGalleryPage() {
                     />
                   </label>
                   <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-zinc-300 px-3 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100">
-                    Upload
+                    {t("Upload")}
                     <input
                       type="file"
                       accept="image/*"
@@ -539,52 +544,52 @@ export default function CropsGalleryPage() {
               {/* Produce photo — the harvested vegetable, and what the shop shows */}
               <div>
                 <label className="mb-2 block text-sm font-medium">
-                  Produce photo <span className="font-normal text-zinc-400">(what the shop shows)</span>
+                  {t("Produce photo")} <span className="font-normal text-zinc-400">{t("(what the shop shows)")}</span>
                 </label>
                 {producePreview ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={producePreview} alt="Harvested produce" className="mb-2 h-32 w-full rounded-2xl object-cover" />
+                  <img src={producePreview} alt={t("Harvested produce")} className="mb-2 h-32 w-full rounded-2xl object-cover" />
                 ) : (
                   <div className="mb-2 flex h-32 w-full items-center justify-center rounded-2xl bg-zinc-100 text-xs text-zinc-400">
-                    No produce photo — the shop will use the plant photo
+                    {t("No produce photo — the shop will use the plant photo")}
                   </div>
                 )}
                 <div className="flex gap-2">
                   <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-zinc-300 px-3 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100">
-                    <Camera size={15} /> Take photo
+                    <Camera size={15} /> {t("Take photo")}
                     <input type="file" accept="image/*" capture="environment" onChange={handleProduceFileChange} className="hidden" />
                   </label>
                   <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-zinc-300 px-3 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100">
-                    Upload
+                    {t("Upload")}
                     <input type="file" accept="image/*" onChange={handleProduceFileChange} className="hidden" />
                   </label>
                 </div>
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium">Name</label>
+                <label className="mb-2 block text-sm font-medium">{t("Name")}</label>
                 <input
                   type="text"
                   value={editForm.crop_name}
                   onChange={(e) => setEditForm((p) => ({ ...p, crop_name: e.target.value }))}
                   className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                  placeholder="Crop name"
+                  placeholder={t("Crop name")}
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium">Variety</label>
+                <label className="mb-2 block text-sm font-medium">{t("Variety")}</label>
                 <input
                   type="text"
                   value={editForm.variety}
                   onChange={(e) => setEditForm((p) => ({ ...p, variety: e.target.value }))}
                   className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                  placeholder="Variety (optional)"
+                  placeholder={t("Variety (optional)")}
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium">Status</label>
+                <label className="mb-2 block text-sm font-medium">{t("Status")}</label>
                 <select
                   value={editForm.status}
                   onChange={(e) => setEditForm((p) => ({ ...p, status: e.target.value }))}
@@ -592,25 +597,25 @@ export default function CropsGalleryPage() {
                 >
                   {STATUS_OPTIONS.map((s) => (
                     <option key={s} value={s}>
-                      {s}
+                      {t(s)}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 p-4">
-                <p className="text-sm font-medium">For the shop <span className="font-normal text-zinc-400">(all optional)</span></p>
-                <p className="mt-1 text-xs text-zinc-500">Shown to customers on the shopfront; blanks are left out.</p>
+                <p className="text-sm font-medium">{t("For the shop")} <span className="font-normal text-zinc-400">{t("(all optional)")}</span></p>
+                <p className="mt-1 text-xs text-zinc-500">{t("Shown to customers on the shopfront; blanks are left out.")}</p>
                 <div className="mt-3 space-y-3">
                   {CROP_DETAIL_FIELDS.map((field) => (
                     <div key={field.key}>
-                      <label className="mb-1.5 block text-xs font-medium text-zinc-600">{field.label}</label>
+                      <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t(field.label)}</label>
                       {field.long ? (
                         <textarea
                           value={editForm[field.key]}
                           onChange={(e) => setEditForm((p) => ({ ...p, [field.key]: e.target.value }))}
                           className="min-h-[60px] w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
-                          placeholder={field.placeholder}
+                          placeholder={t(field.placeholder)}
                         />
                       ) : (
                         <input
@@ -618,7 +623,7 @@ export default function CropsGalleryPage() {
                           value={editForm[field.key]}
                           onChange={(e) => setEditForm((p) => ({ ...p, [field.key]: e.target.value }))}
                           className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
-                          placeholder={field.placeholder}
+                          placeholder={t(field.placeholder)}
                         />
                       )}
                     </div>
@@ -627,18 +632,18 @@ export default function CropsGalleryPage() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium">Notes</label>
+                <label className="mb-2 block text-sm font-medium">{t("Notes")}</label>
                 <textarea
                   value={editForm.notes}
                   onChange={(e) => setEditForm((p) => ({ ...p, notes: e.target.value }))}
                   className="min-h-[70px] w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                  placeholder="Observations…"
+                  placeholder={t("Observations…")}
                 />
               </div>
 
               {zones.length > 0 ? (
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Beds</label>
+                  <label className="mb-2 block text-sm font-medium">{t("Beds")}</label>
                   <div className="max-h-40 space-y-1.5 overflow-y-auto rounded-2xl border border-zinc-300 p-3">
                     {zones.map((z) => (
                       <label key={z.id} className="flex cursor-pointer items-center gap-2 text-sm">
@@ -668,13 +673,13 @@ export default function CropsGalleryPage() {
                   disabled={savingEdit}
                   className="flex-1 rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60"
                 >
-                  {savingEdit ? "Saving…" : "Save"}
+                  {savingEdit ? t("Saving…") : t("Save")}
                 </button>
                 <button
                   onClick={() => setEditCrop(null)}
                   className="rounded-2xl border border-zinc-200 px-5 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
                 >
-                  Cancel
+                  {t("Cancel")}
                 </button>
               </div>
             </div>

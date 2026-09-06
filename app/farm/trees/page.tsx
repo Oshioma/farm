@@ -8,6 +8,8 @@ import { getFarms, getTreeRegistry } from "@/lib/farm";
 import type { Farm, TreeEntry } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { useFarmRole } from "@/hooks/useFarmRole";
+import { useT, useLanguage } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 type FormData = {
   tree_name: string;
@@ -44,6 +46,8 @@ export default function TreeRegistryPage() {
   const [trees, setTrees] = useState<TreeEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const t = useT();
+  const [lang, setLang] = useLanguage();
   const [showModal, setShowModal] = useState(false);
   const [modalEntry, setModalEntry] = useState<TreeEntry | "new" | null>(null);
   const [form, setForm] = useState<FormData>(blank);
@@ -77,7 +81,7 @@ export default function TreeRegistryPage() {
         const farmRows = await getFarms();
         setFarms(farmRows);
       } catch (err) {
-        setError(errMsg(err, "Failed to load"));
+        setError(errMsg(err, t("Failed to load")));
       } finally {
         setLoading(false);
       }
@@ -86,7 +90,7 @@ export default function TreeRegistryPage() {
 
   useEffect(() => {
     if (!activeFarmId) return;
-    load(activeFarmId).catch((err) => setError(errMsg(err, "Failed to load trees")));
+    load(activeFarmId).catch((err) => setError(errMsg(err, t("Failed to load trees"))));
   }, [activeFarmId]);
 
   function openAdd() {
@@ -129,7 +133,7 @@ export default function TreeRegistryPage() {
       await load(activeFarmId);
       closeModal();
     } catch (err) {
-      setError(errMsg(err, "Failed to save"));
+      setError(errMsg(err, t("Failed to save")));
     } finally {
       setSaving(false);
     }
@@ -144,14 +148,14 @@ export default function TreeRegistryPage() {
       await load(activeFarmId);
       setConfirmDeleteId(null);
     } catch (err) {
-      setError(errMsg(err, "Failed to delete"));
+      setError(errMsg(err, t("Failed to delete")));
     } finally {
       setDeletingId(null);
     }
   }
 
   const activeFarm = farms.find((f) => f.id === activeFarmId);
-  const totalTrees = trees.reduce((sum, t) => sum + (t.number_of_trees ?? 0), 0);
+  const totalTrees = trees.reduce((sum, tree) => sum + (tree.number_of_trees ?? 0), 0);
 
   return (
     <main className="min-h-screen bg-stone-50 text-zinc-900">
@@ -161,9 +165,9 @@ export default function TreeRegistryPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                Shamba Farm Manager
+                {t("Shamba Farm Manager")}
               </p>
-              <h1 className="mt-1 text-3xl font-semibold tracking-tight">Tree registry</h1>
+              <h1 className="mt-1 text-3xl font-semibold tracking-tight">{t("Tree registry")}</h1>
               {activeFarm && (
                 <p className="mt-1 text-sm text-zinc-500">{activeFarm.name}</p>
               )}
@@ -186,8 +190,9 @@ export default function TreeRegistryPage() {
                 href="/farm"
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                ← Farm
+                {t("← Farm")}
               </Link>
+              <LanguageToggle lang={lang} onChange={setLang} />
             </div>
           </div>
         </header>
@@ -198,15 +203,15 @@ export default function TreeRegistryPage() {
 
         {loading ? (
           <div className="rounded-3xl border border-zinc-200 bg-white p-10 text-center text-sm text-zinc-500">
-            Loading…
+            {t("Loading…")}
           </div>
         ) : (
           <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <h2 className="text-xl font-semibold">Trees planted</h2>
+                <h2 className="text-xl font-semibold">{t("Trees planted")}</h2>
                 <p className="mt-1 text-sm text-zinc-500">
-                  {trees.length} species · {totalTrees} trees total
+                  {t("{n} species", { n: trees.length })} · {t("{n} trees total", { n: totalTrees })}
                 </p>
               </div>
               {isManager && (
@@ -214,7 +219,7 @@ export default function TreeRegistryPage() {
                   onClick={openAdd}
                   className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
                 >
-                  + Add tree
+                  {t("+ Add tree")}
                 </button>
               )}
             </div>
@@ -223,10 +228,10 @@ export default function TreeRegistryPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-zinc-200 text-left text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                    <th className="pb-3 pr-4">Tree</th>
-                    <th className="pb-3 pr-4 text-right"># Trees</th>
-                    <th className="pb-3 pr-4">Date planted</th>
-                    <th className="pb-3 pr-4">Notes</th>
+                    <th className="pb-3 pr-4">{t("Tree")}</th>
+                    <th className="pb-3 pr-4 text-right">{t("# Trees")}</th>
+                    <th className="pb-3 pr-4">{t("Date planted")}</th>
+                    <th className="pb-3 pr-4">{t("Notes")}</th>
                     <th className="pb-3" />
                   </tr>
                 </thead>
@@ -234,7 +239,7 @@ export default function TreeRegistryPage() {
                   {trees.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="py-8 text-center text-zinc-400">
-                        No trees recorded yet.
+                        {t("No trees recorded yet.")}
                       </td>
                     </tr>
                   ) : (
@@ -255,19 +260,19 @@ export default function TreeRegistryPage() {
                           <div className="flex items-center justify-end gap-2">
                             {confirmDeleteId === tree.id ? (
                               <>
-                                <span className="text-xs text-red-600">Sure?</span>
+                                <span className="text-xs text-red-600">{t("Sure?")}</span>
                                 <button
                                   onClick={() => handleDelete(tree.id)}
                                   disabled={deletingId === tree.id}
                                   className="rounded-xl bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60"
                                 >
-                                  {deletingId === tree.id ? "Deleting…" : "Yes"}
+                                  {deletingId === tree.id ? t("Deleting…") : t("Yes")}
                                 </button>
                                 <button
                                   onClick={() => setConfirmDeleteId(null)}
                                   className="rounded-xl border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
                                 >
-                                  Cancel
+                                  {t("Cancel")}
                                 </button>
                               </>
                             ) : (
@@ -276,13 +281,13 @@ export default function TreeRegistryPage() {
                                   onClick={() => openEdit(tree)}
                                   className="rounded-xl border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
                                 >
-                                  Edit
+                                  {t("Edit")}
                                 </button>
                                 <button
                                   onClick={() => setConfirmDeleteId(tree.id)}
                                   className="rounded-xl border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
                                 >
-                                  Delete
+                                  {t("Delete")}
                                 </button>
                               </>
                             )}
@@ -304,23 +309,23 @@ export default function TreeRegistryPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
             <h2 className="mb-5 text-xl font-semibold">
-              {modalEntry === "new" ? "Add tree" : "Edit tree"}
+              {modalEntry === "new" ? t("Add tree") : t("Edit tree")}
             </h2>
             <form onSubmit={handleSave} className="space-y-4">
               <div>
-                <label className="mb-1.5 block text-sm font-medium">Tree name</label>
+                <label className="mb-1.5 block text-sm font-medium">{t("Tree name")}</label>
                 <input
                   type="text"
                   value={form.tree_name}
                   onChange={(e) => setForm((p) => ({ ...p, tree_name: e.target.value }))}
                   className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                  placeholder="Avocado"
+                  placeholder={t("Avocado")}
                   required
                 />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium">Number of trees</label>
+                  <label className="mb-1.5 block text-sm font-medium">{t("Number of trees")}</label>
                   <input
                     type="number"
                     min="0"
@@ -331,7 +336,7 @@ export default function TreeRegistryPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium">Date planted</label>
+                  <label className="mb-1.5 block text-sm font-medium">{t("Date planted")}</label>
                   <input
                     type="date"
                     value={form.date_planted}
@@ -341,13 +346,13 @@ export default function TreeRegistryPage() {
                 </div>
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium">Notes</label>
+                <label className="mb-1.5 block text-sm font-medium">{t("Notes")}</label>
                 <textarea
                   value={form.notes}
                   onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
                   rows={3}
                   className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                  placeholder="Planting method, protection, conditions…"
+                  placeholder={t("Planting method, protection, conditions…")}
                 />
               </div>
               <div className="flex gap-3 pt-1">
@@ -356,14 +361,14 @@ export default function TreeRegistryPage() {
                   disabled={saving || !form.tree_name.trim()}
                   className="flex-1 rounded-2xl bg-zinc-900 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
                 >
-                  {saving ? "Saving…" : modalEntry === "new" ? "Add tree" : "Save changes"}
+                  {saving ? t("Saving…") : modalEntry === "new" ? t("Add tree") : t("Save changes")}
                 </button>
                 <button
                   type="button"
                   onClick={closeModal}
                   className="flex-1 rounded-2xl border border-zinc-300 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
                 >
-                  Cancel
+                  {t("Cancel")}
                 </button>
               </div>
             </form>

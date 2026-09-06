@@ -21,6 +21,9 @@ import {
 } from "@/lib/farm";
 import type { Farm, HarvestEtaEntry, Zone, Crop, SeasonMonth, Customer, CustomerOrder } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { useT, useLanguage } from "@/lib/i18n";
+import type { Translate } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -74,12 +77,12 @@ type MonthTotal = {
   oversold: boolean;
 };
 
-function lineFor(entry: HarvestEtaEntry, raw: string, crops: Crop[], zones: Zone[], suffix: string): Line {
+function lineFor(t: Translate, entry: HarvestEtaEntry, raw: string, crops: Crop[], zones: Zone[], suffix: string): Line {
   const crop = entry.crop_id ? crops.find((c) => c.id === entry.crop_id) : undefined;
   const cropName =
     entry.main_crop?.trim() ||
     (crop ? crop.crop_name + (crop.variety ? ` · ${crop.variety}` : "") : "") ||
-    "Unnamed";
+    t("Unnamed");
   const beds =
     (crop?.zone_ids ?? [])
       .map((zid) => bedLabel(zones.find((z) => z.id === zid)))
@@ -92,6 +95,7 @@ function lineFor(entry: HarvestEtaEntry, raw: string, crops: Crop[], zones: Zone
 }
 
 function buildMonths(
+  t: Translate,
   months: SeasonMonth[],
   entries: HarvestEtaEntry[],
   crops: Crop[],
@@ -121,14 +125,14 @@ function buildMonths(
 
       const rawExp = ((row[`${month.key}_expected`] as string | null) ?? "").trim();
       if (rawExp) {
-        const line = lineFor(entry, rawExp, crops, zones, `${month.key}_exp`);
+        const line = lineFor(t, entry, rawExp, crops, zones, `${month.key}_exp`);
         expected.push(line);
         if (line.kg === null) unconverted.push(line);
       }
 
       const rawAct = ((row[`${month.key}_actual`] as string | null) ?? "").trim();
       if (rawAct) {
-        const line = lineFor(entry, rawAct, crops, zones, `${month.key}_act`);
+        const line = lineFor(t, entry, rawAct, crops, zones, `${month.key}_act`);
         actual.push(line);
         if (line.kg === null) unconverted.push(line);
       }
@@ -145,8 +149,8 @@ function buildMonths(
       const crop = crops.find((c) => c.id === o.crop_id);
       claims.push({
         id: `${o.id}:${standing && !dated ? "s" : "d"}`,
-        customer: customers.find((c) => c.id === o.customer_id)?.name ?? "Unknown customer",
-        crop: crop ? crop.crop_name + (crop.variety ? ` · ${crop.variety}` : "") : "Any crop",
+        customer: customers.find((c) => c.id === o.customer_id)?.name ?? t("Unknown customer"),
+        crop: crop ? crop.crop_name + (crop.variety ? ` · ${crop.variety}` : "") : t("Any crop"),
         amount: o.quantity_kg !== null ? `${o.quantity_kg} kg` : `${o.share_pct}%`,
         kg: orderKg(o, expectedFor(o.crop_id, month)),
         standing: standing && !dated,
@@ -185,6 +189,8 @@ export default function ProduceExpectedPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const router = useRouter();
+  const t = useT();
+  const [lang, setLang] = useLanguage();
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
   const activeFarmIdRef = useRef(activeFarmId);
   useEffect(() => {
@@ -194,7 +200,7 @@ export default function ProduceExpectedPage() {
   useEffect(() => {
     getFarms()
       .then(setFarms)
-      .catch((err) => setError(errMsg(err, "Failed to load farms")))
+      .catch((err) => setError(errMsg(err, t("Failed to load farms"))))
       .finally(() => setLoading(false));
   }, []);
 
@@ -219,15 +225,15 @@ export default function ProduceExpectedPage() {
         setOrders(orderRows);
         setCustomers(customerRows);
       })
-      .catch((err) => setError(errMsg(err, "Failed to load")))
+      .catch((err) => setError(errMsg(err, t("Failed to load"))))
       .finally(() => setLoading(false));
   }, [activeFarmId, year]);
 
   const months = useMemo(() => seasonMonths(year, SEASON_SPAN), [year]);
   const lastMonth = months[months.length - 1];
   const allTotals = useMemo(
-    () => buildMonths(months, entries, crops, zones, orders, customers),
-    [months, entries, crops, zones, orders, customers]
+    () => buildMonths(t, months, entries, crops, zones, orders, customers),
+    [t, months, entries, crops, zones, orders, customers]
   );
 
   /* "From this month" hides months already gone by, which is what you want when
@@ -240,15 +246,15 @@ export default function ProduceExpectedPage() {
     [allTotals, fromNow, currentIndex]
   );
 
-  const withProduce = totals.filter((t) => t.expected.length > 0 || t.actual.length > 0);
-  const totalExpected = totals.reduce((sum, t) => sum + t.expectedKg, 0);
-  const totalActual = totals.reduce((sum, t) => sum + t.actualKg, 0);
-  const totalUnconverted = totals.reduce((sum, t) => sum + t.unconverted.length, 0);
-  const totalOrdered = totals.reduce((sum, t) => sum + t.orderedKg, 0);
-  const totalUnsold = totals.reduce((sum, t) => sum + t.unsoldKg, 0);
-  const oversoldMonths = totals.filter((t) => t.oversold).length;
+  const withProduce = totals.filter((mt) => mt.expected.length > 0 || mt.actual.length > 0);
+  const totalExpected = totals.reduce((sum, mt) => sum + mt.expectedKg, 0);
+  const totalActual = totals.reduce((sum, mt) => sum + mt.actualKg, 0);
+  const totalUnconverted = totals.reduce((sum, mt) => sum + mt.unconverted.length, 0);
+  const totalOrdered = totals.reduce((sum, mt) => sum + mt.orderedKg, 0);
+  const totalUnsold = totals.reduce((sum, mt) => sum + mt.unsoldKg, 0);
+  const oversoldMonths = totals.filter((mt) => mt.oversold).length;
   const peak = withProduce.reduce<MonthTotal | null>(
-    (best, t) => (!best || t.expectedKg > best.expectedKg ? t : best),
+    (best, mt) => (!best || mt.expectedKg > best.expectedKg ? mt : best),
     null
   );
 
@@ -263,11 +269,11 @@ export default function ProduceExpectedPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                Shamba Farm Manager
+                {t("Shamba Farm Manager")}
               </p>
-              <h1 className="mt-1 text-3xl font-semibold tracking-tight">Produce expected</h1>
+              <h1 className="mt-1 text-3xl font-semibold tracking-tight">{t("Produce expected")}</h1>
               <p className="mt-1 text-sm text-zinc-500">
-                {activeFarm ? `${activeFarm.name} — ` : ""}totalled from the Harvest ETA sheet
+                {activeFarm ? `${activeFarm.name} — ` : ""}{t("totalled from the Harvest ETA sheet")}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -285,17 +291,18 @@ export default function ProduceExpectedPage() {
                 </button>
               ))}
               <Link href="/farm/harvest-eta" className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
-                Harvest ETA
+                {t("Harvest ETA")}
               </Link>
               <Link href="/farm" className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
-                ← Farm
+                {t("← Farm")}
               </Link>
               <button
                 onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                Sign out
+                {t("Sign out")}
               </button>
+              <LanguageToggle lang={lang} onChange={setLang} />
             </div>
           </div>
         </header>
@@ -314,7 +321,7 @@ export default function ProduceExpectedPage() {
               ← {year - 1}
             </button>
             <span className="rounded-full bg-zinc-900 px-5 py-2 text-sm font-semibold text-white">
-              Mar {year} – {lastMonth.label} {lastMonth.calendarYear}
+              {t("Mar")} {year} – {t(lastMonth.label)} {lastMonth.calendarYear}
             </span>
             <button
               onClick={() => setYear((y) => y + 1)}
@@ -325,8 +332,8 @@ export default function ProduceExpectedPage() {
           </div>
           <div className="flex rounded-full border border-zinc-200 bg-white p-1">
             {[
-              { key: true, label: "From this month" },
-              { key: false, label: "Whole window" },
+              { key: true, label: t("From this month") },
+              { key: false, label: t("Whole window") },
             ].map((opt) => (
               <button
                 key={String(opt.key)}
@@ -344,52 +351,53 @@ export default function ProduceExpectedPage() {
         {/* Totals */}
         <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
           <div className="rounded-3xl border border-emerald-200 bg-emerald-50/60 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Expected</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">{t("Expected")}</p>
             <p className="mt-1 text-3xl font-semibold text-emerald-900">{fmtKg(totalExpected)}</p>
             <p className="mt-1 text-xs text-emerald-700">
-              across {withProduce.length} month{withProduce.length === 1 ? "" : "s"}
+              {withProduce.length === 1 ? t("across 1 month") : t("across {n} months", { n: withProduce.length })}
             </p>
           </div>
           <div className="rounded-3xl border border-indigo-200 bg-indigo-50/60 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-700">Sold</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-700">{t("Sold")}</p>
             <p className="mt-1 text-3xl font-semibold text-indigo-900">{fmtKg(totalOrdered)}</p>
             <p className="mt-1 text-xs text-indigo-700">
-              {totalExpected > 0 ? `${Math.round((totalOrdered / totalExpected) * 100)}% of expected` : "nothing ordered"}
+              {totalExpected > 0 ? t("{pct}% of expected", { pct: Math.round((totalOrdered / totalExpected) * 100) }) : t("nothing ordered")}
             </p>
           </div>
           <div className="rounded-3xl border border-amber-200 bg-amber-50/60 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">Still to sell</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">{t("Still to sell")}</p>
             <p className="mt-1 text-3xl font-semibold text-amber-900">{fmtKg(totalUnsold)}</p>
             <p className="mt-1 text-xs text-amber-700">
               {oversoldMonths > 0
-                ? `${oversoldMonths} month${oversoldMonths === 1 ? "" : "s"} oversold`
-                : "expected minus ordered"}
+                ? (oversoldMonths === 1 ? t("1 month oversold") : t("{n} months oversold", { n: oversoldMonths }))
+                : t("expected minus ordered")}
             </p>
           </div>
           <div className="rounded-3xl border border-blue-200 bg-blue-50/60 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Picked so far</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">{t("Picked so far")}</p>
             <p className="mt-1 text-3xl font-semibold text-blue-900">{fmtKg(totalActual)}</p>
-            <p className="mt-1 text-xs text-blue-700">recorded as actual</p>
+            <p className="mt-1 text-xs text-blue-700">{t("recorded as actual")}</p>
           </div>
         </div>
 
         {totalUnconverted > 0 && (
           <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            {totalUnconverted} entr{totalUnconverted === 1 ? "y is" : "ies are"} not a weight (e.g. &ldquo;20 crates&rdquo;) and
-            are left out of the totals. Open a month to see them.
+            {totalUnconverted === 1
+              ? t("1 entry is not a weight (e.g. “20 crates”) and is left out of the totals. Open a month to see it.")
+              : t("{n} entries are not a weight (e.g. “20 crates”) and are left out of the totals. Open a month to see them.", { n: totalUnconverted })}
           </div>
         )}
 
         {/* Months */}
         {loading ? (
-          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">Loading...</div>
+          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">{t("Loading...")}</div>
         ) : (
           <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
-            {totals.map((t) => {
-              const key = `${t.month.season}:${t.month.key}`;
+            {totals.map((mt) => {
+              const key = `${mt.month.season}:${mt.month.key}`;
               const isOpen = expanded === key;
-              const isEmpty = t.expected.length === 0 && t.actual.length === 0;
-              const isCurrent = t.month.season === currentSeason && t.month.key === currentKey;
+              const isEmpty = mt.expected.length === 0 && mt.actual.length === 0;
+              const isCurrent = mt.month.season === currentSeason && mt.month.key === currentKey;
               return (
                 <div key={key} className="border-b border-zinc-100 last:border-b-0">
                   <button
@@ -401,43 +409,43 @@ export default function ProduceExpectedPage() {
                   >
                     <div className="flex items-center gap-3">
                       <span className={`w-24 text-sm font-semibold ${isEmpty ? "text-zinc-400" : "text-zinc-900"}`}>
-                        {t.month.label} {t.month.calendarYear}
+                        {t(mt.month.label)} {mt.month.calendarYear}
                       </span>
                       {isCurrent && (
-                        <span className="rounded-full bg-zinc-900 px-2 py-0.5 text-[10px] font-medium text-white">this month</span>
+                        <span className="rounded-full bg-zinc-900 px-2 py-0.5 text-[10px] font-medium text-white">{t("this month")}</span>
                       )}
                       {!isEmpty && (
                         <span className="text-xs text-zinc-500">
-                          {t.expected.length} crop{t.expected.length === 1 ? "" : "s"}
+                          {mt.expected.length === 1 ? t("1 crop") : t("{n} crops", { n: mt.expected.length })}
                         </span>
                       )}
                     </div>
                     <div className="flex items-center gap-4">
-                      {t.orderedKg > 0 && (
-                        <span className="hidden w-32 sm:block" title={`${fmtKg(t.orderedKg)} of ${fmtKg(t.expectedKg)} sold`}>
+                      {mt.orderedKg > 0 && (
+                        <span className="hidden w-32 sm:block" title={t("{sold} of {expected} sold", { sold: fmtKg(mt.orderedKg), expected: fmtKg(mt.expectedKg) })}>
                           <span className="block h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
                             <span
-                              className={`block h-full ${t.oversold ? "bg-rose-500" : "bg-indigo-500"}`}
-                              style={{ width: `${Math.min(100, t.expectedKg > 0 ? (t.orderedKg / t.expectedKg) * 100 : 100)}%` }}
+                              className={`block h-full ${mt.oversold ? "bg-rose-500" : "bg-indigo-500"}`}
+                              style={{ width: `${Math.min(100, mt.expectedKg > 0 ? (mt.orderedKg / mt.expectedKg) * 100 : 100)}%` }}
                             />
                           </span>
                         </span>
                       )}
-                      {t.actualKg > 0 && (
+                      {mt.actualKg > 0 && (
                         <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
-                          {fmtKg(t.actualKg)} actual
+                          {t("{kg} actual", { kg: fmtKg(mt.actualKg) })}
                         </span>
                       )}
                       <span className="text-right text-xs text-zinc-500">
-                        <span className={`block text-sm font-semibold ${t.expectedKg > 0 ? "text-emerald-700" : "text-zinc-300"}`}>
-                          {t.expectedKg > 0 ? fmtKg(t.expectedKg) : "—"}
+                        <span className={`block text-sm font-semibold ${mt.expectedKg > 0 ? "text-emerald-700" : "text-zinc-300"}`}>
+                          {mt.expectedKg > 0 ? fmtKg(mt.expectedKg) : "—"}
                         </span>
-                        {t.orderedKg > 0 && (
-                          <span className={t.oversold ? "text-rose-600" : "text-zinc-500"}>
-                            {fmtKg(t.orderedKg)} sold
-                            {t.oversold
-                              ? ` · ${fmtKg(t.orderedKg - t.expectedKg)} over`
-                              : ` · ${fmtKg(t.unsoldKg)} left`}
+                        {mt.orderedKg > 0 && (
+                          <span className={mt.oversold ? "text-rose-600" : "text-zinc-500"}>
+                            {t("{kg} sold", { kg: fmtKg(mt.orderedKg) })}
+                            {mt.oversold
+                              ? t(" · {kg} over", { kg: fmtKg(mt.orderedKg - mt.expectedKg) })
+                              : t(" · {kg} left", { kg: fmtKg(mt.unsoldKg) })}
                           </span>
                         )}
                       </span>
@@ -450,71 +458,71 @@ export default function ProduceExpectedPage() {
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                            <th className="py-1.5 text-left">Crop</th>
-                            <th className="py-1.5 text-left">Bed(s)</th>
-                            <th className="py-1.5 text-left">Written</th>
-                            <th className="py-1.5 text-right">Kilos</th>
+                            <th className="py-1.5 text-left">{t("Crop")}</th>
+                            <th className="py-1.5 text-left">{t("Bed(s)")}</th>
+                            <th className="py-1.5 text-left">{t("Written")}</th>
+                            <th className="py-1.5 text-right">{t("Kilos")}</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {t.expected.map((l) => (
+                          {mt.expected.map((l) => (
                             <tr key={l.id} className="border-t border-zinc-200/70">
                               <td className="py-1.5 pr-3 font-medium">{l.crop}</td>
                               <td className="py-1.5 pr-3 text-zinc-500">{l.beds}</td>
                               <td className="py-1.5 pr-3 text-zinc-500">
                                 {l.raw}
-                                {l.isRange && <span className="ml-1 text-zinc-400">(midpoint)</span>}
+                                {l.isRange && <span className="ml-1 text-zinc-400">{t("(midpoint)")}</span>}
                               </td>
                               <td className={`py-1.5 text-right font-medium ${l.kg === null ? "text-amber-700" : "text-emerald-700"}`}>
-                                {l.kg === null ? `not a weight${l.unit ? ` (${l.unit})` : ""}` : fmtKg(l.kg)}
+                                {l.kg === null ? (l.unit ? t("not a weight ({unit})", { unit: l.unit }) : t("not a weight")) : fmtKg(l.kg)}
                               </td>
                             </tr>
                           ))}
-                          {t.actual.map((l) => (
+                          {mt.actual.map((l) => (
                             <tr key={l.id} className="border-t border-zinc-200/70">
                               <td className="py-1.5 pr-3 font-medium">{l.crop}</td>
                               <td className="py-1.5 pr-3 text-zinc-500">{l.beds}</td>
                               <td className="py-1.5 pr-3 text-zinc-500">
-                                {l.raw} <span className="text-blue-600">(actual)</span>
+                                {l.raw} <span className="text-blue-600">{t("(actual)")}</span>
                               </td>
                               <td className={`py-1.5 text-right font-medium ${l.kg === null ? "text-amber-700" : "text-blue-700"}`}>
-                                {l.kg === null ? `not a weight${l.unit ? ` (${l.unit})` : ""}` : fmtKg(l.kg)}
+                                {l.kg === null ? (l.unit ? t("not a weight ({unit})", { unit: l.unit }) : t("not a weight")) : fmtKg(l.kg)}
                               </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
 
-                      {t.claims.length > 0 && (
+                      {mt.claims.length > 0 && (
                         <div className="mt-4 border-t border-zinc-200/70 pt-3">
                           <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                            Sold to
+                            {t("Sold to")}
                           </p>
                           <table className="w-full text-xs">
                             <tbody>
-                              {t.claims.map((c) => (
+                              {mt.claims.map((c) => (
                                 <tr key={c.id} className="border-t border-zinc-200/70 first:border-t-0">
                                   <td className="py-1.5 pr-3 font-medium">
                                     {c.customer}
                                     {c.standing && (
                                       <span className="ml-1.5 rounded-full bg-zinc-200/70 px-1.5 py-0.5 text-[9px] font-medium text-zinc-600">
-                                        standing
+                                        {t("standing")}
                                       </span>
                                     )}
                                   </td>
                                   <td className="py-1.5 pr-3 text-zinc-500">{c.crop}</td>
                                   <td className="py-1.5 pr-3 text-zinc-500">{c.amount}</td>
                                   <td className={`py-1.5 text-right font-medium ${c.kg === null ? "text-amber-700" : "text-indigo-700"}`}>
-                                    {c.kg === null ? "no estimate yet" : fmtKg(c.kg)}
+                                    {c.kg === null ? t("no estimate yet") : fmtKg(c.kg)}
                                   </td>
                                 </tr>
                               ))}
                               <tr className="border-t border-zinc-300">
                                 <td className="py-1.5 pr-3 font-semibold" colSpan={3}>
-                                  {t.oversold ? "Oversold by" : "Still to sell"}
+                                  {mt.oversold ? t("Oversold by") : t("Still to sell")}
                                 </td>
-                                <td className={`py-1.5 text-right font-semibold ${t.oversold ? "text-rose-700" : "text-amber-700"}`}>
-                                  {fmtKg(t.oversold ? t.orderedKg - t.expectedKg : t.unsoldKg)}
+                                <td className={`py-1.5 text-right font-semibold ${mt.oversold ? "text-rose-700" : "text-amber-700"}`}>
+                                  {fmtKg(mt.oversold ? mt.orderedKg - mt.expectedKg : mt.unsoldKg)}
                                 </td>
                               </tr>
                             </tbody>
@@ -531,15 +539,13 @@ export default function ProduceExpectedPage() {
 
         {!loading && withProduce.length === 0 && (
           <p className="mt-4 text-center text-sm text-zinc-500">
-            No estimates in this window yet. Add them on the{" "}
-            <Link href="/farm/harvest-eta" className="underline">Harvest ETA sheet</Link>.
+            {t("No estimates in this window yet. Add them on the")}{" "}
+            <Link href="/farm/harvest-eta" className="underline">{t("Harvest ETA sheet")}</Link>.
           </p>
         )}
 
         <p className="mt-4 text-xs text-zinc-400">
-          Totals read the Harvest ETA month cells. Plain numbers are treated as kilos; g, t and lb are converted;
-          a range like &ldquo;10-15kg&rdquo; counts as its midpoint. Sold figures come from customer orders — a
-          share is worked out against that month&rsquo;s estimate, so it moves as the estimate does.
+          {t("Totals read the Harvest ETA month cells. Plain numbers are treated as kilos; g, t and lb are converted; a range like “10-15kg” counts as its midpoint. Sold figures come from customer orders — a share is worked out against that month’s estimate, so it moves as the estimate does.")}
         </p>
       </div>
     </main>

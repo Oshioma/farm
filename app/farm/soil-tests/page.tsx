@@ -8,6 +8,8 @@ import { getFarms, getSoilTests } from "@/lib/farm";
 import type { Farm, SoilTestEntry } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { useFarmRole } from "@/hooks/useFarmRole";
+import { useT, useLanguage } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -25,6 +27,8 @@ function fmt(d: string | null) {
 }
 
 export default function SoilTestsPage() {
+  const t = useT();
+  const [lang, setLang] = useLanguage();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [entries, setEntries] = useState<SoilTestEntry[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
@@ -56,7 +60,7 @@ export default function SoilTestsPage() {
         const farmRows = await getFarms();
         setFarms(farmRows);
       } catch (err) {
-        setError(errMsg(err, "Failed to load"));
+        setError(errMsg(err, t("Failed to load")));
       } finally {
         setLoading(false);
       }
@@ -67,7 +71,7 @@ export default function SoilTestsPage() {
     if (!activeFarmId) return;
     setLoading(true);
     loadEntries(activeFarmId)
-      .catch((err) => setError(errMsg(err, "Failed to load")))
+      .catch((err) => setError(errMsg(err, t("Failed to load"))))
       .finally(() => setLoading(false));
   }, [activeFarmId]);
 
@@ -94,7 +98,7 @@ export default function SoilTestsPage() {
       await loadEntries(activeFarmId);
       setModal(null);
     } catch (err) {
-      setError(errMsg(err, "Failed to save"));
+      setError(errMsg(err, t("Failed to save")));
     } finally {
       setSaving(false);
     }
@@ -107,7 +111,7 @@ export default function SoilTestsPage() {
       if (e) throw e;
       setEntries((prev) => prev.filter((e) => e.id !== id));
     } catch (err) {
-      setError(errMsg(err, "Failed to delete"));
+      setError(errMsg(err, t("Failed to delete")));
     } finally {
       setDeletingId(null);
     }
@@ -139,9 +143,9 @@ export default function SoilTestsPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                Shamba Farm Manager
+                {t("Shamba Farm Manager")}
               </p>
-              <h1 className="mt-1 text-3xl font-semibold tracking-tight">Soil tests</h1>
+              <h1 className="mt-1 text-3xl font-semibold tracking-tight">{t("Soil tests")}</h1>
               {activeFarm && <p className="mt-1 text-sm text-zinc-500">{activeFarm.name}</p>}
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -158,14 +162,15 @@ export default function SoilTestsPage() {
                   {f.name}
                 </button>
               ))}
+              <LanguageToggle lang={lang} onChange={setLang} />
               <Link href="/farm" className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
-                &larr; Farm
+                {t("← Farm")}
               </Link>
               <button
                 onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                Sign out
+                {t("Sign out")}
               </button>
             </div>
           </div>
@@ -176,22 +181,22 @@ export default function SoilTestsPage() {
         )}
 
         <div className="mb-4 flex items-center justify-between">
-          <span className="text-sm text-zinc-500">{entries.length} entries</span>
+          <span className="text-sm text-zinc-500">{entries.length === 1 ? t("1 entry") : t("{n} entries", { n: entries.length })}</span>
           {isManager && (
             <button
               onClick={openAdd}
               className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
             >
-              + Add soil test
+              {t("+ Add soil test")}
             </button>
           )}
         </div>
 
         {loading ? (
-          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">Loading...</div>
+          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">{t("Loading...")}</div>
         ) : entries.length === 0 ? (
           <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-center text-sm text-zinc-500">
-            No soil test entries yet.
+            {t("No soil test entries yet.")}
           </div>
         ) : (
           <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
@@ -199,11 +204,11 @@ export default function SoilTestsPage() {
               <table className="w-full min-w-[700px] text-sm">
                 <thead>
                   <tr className="border-b border-zinc-200 bg-zinc-50 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                    <th className="px-4 py-3 text-left">Date</th>
-                    <th className="px-4 py-3 text-left">Location</th>
-                    <th className="px-4 py-3 text-left">Action</th>
-                    <th className="px-4 py-3 text-left">Result</th>
-                    <th className="px-4 py-3 text-left">Notes</th>
+                    <th className="px-4 py-3 text-left">{t("Date")}</th>
+                    <th className="px-4 py-3 text-left">{t("Location")}</th>
+                    <th className="px-4 py-3 text-left">{t("Action")}</th>
+                    <th className="px-4 py-3 text-left">{t("Result")}</th>
+                    <th className="px-4 py-3 text-left">{t("Notes")}</th>
                     <th className="px-4 py-3" />
                   </tr>
                 </thead>
@@ -218,9 +223,9 @@ export default function SoilTestsPage() {
                       <td className="px-4 py-3 whitespace-nowrap">
                         {isManager && (
                           <div className="flex gap-1">
-                            <button onClick={() => openEdit(row)} className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">Edit</button>
+                            <button onClick={() => openEdit(row)} className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">{t("Edit")}</button>
                             <button onClick={() => handleDelete(row.id)} disabled={deletingId === row.id} className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">
-                              {deletingId === row.id ? "\u2026" : "Delete"}
+                              {deletingId === row.id ? "\u2026" : t("Delete")}
                             </button>
                           </div>
                         )}
@@ -239,38 +244,38 @@ export default function SoilTestsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-lg rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl">
             <h2 className="mb-5 text-lg font-semibold">
-              {modal === "new" ? "Add soil test entry" : `Edit \u2014 ${(modal as SoilTestEntry).action ?? "entry"}`}
+              {modal === "new" ? t("Add soil test entry") : t("Edit — {name}", { name: (modal as SoilTestEntry).action ?? t("entry") })}
             </h2>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Date</label>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Date")}</label>
                   <input type="date" className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Location</label>
-                  <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.location} onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))} placeholder="Mount Sol, Greenhouse…" />
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Location")}</label>
+                  <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.location} onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))} placeholder={t("Mount Sol, Greenhouse…")} />
                 </div>
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Action</label>
-                <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.action} onChange={(e) => setForm((p) => ({ ...p, action: e.target.value }))} placeholder="pH test, Nitrogen test…" />
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Action")}</label>
+                <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.action} onChange={(e) => setForm((p) => ({ ...p, action: e.target.value }))} placeholder={t("pH test, Nitrogen test…")} />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Result</label>
-                <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.result} onChange={(e) => setForm((p) => ({ ...p, result: e.target.value }))} placeholder="pH 7.0 Neutral, Nitrogen sufficient…" />
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Result")}</label>
+                <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.result} onChange={(e) => setForm((p) => ({ ...p, result: e.target.value }))} placeholder={t("pH 7.0 Neutral, Nitrogen sufficient…")} />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Notes</label>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Notes")}</label>
                 <textarea className="min-h-[70px] w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
               </div>
             </div>
             <div className="mt-5 flex gap-2">
               <button onClick={handleSave} disabled={saving} className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60">
-                {saving ? "Saving..." : "Save"}
+                {saving ? t("Saving...") : t("Save")}
               </button>
               <button onClick={() => setModal(null)} className="rounded-2xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
-                Cancel
+                {t("Cancel")}
               </button>
             </div>
           </div>

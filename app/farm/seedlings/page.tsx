@@ -21,6 +21,8 @@ import { createLunarTask } from "@/lib/lunarTasks";
 import { SeedlingMap } from "../components/SeedlingMap";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { useFarmRole } from "@/hooks/useFarmRole";
+import { useT, useLanguage } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 /* ── Types ────────────────────────────────────────────────── */
 
@@ -83,6 +85,8 @@ function fmt(date: string | null) {
 /* ── Page ─────────────────────────────────────────────────── */
 
 export default function SeedlingsPage() {
+  const t = useT();
+  const [lang, setLang] = useLanguage();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
   const [entries, setEntries] = useState<SeedlingEntry[]>([]);
@@ -132,7 +136,7 @@ export default function SeedlingsPage() {
       .then((rows) => {
         setFarms(rows);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load farms"));
+      .catch((err) => setError(err instanceof Error ? err.message : t("Failed to load farms")));
   }, []);
 
   useEffect(() => {
@@ -147,7 +151,7 @@ export default function SeedlingsPage() {
         setSeedEntries(seeds);
         setZones(zoneRows);
       })
-      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load data"); })
+      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : t("Failed to load data")); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => {
       cancelled = true;
@@ -291,7 +295,7 @@ export default function SeedlingsPage() {
       await reload();
       setTransplantModal(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to transplant");
+      setError(err instanceof Error ? err.message : t("Failed to transplant"));
     } finally {
       setTransplanting(false);
     }
@@ -354,7 +358,7 @@ export default function SeedlingsPage() {
       await reload();
       setModal(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save");
+      setError(err instanceof Error ? err.message : t("Failed to save"));
     } finally {
       setSaving(false);
     }
@@ -367,7 +371,7 @@ export default function SeedlingsPage() {
       if (e) throw e;
       await reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete");
+      setError(err instanceof Error ? err.message : t("Failed to delete"));
     } finally {
       setDeletingId(null);
     }
@@ -395,7 +399,7 @@ export default function SeedlingsPage() {
       await reload();
       setSeedModal(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save");
+      setError(err instanceof Error ? err.message : t("Failed to save"));
     } finally {
       setSeedSaving(false);
     }
@@ -408,7 +412,7 @@ export default function SeedlingsPage() {
       if (e) throw e;
       await reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete");
+      setError(err instanceof Error ? err.message : t("Failed to delete"));
     } finally {
       setSeedDeletingId(null);
     }
@@ -427,9 +431,9 @@ export default function SeedlingsPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                Shamba Farm Manager
+                {t("Shamba Farm Manager")}
               </p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight">Seedlings</h1>
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight">{t("Seedlings")}</h1>
               {activeFarm && <p className="mt-1 text-sm text-zinc-500">{activeFarm.name}</p>}
             </div>
             <div className="flex flex-wrap gap-2">
@@ -447,14 +451,15 @@ export default function SeedlingsPage() {
                 </button>
               ))}
               <Link href="/farm" className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
-                ← Farm
+                {t("← Farm")}
               </Link>
               <button
                 onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                Sign out
+                {t("Sign out")}
               </button>
+              <LanguageToggle lang={lang} onChange={setLang} />
             </div>
           </div>
         </header>
@@ -479,7 +484,7 @@ export default function SeedlingsPage() {
                   tab === key ? "bg-zinc-900 text-white" : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
                 }`}
               >
-                {label}
+                {t(label)}
                 <span className="ml-2 text-xs opacity-60">{count}</span>
               </button>
             ))}
@@ -489,13 +494,13 @@ export default function SeedlingsPage() {
               onClick={openAdd}
               className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
             >
-              + Add entry
+              {t("+ Add entry")}
             </button>
           </div>
         </div>
 
         {loading ? (
-          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">Loading...</div>
+          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">{t("Loading...")}</div>
         ) : tab === "nursery" ? (
           <div className="space-y-6">
             <div className="rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6">
@@ -543,82 +548,82 @@ export default function SeedlingsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-lg rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl">
             <h2 className="mb-5 text-lg font-semibold">
-              {modal === "new" ? "Add entry" : `Edit — ${(modal as SeedlingEntry).plant}`}
+              {modal === "new" ? t("Add entry") : t("Edit — {name}", { name: (modal as SeedlingEntry).plant })}
             </h2>
 
             <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
-              <Field label="Type">
+              <Field label={t("Type")}>
                 <select className={inp} value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}>
-                  <option value="nursery">Nursery start</option>
-                  <option value="field">Field planting</option>
+                  <option value="nursery">{t("Nursery start")}</option>
+                  <option value="field">{t("Field planting")}</option>
                 </select>
               </Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Date">
+                <Field label={t("Date")}>
                   <input type="date" className={inp} value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
                 </Field>
-                <Field label="Plant *">
-                  <input className={inp} value={form.plant} onChange={(e) => setForm((p) => ({ ...p, plant: e.target.value }))} placeholder="Tomato" />
+                <Field label={t("Plant *")}>
+                  <input className={inp} value={form.plant} onChange={(e) => setForm((p) => ({ ...p, plant: e.target.value }))} placeholder={t("Tomato")} />
                 </Field>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Variety">
-                  <input className={inp} value={form.variety} onChange={(e) => setForm((p) => ({ ...p, variety: e.target.value }))} placeholder="Fiorentino" />
+                <Field label={t("Variety")}>
+                  <input className={inp} value={form.variety} onChange={(e) => setForm((p) => ({ ...p, variety: e.target.value }))} placeholder={t("Fiorentino")} />
                 </Field>
-                <Field label="Quantity">
-                  <input className={inp} value={form.quantity} onChange={(e) => setForm((p) => ({ ...p, quantity: e.target.value }))} placeholder="64 or ~20" />
+                <Field label={t("Quantity")}>
+                  <input className={inp} value={form.quantity} onChange={(e) => setForm((p) => ({ ...p, quantity: e.target.value }))} placeholder={t("64 or ~20")} />
                 </Field>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Successional sowing">
-                  <input className={inp} value={form.successional_sowing} onChange={(e) => setForm((p) => ({ ...p, successional_sowing: e.target.value }))} placeholder="After seed collection, monthly…" />
+                <Field label={t("Successional sowing")}>
+                  <input className={inp} value={form.successional_sowing} onChange={(e) => setForm((p) => ({ ...p, successional_sowing: e.target.value }))} placeholder={t("After seed collection, monthly…")} />
                 </Field>
-                <Field label="Germination date">
+                <Field label={t("Germination date")}>
                   <input type="date" className={inp} value={form.germination_date} onChange={(e) => setForm((p) => ({ ...p, germination_date: e.target.value }))} />
                 </Field>
               </div>
               {form.type === "nursery" && (
                 <div>
-                  <Field label="Next succession sowing date">
+                  <Field label={t("Next succession sowing date")}>
                     <input type="date" className={inp} value={form.next_sowing_date} onChange={(e) => setForm((p) => ({ ...p, next_sowing_date: e.target.value }))} />
                   </Field>
                   <p className="mt-1.5 text-xs text-zinc-400">
-                    Adds a task on this date to the Planner so you get reminded to sow again.
+                    {t("Adds a task on this date to the Planner so you get reminded to sow again.")}
                   </p>
                 </div>
               )}
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Healthy seedlings">
-                  <input className={inp} value={form.healthy_seedlings} onChange={(e) => setForm((p) => ({ ...p, healthy_seedlings: e.target.value }))} placeholder="8, All, None…" />
+                <Field label={t("Healthy seedlings")}>
+                  <input className={inp} value={form.healthy_seedlings} onChange={(e) => setForm((p) => ({ ...p, healthy_seedlings: e.target.value }))} placeholder={t("8, All, None…")} />
                 </Field>
                 {form.type === "nursery" ? (
-                  <Field label="Tray">
+                  <Field label={t("Tray")}>
                     <select
                       className={inp}
                       value={form.row_location}
                       onChange={(e) => setForm((p) => ({ ...p, row_location: e.target.value }))}
                     >
-                      <option value="">— None —</option>
+                      <option value="">{t("— None —")}</option>
                       {trayCodes.map((code) => (
                         <option key={code} value={code}>{code}</option>
                       ))}
                       {form.row_location && !trayCodes.includes(form.row_location) && (
-                        <option value={form.row_location}>{form.row_location} (not on map)</option>
+                        <option value={form.row_location}>{t("{code} (not on map)", { code: form.row_location })}</option>
                       )}
                     </select>
                     {trayCodes.length === 0 && (
                       <p className="mt-1 text-[10px] text-zinc-400">
-                        No trays yet — add some on the Map tab.
+                        {t("No trays yet — add some on the Map tab.")}
                       </p>
                     )}
                   </Field>
                 ) : (
-                  <Field label="Row / Location">
-                    <input className={inp} value={form.row_location} onChange={(e) => setForm((p) => ({ ...p, row_location: e.target.value }))} placeholder="A1, South border…" />
+                  <Field label={t("Row / Location")}>
+                    <input className={inp} value={form.row_location} onChange={(e) => setForm((p) => ({ ...p, row_location: e.target.value }))} placeholder={t("A1, South border…")} />
                   </Field>
                 )}
               </div>
-              <Field label="Germination status">
+              <Field label={t("Germination status")}>
                 <div className="flex gap-3 pt-1">
                   {[
                     { value: "green",  bg: "bg-emerald-500", ring: "ring-emerald-500", label: "Good" },
@@ -636,16 +641,16 @@ export default function SeedlingsPage() {
                       }`}
                     >
                       <span className={`h-3 w-3 rounded-full ${bg}`} />
-                      {label}
+                      {t(label)}
                     </button>
                   ))}
                 </div>
               </Field>
-              <Field label="Notes">
-                <textarea className={`${inp} min-h-[80px]`} value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} placeholder="Observations…" />
+              <Field label={t("Notes")}>
+                <textarea className={`${inp} min-h-[80px]`} value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} placeholder={t("Observations…")} />
               </Field>
-              <Field label="Yields">
-                <textarea className={`${inp} min-h-[60px]`} value={form.yields} onChange={(e) => setForm((p) => ({ ...p, yields: e.target.value }))} placeholder="Harvest results…" />
+              <Field label={t("Yields")}>
+                <textarea className={`${inp} min-h-[60px]`} value={form.yields} onChange={(e) => setForm((p) => ({ ...p, yields: e.target.value }))} placeholder={t("Harvest results…")} />
               </Field>
             </div>
 
@@ -655,13 +660,13 @@ export default function SeedlingsPage() {
                 disabled={saving || !form.plant.trim()}
                 className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60"
               >
-                {saving ? "Saving..." : "Save"}
+                {saving ? t("Saving...") : t("Save")}
               </button>
               <button
                 onClick={() => setModal(null)}
                 className="rounded-2xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                Cancel
+                {t("Cancel")}
               </button>
             </div>
           </div>
@@ -673,30 +678,30 @@ export default function SeedlingsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-lg rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl">
             <h2 className="mb-5 text-lg font-semibold">
-              {seedModal === "new" ? "Add seed entry" : `Edit — ${(seedModal as SeedCollectionEntry).plant}`}
+              {seedModal === "new" ? t("Add seed entry") : t("Edit — {name}", { name: (seedModal as SeedCollectionEntry).plant })}
             </h2>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Plant *">
-                  <input className={inp} value={seedForm.plant} onChange={(e) => setSeedForm((p) => ({ ...p, plant: e.target.value }))} placeholder="Tomatoes" />
+                <Field label={t("Plant *")}>
+                  <input className={inp} value={seedForm.plant} onChange={(e) => setSeedForm((p) => ({ ...p, plant: e.target.value }))} placeholder={t("Tomatoes")} />
                 </Field>
-                <Field label="Isolation distance">
-                  <input className={inp} value={seedForm.distance} onChange={(e) => setSeedForm((p) => ({ ...p, distance: e.target.value }))} placeholder="500 m - 1 km" />
+                <Field label={t("Isolation distance")}>
+                  <input className={inp} value={seedForm.distance} onChange={(e) => setSeedForm((p) => ({ ...p, distance: e.target.value }))} placeholder={t("500 m - 1 km")} />
                 </Field>
               </div>
-              <Field label="Notes">
-                <textarea className={`${inp} min-h-[70px]`} value={seedForm.notes} onChange={(e) => setSeedForm((p) => ({ ...p, notes: e.target.value }))} placeholder="Wind direction, bagging…" />
+              <Field label={t("Notes")}>
+                <textarea className={`${inp} min-h-[70px]`} value={seedForm.notes} onChange={(e) => setSeedForm((p) => ({ ...p, notes: e.target.value }))} placeholder={t("Wind direction, bagging…")} />
               </Field>
-              <Field label="Additional notes">
-                <textarea className={`${inp} min-h-[70px]`} value={seedForm.notes2} onChange={(e) => setSeedForm((p) => ({ ...p, notes2: e.target.value }))} placeholder="Harvest tips…" />
+              <Field label={t("Additional notes")}>
+                <textarea className={`${inp} min-h-[70px]`} value={seedForm.notes2} onChange={(e) => setSeedForm((p) => ({ ...p, notes2: e.target.value }))} placeholder={t("Harvest tips…")} />
               </Field>
             </div>
             <div className="mt-5 flex gap-2">
               <button onClick={handleSeedSave} disabled={seedSaving || !seedForm.plant.trim()} className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60">
-                {seedSaving ? "Saving..." : "Save"}
+                {seedSaving ? t("Saving...") : t("Save")}
               </button>
               <button onClick={() => setSeedModal(null)} className="rounded-2xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
-                Cancel
+                {t("Cancel")}
               </button>
             </div>
           </div>
@@ -707,18 +712,18 @@ export default function SeedlingsPage() {
       {transplantModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-lg rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl">
-            <h2 className="mb-1 text-lg font-semibold">Transplant — {transplantModal.plant}</h2>
+            <h2 className="mb-1 text-lg font-semibold">{t("Transplant — {name}", { name: transplantModal.plant })}</h2>
             <p className="mb-5 text-sm text-zinc-500">
-              Choose the bed(s) this is going into. It will be added to Crops on those beds.
+              {t("Choose the bed(s) this is going into. It will be added to Crops on those beds.")}
             </p>
             <div className="space-y-4">
-              <Field label="Date transplanted">
+              <Field label={t("Date transplanted")}>
                 <input type="date" className={inp} value={transplantDate} onChange={(e) => setTransplantDate(e.target.value)} />
               </Field>
-              <Field label="Beds *">
+              <Field label={t("Beds *")}>
                 <div className="max-h-56 space-y-2 overflow-y-auto rounded-2xl border border-zinc-300 p-3">
                   {zones.length === 0 ? (
-                    <p className="text-sm text-zinc-400">No beds available</p>
+                    <p className="text-sm text-zinc-400">{t("No beds available")}</p>
                   ) : (
                     zones.map((z) => (
                       <label key={z.id} className="flex items-center gap-2 cursor-pointer">
@@ -744,10 +749,10 @@ export default function SeedlingsPage() {
               {/* Estimated harvest — written straight onto the Harvest ETA sheet */}
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-3">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                  Estimated harvest <span className="font-normal normal-case tracking-normal text-emerald-600">(optional)</span>
+                  {t("Estimated harvest")} <span className="font-normal normal-case tracking-normal text-emerald-600">{t("(optional)")}</span>
                 </p>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Harvest month">
+                  <Field label={t("Harvest month")}>
                     <select
                       className={inp}
                       value={estimateMonth ? monthId(estimateMonth) : ""}
@@ -755,24 +760,24 @@ export default function SeedlingsPage() {
                     >
                       {estimateMonths.map((m) => (
                         <option key={monthId(m)} value={monthId(m)}>
-                          {m.label} {m.calendarYear}
+                          {t(m.label)} {m.calendarYear}
                         </option>
                       ))}
                     </select>
                   </Field>
-                  <Field label="Estimated yield">
+                  <Field label={t("Estimated yield")}>
                     <input
                       className={inp}
                       value={estimateYield}
                       onChange={(e) => setEstimateYield(e.target.value)}
-                      placeholder="e.g. 20kg"
+                      placeholder={t("e.g. 20kg")}
                     />
                   </Field>
                 </div>
                 <p className="mt-2 text-xs text-emerald-700">
                   {estimateYield.trim()
-                    ? `Adds ${estimateYield.trim()} to ${estimateHarvestDate} on the Harvest ETA sheet as this crop's own row.`
-                    : "Leave blank to skip — you can add estimates later on the Harvest ETA page."}
+                    ? t("Adds {yield} to {month} on the Harvest ETA sheet as this crop's own row.", { yield: estimateYield.trim(), month: estimateHarvestDate })
+                    : t("Leave blank to skip — you can add estimates later on the Harvest ETA page.")}
                 </p>
               </div>
             </div>
@@ -782,13 +787,13 @@ export default function SeedlingsPage() {
                 disabled={transplanting || transplantZoneIds.length === 0}
                 className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60"
               >
-                {transplanting ? "Transplanting..." : "Transplant"}
+                {transplanting ? t("Transplanting...") : t("Transplant")}
               </button>
               <button
                 onClick={() => setTransplantModal(null)}
                 className="rounded-2xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                Cancel
+                {t("Cancel")}
               </button>
             </div>
           </div>
@@ -825,10 +830,11 @@ function SeedlingTable({
   onTransplant?: (e: SeedlingEntry) => void;
   isManager: boolean;
 }) {
+  const t = useT();
   if (rows.length === 0) {
     return (
       <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">
-        No entries yet. Click + Add entry to get started.
+        {t("No entries yet. Click + Add entry to get started.")}
       </div>
     );
   }
@@ -838,9 +844,9 @@ function SeedlingTable({
     if (col === "germination_date") return fmt(row.germination_date);
     if (col === "germination") {
       const g = row.germination;
-      if (g === "green") return <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-500" />Good</span>;
-      if (g === "amber") return <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700"><span className="h-2 w-2 rounded-full bg-amber-400" />Partial</span>;
-      if (g === "red")   return <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-medium text-rose-700"><span className="h-2 w-2 rounded-full bg-rose-500" />Failed</span>;
+      if (g === "green") return <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-500" />{t("Good")}</span>;
+      if (g === "amber") return <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700"><span className="h-2 w-2 rounded-full bg-amber-400" />{t("Partial")}</span>;
+      if (g === "red")   return <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-medium text-rose-700"><span className="h-2 w-2 rounded-full bg-rose-500" />{t("Failed")}</span>;
       return <span className="text-zinc-300">—</span>;
     }
     const val = row[col as keyof SeedlingEntry];
@@ -855,7 +861,7 @@ function SeedlingTable({
           <thead>
             <tr className="border-b border-zinc-200 bg-zinc-50 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
               {headers.map((h) => (
-                <th key={h} className="px-4 py-3 text-left">{h}</th>
+                <th key={h} className="px-4 py-3 text-left">{t(h)}</th>
               ))}
               <th className="px-4 py-3" />
             </tr>
@@ -876,14 +882,14 @@ function SeedlingTable({
                     {onTransplant && (
                       row.transplanted ? (
                         <span className="rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                          Transplanted{row.transplanted_at ? ` ${fmt(row.transplanted_at)}` : ""}
+                          {row.transplanted_at ? t("Transplanted {date}", { date: fmt(row.transplanted_at) }) : t("Transplanted")}
                         </span>
                       ) : (
                         <button
                           onClick={() => onTransplant(row)}
                           className="rounded-lg border border-emerald-200 px-2.5 py-1 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50"
                         >
-                          Transplant
+                          {t("Transplant")}
                         </button>
                       )
                     )}
@@ -891,7 +897,7 @@ function SeedlingTable({
                       onClick={() => onEdit(row)}
                       className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100"
                     >
-                      Edit
+                      {t("Edit")}
                     </button>
                     {isManager && (
                       <button
@@ -899,7 +905,7 @@ function SeedlingTable({
                         disabled={deletingId === row.id}
                         className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
                       >
-                        {deletingId === row.id ? "…" : "Delete"}
+                        {deletingId === row.id ? "…" : t("Delete")}
                       </button>
                     )}
                   </div>
@@ -924,10 +930,11 @@ function SeedCollectionTable({
   deletingId: string | null;
   isManager: boolean;
 }) {
+  const t = useT();
   if (rows.length === 0) {
     return (
       <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">
-        No seed collection entries yet. Click + Add entry to get started.
+        {t("No seed collection entries yet. Click + Add entry to get started.")}
       </div>
     );
   }
@@ -937,10 +944,10 @@ function SeedCollectionTable({
         <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="border-b border-zinc-200 bg-zinc-50 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
-              <th className="px-4 py-3 text-left">Plant</th>
-              <th className="px-4 py-3 text-left">Isolation distance</th>
-              <th className="px-4 py-3 text-left">Notes</th>
-              <th className="px-4 py-3 text-left">Additional notes</th>
+              <th className="px-4 py-3 text-left">{t("Plant")}</th>
+              <th className="px-4 py-3 text-left">{t("Isolation distance")}</th>
+              <th className="px-4 py-3 text-left">{t("Notes")}</th>
+              <th className="px-4 py-3 text-left">{t("Additional notes")}</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
@@ -953,10 +960,10 @@ function SeedCollectionTable({
                 <td className="px-4 py-3 text-zinc-500 max-w-[200px]">{row.notes2 ?? <span className="text-zinc-300">—</span>}</td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <div className="flex gap-1">
-                    <button onClick={() => onEdit(row)} className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">Edit</button>
+                    <button onClick={() => onEdit(row)} className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">{t("Edit")}</button>
                     {isManager && (
                       <button onClick={() => onDelete(row.id)} disabled={deletingId === row.id} className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">
-                        {deletingId === row.id ? "…" : "Delete"}
+                        {deletingId === row.id ? "…" : t("Delete")}
                       </button>
                     )}
                   </div>

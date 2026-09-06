@@ -10,6 +10,8 @@ import type { ZoneFormData } from "@/app/farm/components/ZoneForm";
 import { badgeClass } from "@/app/farm/utils";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { useFarmRole } from "@/hooks/useFarmRole";
+import { useT, useLanguage } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -19,6 +21,8 @@ function errMsg(err: unknown, fallback: string): string {
 }
 
 export default function ZonesPage() {
+  const t = useT();
+  const [lang, setLang] = useLanguage();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
   const [crops, setCrops] = useState<Crop[]>([]);
@@ -43,7 +47,7 @@ export default function ZonesPage() {
         const farmRows = await getFarms();
         setFarms(farmRows);
       } catch (err) {
-        setError(errMsg(err, "Failed to load farms"));
+        setError(errMsg(err, t("Failed to load farms")));
       } finally {
         setLoading(false);
       }
@@ -65,7 +69,7 @@ export default function ZonesPage() {
         setZones(zoneRows);
         setCrops(cropRows);
       } catch (err) {
-        if (!cancelled) setError(errMsg(err, "Failed to load zones"));
+        if (!cancelled) setError(errMsg(err, t("Failed to load zones")));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -90,7 +94,7 @@ export default function ZonesPage() {
       setZones(zoneRows);
       setCrops(cropRows);
     } catch (err) {
-      setError(errMsg(err, "Failed to reload zones"));
+      setError(errMsg(err, t("Failed to reload zones")));
     }
   }
 
@@ -99,7 +103,7 @@ export default function ZonesPage() {
     try {
       setError("");
       const name = data.name.trim();
-      if (!name) throw new Error("Zone name is required.");
+      if (!name) throw new Error(t("Zone name is required."));
 
       const { error: insertError } = await supabase.from("zones").insert({
         farm_id: activeFarmId,
@@ -114,7 +118,7 @@ export default function ZonesPage() {
       setActiveForm(null);
       return true;
     } catch (err) {
-      setError(errMsg(err, "Failed to add zone"));
+      setError(errMsg(err, t("Failed to add zone")));
       return false;
     }
   }
@@ -136,7 +140,7 @@ export default function ZonesPage() {
       setSavingZoneId(editingZoneId);
       setError("");
       const name = data.name.trim();
-      if (!name) throw new Error("Zone name is required.");
+      if (!name) throw new Error(t("Zone name is required."));
 
       const { error: updateError } = await supabase
         .from("zones")
@@ -153,7 +157,7 @@ export default function ZonesPage() {
       await loadZones();
       return true;
     } catch (err) {
-      setError(errMsg(err, "Failed to update zone"));
+      setError(errMsg(err, t("Failed to update zone")));
       return false;
     } finally {
       setSavingZoneId(null);
@@ -161,7 +165,7 @@ export default function ZonesPage() {
   }
 
   async function handleDeleteZone(zoneId: string) {
-    if (!confirm("Are you sure you want to delete this zone?")) return;
+    if (!confirm(t("Are you sure you want to delete this zone?"))) return;
     try {
       setError("");
       const { error: deleteError } = await supabase
@@ -174,7 +178,7 @@ export default function ZonesPage() {
       setEditingZoneForm({ name: "", code: "", size_acres: "" });
       await loadZones();
     } catch (err) {
-      setError(errMsg(err, "Failed to delete zone"));
+      setError(errMsg(err, t("Failed to delete zone")));
     }
   }
 
@@ -182,7 +186,7 @@ export default function ZonesPage() {
     return (
       <main className="min-h-screen bg-stone-50 text-zinc-900">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          <p className="text-center text-zinc-500">Loading...</p>
+          <p className="text-center text-zinc-500">{t("Loading...")}</p>
         </div>
       </main>
     );
@@ -195,10 +199,10 @@ export default function ZonesPage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                Zone Manager
+                {t("Zone Manager")}
               </p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-                {activeFarm?.name ?? "Farm Manager"}
+                {activeFarm?.name ?? t("Farm Manager")}
               </h1>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -218,6 +222,7 @@ export default function ZonesPage() {
                   </button>
                 );
               })}
+              <LanguageToggle lang={lang} onChange={setLang} />
             </div>
           </div>
         </header>
@@ -229,13 +234,13 @@ export default function ZonesPage() {
               href="/farm"
               className="rounded-full border border-zinc-100 px-3 py-1.5 font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900"
             >
-              Farm
+              {t("Farm")}
             </Link>
             <a
               href="#"
               className="rounded-full border border-zinc-900 px-3 py-1.5 font-medium text-zinc-900"
             >
-              Zones
+              {t("Zones")}
             </a>
           </div>
         </nav>
@@ -252,7 +257,7 @@ export default function ZonesPage() {
             {isManager && activeForm === "create" && (
               <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                 <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-xl font-semibold">Add new zone</h2>
+                  <h2 className="text-xl font-semibold">{t("Add new zone")}</h2>
                   <button
                     onClick={() => setActiveForm(null)}
                     className="text-sm text-zinc-400 hover:text-zinc-600"
@@ -274,9 +279,9 @@ export default function ZonesPage() {
             <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
               <div className="mb-6 flex items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-semibold">Zones</h2>
+                  <h2 className="text-xl font-semibold">{t("Zones")}</h2>
                   <p className="mt-1 text-sm text-zinc-500">
-                    Manage all zones in {activeFarm.name}
+                    {t("Manage all zones in {farm}", { farm: activeFarm.name })}
                   </p>
                 </div>
                 {isManager && (
@@ -284,14 +289,14 @@ export default function ZonesPage() {
                     onClick={() => setActiveForm(activeForm === "create" ? null : "create")}
                     className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
                   >
-                    {activeForm === "create" ? "Cancel" : "+ Add zone"}
+                    {activeForm === "create" ? t("Cancel") : t("+ Add zone")}
                   </button>
                 )}
               </div>
 
               {zones.length === 0 ? (
                 <p className="text-sm text-zinc-500">
-                  No zones yet — create one to get started.
+                  {t("No zones yet — create one to get started.")}
                 </p>
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -312,10 +317,10 @@ export default function ZonesPage() {
                       >
                         {isEditing && isManager ? (
                           <div className="space-y-3">
-                            <h3 className="text-sm font-semibold">Edit zone</h3>
+                            <h3 className="text-sm font-semibold">{t("Edit zone")}</h3>
                             <div>
                               <label className="mb-1 block text-xs font-medium">
-                                Zone name
+                                {t("Zone name")}
                               </label>
                               <input
                                 type="text"
@@ -327,13 +332,13 @@ export default function ZonesPage() {
                                   }))
                                 }
                                 className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
-                                placeholder="Zone name"
+                                placeholder={t("Zone name")}
                               />
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                               <div>
                                 <label className="mb-1 block text-xs font-medium">
-                                  Code
+                                  {t("Code")}
                                 </label>
                                 <input
                                   type="text"
@@ -345,12 +350,12 @@ export default function ZonesPage() {
                                     }))
                                   }
                                   className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
-                                  placeholder="e.g. B1"
+                                  placeholder={t("e.g. B1")}
                                 />
                               </div>
                               <div>
                                 <label className="mb-1 block text-xs font-medium">
-                                  Size (acres)
+                                  {t("Size (acres)")}
                                 </label>
                                 <input
                                   type="number"
@@ -387,7 +392,7 @@ export default function ZonesPage() {
                                 }
                                 className="flex-1 rounded-xl bg-zinc-900 px-3 py-2 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
                               >
-                                {savingZoneId === editingZoneId ? "Saving…" : "Save"}
+                                {savingZoneId === editingZoneId ? t("Saving…") : t("Save")}
                               </button>
                               <button
                                 onClick={() => {
@@ -400,13 +405,13 @@ export default function ZonesPage() {
                                 }}
                                 className="rounded-xl border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-100"
                               >
-                                Cancel
+                                {t("Cancel")}
                               </button>
                               <button
                                 onClick={() => handleDeleteZone(zone.id)}
                                 className="rounded-xl border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
                               >
-                                Delete
+                                {t("Delete")}
                               </button>
                             </div>
                           </div>
@@ -422,7 +427,7 @@ export default function ZonesPage() {
                               <div className="flex gap-2">
                                 {zone.size_acres && (
                                   <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">
-                                    {zone.size_acres} ac
+                                    {t("{n} ac", { n: zone.size_acres })}
                                   </span>
                                 )}
                                 {isManager && (
@@ -430,7 +435,7 @@ export default function ZonesPage() {
                                     onClick={() => startEditZone(zone.id)}
                                     className="rounded-full border border-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100"
                                   >
-                                    Edit
+                                    {t("Edit")}
                                   </button>
                                 )}
                               </div>
@@ -451,14 +456,14 @@ export default function ZonesPage() {
                                         c.status
                                       )}`}
                                     >
-                                      {c.status}
+                                      {c.status ? t(c.status) : c.status}
                                     </span>
                                   </li>
                                 ))}
                               </ul>
                             ) : (
                               <p className="text-xs text-zinc-400">
-                                No crops assigned yet.
+                                {t("No crops assigned yet.")}
                               </p>
                             )}
                           </>

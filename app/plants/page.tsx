@@ -9,6 +9,8 @@ import { getFarms, getPlants, getZones } from "@/lib/farm";
 import type { Farm, Plant, Zone } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { useFarmRole } from "@/hooks/useFarmRole";
+import { useT, useLanguage } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -24,6 +26,8 @@ export default function PlantsPage() {
   const [activeFarmId, setActiveFarmId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const t = useT();
+  const [lang, setLang] = useLanguage();
 
   const [showUpload, setShowUpload] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -75,7 +79,7 @@ export default function PlantsPage() {
         setLoading(true);
         await loadFarms();
       } catch (err) {
-        setError(errMsg(err, "Failed to load farms"));
+        setError(errMsg(err, t("Failed to load farms")));
       } finally {
         setLoading(false);
       }
@@ -90,7 +94,7 @@ export default function PlantsPage() {
         setLoading(true);
         await Promise.all([loadPlants(activeFarmId), loadZones(activeFarmId)]);
       } catch (err) {
-        setError(errMsg(err, "Failed to load plants"));
+        setError(errMsg(err, t("Failed to load plants")));
       } finally {
         setLoading(false);
       }
@@ -159,7 +163,7 @@ export default function PlantsPage() {
       if (fileInputRef.current) fileInputRef.current.value = "";
       await loadPlants(activeFarmId);
     } catch (err) {
-      setError(errMsg(err, "Failed to upload plant"));
+      setError(errMsg(err, t("Failed to upload plant")));
     } finally {
       setUploading(false);
     }
@@ -227,7 +231,7 @@ export default function PlantsPage() {
       setEditPlant(null);
       setEditPreview("");
     } catch (err) {
-      setError(errMsg(err, "Failed to save plant"));
+      setError(errMsg(err, t("Failed to save plant")));
     } finally {
       setSavingEdit(false);
     }
@@ -241,7 +245,7 @@ export default function PlantsPage() {
       if (deleteError) throw deleteError;
       setPlants((prev) => prev.filter((p) => p.id !== plantId));
     } catch (err) {
-      setError(errMsg(err, "Failed to delete plant"));
+      setError(errMsg(err, t("Failed to delete plant")));
     } finally {
       setDeletingId(null);
       setConfirmDeleteId(null);
@@ -276,9 +280,9 @@ export default function PlantsPage() {
       });
 
       setEditPlant(null);
-      alert(`"${plant.name || "Unnamed plant"}" is now tracked as a crop on the Farm page.`);
+      alert(t('"{name}" is now tracked as a crop on the Farm page.', { name: plant.name || t("Unnamed plant") }));
     } catch (err) {
-      setError(errMsg(err, "Failed to promote to crop"));
+      setError(errMsg(err, t("Failed to promote to crop")));
     } finally {
       setPromotingToCrop(false);
     }
@@ -299,13 +303,13 @@ export default function PlantsPage() {
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                Shamba Farm Manager
+                {t("Shamba Farm Manager")}
               </p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-                Plants
+                {t("Plants")}
               </h1>
               <p className="mt-1 text-sm text-zinc-500">
-                {activeFarm?.name ?? "—"} · Photo your plants, name them when you know what they are.
+                {activeFarm?.name ?? "—"} · {t("Photo your plants, name them when you know what they are.")}
               </p>
             </div>
 
@@ -330,14 +334,15 @@ export default function PlantsPage() {
                 href="/farm"
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                ← Farm
+                {t("← Farm")}
               </Link>
               <button
                 onClick={handleSignOut}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                Sign out
+                {t("Sign out")}
               </button>
+              <LanguageToggle lang={lang} onChange={setLang} />
             </div>
           </div>
         </header>
@@ -359,19 +364,19 @@ export default function PlantsPage() {
             }`}
           >
             <ImagePlus size={15} />
-            Add plant
+            {t("Add plant")}
           </button>
 
           {showUpload ? (
             <div className="mt-4 max-w-sm rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold">Add plant</h2>
+              <h2 className="text-lg font-semibold">{t("Add plant")}</h2>
               <p className="mt-1 text-sm text-zinc-500">
-                Upload a photo. Name is optional — add it later when you know.
+                {t("Upload a photo. Name is optional — add it later when you know.")}
               </p>
 
               <form onSubmit={handleUpload} className="mt-4 space-y-4">
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Photo</label>
+                  <label className="mb-2 block text-sm font-medium">{t("Photo")}</label>
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -384,52 +389,52 @@ export default function PlantsPage() {
                 {preview ? (
                   <img
                     src={preview}
-                    alt="Preview"
+                    alt={t("Preview")}
                     className="h-48 w-full rounded-2xl object-cover"
                   />
                 ) : null}
 
                 <div>
                   <label className="mb-2 block text-sm font-medium">
-                    Name <span className="font-normal text-zinc-400">(optional)</span>
+                    {t("Name")} <span className="font-normal text-zinc-400">{t("(optional)")}</span>
                   </label>
                   <input
                     type="text"
                     value={plantName}
                     onChange={(e) => setPlantName(e.target.value)}
                     className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                    placeholder="Tomato, Basil, Unknown weed…"
+                    placeholder={t("Tomato, Basil, Unknown weed…")}
                   />
                 </div>
 
                 <div>
                   <label className="mb-2 block text-sm font-medium">
-                    Notes <span className="font-normal text-zinc-400">(optional)</span>
+                    {t("Notes")} <span className="font-normal text-zinc-400">{t("(optional)")}</span>
                   </label>
                   <textarea
                     value={plantNotes}
                     onChange={(e) => setPlantNotes(e.target.value)}
                     className="min-h-[60px] w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                    placeholder="Growing conditions, observations…"
+                    placeholder={t("Growing conditions, observations…")}
                   />
                 </div>
 
                 <div>
                   <label className="mb-2 block text-sm font-medium">
-                    Medicinal properties <span className="font-normal text-zinc-400">(optional)</span>
+                    {t("Medicinal properties")} <span className="font-normal text-zinc-400">{t("(optional)")}</span>
                   </label>
                   <textarea
                     value={plantMedicinal}
                     onChange={(e) => setPlantMedicinal(e.target.value)}
                     className="min-h-[60px] w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                    placeholder="Traditional or known medicinal uses…"
+                    placeholder={t("Traditional or known medicinal uses…")}
                   />
                 </div>
 
                 {zones.length > 0 ? (
                   <div>
                     <label className="mb-2 block text-sm font-medium">
-                      Zones <span className="font-normal text-zinc-400">(optional)</span>
+                      {t("Zones")} <span className="font-normal text-zinc-400">{t("(optional)")}</span>
                     </label>
                     <div className="max-h-40 overflow-y-auto rounded-2xl border border-zinc-300 p-3 space-y-1.5">
                       {zones.map((z) => (
@@ -458,7 +463,7 @@ export default function PlantsPage() {
                   disabled={uploading || (!file && !plantName.trim())}
                   className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {uploading ? "Uploading…" : "Save plant"}
+                  {uploading ? t("Uploading…") : t("Save plant")}
                 </button>
               </form>
             </div>
@@ -467,11 +472,11 @@ export default function PlantsPage() {
 
         {/* Plant grid */}
         {loading && plants.length === 0 ? (
-          <p className="text-sm text-zinc-500">Loading…</p>
+          <p className="text-sm text-zinc-500">{t("Loading…")}</p>
         ) : plants.length === 0 ? (
           <div className="rounded-3xl border border-zinc-200 bg-white p-10 text-center shadow-sm">
             <Leaf className="mx-auto mb-3 text-zinc-300" size={32} />
-            <p className="text-sm text-zinc-500">No plants yet. Add one above.</p>
+            <p className="text-sm text-zinc-500">{t("No plants yet. Add one above.")}</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -489,7 +494,7 @@ export default function PlantsPage() {
                         disabled={deletingId === plant.id}
                         className="rounded-full bg-rose-600 px-2 py-1 text-xs font-medium text-white shadow hover:bg-rose-700 disabled:opacity-60"
                       >
-                        {deletingId === plant.id ? "…" : "Confirm"}
+                        {deletingId === plant.id ? "…" : t("Confirm")}
                       </button>
                     ) : (
                       <button
@@ -507,7 +512,7 @@ export default function PlantsPage() {
                   {plant.image_url ? (
                     <img
                       src={plant.image_url}
-                      alt={plant.name ?? "Plant"}
+                      alt={plant.name ?? t("Plant")}
                       className="aspect-square w-full object-cover"
                     />
                   ) : (
@@ -522,13 +527,13 @@ export default function PlantsPage() {
                     {plant.name ? (
                       <span className="text-sm font-medium">{plant.name}</span>
                     ) : (
-                      <span className="text-sm text-zinc-400 italic">Tap to edit…</span>
+                      <span className="text-sm text-zinc-400 italic">{t("Tap to edit…")}</span>
                     )}
                     {plant.notes ? (
                       <p className="mt-0.5 text-xs text-zinc-500 line-clamp-2">{plant.notes}</p>
                     ) : null}
                     {plant.medicinal_properties ? (
-                      <p className="mt-0.5 text-xs text-emerald-600 line-clamp-1">Medicinal: {plant.medicinal_properties}</p>
+                      <p className="mt-0.5 text-xs text-emerald-600 line-clamp-1">{t("Medicinal:")} {plant.medicinal_properties}</p>
                     ) : null}
                   </button>
                 </div>
@@ -542,20 +547,20 @@ export default function PlantsPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
             <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 shadow-xl">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Edit plant</h2>
+                <h2 className="text-lg font-semibold">{t("Edit plant")}</h2>
                 <button onClick={() => setEditPlant(null)} className="rounded-full p-1 hover:bg-zinc-100">
                   <X size={18} />
                 </button>
               </div>
 
               {editPreview ? (
-                <img src={editPreview} alt={editPlant.name ?? "Plant"} className="mt-4 h-40 w-full rounded-2xl object-cover" />
+                <img src={editPreview} alt={editPlant.name ?? t("Plant")} className="mt-4 h-40 w-full rounded-2xl object-cover" />
               ) : null}
 
               <div className="mt-4 space-y-4">
                 <div>
                   <label className="mb-2 block text-sm font-medium">
-                    Photo <span className="font-normal text-zinc-400">(optional)</span>
+                    {t("Photo")} <span className="font-normal text-zinc-400">{t("(optional)")}</span>
                   </label>
                   <input
                     type="file"
@@ -565,39 +570,39 @@ export default function PlantsPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Name</label>
+                  <label className="mb-2 block text-sm font-medium">{t("Name")}</label>
                   <input
                     type="text"
                     value={editForm.name}
                     onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
                     className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                    placeholder="Plant name"
+                    placeholder={t("Plant name")}
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Notes</label>
+                  <label className="mb-2 block text-sm font-medium">{t("Notes")}</label>
                   <textarea
                     value={editForm.notes}
                     onChange={(e) => setEditForm((p) => ({ ...p, notes: e.target.value }))}
                     className="min-h-[80px] w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                    placeholder="Growing conditions, observations…"
+                    placeholder={t("Growing conditions, observations…")}
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Medicinal properties</label>
+                  <label className="mb-2 block text-sm font-medium">{t("Medicinal properties")}</label>
                   <textarea
                     value={editForm.medicinal_properties}
                     onChange={(e) => setEditForm((p) => ({ ...p, medicinal_properties: e.target.value }))}
                     className="min-h-[80px] w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                    placeholder="Traditional or known medicinal uses…"
+                    placeholder={t("Traditional or known medicinal uses…")}
                   />
                 </div>
 
                 {zones.length > 0 ? (
                   <div>
-                    <label className="mb-2 block text-sm font-medium">Zones</label>
+                    <label className="mb-2 block text-sm font-medium">{t("Zones")}</label>
                     <div className="max-h-40 overflow-y-auto rounded-2xl border border-zinc-300 p-3 space-y-1.5">
                       {zones.map((z) => (
                         <label key={z.id} className="flex items-center gap-2 text-sm cursor-pointer">
@@ -627,13 +632,13 @@ export default function PlantsPage() {
                     disabled={savingEdit}
                     className="flex-1 rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60"
                   >
-                    {savingEdit ? "Saving…" : "Save"}
+                    {savingEdit ? t("Saving…") : t("Save")}
                   </button>
                   <button
                     onClick={() => setEditPlant(null)}
                     className="rounded-2xl border border-zinc-200 px-5 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
                   >
-                    Cancel
+                    {t("Cancel")}
                   </button>
                 </div>
 
@@ -642,7 +647,7 @@ export default function PlantsPage() {
                   disabled={promotingToCrop}
                   className="w-full rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60"
                 >
-                  {promotingToCrop ? "Adding…" : "Track as crop"}
+                  {promotingToCrop ? t("Adding…") : t("Track as crop")}
                 </button>
               </div>
             </div>

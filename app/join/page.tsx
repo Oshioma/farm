@@ -4,6 +4,8 @@ import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { useT, useLanguage } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 type InviteInfo = {
   id: string;
@@ -15,6 +17,8 @@ function JoinInner() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
   const router = useRouter();
+  const t = useT();
+  const [lang, setLang] = useLanguage();
 
   const [status, setStatus] = useState<"loading" | "ready" | "joining" | "done" | "error">("loading");
   const [invite, setInvite] = useState<InviteInfo | null>(null);
@@ -24,7 +28,7 @@ function JoinInner() {
   useEffect(() => {
     if (!token) {
       setStatus("error");
-      setMessage("No invite token found in this link.");
+      setMessage(t("No invite token found in this link."));
       return;
     }
 
@@ -43,7 +47,7 @@ function JoinInner() {
 
       if (error || !inv) {
         setStatus("error");
-        setMessage("This invite link is invalid or has already been used.");
+        setMessage(t("This invite link is invalid or has already been used."));
         return;
       }
 
@@ -86,7 +90,7 @@ function JoinInner() {
       const { error: memberError } = await supabase.from("farm_members").insert(toInsert);
       if (memberError) {
         setStatus("error");
-        setMessage("Failed to join the farm. Please try again.");
+        setMessage(t("Failed to join the farm. Please try again."));
         return;
       }
     }
@@ -102,54 +106,57 @@ function JoinInner() {
     <main className="flex min-h-screen items-center justify-center bg-stone-50 px-4">
       <div className="w-full max-w-sm">
         <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-center">
+          <div className="mb-4 flex justify-center">
+            <LanguageToggle lang={lang} onChange={setLang} />
+          </div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-            Shamba Farm Manager
+            {t("Shamba Farm Manager")}
           </p>
 
           {status === "loading" && (
-            <p className="mt-6 text-sm text-zinc-500">Checking invite…</p>
+            <p className="mt-6 text-sm text-zinc-500">{t("Checking invite…")}</p>
           )}
 
           {status === "ready" && invite && (
             <>
-              <h1 className="mt-4 text-2xl font-semibold tracking-tight">You're invited</h1>
+              <h1 className="mt-4 text-2xl font-semibold tracking-tight">{t("You're invited")}</h1>
               <p className="mt-2 text-sm text-zinc-500">
-                You've been invited to join Shamba Farm Manager.
+                {t("You've been invited to join Shamba Farm Manager.")}
               </p>
               {!loggedIn && (
                 <p className="mt-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                  You'll need to log in first — you'll be brought back here after.
+                  {t("You'll need to log in first — you'll be brought back here after.")}
                 </p>
               )}
               <button
                 onClick={acceptInvite}
                 className="mt-6 w-full rounded-2xl bg-zinc-900 py-3 text-sm font-medium text-white hover:bg-zinc-800"
               >
-                {loggedIn ? "Accept invite" : "Log in to accept invite"}
+                {loggedIn ? t("Accept invite") : t("Log in to accept invite")}
               </button>
             </>
           )}
 
           {status === "joining" && (
-            <p className="mt-6 text-sm text-zinc-500">Joining farm…</p>
+            <p className="mt-6 text-sm text-zinc-500">{t("Joining farm…")}</p>
           )}
 
           {status === "done" && (
             <>
-              <h1 className="mt-4 text-2xl font-semibold tracking-tight">You're in!</h1>
-              <p className="mt-2 text-sm text-zinc-500">Taking you to the farm…</p>
+              <h1 className="mt-4 text-2xl font-semibold tracking-tight">{t("You're in!")}</h1>
+              <p className="mt-2 text-sm text-zinc-500">{t("Taking you to the farm…")}</p>
             </>
           )}
 
           {status === "error" && (
             <>
-              <h1 className="mt-4 text-2xl font-semibold tracking-tight">Invalid link</h1>
+              <h1 className="mt-4 text-2xl font-semibold tracking-tight">{t("Invalid link")}</h1>
               <p className="mt-2 text-sm text-zinc-500">{message}</p>
               <Link
                 href="/farm"
                 className="mt-6 inline-block rounded-2xl bg-zinc-900 px-6 py-3 text-sm font-medium text-white hover:bg-zinc-800"
               >
-                Go to farm
+                {t("Go to farm")}
               </Link>
             </>
           )}
@@ -160,10 +167,11 @@ function JoinInner() {
 }
 
 export default function JoinPage() {
+  const t = useT();
   return (
     <Suspense fallback={
       <main className="flex min-h-screen items-center justify-center bg-stone-50">
-        <p className="text-sm text-zinc-500">Loading…</p>
+        <p className="text-sm text-zinc-500">{t("Loading…")}</p>
       </main>
     }>
       <JoinInner />

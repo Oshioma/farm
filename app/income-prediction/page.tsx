@@ -10,6 +10,8 @@ import type { Farm, IncomePredictionRow } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { useFarmRole } from "@/hooks/useFarmRole";
 import { ManagerOnly } from "@/components/ManagerOnly";
+import { useT, useLanguage } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -100,6 +102,8 @@ export default function IncomePredictionPage() {
   const [savingEditId, setSavingEditId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
+  const t = useT();
+  const [lang, setLang] = useLanguage();
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
   const { isManager, loading: roleLoading } = useFarmRole(activeFarmId);
   const activeFarmIdRef = useRef(activeFarmId);
@@ -120,7 +124,7 @@ export default function IncomePredictionPage() {
         const farmRows = await getFarms();
         setFarms(farmRows);
       } catch (err) {
-        setError(errMsg(err, "Failed to load"));
+        setError(errMsg(err, t("Failed to load")));
       } finally {
         setLoading(false);
       }
@@ -131,7 +135,7 @@ export default function IncomePredictionPage() {
     if (!activeFarmId) return;
     setLoading(true);
     loadRows(activeFarmId)
-      .catch((err) => setError(errMsg(err, "Failed to load")))
+      .catch((err) => setError(errMsg(err, t("Failed to load"))))
       .finally(() => setLoading(false));
   }, [activeFarmId]);
 
@@ -149,7 +153,7 @@ export default function IncomePredictionPage() {
       setShowForm(false);
       await loadRows(activeFarmId);
     } catch (err) {
-      setError(errMsg(err, "Failed to save"));
+      setError(errMsg(err, t("Failed to save")));
     } finally {
       setSaving(false);
     }
@@ -169,7 +173,7 @@ export default function IncomePredictionPage() {
       setEditingId(null);
       await loadRows(activeFarmId);
     } catch (err) {
-      setError(errMsg(err, "Failed to update"));
+      setError(errMsg(err, t("Failed to update")));
     } finally {
       setSavingEditId(null);
     }
@@ -178,7 +182,7 @@ export default function IncomePredictionPage() {
   async function handleDelete(id: string) {
     setDeletingId(id);
     const { error: err } = await supabase.from("income_prediction").delete().eq("id", id);
-    if (err) setError(errMsg(err, "Failed to delete"));
+    if (err) setError(errMsg(err, t("Failed to delete")));
     else setRows((prev) => prev.filter((r) => r.id !== id));
     setDeletingId(null);
   }
@@ -204,7 +208,7 @@ export default function IncomePredictionPage() {
   }
 
   if (activeFarmId && !roleLoading && !isManager) {
-    return <ManagerOnly title="Income prediction — managers only" />;
+    return <ManagerOnly title={t("Income prediction — managers only")} />;
   }
 
   return (
@@ -215,9 +219,9 @@ export default function IncomePredictionPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                Shamba Farm Manager
+                {t("Shamba Farm Manager")}
               </p>
-              <h1 className="mt-1 text-3xl font-semibold tracking-tight">Income prediction</h1>
+              <h1 className="mt-1 text-3xl font-semibold tracking-tight">{t("Income prediction")}</h1>
               {activeFarm && <p className="mt-1 text-sm text-zinc-500">{activeFarm.name}</p>}
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -238,14 +242,15 @@ export default function IncomePredictionPage() {
                 href="/farm"
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                ← Farm
+                {t("← Farm")}
               </Link>
               <button
                 onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                Sign out
+                {t("Sign out")}
               </button>
+              <LanguageToggle lang={lang} onChange={setLang} />
             </div>
           </div>
         </header>
@@ -262,21 +267,21 @@ export default function IncomePredictionPage() {
             }`}
           >
             <TrendingUp size={15} />
-            Add species
+            {t("Add species")}
           </button>
 
           {showForm && (
             <div className="mt-4 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-lg font-semibold">New species</h2>
+              <h2 className="mb-4 text-lg font-semibold">{t("New species")}</h2>
               <form onSubmit={handleSubmit}>
                 <div className="mb-4">
-                  <label className="mb-1 block text-sm font-medium">Species name</label>
+                  <label className="mb-1 block text-sm font-medium">{t("Species name")}</label>
                   <input
                     type="text"
                     value={form.species}
                     onChange={(e) => setForm((p) => ({ ...p, species: e.target.value }))}
                     className="w-64 rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-                    placeholder="e.g. Mango"
+                    placeholder={t("e.g. Mango")}
                     required
                   />
                 </div>
@@ -284,15 +289,15 @@ export default function IncomePredictionPage() {
                   <table className="text-xs">
                     <thead>
                       <tr className="text-left text-zinc-500">
-                        <th className="w-20 pb-2 pr-3">Year</th>
-                        <th className="w-24 pb-2 pr-3">Qty</th>
-                        <th className="w-28 pb-2 pr-3">Income</th>
+                        <th className="w-20 pb-2 pr-3">{t("Year")}</th>
+                        <th className="w-24 pb-2 pr-3">{t("Qty")}</th>
+                        <th className="w-28 pb-2 pr-3">{t("Income")}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {YEARS.map(({ key, label }) => (
                         <tr key={key} className="border-t border-zinc-100">
-                          <td className="py-1.5 pr-3 font-semibold text-zinc-500">{label}</td>
+                          <td className="py-1.5 pr-3 font-semibold text-zinc-500">{t(label)}</td>
                           <td className="py-1.5 pr-3">
                             {field(form, `${key}_qty`, (k, v) => setForm((p) => ({ ...p, [k]: v })), "—")}
                           </td>
@@ -307,11 +312,11 @@ export default function IncomePredictionPage() {
                 <div className="mt-4 flex gap-3">
                   <button type="submit" disabled={saving}
                     className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60">
-                    {saving ? "Saving…" : "Save"}
+                    {saving ? t("Saving…") : t("Save")}
                   </button>
                   <button type="button" onClick={() => { setShowForm(false); setForm(blankForm); }}
                     className="rounded-2xl border border-zinc-200 px-5 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100">
-                    Cancel
+                    {t("Cancel")}
                   </button>
                 </div>
               </form>
@@ -320,11 +325,11 @@ export default function IncomePredictionPage() {
         </div>
 
         {loading && rows.length === 0 ? (
-          <p className="text-sm text-zinc-500">Loading…</p>
+          <p className="text-sm text-zinc-500">{t("Loading…")}</p>
         ) : rows.length === 0 ? (
           <div className="rounded-3xl border border-zinc-200 bg-white p-10 text-center shadow-sm">
             <TrendingUp className="mx-auto mb-3 text-zinc-300" size={32} />
-            <p className="text-sm text-zinc-500">No data yet. Add a species above.</p>
+            <p className="text-sm text-zinc-500">{t("No data yet. Add a species above.")}</p>
           </div>
         ) : (
           <div className="overflow-x-auto rounded-3xl border border-zinc-200 bg-white shadow-sm">
@@ -332,12 +337,12 @@ export default function IncomePredictionPage() {
               <thead>
                 <tr className="border-b border-zinc-100">
                   <th className="sticky left-0 z-10 bg-white px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500">
-                    Species
+                    {t("Species")}
                   </th>
                   {YEARS.map(({ key, label }) => (
                     <th key={key} colSpan={2}
                       className="border-l border-zinc-100 px-4 py-4 text-center text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500">
-                      {label}
+                      {t(label)}
                     </th>
                   ))}
                   <th className="px-4 py-4"></th>
@@ -346,8 +351,8 @@ export default function IncomePredictionPage() {
                   <th className="sticky left-0 z-10 bg-zinc-50 px-5 py-2"></th>
                   {YEARS.map(({ key }) => (
                     <>
-                      <th key={`${key}-qty`} className="border-l border-zinc-100 px-3 py-2 text-right text-xs font-normal text-zinc-400">Qty</th>
-                      <th key={`${key}-inc`} className="px-3 py-2 text-right text-xs font-normal text-zinc-400">Income</th>
+                      <th key={`${key}-qty`} className="border-l border-zinc-100 px-3 py-2 text-right text-xs font-normal text-zinc-400">{t("Qty")}</th>
+                      <th key={`${key}-inc`} className="px-3 py-2 text-right text-xs font-normal text-zinc-400">{t("Income")}</th>
                     </>
                   ))}
                   <th></th>
@@ -377,11 +382,11 @@ export default function IncomePredictionPage() {
                           <button onClick={() => handleSaveEdit(row.id, row.sort_order)}
                             disabled={savingEditId === row.id}
                             className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-60">
-                            {savingEditId === row.id ? "…" : "Save"}
+                            {savingEditId === row.id ? "…" : t("Save")}
                           </button>
                           <button onClick={() => setEditingId(null)}
                             className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100">
-                            Cancel
+                            {t("Cancel")}
                           </button>
                         </div>
                       </td>
@@ -409,11 +414,11 @@ export default function IncomePredictionPage() {
                         <div className="flex gap-2">
                           <button onClick={() => { setEditingId(row.id); setEditForm(rowToForm(row)); }}
                             className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100">
-                            Edit
+                            {t("Edit")}
                           </button>
                           <button onClick={() => handleDelete(row.id)} disabled={deletingId === row.id}
                             className="rounded-xl border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">
-                            Delete
+                            {t("Delete")}
                           </button>
                         </div>
                       </td>
@@ -424,7 +429,7 @@ export default function IncomePredictionPage() {
                 {/* Totals row */}
                 <tr className="border-t-2 border-zinc-200 bg-zinc-900 text-white">
                   <td className="sticky left-0 z-10 bg-zinc-900 px-5 py-4 text-xs font-bold uppercase tracking-wider">
-                    Total
+                    {t("Total")}
                   </td>
                   {YEARS.map(({ key }) => (
                     <>
