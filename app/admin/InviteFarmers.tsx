@@ -38,13 +38,24 @@ export function InviteFarmers() {
   const [latest, setLatest] = useState<Invite | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
+  /* Parse a reply defensively: a crashed function returns no JSON at all, and
+     the status and raw text are the only clue to what went wrong. */
+  async function readJson(res: Response) {
+    const text = await res.text();
+    try {
+      return text ? JSON.parse(text) : {};
+    } catch {
+      throw new Error(`The server replied ${res.status} ${res.statusText || ""} with: ${text.slice(0, 200) || "(empty body)"}`);
+    }
+  }
+
   async function load() {
     setLoading(true);
     setError("");
     try {
       const res = await fetch("/api/admin/invites");
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not load invites");
+      const data = await readJson(res);
+      if (!res.ok) throw new Error(data.error || `Could not load invites (${res.status})`);
       setInvites(data.invites ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load invites");
@@ -65,8 +76,8 @@ export function InviteFarmers() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not create the invite");
+      const data = await readJson(res);
+      if (!res.ok) throw new Error(data.error || `Could not create the invite (${res.status})`);
       setLatest(data.invite);
       setInvites((current) => [data.invite, ...current]);
       setForm({ farmerName: "", phone: "", lang: form.lang });

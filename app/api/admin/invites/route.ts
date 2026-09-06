@@ -57,17 +57,30 @@ function present(origin: string, invite: InviteRow, farm: { name: string; slug: 
   };
 }
 
+function failure(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err);
+  return NextResponse.json({ error: `Invites are not available: ${message}` }, { status: 500 });
+}
+
 export async function GET(req: NextRequest) {
+  try {
+    return await listInvites(req);
+  } catch (err) {
+    return failure(err);
+  }
+}
+
+async function listInvites(req: NextRequest) {
   const gate = await requireAdmin();
   if ("error" in gate) return gate.error;
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
-    .from("farm_invites")
+    .from("whatsapp_invites")
     .select("*")
     .order("created_at", { ascending: false })
     .limit(200);
   if (error) {
-    if (/farm_invites/.test(error.message)) {
+    if (/whatsapp_invites/.test(error.message)) {
       return NextResponse.json({ error: "The invites table is not on the database yet — the migration has not run." }, { status: 503 });
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -84,6 +97,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  try {
+    return await createInvite(req);
+  } catch (err) {
+    return failure(err);
+  }
+}
+
+async function createInvite(req: NextRequest) {
   const gate = await requireAdmin();
   if ("error" in gate) return gate.error;
   const body = await req.json().catch(() => ({}));
@@ -95,12 +116,12 @@ export async function POST(req: NextRequest) {
 
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
-    .from("farm_invites")
+    .from("whatsapp_invites")
     .insert({ farmer_name: farmerName, phone, lang, created_by: gate.user.id })
     .select("*")
     .single();
   if (error) {
-    if (/farm_invites/.test(error.message)) {
+    if (/whatsapp_invites/.test(error.message)) {
       return NextResponse.json({ error: "The invites table is not on the database yet — the migration has not run." }, { status: 503 });
     }
     return NextResponse.json({ error: error.message }, { status: 500 });

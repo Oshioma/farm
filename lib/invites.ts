@@ -23,7 +23,7 @@ export function isInviteToken(token: string): boolean {
 
 export async function loadInviteByToken(admin: SupabaseClient, token: string): Promise<InviteRow | null> {
   if (!isInviteToken(token)) return null;
-  const { data } = await admin.from("farm_invites").select("*").eq("token", token).maybeSingle();
+  const { data } = await admin.from("whatsapp_invites").select("*").eq("token", token).maybeSingle();
   return (data as InviteRow | null) ?? null;
 }
 

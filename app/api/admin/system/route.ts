@@ -425,7 +425,7 @@ const TABLES = [
   "lunar_tasks", "mulch", "notifications", "pest_logs", "plants", "planting_plan",
   "sales", "seed_collection", "seedling_map_layouts", "seedlings",
   "soil_improvements", "soil_tests", "system_docs", "tasks", "tree_registry",
-  "wants", "work_hours", "zones",
+  "wants", "whatsapp_invites", "work_hours", "zones",
 ];
 
 /* Each migration in supabase/migrations, with the schema it should have created.
@@ -498,8 +498,8 @@ const MIGRATIONS: { version: string; name: string; probes: string[]; note?: stri
   },
   {
     version: "20260906120000",
-    name: "create_farm_invites",
-    probes: ["farm_invites.token", "farm_invites.step"],
+    name: "create_whatsapp_invites",
+    probes: ["whatsapp_invites.token", "whatsapp_invites.step"],
   },
 ];
 
