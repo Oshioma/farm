@@ -19,24 +19,46 @@ function phoneEmail(phone: string) {
   return `wa-${phone}@farmers.shamba.online`;
 }
 
+/** True when the auth account still exists (a test user may have been deleted). */
+async function userExists(admin: ReturnType<typeof getSupabaseAdmin>, userId: string): Promise<boolean> {
+  const { data, error } = await admin.auth.admin.getUserById(userId);
+  return !error && !!data?.user;
+}
+
+/** Supabase has no lookup by email for admins, so page through the list. */
+async function findUserIdByEmail(admin: ReturnType<typeof getSupabaseAdmin>, email: string): Promise<string | null> {
+  const wanted = email.toLowerCase();
+  for (let page = 1; page <= 25; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
+    if (error || !data?.users?.length) return null;
+    const hit = data.users.find((user) => user.email?.toLowerCase() === wanted);
+    if (hit) return hit.id;
+    if (data.users.length < 200) return null;
+  }
+  return null;
+}
+
 /** Find or create the Supabase user behind an invite, remembering it on the row. */
 async function ensureUser(admin: ReturnType<typeof getSupabaseAdmin>, invite: InviteRow): Promise<string> {
   const email = phoneEmail(invite.phone);
-  if (invite.user_id) {
-    // The account exists from an earlier attempt; the profile row may still be missing.
-    await ensureProfile(admin, invite.user_id, email, invite.farmer_name);
-    return invite.user_id;
+
+  // An id remembered from an earlier attempt is only good if the account still exists.
+  let userId: string | null = invite.user_id && (await userExists(admin, invite.user_id)) ? invite.user_id : null;
+
+  if (!userId) {
+    // Another invite for the same phone may already have made the account.
+    const { data: earlier } = await admin
+      .from("whatsapp_invites")
+      .select("user_id")
+      .eq("phone", invite.phone)
+      .not("user_id", "is", null)
+      .neq("id", invite.id)
+      .limit(1)
+      .maybeSingle();
+    if (earlier?.user_id && (await userExists(admin, earlier.user_id))) userId = earlier.user_id;
   }
 
-  // Another invite for the same phone may already have made the account.
-  const { data: earlier } = await admin
-    .from("whatsapp_invites")
-    .select("user_id")
-    .eq("phone", invite.phone)
-    .not("user_id", "is", null)
-    .limit(1)
-    .maybeSingle();
-  let userId: string | null = earlier?.user_id ?? null;
+  if (!userId) userId = await findUserIdByEmail(admin, email);
 
   if (!userId) {
     const { data, error } = await admin.auth.admin.createUser({
@@ -46,18 +68,15 @@ async function ensureUser(admin: ReturnType<typeof getSupabaseAdmin>, invite: In
       user_metadata: { full_name: invite.farmer_name, phone: invite.phone, signed_up_via: "whatsapp_invite" },
     });
     if (error && !/already/i.test(error.message)) throw error;
-    userId = data?.user?.id ?? null;
-  }
-  if (!userId) {
-    // The account exists from before invites were tracked: farm_members remembers emails.
-    const { data: member } = await admin.from("farm_members").select("profile_id").eq("user_email", email).limit(1).maybeSingle();
-    userId = member?.profile_id ?? null;
+    userId = data?.user?.id ?? (await findUserIdByEmail(admin, email));
   }
   if (!userId) throw new Error("Could not create the farmer's account.");
 
   await ensureProfile(admin, userId, email, invite.farmer_name);
-  await admin.from("whatsapp_invites").update({ user_id: userId }).eq("id", invite.id);
-  invite.user_id = userId;
+  if (invite.user_id !== userId) {
+    await admin.from("whatsapp_invites").update({ user_id: userId }).eq("id", invite.id);
+    invite.user_id = userId;
+  }
   return userId;
 }
 
