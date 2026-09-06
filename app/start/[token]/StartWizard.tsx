@@ -150,6 +150,12 @@ export function StartWizard({ initial }: { initial: InviteState }) {
     if (data?.url) window.location.href = data.url;
   }
 
+  async function viewShop() {
+    if (!state.farm) return;
+    const data = await post("enter", { next: `/${state.farm.slug}` });
+    window.location.href = data?.url ?? shopLink;
+  }
+
   const cropReady = !!crop.name.trim() && !!crop.harvestDate && Number(crop.expectedKg) > 0;
   const stepNumber = state.step === "farm" ? 1 : state.step === "location" ? 2 : 3;
 
@@ -234,7 +240,7 @@ export function StartWizard({ initial }: { initial: InviteState }) {
               <div className="flex items-center gap-2 text-emerald-800"><Check className="h-6 w-6" /><h1 className="text-2xl font-semibold tracking-tight">{t.liveTitle}</h1></div>
               <p className="mt-2 text-sm text-zinc-600">{t.liveBody(state.farm.name)}</p>
               <div className="mt-5 grid gap-3">
-                <a href={shopLink} className={primary}>{t.viewShop} <ExternalLink className="h-5 w-5" /></a>
+                <button type="button" onClick={viewShop} disabled={busy === "enter"} className={primary}>{busy === "enter" ? t.entering : t.viewShop} <ExternalLink className="h-5 w-5" /></button>
                 <a href={whatsappLink("", t.shareText(state.farm.name, shopLink))} target="_blank" rel="noreferrer" className={secondary}>{t.shareShop}</a>
                 <button type="button" onClick={enterFarm} disabled={busy === "enter"} className="text-sm font-semibold text-emerald-800 hover:underline">{busy === "enter" ? t.entering : t.enterFarm}</button>
               </div>
