@@ -302,4 +302,22 @@ export const dashboard: Record<string, string> = {
   /* Misc */
   "Scroll to top": "Nenda juu",
   "Back to top": "Rudi juu",
+  /* Grouped desktop navigation and header menus */
+  "Overview": "Muhtasari",
+  "Growing": "Kilimo",
+  "Care": "Utunzaji",
+  "Business": "Biashara",
+  "Dashboard": "Dashibodi",
+  "Expected harvests": "Mavuno yanayotarajiwa",
+  "Farm setup": "Maandalizi ya shamba",
+  "Farm navigation": "Urambazaji wa shamba",
+  "Current farm": "Shamba la sasa",
+  "Account": "Akaunti",
+  "Close form": "Funga fomu",
+  "Want": "Hitaji",
+  "Task": "Kazi",
+  "Pest": "Mdudu",
+  "Sale": "Mauzo",
+  "Expense": "Gharama",
+  "Asset": "Mali",
 };

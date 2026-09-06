@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { supabase, getCurrentUser } from "@/lib/supabase";
 import {
   getFarms,
@@ -43,9 +43,10 @@ import { useFocusTarget } from "@/hooks/useFocusTarget";
 import { blankCropDetails, cropDetailsToForm, cropDetailsPayload } from "@/lib/cropDetails";
 import { LogHoursModal } from "@/app/farm/components/LogHoursModal";
 import { ExpandableText } from "@/app/farm/components/ExpandableText";
-import { ArrowUp, Images, Plus, Settings, X } from "lucide-react";
+import { ArrowUp, Images, Plus, RefreshCw, Settings, X } from "lucide-react";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
 import NotificationBell from "@/components/NotificationBell";
+import { NavMenu } from "@/app/farm/components/NavMenu";
 import { useT, useLanguage } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import type { CropFormData } from "@/app/farm/components/CropForm";
@@ -104,6 +105,7 @@ export default function FarmPage() {
   const [farmEditForm, setFarmEditForm] = useState({ name: "", location: "", size_acres: "" });
   const [savingFarm, setSavingFarm] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const [hoursPromptTask, setHoursPromptTask] = useState<Task | null>(null);
   const [loggingHours, setLoggingHours] = useState(false);
@@ -1504,6 +1506,130 @@ export default function FarmPage() {
     }
   }
 
+  /* Header actions shared by the mobile cluster and the desktop menus, so a
+     control moved into a dropdown keeps exactly the handler it had. */
+  const isSuperAdmin = !!userEmail && userEmail === process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAIL;
+  function toggleJoinFarm() {
+    setNoFarmMode(noFarmMode === "join" ? "idle" : "join");
+    if (noFarmMode !== "join") loadAllFarms();
+  }
+  function toggleCreateFarm() {
+    setNoFarmMode(noFarmMode === "create" ? "idle" : "create");
+  }
+  async function handleRefresh() {
+    setIsRefreshing(true);
+    try {
+      if (activeFarmId) {
+        await loadFarmData(activeFarmId);
+      }
+    } catch (err) {
+      setError(errMsg(err, t("Failed to refresh farm data")));
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
+  const farmMenuItems = [
+    ...farms.map((farm) => ({ key: farm.id, label: farm.name, active: farm.id === activeFarmId, onSelect: () => setActiveFarmId(farm.id) })),
+    { key: "join", label: t("Join a farm"), onSelect: toggleJoinFarm, dividerBefore: true },
+    { key: "create", label: t("Create a farm"), onSelect: toggleCreateFarm },
+    { key: "invite", label: t("Invite"), href: withFarmContext("/farm/invite") },
+  ];
+  const accountMenuItems = [
+    ...(userEmail ? [{ key: "email", label: userEmail, heading: true }] : []),
+    ...(isSuperAdmin ? [{ key: "admin", label: t("Admin"), href: "/admin", tone: "danger" as const }] : []),
+    { key: "signout", label: t("Sign out"), onSelect: handleSignOut, dividerBefore: true },
+  ];
+
+  /* Desktop navigation, grouped. Every destination from the flat list is here;
+     managerOnly entries follow the same role check as before. */
+  type NavLeaf = { href: string; label: string; path?: string; managerOnly?: boolean };
+  const leaf = (href: string, label: string, path?: string, managerOnly?: boolean): NavLeaf => ({ href, label, path, managerOnly });
+  const navSections = [
+    { key: "overview", label: "Overview", items: [
+      leaf(withFarmContext("/farm"), "Dashboard", "/farm"),
+      leaf(workerGoalsHref, "Goals", "/farm/goals"),
+      leaf(withFarmContext("/income-prediction"), "Income prediction", "/income-prediction", true),
+    ] },
+    { key: "farm", label: "Farm", items: [
+      leaf("#map", "Map"),
+      leaf(withFarmContext("/farm/onboarding"), "Farm setup", "/farm/onboarding", true),
+      leaf(withFarmContext("/farm/systems"), "Systems", "/farm/systems"),
+      leaf(withFarmContext("/farm/work-hours"), "Work hours", "/farm/work-hours", true),
+      leaf("#assets", "Assets"),
+    ] },
+    { key: "growing", label: "Growing", items: [
+      leaf("#crops", "Crops"),
+      leaf(withFarmContext("/plants"), "Plants", "/plants"),
+      leaf(withFarmContext("/farm/trees"), "Trees", "/farm/trees"),
+      leaf(withFarmContext("/farm/seedlings"), "Seedlings", "/farm/seedlings"),
+      leaf(withFarmContext("/farm/planting-plan"), "Planting plan", "/farm/planting-plan"),
+      leaf(withFarmContext("/companion"), "Companion planting", "/companion"),
+    ] },
+    { key: "care", label: "Care", items: [
+      leaf(withFarmContext("/farm/soil-tests"), "Soil tests", "/farm/soil-tests"),
+      leaf(withFarmContext("/farm/compost"), "Compost", "/farm/compost"),
+      leaf(withFarmContext("/fertiliser"), "Fertiliser", "/fertiliser"),
+      leaf(withFarmContext("/farm/mulch"), "Mulch", "/farm/mulch"),
+      leaf(withFarmContext("/farm/pest-control"), "Pest control", "/farm/pest-control"),
+    ] },
+    { key: "harvest", label: "Harvest", items: [
+      leaf(withFarmContext("/farm/produce-expected"), "Expected harvests", "/farm/produce-expected"),
+      leaf(withFarmContext("/farm/harvest-eta"), "Harvest", "/farm/harvest-eta"),
+      leaf(withFarmContext("/farm/harvest-logs"), "Harvest logs", "/farm/harvest-logs"),
+    ] },
+    { key: "business", label: "Business", items: [
+      leaf(withFarmContext("/farm/orders"), "Orders", "/farm/orders", true),
+      leaf(withFarmContext("/farm/customers"), "Customers", "/farm/customers", true),
+      leaf("#sales", "Sales"),
+      leaf("#expenses", "Expenses"),
+    ] },
+  ].map((section) => ({
+    ...section,
+    items: section.items
+      .filter((item) => isManager || !item.managerOnly)
+      .map((item) => ({ ...item, active: !!item.path && item.path === pathname })),
+  }));
+
+  /* Mobile keeps the flat alphabetical list it had, with two clearer labels. */
+  const mobileNavItems = [
+    { href: withFarmContext("/companion"), label: "Companion planting" },
+    { href: withFarmContext("/farm/compost"), label: "Compost" },
+    { href: "#crops", label: "Crops" },
+    { href: withFarmContext("/farm/customers"), label: "Customers", managerOnly: true },
+    { href: withFarmContext("/farm/orders"), label: "Orders", managerOnly: true },
+    { href: withFarmContext("/farm/onboarding"), label: "Farm setup", managerOnly: true },
+    { href: withFarmContext("/fertiliser"), label: "Fertiliser" },
+    { href: workerGoalsHref, label: "Goals" },
+    { href: withFarmContext("/farm/harvest-eta"), label: "Harvest" },
+    { href: withFarmContext("/farm/harvest-logs"), label: "Harvest logs" },
+    { href: withFarmContext("/income-prediction"), label: "Income prediction", managerOnly: true },
+    { href: "#map", label: "Map" },
+    { href: withFarmContext("/farm/mulch"), label: "Mulch" },
+    { href: withFarmContext("/farm/pest-control"), label: "Pest control" },
+    { href: withFarmContext("/farm/planting-plan"), label: "Planting plan" },
+    { href: withFarmContext("/farm/produce-expected"), label: "Expected harvests" },
+    { href: withFarmContext("/plants"), label: "Plants" },
+    { href: withFarmContext("/farm/seedlings"), label: "Seedlings" },
+    { href: withFarmContext("/farm/soil-tests"), label: "Soil tests" },
+    { href: withFarmContext("/farm/systems"), label: "Systems" },
+    { href: withFarmContext("/farm/trees"), label: "Trees" },
+    { href: withFarmContext("/farm/work-hours"), label: "Work hours", managerOnly: true },
+  ].filter((item) => isManager || !item.managerOnly);
+
+  /* Quick actions: one list drives the desktop "+ Add" menu and the mobile pills. */
+  const quickActions = (
+    [
+      { key: "crop", label: "Crop", mobileLabel: "+ Crop", managerOnly: true },
+      { key: "want", label: "Want", mobileLabel: "+ Want" },
+      { key: "task", label: "Task", mobileLabel: "+ Task", managerOnly: true },
+      { key: "harvest", label: "Harvest", mobileLabel: "+ Harvest" },
+      { key: "pest", label: "Pest", mobileLabel: "+ Pest" },
+      { key: "sale", label: "Sale", mobileLabel: "+ Sale", managerOnly: true },
+      { key: "expense", label: "Expense", mobileLabel: "+ Expense", managerOnly: true },
+      { key: "asset", label: "Asset", mobileLabel: "+ Asset", managerOnly: true },
+    ] as const
+  ).filter((item) => isManager || !("managerOnly" in item && item.managerOnly));
+
   /* An account with no farm belongs in the setup wizard, unless it came here
      to join an existing farm. Until the farms query answers we show a blank
      loading screen rather than flashing the dashboard shell. */
@@ -1523,16 +1649,17 @@ export default function FarmPage() {
   return (
     <main className="min-h-screen bg-stone-50 text-zinc-900">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <header className="relative mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <header className="relative mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm lg:p-5">
+          {/* Mobile and tablet keep the corner settings gear; on desktop it sits in the action cluster. */}
           {!hideChrome && <Link
             href={withFarmContext("/farm/settings")}
             aria-label={t("Settings")}
-            className="absolute right-4 top-4 rounded-full border border-zinc-200 bg-white p-2 text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900"
+            className="absolute right-4 top-4 rounded-full border border-zinc-200 bg-white p-2 text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 lg:hidden"
           >
             <Settings className="h-5 w-5" />
           </Link>}
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div>
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+            <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
                 {t("Shamba Farm Manager")}
               </p>
@@ -1581,41 +1708,44 @@ export default function FarmPage() {
                 </div>
               ) : (
                 <>
-                  <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
+                  <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl lg:mt-1 lg:text-2xl">
                     {activeFarm?.name ?? t("Farm Manager")}
                   </h1>
-                  <p className="mt-3 text-sm text-zinc-600 sm:text-base">
-                    {activeFarm?.location || t("No location set")}
-                    {activeFarm?.size_acres ? ` · ${activeFarm.size_acres} ${t("acres")}` : ""}
-                  </p>
-                  {activeFarm && (
-                    activeFarm.list_in_market && activeFarm.slug ? (
-                      <Link
-                        href={`/${activeFarm.slug}`}
-                        className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:underline"
-                      >
-                        {t("View your shop ↗")}
-                      </Link>
-                    ) : (
-                      <Link
-                        href="/farm/onboarding"
-                        className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:underline"
-                      >
-                        {t("Publish your shop →")}
-                      </Link>
-                    )
-                  )}
-                  {activeFarm && <button
-                    onClick={startEditFarm}
-                    className="mt-3 rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100"
-                  >
-                    {t("Edit")}
-                  </button>}
+                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-600 sm:text-base lg:mt-1 lg:text-sm">
+                    <span>
+                      {activeFarm?.location || t("No location set")}
+                      {activeFarm?.size_acres ? ` · ${activeFarm.size_acres} ${t("acres")}` : ""}
+                    </span>
+                    {activeFarm && (
+                      activeFarm.list_in_market && activeFarm.slug ? (
+                        <Link
+                          href={`/${activeFarm.slug}`}
+                          className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:underline"
+                        >
+                          {t("View your shop ↗")}
+                        </Link>
+                      ) : (
+                        <Link
+                          href="/farm/onboarding"
+                          className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:underline"
+                        >
+                          {t("Publish your shop →")}
+                        </Link>
+                      )
+                    )}
+                    {activeFarm && <button
+                      onClick={startEditFarm}
+                      className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100"
+                    >
+                      {t("Edit")}
+                    </button>}
+                  </div>
                 </>
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Mobile and tablet: the existing action cluster, unchanged. */}
+            <div className="flex flex-wrap items-center gap-2 lg:hidden">
               {farms.map((farm) => {
                 const isActive = farm.id === activeFarmId;
                 return (
@@ -1634,16 +1764,13 @@ export default function FarmPage() {
               })}
               {!hideChrome && (<>
               <button
-                onClick={() => {
-                  setNoFarmMode(noFarmMode === "join" ? "idle" : "join");
-                  if (noFarmMode !== "join") loadAllFarms();
-                }}
+                onClick={toggleJoinFarm}
                 className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100"
               >
                 {t("Join a farm")}
               </button>
               <button
-                onClick={() => setNoFarmMode(noFarmMode === "create" ? "idle" : "create")}
+                onClick={toggleCreateFarm}
                 className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
               >
                 {t("Create a farm")}
@@ -1654,7 +1781,7 @@ export default function FarmPage() {
               >
                 {t("Invite")}
               </Link>
-              {userEmail && userEmail === process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAIL && (
+              {isSuperAdmin && (
                 <Link
                   href="/admin"
                   className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
@@ -1663,18 +1790,7 @@ export default function FarmPage() {
                 </Link>
               )}
               <button
-                onClick={async () => {
-                  setIsRefreshing(true);
-                  try {
-                    if (activeFarmId) {
-                      await loadFarmData(activeFarmId);
-                    }
-                  } catch (err) {
-                    setError(errMsg(err, t("Failed to refresh farm data")));
-                  } finally {
-                    setIsRefreshing(false);
-                  }
-                }}
+                onClick={handleRefresh}
                 disabled={isRefreshing}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-60"
               >
@@ -1693,36 +1809,65 @@ export default function FarmPage() {
                 {t("Sign out")}
               </button>
             </div>
+
+            {/* Desktop: the same actions, grouped. Farms, join, create and invite live
+                under the farm switcher; admin and sign out under the account menu. */}
+            <div className="hidden flex-wrap items-center justify-end gap-2 lg:flex">
+              {!hideChrome && (<>
+                <NavMenu
+                  ariaLabel={t("Current farm")}
+                  label={<span className="max-w-[14rem] truncate">{activeFarm?.name ?? t("Farm")}</span>}
+                  items={farmMenuItems}
+                  align="right"
+                />
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  aria-label={t("Refresh")}
+                  title={t("Refresh")}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3.5 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-60"
+                >
+                  <RefreshCw className={"h-4 w-4 " + (isRefreshing ? "animate-spin" : "")} aria-hidden="true" />
+                  {isRefreshing ? t("Refreshing...") : t("Refresh")}
+                </button>
+                <NotificationBell />
+                <Link
+                  href={withFarmContext("/farm/settings")}
+                  aria-label={t("Settings")}
+                  title={t("Settings")}
+                  className="rounded-full border border-zinc-200 bg-white p-2 text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900"
+                >
+                  <Settings className="h-5 w-5" />
+                </Link>
+              </>)}
+              <LanguageToggle lang={lang} onChange={setLang} />
+              <NavMenu
+                ariaLabel={t("Account")}
+                label={<span className="max-w-[12rem] truncate">{userEmail || t("Account")}</span>}
+                items={accountMenuItems}
+                align="right"
+              />
+            </div>
           </div>
         </header>
 
         {/* Keep the full app navigation out of the focused setup flow and away from accounts with no farm yet. */}
-        {!hideChrome && <nav className="mb-6 rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
-          <div className="flex flex-wrap items-center gap-1.5 text-sm">
-            {[
-              { href: withFarmContext("/companion"), label: "Companion planting" },
-              { href: withFarmContext("/farm/compost"), label: "Compost" },
-              { href: "#crops", label: "Crops" },
-              { href: withFarmContext("/farm/customers"), label: "Customers", managerOnly: true },
-              { href: withFarmContext("/farm/orders"), label: "Orders", managerOnly: true },
-              { href: withFarmContext("/farm/onboarding"), label: "Setup", managerOnly: true },
-              { href: withFarmContext("/fertiliser"), label: "Fertiliser" },
-              { href: workerGoalsHref, label: "Goals" },
-              { href: withFarmContext("/farm/harvest-eta"), label: "Harvest" },
-              { href: withFarmContext("/farm/harvest-logs"), label: "Harvest logs" },
-              { href: withFarmContext("/income-prediction"), label: "Income prediction", managerOnly: true },
-              { href: "#map", label: "Map" },
-              { href: withFarmContext("/farm/mulch"), label: "Mulch" },
-              { href: withFarmContext("/farm/pest-control"), label: "Pest control" },
-              { href: withFarmContext("/farm/planting-plan"), label: "Planting plan" },
-              { href: withFarmContext("/farm/produce-expected"), label: "Produce expected" },
-              { href: withFarmContext("/plants"), label: "Plants" },
-              { href: withFarmContext("/farm/seedlings"), label: "Seedlings" },
-              { href: withFarmContext("/farm/soil-tests"), label: "Soil tests" },
-              { href: withFarmContext("/farm/systems"), label: "Systems" },
-              { href: withFarmContext("/farm/trees"), label: "Trees" },
-              { href: withFarmContext("/farm/work-hours"), label: "Work hours", managerOnly: true },
-            ].filter((item) => isManager || !item.managerOnly).map(({ href, label }) => (
+        {!hideChrome && <nav aria-label={t("Farm navigation")} className="mb-6 rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
+          {/* Desktop: six grouped menus. */}
+          <div className="hidden flex-wrap items-center gap-1.5 text-sm lg:flex">
+            {navSections.map((section) => (
+              <NavMenu
+                key={section.key}
+                variant="nav"
+                label={t(section.label)}
+                active={section.items.some((item) => item.active)}
+                items={section.items.map((item) => ({ key: item.href, label: t(item.label), href: item.href, active: item.active }))}
+              />
+            ))}
+          </div>
+          {/* Mobile and tablet: the flat list, as before. */}
+          <div className="flex flex-wrap items-center gap-1.5 text-sm lg:hidden">
+            {mobileNavItems.map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}
@@ -1943,21 +2088,32 @@ export default function FarmPage() {
 
         {activeFarm ? (
           <>
-            <div className="mb-6 flex flex-wrap gap-2">
-              {(
-                [
-                  { key: "crop", label: "+ Crop", managerOnly: true },
-                  { key: "want", label: "+ Want" },
-                  { key: "task", label: "+ Task", managerOnly: true },
-                  { key: "harvest", label: "+ Harvest" },
-                  { key: "pest", label: "+ Pest" },
-                  { key: "sale", label: "+ Sale", managerOnly: true },
-                  { key: "expense", label: "+ Expense", managerOnly: true },
-                  { key: "asset", label: "+ Asset", managerOnly: true },
-                ] as const
-              )
-                .filter((item) => isManager || !("managerOnly" in item && item.managerOnly))
-                .map(({ key, label }) => (
+            {/* Desktop: one "+ Add" menu holding every quick action. */}
+            <div className="mb-6 hidden items-center gap-2 lg:flex">
+              <NavMenu
+                variant="primary"
+                ariaLabel={t("Add")}
+                label={<><Plus className="h-4 w-4" aria-hidden="true" />{t("Add")}</>}
+                items={quickActions.map((action) => ({
+                  key: action.key,
+                  label: t(action.label),
+                  active: activeForm === action.key,
+                  onSelect: () => setActiveForm(activeForm === action.key ? null : action.key),
+                }))}
+              />
+              {activeForm && quickActions.some((action) => action.key === activeForm) && (
+                <button
+                  onClick={() => setActiveForm(null)}
+                  className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-3.5 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                  {t("Close form")}
+                </button>
+              )}
+            </div>
+            {/* Mobile and tablet: the existing row of quick-action pills. */}
+            <div className="mb-6 flex flex-wrap gap-2 lg:hidden">
+              {quickActions.map(({ key, mobileLabel }) => (
                 <button
                   key={key}
                   onClick={() => setActiveForm(activeForm === key ? null : key)}
@@ -1967,7 +2123,7 @@ export default function FarmPage() {
                       : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
                   }`}
                 >
-                  {t(label)}
+                  {t(mobileLabel)}
                 </button>
               ))}
             </div>
@@ -2797,7 +2953,7 @@ export default function FarmPage() {
                     className="flex w-full items-center justify-between gap-4 text-left"
                   >
                     <div>
-                      <h2 className="text-xl font-semibold">{t("Assets")}</h2>
+                      <h2 id="assets" className="scroll-mt-4 text-xl font-semibold">{t("Assets")}</h2>
                       <p className="mt-1 text-sm text-zinc-500">{t("{n} logged", { n: assets.length })}</p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -3046,7 +3202,7 @@ export default function FarmPage() {
               <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <h2 className="text-xl font-semibold">{t("Sales")}</h2>
+                    <h2 id="sales" className="scroll-mt-4 text-xl font-semibold">{t("Sales")}</h2>
                     <p className="mt-1 text-sm text-zinc-500">{t("Most recent 20 sales.")}</p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -3110,7 +3266,7 @@ export default function FarmPage() {
                   className="flex w-full items-center justify-between gap-4 text-left"
                 >
                   <div>
-                    <h2 className="text-xl font-semibold">{t("Expenses")}</h2>
+                    <h2 id="expenses" className="scroll-mt-4 text-xl font-semibold">{t("Expenses")}</h2>
                     <p className="mt-1 text-sm text-zinc-500">{t("{n} logged", { n: expenses.length })}</p>
                   </div>
                   <div className="flex items-center gap-3">
