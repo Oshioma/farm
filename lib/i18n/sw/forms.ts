@@ -220,4 +220,11 @@ export const forms: Record<string, string> = {
 
   /* OfflineIndicator */
   "You're offline - Viewing cached data": "Uko nje ya mtandao - Unaona data iliyohifadhiwa",
+  /* Three-stage crop form */
+  "Step {n} of 3": "Hatua {n} kati ya 3",
+  "Basics": "Msingi",
+  "Growing details": "Maelezo ya ukuaji",
+  "Next: growing details": "Inayofuata: maelezo ya ukuaji",
+  "Next: for the shop": "Inayofuata: kwa ajili ya duka",
+  "Enter a crop name to continue.": "Andika jina la zao ili kuendelea.",
 };
