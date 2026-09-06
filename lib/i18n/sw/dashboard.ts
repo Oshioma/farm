@@ -320,4 +320,6 @@ export const dashboard: Record<string, string> = {
   "Sale": "Mauzo",
   "Expense": "Gharama",
   "Asset": "Mali",
+  "The basics are enough to create the crop. The rest is optional.": "Taarifa za msingi zinatosha kusajili zao. Zilizobaki ni hiari.",
+  "Basics": "Taarifa za msingi",
 };

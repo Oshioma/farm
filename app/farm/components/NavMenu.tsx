@@ -7,6 +7,7 @@ import { Check, ChevronDown } from "lucide-react";
 export type NavMenuItem = {
   key: string;
   label: string;
+  icon?: React.ReactNode;
   /** A link item navigates; an action item calls onSelect. */
   href?: string;
   onSelect?: () => void;
@@ -20,20 +21,23 @@ export type NavMenuItem = {
 
 type Props = {
   label: React.ReactNode;
+  icon?: React.ReactNode;
   items: NavMenuItem[];
   /** Highlights the trigger, e.g. when the current page lives in this menu. */
   active?: boolean;
   align?: "left" | "right";
-  variant?: "pill" | "primary" | "nav";
+  variant?: "pill" | "dark" | "primary" | "nav";
+  /** Lay the items out in two columns when there are many. */
+  columns?: 1 | 2;
   ariaLabel?: string;
   className?: string;
 };
 
-/* A small accessible dropdown in the app's pill style. Opens on click, closes
-   on outside click, Escape, or after choosing an item; arrow keys move between
-   items. Used for the grouped desktop navigation, the farm switcher, the
-   account menu and the "+ Add" quick actions. */
-export function NavMenu({ label, items, active = false, align = "left", variant = "pill", ariaLabel, className = "" }: Props) {
+/* A small accessible dropdown in the app's style. Opens on click or tap,
+   closes on outside click, Escape, or after choosing an item; arrow keys move
+   between items. Used for the grouped navigation, the farm switcher and the
+   "+ Add" quick actions. */
+export function NavMenu({ label, icon, items, active = false, align = "left", variant = "pill", columns = 1, ariaLabel, className = "" }: Props) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const menuId = useId();
@@ -77,15 +81,16 @@ export function NavMenu({ label, items, active = false, align = "left", variant 
 
   const trigger = {
     pill: "rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100",
-    primary: "rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800",
+    dark: "rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800",
+    primary: "rounded-full bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800",
     nav: active
-      ? "rounded-full bg-zinc-900 px-3.5 py-1.5 text-sm font-medium text-white"
-      : "rounded-full border border-zinc-100 px-3.5 py-1.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900",
+      ? "rounded-xl border-b-2 border-emerald-700 bg-emerald-50 px-4 py-2.5 text-[15px] font-medium text-emerald-800"
+      : "rounded-xl border-b-2 border-transparent px-4 py-2.5 text-[15px] font-medium text-zinc-800 transition hover:bg-zinc-50",
   }[variant];
 
   const itemClass = (item: NavMenuItem) =>
-    "flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm transition focus:outline-none focus-visible:bg-zinc-100 " +
-    (item.tone === "danger" ? "text-red-600 hover:bg-red-50" : item.active ? "bg-zinc-100 font-semibold text-zinc-900" : "text-zinc-700 hover:bg-zinc-100");
+    "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[15px] transition focus:outline-none focus-visible:bg-emerald-50 " +
+    (item.tone === "danger" ? "text-red-600 hover:bg-red-50" : item.active ? "bg-emerald-50 font-semibold text-emerald-800" : "text-zinc-800 hover:bg-zinc-50");
 
   return (
     <div ref={root} className={"relative " + className}>
@@ -99,49 +104,53 @@ export function NavMenu({ label, items, active = false, align = "left", variant 
         onKeyDown={(event) => {
           if (event.key === "ArrowDown") { event.preventDefault(); setOpen(true); window.setTimeout(() => focusItem(Number.NEGATIVE_INFINITY), 0); }
         }}
-        className={"inline-flex items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 " + trigger}
+        className={"inline-flex items-center gap-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 " + trigger}
       >
+        {icon && <span className={"shrink-0 " + (variant === "nav" && active ? "text-emerald-700" : "")} aria-hidden="true">{icon}</span>}
         {label}
-        <ChevronDown className={"h-4 w-4 transition " + (open ? "rotate-180" : "")} aria-hidden="true" />
+        <ChevronDown className={"h-4 w-4 shrink-0 transition " + (open ? "rotate-180" : "")} aria-hidden="true" />
       </button>
       {open && (
         <div
           id={menuId}
           role="menu"
           onKeyDown={onMenuKey}
-          className={"absolute z-40 mt-2 min-w-[13rem] overflow-hidden rounded-2xl border border-zinc-200 bg-white py-1.5 shadow-lg " + (align === "right" ? "right-0" : "left-0")}
+          className={"absolute z-40 mt-2 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-zinc-200 bg-white p-2 shadow-lg " + (columns === 2 ? "w-[26rem] " : "min-w-[14rem] ") + (align === "right" ? "right-0" : "left-0")}
         >
-          {items.map((item) => {
-            const rule = item.dividerBefore ? <div className="my-1.5 border-t border-zinc-100" /> : null;
-            if (item.heading) {
+          <div className={columns === 2 ? "grid grid-cols-2 gap-x-1" : ""}>
+            {items.map((item) => {
+              const rule = item.dividerBefore ? <div className={"my-1.5 border-t border-zinc-100 " + (columns === 2 ? "col-span-2" : "")} /> : null;
+              if (item.heading) {
+                return (
+                  <div key={item.key} className={columns === 2 ? "col-span-2" : ""}>
+                    {rule}
+                    <div className="px-3 py-2 text-xs text-zinc-500">{item.label}</div>
+                  </div>
+                );
+              }
+              const content = (
+                <>
+                  {item.icon && <span className={"shrink-0 " + (item.active ? "text-emerald-700" : "text-zinc-700")} aria-hidden="true">{item.icon}</span>}
+                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  {item.active && <Check className="h-4 w-4 shrink-0 text-emerald-700" aria-hidden="true" />}
+                </>
+              );
               return (
-                <div key={item.key}>
+                <div key={item.key} className="contents">
                   {rule}
-                  <div className="px-4 py-2 text-xs text-zinc-500">{item.label}</div>
+                  {item.href ? (
+                    <Link role="menuitem" href={item.href} onClick={() => setOpen(false)} className={itemClass(item)} aria-current={item.active ? "page" : undefined}>
+                      {content}
+                    </Link>
+                  ) : (
+                    <button role="menuitem" type="button" onClick={() => { setOpen(false); item.onSelect?.(); }} className={itemClass(item)}>
+                      {content}
+                    </button>
+                  )}
                 </div>
               );
-            }
-            const content = (
-              <>
-                <span className="truncate">{item.label}</span>
-                {item.active && <Check className="h-4 w-4 shrink-0 text-emerald-700" aria-hidden="true" />}
-              </>
-            );
-            return (
-              <div key={item.key}>
-                {rule}
-                {item.href ? (
-                  <Link role="menuitem" href={item.href} onClick={() => setOpen(false)} className={itemClass(item)} aria-current={item.active ? "page" : undefined}>
-                    {content}
-                  </Link>
-                ) : (
-                  <button role="menuitem" type="button" onClick={() => { setOpen(false); item.onSelect?.(); }} className={itemClass(item)}>
-                    {content}
-                  </button>
-                )}
-              </div>
-            );
-          })}
+            })}
+          </div>
         </div>
       )}
     </div>

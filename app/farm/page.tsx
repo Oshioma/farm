@@ -43,7 +43,7 @@ import { useFocusTarget } from "@/hooks/useFocusTarget";
 import { blankCropDetails, cropDetailsToForm, cropDetailsPayload } from "@/lib/cropDetails";
 import { LogHoursModal } from "@/app/farm/components/LogHoursModal";
 import { ExpandableText } from "@/app/farm/components/ExpandableText";
-import { ArrowUp, Images, Plus, RefreshCw, Settings, X } from "lucide-react";
+import { ArrowUp, Bug, CalendarDays, ChartColumn, ClipboardList, Clock, Droplets, FlaskConical, Flower2, Heart, HeartHandshake, Home, Images, Layers, LayoutDashboard, Leaf, Map as MapIcon, Package, Plus, Receipt, Recycle, RefreshCw, Settings, ShoppingBag, Shovel, SlidersHorizontal, Sprout, Target, TreeDeciduous, TrendingUp, Users, Wallet, Wheat, X } from "lucide-react";
 import { ActivityFeed } from "@/app/farm/components/ActivityFeed";
 import NotificationBell from "@/components/NotificationBell";
 import { NavMenu } from "@/app/farm/components/NavMenu";
@@ -1534,54 +1534,50 @@ export default function FarmPage() {
     { key: "create", label: t("Create a farm"), onSelect: toggleCreateFarm },
     { key: "invite", label: t("Invite"), href: withFarmContext("/farm/invite") },
   ];
-  const accountMenuItems = [
-    ...(userEmail ? [{ key: "email", label: userEmail, heading: true }] : []),
-    ...(isSuperAdmin ? [{ key: "admin", label: t("Admin"), href: "/admin", tone: "danger" as const }] : []),
-    { key: "signout", label: t("Sign out"), onSelect: handleSignOut, dividerBefore: true },
-  ];
-
-  /* Desktop navigation, grouped. Every destination from the flat list is here;
-     managerOnly entries follow the same role check as before. */
-  type NavLeaf = { href: string; label: string; path?: string; managerOnly?: boolean };
-  const leaf = (href: string, label: string, path?: string, managerOnly?: boolean): NavLeaf => ({ href, label, path, managerOnly });
+  /* Navigation, grouped, with an icon per section and per destination. Every
+     destination from the old flat list is here; managerOnly entries follow the
+     same role check as before. */
+  const iconClass = "h-[18px] w-[18px]";
+  type NavLeaf = { href: string; label: string; icon: React.ReactNode; path?: string; managerOnly?: boolean };
+  const leaf = (href: string, label: string, icon: React.ReactNode, path?: string, managerOnly?: boolean): NavLeaf => ({ href, label, icon, path, managerOnly });
   const navSections = [
-    { key: "overview", label: "Overview", items: [
-      leaf(withFarmContext("/farm"), "Dashboard", "/farm"),
-      leaf(workerGoalsHref, "Goals", "/farm/goals"),
-      leaf(withFarmContext("/income-prediction"), "Income prediction", "/income-prediction", true),
+    { key: "overview", label: "Overview", icon: <Home className={iconClass} />, items: [
+      leaf(withFarmContext("/farm"), "Dashboard", <LayoutDashboard className={iconClass} />, "/farm"),
+      leaf(workerGoalsHref, "Goals", <Target className={iconClass} />, "/farm/goals"),
+      leaf(withFarmContext("/income-prediction"), "Income prediction", <TrendingUp className={iconClass} />, "/income-prediction", true),
     ] },
-    { key: "farm", label: "Farm", items: [
-      leaf("#map", "Map"),
-      leaf(withFarmContext("/farm/onboarding"), "Farm setup", "/farm/onboarding", true),
-      leaf(withFarmContext("/farm/systems"), "Systems", "/farm/systems"),
-      leaf(withFarmContext("/farm/work-hours"), "Work hours", "/farm/work-hours", true),
-      leaf("#assets", "Assets"),
+    { key: "farm", label: "Farm", icon: <Sprout className={iconClass} />, items: [
+      leaf("#map", "Map", <MapIcon className={iconClass} />),
+      leaf(withFarmContext("/farm/onboarding"), "Farm setup", <SlidersHorizontal className={iconClass} />, "/farm/onboarding", true),
+      leaf(withFarmContext("/farm/systems"), "Systems", <Layers className={iconClass} />, "/farm/systems"),
+      leaf(withFarmContext("/farm/work-hours"), "Work hours", <Clock className={iconClass} />, "/farm/work-hours", true),
+      leaf("#assets", "Assets", <Package className={iconClass} />),
     ] },
-    { key: "growing", label: "Growing", items: [
-      leaf("#crops", "Crops"),
-      leaf(withFarmContext("/plants"), "Plants", "/plants"),
-      leaf(withFarmContext("/farm/trees"), "Trees", "/farm/trees"),
-      leaf(withFarmContext("/farm/seedlings"), "Seedlings", "/farm/seedlings"),
-      leaf(withFarmContext("/farm/planting-plan"), "Planting plan", "/farm/planting-plan"),
-      leaf(withFarmContext("/companion"), "Companion planting", "/companion"),
+    { key: "growing", label: "Growing", icon: <Leaf className={iconClass} />, items: [
+      leaf("#crops", "Crops", <Leaf className={iconClass} />),
+      leaf(withFarmContext("/farm/seedlings"), "Seedlings", <Sprout className={iconClass} />, "/farm/seedlings"),
+      leaf(withFarmContext("/plants"), "Plants", <Flower2 className={iconClass} />, "/plants"),
+      leaf(withFarmContext("/farm/trees"), "Trees", <TreeDeciduous className={iconClass} />, "/farm/trees"),
+      leaf(withFarmContext("/farm/planting-plan"), "Planting plan", <CalendarDays className={iconClass} />, "/farm/planting-plan"),
+      leaf(withFarmContext("/companion"), "Companion planting", <HeartHandshake className={iconClass} />, "/companion"),
     ] },
-    { key: "care", label: "Care", items: [
-      leaf(withFarmContext("/farm/soil-tests"), "Soil tests", "/farm/soil-tests"),
-      leaf(withFarmContext("/farm/compost"), "Compost", "/farm/compost"),
-      leaf(withFarmContext("/fertiliser"), "Fertiliser", "/fertiliser"),
-      leaf(withFarmContext("/farm/mulch"), "Mulch", "/farm/mulch"),
-      leaf(withFarmContext("/farm/pest-control"), "Pest control", "/farm/pest-control"),
+    { key: "care", label: "Care", icon: <Heart className={iconClass} />, items: [
+      leaf(withFarmContext("/farm/soil-tests"), "Soil tests", <FlaskConical className={iconClass} />, "/farm/soil-tests"),
+      leaf(withFarmContext("/farm/compost"), "Compost", <Recycle className={iconClass} />, "/farm/compost"),
+      leaf(withFarmContext("/fertiliser"), "Fertiliser", <Droplets className={iconClass} />, "/fertiliser"),
+      leaf(withFarmContext("/farm/mulch"), "Mulch", <Shovel className={iconClass} />, "/farm/mulch"),
+      leaf(withFarmContext("/farm/pest-control"), "Pest control", <Bug className={iconClass} />, "/farm/pest-control"),
     ] },
-    { key: "harvest", label: "Harvest", items: [
-      leaf(withFarmContext("/farm/produce-expected"), "Expected harvests", "/farm/produce-expected"),
-      leaf(withFarmContext("/farm/harvest-eta"), "Harvest", "/farm/harvest-eta"),
-      leaf(withFarmContext("/farm/harvest-logs"), "Harvest logs", "/farm/harvest-logs"),
+    { key: "harvest", label: "Harvest", icon: <ChartColumn className={iconClass} />, items: [
+      leaf(withFarmContext("/farm/produce-expected"), "Expected harvests", <TrendingUp className={iconClass} />, "/farm/produce-expected"),
+      leaf(withFarmContext("/farm/harvest-eta"), "Harvest", <Wheat className={iconClass} />, "/farm/harvest-eta"),
+      leaf(withFarmContext("/farm/harvest-logs"), "Harvest logs", <ClipboardList className={iconClass} />, "/farm/harvest-logs"),
     ] },
-    { key: "business", label: "Business", items: [
-      leaf(withFarmContext("/farm/orders"), "Orders", "/farm/orders", true),
-      leaf(withFarmContext("/farm/customers"), "Customers", "/farm/customers", true),
-      leaf("#sales", "Sales"),
-      leaf("#expenses", "Expenses"),
+    { key: "business", label: "Business", icon: <Wallet className={iconClass} />, items: [
+      leaf(withFarmContext("/farm/orders"), "Orders", <ShoppingBag className={iconClass} />, "/farm/orders", true),
+      leaf(withFarmContext("/farm/customers"), "Customers", <Users className={iconClass} />, "/farm/customers", true),
+      leaf("#sales", "Sales", <Receipt className={iconClass} />),
+      leaf("#expenses", "Expenses", <Wallet className={iconClass} />),
     ] },
   ].map((section) => ({
     ...section,
@@ -1590,43 +1586,17 @@ export default function FarmPage() {
       .map((item) => ({ ...item, active: !!item.path && item.path === pathname })),
   }));
 
-  /* Mobile keeps the flat alphabetical list it had, with two clearer labels. */
-  const mobileNavItems = [
-    { href: withFarmContext("/companion"), label: "Companion planting" },
-    { href: withFarmContext("/farm/compost"), label: "Compost" },
-    { href: "#crops", label: "Crops" },
-    { href: withFarmContext("/farm/customers"), label: "Customers", managerOnly: true },
-    { href: withFarmContext("/farm/orders"), label: "Orders", managerOnly: true },
-    { href: withFarmContext("/farm/onboarding"), label: "Farm setup", managerOnly: true },
-    { href: withFarmContext("/fertiliser"), label: "Fertiliser" },
-    { href: workerGoalsHref, label: "Goals" },
-    { href: withFarmContext("/farm/harvest-eta"), label: "Harvest" },
-    { href: withFarmContext("/farm/harvest-logs"), label: "Harvest logs" },
-    { href: withFarmContext("/income-prediction"), label: "Income prediction", managerOnly: true },
-    { href: "#map", label: "Map" },
-    { href: withFarmContext("/farm/mulch"), label: "Mulch" },
-    { href: withFarmContext("/farm/pest-control"), label: "Pest control" },
-    { href: withFarmContext("/farm/planting-plan"), label: "Planting plan" },
-    { href: withFarmContext("/farm/produce-expected"), label: "Expected harvests" },
-    { href: withFarmContext("/plants"), label: "Plants" },
-    { href: withFarmContext("/farm/seedlings"), label: "Seedlings" },
-    { href: withFarmContext("/farm/soil-tests"), label: "Soil tests" },
-    { href: withFarmContext("/farm/systems"), label: "Systems" },
-    { href: withFarmContext("/farm/trees"), label: "Trees" },
-    { href: withFarmContext("/farm/work-hours"), label: "Work hours", managerOnly: true },
-  ].filter((item) => isManager || !item.managerOnly);
-
-  /* Quick actions: one list drives the desktop "+ Add" menu and the mobile pills. */
+  /* Quick actions behind the "+ Add" button on the navigation line. */
   const quickActions = (
     [
-      { key: "crop", label: "Crop", mobileLabel: "+ Crop", managerOnly: true },
-      { key: "want", label: "Want", mobileLabel: "+ Want" },
-      { key: "task", label: "Task", mobileLabel: "+ Task", managerOnly: true },
-      { key: "harvest", label: "Harvest", mobileLabel: "+ Harvest" },
-      { key: "pest", label: "Pest", mobileLabel: "+ Pest" },
-      { key: "sale", label: "Sale", mobileLabel: "+ Sale", managerOnly: true },
-      { key: "expense", label: "Expense", mobileLabel: "+ Expense", managerOnly: true },
-      { key: "asset", label: "Asset", mobileLabel: "+ Asset", managerOnly: true },
+      { key: "crop", label: "Crop", icon: <Leaf className={iconClass} />, managerOnly: true },
+      { key: "want", label: "Want", icon: <ShoppingBag className={iconClass} /> },
+      { key: "task", label: "Task", icon: <ClipboardList className={iconClass} />, managerOnly: true },
+      { key: "harvest", label: "Harvest", icon: <Wheat className={iconClass} /> },
+      { key: "pest", label: "Pest", icon: <Bug className={iconClass} /> },
+      { key: "sale", label: "Sale", icon: <Receipt className={iconClass} />, managerOnly: true },
+      { key: "expense", label: "Expense", icon: <Wallet className={iconClass} />, managerOnly: true },
+      { key: "asset", label: "Asset", icon: <Package className={iconClass} />, managerOnly: true },
     ] as const
   ).filter((item) => isManager || !("managerOnly" in item && item.managerOnly));
 
@@ -1650,14 +1620,6 @@ export default function FarmPage() {
     <main className="min-h-screen bg-stone-50 text-zinc-900">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <header className="relative mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm lg:p-5">
-          {/* Mobile and tablet keep the corner settings gear; on desktop it sits in the action cluster. */}
-          {!hideChrome && <Link
-            href={withFarmContext("/farm/settings")}
-            aria-label={t("Settings")}
-            className="absolute right-4 top-4 rounded-full border border-zinc-200 bg-white p-2 text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 lg:hidden"
-          >
-            <Settings className="h-5 w-5" />
-          </Link>}
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
@@ -1744,24 +1706,14 @@ export default function FarmPage() {
               )}
             </div>
 
-            {/* Mobile and tablet: the existing action cluster, unchanged. */}
-            <div className="flex flex-wrap items-center gap-2 lg:hidden">
-              {farms.map((farm) => {
-                const isActive = farm.id === activeFarmId;
-                return (
-                  <button
-                    key={farm.id}
-                    onClick={() => setActiveFarmId(farm.id)}
-                    className={`rounded-full px-5 py-2.5 text-sm font-medium transition ${
-                      isActive
-                        ? "bg-zinc-900 text-white"
-                        : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
-                    }`}
-                  >
-                    {farm.name}
-                  </button>
-                );
-              })}
+            {/* Actions, the same on every screen size: farm switcher, then the pills. */}
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+              <NavMenu
+                variant="dark"
+                ariaLabel={t("Current farm")}
+                label={<span className="max-w-[12rem] truncate">{activeFarm?.name ?? t("Farm")}</span>}
+                items={farmMenuItems}
+              />
               {!hideChrome && (<>
               <button
                 onClick={toggleJoinFarm}
@@ -1792,14 +1744,15 @@ export default function FarmPage() {
               <button
                 onClick={handleRefresh}
                 disabled={isRefreshing}
-                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-60"
               >
+                <RefreshCw className={"h-4 w-4 " + (isRefreshing ? "animate-spin" : "")} aria-hidden="true" />
                 {isRefreshing ? t("Refreshing...") : t("Refresh")}
               </button>
               <NotificationBell />
               </>)}
               {userEmail && (
-                <span className="text-sm text-zinc-500">{userEmail}</span>
+                <span className="max-w-[16rem] truncate text-sm text-zinc-500">{userEmail}</span>
               )}
               <LanguageToggle lang={lang} onChange={setLang} />
               <button
@@ -1808,29 +1761,7 @@ export default function FarmPage() {
               >
                 {t("Sign out")}
               </button>
-            </div>
-
-            {/* Desktop: the same actions, grouped. Farms, join, create and invite live
-                under the farm switcher; admin and sign out under the account menu. */}
-            <div className="hidden flex-wrap items-center justify-end gap-2 lg:flex">
-              {!hideChrome && (<>
-                <NavMenu
-                  ariaLabel={t("Current farm")}
-                  label={<span className="max-w-[14rem] truncate">{activeFarm?.name ?? t("Farm")}</span>}
-                  items={farmMenuItems}
-                  align="right"
-                />
-                <button
-                  onClick={handleRefresh}
-                  disabled={isRefreshing}
-                  aria-label={t("Refresh")}
-                  title={t("Refresh")}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3.5 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-60"
-                >
-                  <RefreshCw className={"h-4 w-4 " + (isRefreshing ? "animate-spin" : "")} aria-hidden="true" />
-                  {isRefreshing ? t("Refreshing...") : t("Refresh")}
-                </button>
-                <NotificationBell />
+              {!hideChrome && (
                 <Link
                   href={withFarmContext("/farm/settings")}
                   aria-label={t("Settings")}
@@ -1839,43 +1770,56 @@ export default function FarmPage() {
                 >
                   <Settings className="h-5 w-5" />
                 </Link>
-              </>)}
-              <LanguageToggle lang={lang} onChange={setLang} />
-              <NavMenu
-                ariaLabel={t("Account")}
-                label={<span className="max-w-[12rem] truncate">{userEmail || t("Account")}</span>}
-                items={accountMenuItems}
-                align="right"
-              />
+              )}
             </div>
           </div>
         </header>
 
         {/* Keep the full app navigation out of the focused setup flow and away from accounts with no farm yet. */}
-        {!hideChrome && <nav aria-label={t("Farm navigation")} className="mb-6 rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
-          {/* Desktop: six grouped menus. */}
-          <div className="hidden flex-wrap items-center gap-1.5 text-sm lg:flex">
-            {navSections.map((section) => (
-              <NavMenu
-                key={section.key}
-                variant="nav"
-                label={t(section.label)}
-                active={section.items.some((item) => item.active)}
-                items={section.items.map((item) => ({ key: item.href, label: t(item.label), href: item.href, active: item.active }))}
-              />
-            ))}
-          </div>
-          {/* Mobile and tablet: the flat list, as before. */}
-          <div className="flex flex-wrap items-center gap-1.5 text-sm lg:hidden">
-            {mobileNavItems.map(({ href, label }) => (
-              <Link
-                key={href}
-                href={href}
-                className="rounded-full border border-zinc-100 px-3 py-1.5 font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900"
-              >
-                {t(label)}
-              </Link>
-            ))}
+        {!hideChrome && <nav aria-label={t("Farm navigation")} className="mb-6 rounded-2xl border border-zinc-200 bg-white px-2 py-2 shadow-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center divide-x divide-zinc-100">
+              {navSections.map((section, index) => (
+                <div key={section.key} className="px-1 first:pl-0">
+                  <NavMenu
+                    variant="nav"
+                    icon={section.icon}
+                    label={t(section.label)}
+                    active={section.items.some((item) => item.active)}
+                    columns={section.items.length > 4 ? 2 : 1}
+                    align={index >= navSections.length - 2 ? "right" : "left"}
+                    items={section.items.map((item) => ({ key: item.href, label: t(item.label), icon: item.icon, href: item.href, active: item.active }))}
+                  />
+                </div>
+              ))}
+            </div>
+            {activeFarm && (
+              <div className="flex items-center gap-2">
+                {activeForm && quickActions.some((action) => action.key === activeForm) && (
+                  <button
+                    onClick={() => setActiveForm(null)}
+                    className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-3.5 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+                  >
+                    <X className="h-4 w-4" aria-hidden="true" />
+                    {t("Close form")}
+                  </button>
+                )}
+                <NavMenu
+                  variant="primary"
+                  align="right"
+                  ariaLabel={t("Add")}
+                  icon={<Plus className="h-4 w-4" />}
+                  label={t("Add")}
+                  items={quickActions.map((action) => ({
+                    key: action.key,
+                    label: t(action.label),
+                    icon: action.icon,
+                    active: activeForm === action.key,
+                    onSelect: () => setActiveForm(activeForm === action.key ? null : action.key),
+                  }))}
+                />
+              </div>
+            )}
           </div>
         </nav>}
 
@@ -2088,46 +2032,6 @@ export default function FarmPage() {
 
         {activeFarm ? (
           <>
-            {/* Desktop: one "+ Add" menu holding every quick action. */}
-            <div className="mb-6 hidden items-center gap-2 lg:flex">
-              <NavMenu
-                variant="primary"
-                ariaLabel={t("Add")}
-                label={<><Plus className="h-4 w-4" aria-hidden="true" />{t("Add")}</>}
-                items={quickActions.map((action) => ({
-                  key: action.key,
-                  label: t(action.label),
-                  active: activeForm === action.key,
-                  onSelect: () => setActiveForm(activeForm === action.key ? null : action.key),
-                }))}
-              />
-              {activeForm && quickActions.some((action) => action.key === activeForm) && (
-                <button
-                  onClick={() => setActiveForm(null)}
-                  className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-3.5 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
-                >
-                  <X className="h-4 w-4" aria-hidden="true" />
-                  {t("Close form")}
-                </button>
-              )}
-            </div>
-            {/* Mobile and tablet: the existing row of quick-action pills. */}
-            <div className="mb-6 flex flex-wrap gap-2 lg:hidden">
-              {quickActions.map(({ key, mobileLabel }) => (
-                <button
-                  key={key}
-                  onClick={() => setActiveForm(activeForm === key ? null : key)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                    activeForm === key
-                      ? "bg-zinc-900 text-white"
-                      : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
-                  }`}
-                >
-                  {t(mobileLabel)}
-                </button>
-              ))}
-            </div>
-
             {activeForm && ["crop", "task", "harvest", "expense", "asset", "pest", "sale", "want"].includes(activeForm) ? (
               <div className="mb-6 max-w-sm">
                 {activeForm === "crop" && (
