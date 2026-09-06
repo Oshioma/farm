@@ -1715,18 +1715,6 @@ export default function FarmPage() {
                 items={farmMenuItems}
               />
               {!hideChrome && (<>
-              <button
-                onClick={toggleJoinFarm}
-                className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100"
-              >
-                {t("Join a farm")}
-              </button>
-              <button
-                onClick={toggleCreateFarm}
-                className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
-              >
-                {t("Create a farm")}
-              </button>
               <Link
                 href={withFarmContext("/farm/invite")}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
@@ -2033,7 +2021,7 @@ export default function FarmPage() {
         {activeFarm ? (
           <>
             {activeForm && ["crop", "task", "harvest", "expense", "asset", "pest", "sale", "want"].includes(activeForm) ? (
-              <div className="mb-6 max-w-sm">
+              <div className={activeForm === "crop" ? "mb-6" : "mb-6 max-w-sm"}>
                 {activeForm === "crop" && (
                   <CropForm
                     zones={zones}
