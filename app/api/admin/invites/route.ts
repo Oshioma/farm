@@ -57,7 +57,20 @@ function present(origin: string, invite: InviteRow, farm: { name: string; slug: 
   };
 }
 
+function failure(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err);
+  return NextResponse.json({ error: `Invites are not available: ${message}` }, { status: 500 });
+}
+
 export async function GET(req: NextRequest) {
+  try {
+    return await listInvites(req);
+  } catch (err) {
+    return failure(err);
+  }
+}
+
+async function listInvites(req: NextRequest) {
   const gate = await requireAdmin();
   if ("error" in gate) return gate.error;
   const admin = getSupabaseAdmin();
@@ -84,6 +97,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  try {
+    return await createInvite(req);
+  } catch (err) {
+    return failure(err);
+  }
+}
+
+async function createInvite(req: NextRequest) {
   const gate = await requireAdmin();
   if ("error" in gate) return gate.error;
   const body = await req.json().catch(() => ({}));
