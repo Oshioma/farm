@@ -58,7 +58,10 @@ function present(origin: string, invite: InviteRow, farm: { name: string; slug: 
 }
 
 function failure(err: unknown) {
-  const message = err instanceof Error ? err.message : String(err);
+  console.error("[admin/invites] failed:", err);
+  const e = (typeof err === "object" && err !== null ? err : {}) as { message?: unknown; details?: unknown };
+  const message = [e.message, e.details].filter((v): v is string => typeof v === "string" && v.length > 0).join(" — ")
+    || (err instanceof Error ? err.message : String(err));
   return NextResponse.json({ error: `Invites are not available: ${message}` }, { status: 500 });
 }
 
