@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, ChevronRight, Circle, ExternalLink, Sprout } from "lucide-react";
+import { Check, ChevronRight, ExternalLink, Sprout } from "lucide-react";
 import {
   getCrops,
   getFarms,
@@ -23,57 +23,47 @@ type Listing = { listed: boolean; slug: string | null; heroUrl: string | null; a
 
 const copy = {
   en: {
-    eyebrow: "Farmer setup", title: "Get ready to take real orders",
-    intro: "Work through this once. You can return any time and Shamba will recognise what is already complete.",
+    eyebrow: "Farmer setup", title: "Open your farm shop",
+    intro: "Two short steps. Your shop opens as soon as your first crop is in.",
     back: "Enter farm", farm: "Farm", checking: "Checking your farm setup…",
-    createTitle: "Name your farm to begin", createBody: "This guide then takes you from the first crop to a public shop.", create: "Create farm", creating: "Creating…",
+    createTitle: "Name your farm to begin", createBody: "Then add what you are growing and your shop opens.", create: "Create farm", creating: "Creating…",
     joinInstead: "Joining a farm that already exists? Request access instead",
     complete: "complete", done: "Done", review: "Review", continue: "Continue",
     farmName: "Farm name", location: "Location", saveDetails: "Save and continue", savingDetails: "Saving…",
     locationPlaceholder: "Village, district or region",
     cropName: "Crop name", variety: "Variety", plantedOn: "Planted on", expectedHarvestStart: "Expected harvest date", expectedKg: "Expected kilograms", pricePerKg: "Expected price per kg",
-    optional: "optional", addCrop: "Add crop and continue", addingCrop: "Adding…", cropsSoFar: "Crops on this farm", addAnotherCrop: "Add another crop", kg: "kg",
+    optional: "optional", addCrop: "Add crop", addingCrop: "Adding…", cropsSoFar: "Crops on this farm", addAnotherCrop: "Add another crop", kg: "kg",
     cropPlaceholder: "e.g. Tomatoes", varietyPlaceholder: "e.g. Roma",
-    publishQuestion: "Do you want to publish your shop now?", publishBody: "Buyers will be able to find your farm and reserve produce from the crops above.",
-    publishYes: "Yes, publish and open my shop", publishing: "Publishing…", publishNo: "Not yet, take me to the farm",
+    openShop: "Continue to my shop", opening: "Opening your shop…", openShopBody: "Your shop goes live and buyers can reserve the crops above. You can add photos, prices and delivery details afterwards.",
     detailsHint: "Farm name and location are needed to continue.",
-    cropHint: "Crop name, expected harvest date and expected kilograms are needed to continue.",
-    publishHint: "Add at least one crop with a harvest date and expected kilograms before publishing.",
+    cropHint: "Crop name, expected harvest date and expected kilograms are needed.",
     skip: "Skip setup for now and go to the farm dashboard",
-    live: "Your shop is live", open: "Open public shop",
-    privacy: "Publishing stays off until you choose it. Buyers cannot find an unfinished shop.",
+    live: "Your shop is live", open: "Open shop",
     steps: [
       ["Farm name and location", "", "Add farm name and location"],
       ["Add your crops", "What is growing, when it should be ready, and how much you expect to harvest.", "Add a crop"],
-      ["Prepare the shop", "Add a farm photo, produce photo and price before publishing.", "Prepare shop"],
-      ["Publish", "Put your shop where buyers can find it.", "Publish"],
     ],
   },
   sw: {
-    eyebrow: "Maandalizi ya mkulima", title: "Jiandae kupokea oda halisi",
-    intro: "Fuata hatua hizi mara moja. Unaweza kurudi wakati wowote, na Shamba itatambua hatua ulizokamilisha.",
+    eyebrow: "Maandalizi ya mkulima", title: "Fungua duka la shamba lako",
+    intro: "Hatua mbili fupi. Duka lako linafunguka mara tu zao lako la kwanza likiingizwa.",
     back: "Ingia shambani", farm: "Shamba", checking: "Tunakagua maandalizi ya shamba lako…",
-    createTitle: "Anza kwa kulipa jina shamba lako", createBody: "Kisha mwongozo huu utakusaidia kutoka zao la kwanza hadi duka la umma.", create: "Unda shamba", creating: "Inaunda…",
+    createTitle: "Anza kwa kulipa jina shamba lako", createBody: "Kisha ongeza unacholima na duka lako litafunguka.", create: "Unda shamba", creating: "Inaunda…",
     joinInstead: "Unajiunga na shamba lililopo? Omba ruhusa badala yake",
     complete: "zimekamilika", done: "Imekamilika", review: "Kagua", continue: "Endelea",
     farmName: "Jina la shamba", location: "Eneo", saveDetails: "Hifadhi na uendelee", savingDetails: "Inahifadhi…",
     locationPlaceholder: "Kijiji, wilaya au mkoa",
     cropName: "Jina la zao", variety: "Aina", plantedOn: "Tarehe ya kupanda", expectedHarvestStart: "Tarehe ya mavuno inayotarajiwa", expectedKg: "Kilo zinazotarajiwa", pricePerKg: "Bei inayotarajiwa kwa kilo",
-    optional: "hiari", addCrop: "Ongeza zao na uendelee", addingCrop: "Inaongeza…", cropsSoFar: "Mazao ya shamba hili", addAnotherCrop: "Ongeza zao lingine", kg: "kg",
+    optional: "hiari", addCrop: "Ongeza zao", addingCrop: "Inaongeza…", cropsSoFar: "Mazao ya shamba hili", addAnotherCrop: "Ongeza zao lingine", kg: "kg",
     cropPlaceholder: "mf. Nyanya", varietyPlaceholder: "mf. Roma",
-    publishQuestion: "Unataka kuchapisha duka lako sasa?", publishBody: "Wanunuzi wataweza kuona shamba lako na kuagiza mazao yaliyo hapo juu.",
-    publishYes: "Ndiyo, chapisha na ufungue duka langu", publishing: "Inachapisha…", publishNo: "Bado, nipeleke shambani",
+    openShop: "Endelea kwenye duka langu", opening: "Inafungua duka lako…", openShopBody: "Duka lako linaingia hewani na wanunuzi wanaweza kuagiza mazao yaliyo hapo juu. Unaweza kuongeza picha, bei na maelezo ya usafirishaji baadaye.",
     detailsHint: "Jina la shamba na eneo vinahitajika ili kuendelea.",
-    cropHint: "Jina la zao, tarehe ya mavuno inayotarajiwa na kilo zinazotarajiwa vinahitajika ili kuendelea.",
-    publishHint: "Ongeza angalau zao moja lenye tarehe ya mavuno na kilo zinazotarajiwa kabla ya kuchapisha.",
+    cropHint: "Jina la zao, tarehe ya mavuno inayotarajiwa na kilo zinazotarajiwa vinahitajika.",
     skip: "Ruka maandalizi kwa sasa na uende kwenye dashibodi ya shamba",
-    live: "Duka lako sasa liko hewani", open: "Fungua duka la umma",
-    privacy: "Duka halitawekwa hadharani mpaka uchague kufanya hivyo. Wanunuzi hawawezi kuona duka ambalo halijakamilika.",
+    live: "Duka lako liko hewani", open: "Fungua duka",
     steps: [
       ["Jina na eneo la shamba", "", "Weka jina na eneo la shamba"],
       ["Ongeza mazao yako", "Kinacholimwa, kitakapokuwa tayari, na kiasi unachotarajia kuvuna.", "Ongeza zao"],
-      ["Andaa duka", "Weka picha ya shamba, picha ya mazao na bei kabla ya kuchapisha.", "Andaa duka"],
-      ["Chapisha", "Weka duka lako mahali wanunuzi wanaweza kuliona.", "Chapisha"],
     ],
   },
 } as const;
@@ -116,8 +106,10 @@ export default function FarmerOnboardingPage() {
 
   const [cropForm, setCropForm] = useState(blankCrop);
   const [savingCrop, setSavingCrop] = useState(false);
+  /* After the first crop the form folds away behind "Add another crop". */
+  const [showCropForm, setShowCropForm] = useState(false);
 
-  const [publishing, setPublishing] = useState(false);
+  const [opening, setOpening] = useState(false);
 
   const seasonYear = harvestSeasonYear();
 
@@ -144,6 +136,7 @@ export default function FarmerOnboardingPage() {
       if (cancelled) return;
       setCrops(cropRows);
       setHarvests(harvestRows);
+      setShowCropForm(cropRows.length === 0);
       setListing({ listed: !!shop.listed, slug: shop.slug ?? null, heroUrl: shop.heroUrl ?? null, available: shop.available !== false });
     }).catch((err) => {
       if (!cancelled) setError(errMsg(err, "Could not check setup"));
@@ -203,7 +196,7 @@ export default function FarmerOnboardingPage() {
 
     setSavingDetails(true);
     setError("");
-    // Farm size is collected later in settings, not during first setup.
+    // Farm size is collected later in the prepare-farm wizard, not here.
     const { error: updateError } = await supabase
       .from("farms")
       .update({ name, location })
@@ -270,7 +263,7 @@ export default function FarmerOnboardingPage() {
       setCrops(cropRows);
       setHarvests(harvestRows);
       setCropForm(blankCrop);
-      goToStep(2);
+      setShowCropForm(false);
     } catch (err) {
       setError(errMsg(err, "Failed to add crop"));
     } finally {
@@ -278,48 +271,46 @@ export default function FarmerOnboardingPage() {
     }
   }
 
-  async function publishShop() {
-    if (!farm) return;
-    setPublishing(true);
+  /* Publishes the shop (if it is not already) and takes the farmer to it. */
+  async function openShop() {
+    if (!farm || !listing.slug) return;
+    setOpening(true);
     setError("");
     try {
-      const res = await fetch("/api/farm/market-listing", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ farmId: farm.id, listed: true }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not publish the shop");
-      setListing((current) => ({ ...current, listed: true }));
-      if (listing.slug) {
-        router.push(`/${listing.slug}`);
-        return;
+      if (!listing.listed) {
+        const res = await fetch("/api/farm/market-listing", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ farmId: farm.id, listed: true }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not open the shop");
+        setListing((current) => ({ ...current, listed: true }));
       }
+      router.push(`/${listing.slug}`);
     } catch (err) {
-      setError(errMsg(err, "Could not publish the shop"));
+      setError(errMsg(err, "Could not open the shop"));
+      setOpening(false);
     }
-    setPublishing(false);
   }
 
   const hasCrop = crops.length > 0 && harvests.some((row) => expectedTotal(row) > 0);
-  const hasShopDetails = !!listing.heroUrl && crops.some((crop) => crop.expected_sale_price_per_kg && (crop.produce_image_url || crop.image_url));
-  const done = [!!farm?.location, hasCrop, hasShopDetails, listing.listed];
+  const done = [!!farm?.location, hasCrop];
 
   const steps = useMemo(() => t.steps.map((step, index) => ({
     title: step[0], detail: step[1], action: step[2], done: done[index],
-  })), [t, farm, hasCrop, hasShopDetails, listing.listed]); // eslint-disable-line react-hooks/exhaustive-deps
+  })), [t, farm, hasCrop]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const completed = steps.filter((step) => step.done).length;
   const progress = Math.round((completed / steps.length) * 100);
   const firstOpen = steps.findIndex((step) => !step.done);
-  const expanded = activeStep ?? (firstOpen === -1 ? null : firstOpen);
-  const next = steps.find((step) => !step.done);
-  const nextIndex = next ? steps.indexOf(next) : -1;
+  const expanded = activeStep ?? (firstOpen === -1 ? 1 : firstOpen);
 
   if (loading && farms.length === 0) return <main className="mx-auto max-w-3xl px-4 py-12 text-sm text-zinc-500">{t.checking}</main>;
 
   const cropLabel = (crop: Crop) => (crop.variety ? `${crop.crop_name} · ${crop.variety}` : crop.crop_name);
   const expectedKgFor = (cropId: string) => harvests.filter((row) => row.crop_id === cropId).reduce((sum, row) => sum + expectedTotal(row), 0);
+  const cropFormReady = !!cropForm.name.trim() && !!cropForm.expectedHarvestStart && Number(cropForm.expectedKg) > 0;
 
   function stepHeader(index: number) {
     const step = steps[index];
@@ -358,7 +349,7 @@ export default function FarmerOnboardingPage() {
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-950">{t.title}</h1>
           <p className="mt-2 max-w-2xl text-zinc-600">{t.intro}</p>
         </div>
-        {completed === steps.length && <Link href="/farm" className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">{t.back}</Link>}
+        {listing.listed && listing.slug && <Link href={`/${listing.slug}`} className="inline-flex items-center gap-1 rounded-full bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">{t.open} <ExternalLink className="h-4 w-4" /></Link>}
       </div>
 
       {error && <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -396,7 +387,7 @@ export default function FarmerOnboardingPage() {
               </form>
             ))}
 
-            {/* Step 2: crops with their harvest estimate, added right here */}
+            {/* Step 2: crops with their harvest estimate, then straight to the shop */}
             {stepCard(1, (
               <div>
                 {crops.length > 0 && (
@@ -414,60 +405,38 @@ export default function FarmerOnboardingPage() {
                     </ul>
                   </div>
                 )}
-                <form onSubmit={addCrop} className="grid gap-4 sm:grid-cols-2">
-                  <label className="text-sm font-medium text-zinc-700">{t.cropName}<input required value={cropForm.name} onChange={(event) => setCropForm((current) => ({ ...current, name: event.target.value }))} placeholder={t.cropPlaceholder} className={inputClass} /></label>
-                  <label className="text-sm font-medium text-zinc-700">{t.variety} <span className="font-normal text-zinc-400">({t.optional})</span><input value={cropForm.variety} onChange={(event) => setCropForm((current) => ({ ...current, variety: event.target.value }))} placeholder={t.varietyPlaceholder} className={inputClass} /></label>
-                  <label className="text-sm font-medium text-zinc-700">{t.plantedOn} <span className="font-normal text-zinc-400">({t.optional})</span><input type="date" value={cropForm.plantedOn} onChange={(event) => setCropForm((current) => ({ ...current, plantedOn: event.target.value }))} className={inputClass} /></label>
-                  <label className="text-sm font-medium text-zinc-700">{t.expectedHarvestStart}<input required type="date" value={cropForm.expectedHarvestStart} onChange={(event) => setCropForm((current) => ({ ...current, expectedHarvestStart: event.target.value }))} className={inputClass} /></label>
-                  <label className="text-sm font-medium text-zinc-700">{t.expectedKg}<input required type="number" min="0.1" step="0.1" value={cropForm.expectedKg} onChange={(event) => setCropForm((current) => ({ ...current, expectedKg: event.target.value }))} className={inputClass} /></label>
-                  <label className="text-sm font-medium text-zinc-700">{t.pricePerKg} <span className="font-normal text-zinc-400">({t.optional})</span><input type="number" min="0" step="0.01" value={cropForm.pricePerKg} onChange={(event) => setCropForm((current) => ({ ...current, pricePerKg: event.target.value }))} className={inputClass} /></label>
-                  <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
-                    <button type="submit" disabled={savingCrop || !cropForm.name.trim() || !cropForm.expectedHarvestStart || Number(cropForm.expectedKg) <= 0} className={primaryButton}>{savingCrop ? t.addingCrop : t.addCrop}</button>
-                    {hasCrop && <button type="button" onClick={() => goToStep(2)} className={secondaryButton}>{t.continue}<ChevronRight className="ml-1 inline h-4 w-4" /></button>}
+
+                {showCropForm || crops.length === 0 ? (
+                  <form onSubmit={addCrop} className="grid gap-4 sm:grid-cols-2">
+                    <label className="text-sm font-medium text-zinc-700">{t.cropName}<input required value={cropForm.name} onChange={(event) => setCropForm((current) => ({ ...current, name: event.target.value }))} placeholder={t.cropPlaceholder} className={inputClass} /></label>
+                    <label className="text-sm font-medium text-zinc-700">{t.variety} <span className="font-normal text-zinc-400">({t.optional})</span><input value={cropForm.variety} onChange={(event) => setCropForm((current) => ({ ...current, variety: event.target.value }))} placeholder={t.varietyPlaceholder} className={inputClass} /></label>
+                    <label className="text-sm font-medium text-zinc-700">{t.plantedOn} <span className="font-normal text-zinc-400">({t.optional})</span><input type="date" value={cropForm.plantedOn} onChange={(event) => setCropForm((current) => ({ ...current, plantedOn: event.target.value }))} className={inputClass} /></label>
+                    <label className="text-sm font-medium text-zinc-700">{t.expectedHarvestStart}<input required type="date" value={cropForm.expectedHarvestStart} onChange={(event) => setCropForm((current) => ({ ...current, expectedHarvestStart: event.target.value }))} className={inputClass} /></label>
+                    <label className="text-sm font-medium text-zinc-700">{t.expectedKg}<input required type="number" min="0.1" step="0.1" value={cropForm.expectedKg} onChange={(event) => setCropForm((current) => ({ ...current, expectedKg: event.target.value }))} className={inputClass} /></label>
+                    <label className="text-sm font-medium text-zinc-700">{t.pricePerKg} <span className="font-normal text-zinc-400">({t.optional})</span><input type="number" min="0" step="0.01" value={cropForm.pricePerKg} onChange={(event) => setCropForm((current) => ({ ...current, pricePerKg: event.target.value }))} className={inputClass} /></label>
+                    <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+                      <button type="submit" disabled={savingCrop || !cropFormReady} className={primaryButton}>{savingCrop ? t.addingCrop : t.addCrop}</button>
+                      {crops.length > 0 && <button type="button" onClick={() => setShowCropForm(false)} className={secondaryButton}>{t.continue}</button>}
+                    </div>
+                    {!cropFormReady && <p className="text-xs text-zinc-500 sm:col-span-2">{t.cropHint}</p>}
+                  </form>
+                ) : (
+                  <div>
+                    <p className="text-sm leading-6 text-zinc-600">{t.openShopBody}</p>
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <button type="button" onClick={() => setShowCropForm(true)} className={secondaryButton}>{t.addAnotherCrop}</button>
+                      <button type="button" onClick={openShop} disabled={opening || !hasCrop || !listing.slug} className={primaryButton}>{opening ? t.opening : t.openShop}<ChevronRight className="ml-1 inline h-4 w-4" /></button>
+                    </div>
                   </div>
-                  {(!cropForm.name.trim() || !cropForm.expectedHarvestStart || Number(cropForm.expectedKg) <= 0) && <p className="text-xs text-zinc-500 sm:col-span-2">{t.cropHint}</p>}
-                </form>
-              </div>
-            ))}
-
-            {/* Step 3: shop photos and prices live on the settings page */}
-            {stepCard(2, (
-              <div className="flex flex-wrap items-center gap-3">
-                <Link href="/farm/settings#public-shop" className="inline-flex items-center gap-1 rounded-full bg-emerald-700 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-800">{steps[2].done ? t.review : steps[2].action}<ChevronRight className="h-4 w-4" /></Link>
-                <button type="button" onClick={() => goToStep(1)} className={secondaryButton}>{t.addAnotherCrop}</button>
-                <button type="button" onClick={() => goToStep(3)} className={secondaryButton}>{t.continue}<ChevronRight className="ml-1 inline h-4 w-4" /></button>
-              </div>
-            ))}
-
-            {/* Step 4: publish, then straight to the public shop */}
-            {stepCard(3, listing.listed ? (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                <div className="flex items-center gap-2 font-semibold text-emerald-950"><Check className="h-5 w-5" />{t.live}</div>
-                {listing.slug && <Link href={`/${listing.slug}`} className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-emerald-800">{t.open} <ExternalLink className="h-4 w-4" /></Link>}
-              </div>
-            ) : (
-              <div>
-                <p className="font-semibold text-zinc-950">{t.publishQuestion}</p>
-                <p className="mt-1 text-sm leading-6 text-zinc-600">{t.publishBody}</p>
-                <div className="mt-4 flex flex-wrap items-center gap-3">
-                  <button type="button" onClick={publishShop} disabled={publishing || !hasCrop} className={primaryButton}>{publishing ? t.publishing : t.publishYes}</button>
-                  <Link href="/farm" className={secondaryButton}>{t.publishNo}</Link>
-                </div>
-                {!hasCrop && (
-                  <p className="mt-3 text-sm text-zinc-600">
-                    {t.publishHint}{" "}
-                    <button type="button" onClick={() => goToStep(1)} className="font-semibold text-emerald-700 hover:underline">{steps[1].action} →</button>
-                  </p>
                 )}
               </div>
             ))}
           </div>
 
-          {completed < steps.length && next && nextIndex !== expanded ? (
-            <button type="button" onClick={() => goToStep(nextIndex)} className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 py-3.5 text-sm font-semibold text-white hover:bg-emerald-800">{t.continue}: {next.title}<ChevronRight className="h-4 w-4" /></button>
-          ) : null}
+          {listing.listed && (
+            <section className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-6"><div className="flex items-center gap-2 font-semibold text-emerald-950"><Check className="h-5 w-5" />{t.live}</div>{listing.slug && <Link href={`/${listing.slug}`} className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-emerald-800">{t.open} <ExternalLink className="h-4 w-4" /></Link>}</section>
+          )}
 
-          <p className="mt-5 flex items-start gap-2 text-xs leading-5 text-zinc-500"><Circle className="mt-1 h-2 w-2 shrink-0 fill-current" />{t.privacy}</p>
           <p className="mt-6 text-center text-sm"><Link href="/farm" className="text-zinc-500 hover:text-zinc-900 hover:underline">{t.skip}</Link></p>
         </>
       )}

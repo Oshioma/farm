@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import type { SeedlingEntry } from "@/lib/farm";
+import { useT } from "@/lib/i18n";
 
 type ZoneDef = {
   id: string;
@@ -60,6 +61,7 @@ type DragMode =
   | null;
 
 export function SeedlingMap({ seedlings = [], farmName, farmId, canEdit = true }: Props) {
+  const t = useT();
   const [zones, setZones] = useState<ZoneDef[]>([]);
   const [trays, setTrays] = useState<TrayDef[]>([]);
   const [editMode, setEditMode] = useState(false);
@@ -108,10 +110,10 @@ export function SeedlingMap({ seedlings = [], farmName, farmId, canEdit = true }
           if (cancelled) return;
           if (response.ok && result.data) {
             const z = Array.isArray(result.data.zones) ? result.data.zones : [];
-            const t = Array.isArray(result.data.trays) ? result.data.trays : [];
-            if (z.length > 0 || t.length > 0) {
+            const loadedTrays = Array.isArray(result.data.trays) ? result.data.trays : [];
+            if (z.length > 0 || loadedTrays.length > 0) {
               setZones(z);
-              setTrays(t);
+              setTrays(loadedTrays);
             }
           }
         } catch (err) {
@@ -201,7 +203,7 @@ export function SeedlingMap({ seedlings = [], farmName, farmId, canEdit = true }
     if (!editMode) return;
     e.stopPropagation();
     const pt = svgPoint(e);
-    const tray = trays.find((t) => t.id === trayId);
+    const tray = trays.find((tr) => tr.id === trayId);
     if (!tray) return;
     setDrag({ kind: "tray-move", id: trayId, offsetX: pt.x - tray.x, offsetY: pt.y - tray.y });
     setSelectedTray(trayId);
@@ -238,19 +240,19 @@ export function SeedlingMap({ seedlings = [], farmName, farmId, canEdit = true }
       );
     } else if (drag.kind === "tray-move") {
       setTrays((prev) =>
-        prev.map((t) =>
-          t.id === drag.id
-            ? { ...t, x: Math.round(pt.x - drag.offsetX), y: Math.round(pt.y - drag.offsetY) }
-            : t
+        prev.map((tr) =>
+          tr.id === drag.id
+            ? { ...tr, x: Math.round(pt.x - drag.offsetX), y: Math.round(pt.y - drag.offsetY) }
+            : tr
         )
       );
     } else if (drag.kind === "tray-resize") {
       setTrays((prev) =>
-        prev.map((t) => {
-          if (t.id !== drag.id) return t;
-          const newW = Math.max(15, Math.round(pt.x - t.x));
-          const newH = Math.max(12, Math.round(pt.y - t.y));
-          return { ...t, w: newW, h: newH };
+        prev.map((tr) => {
+          if (tr.id !== drag.id) return tr;
+          const newW = Math.max(15, Math.round(pt.x - tr.x));
+          const newH = Math.max(12, Math.round(pt.y - tr.y));
+          return { ...tr, w: newW, h: newH };
         })
       );
     }
@@ -260,14 +262,14 @@ export function SeedlingMap({ seedlings = [], farmName, farmId, canEdit = true }
     // When finishing a tray move, auto-assign zoneId based on containment
     if (drag?.kind === "tray-move") {
       setTrays((prev) =>
-        prev.map((t) => {
-          if (t.id !== drag.id) return t;
-          const centerX = t.x + t.w / 2;
-          const centerY = t.y + t.h / 2;
+        prev.map((tr) => {
+          if (tr.id !== drag.id) return tr;
+          const centerX = tr.x + tr.w / 2;
+          const centerY = tr.y + tr.h / 2;
           const container = zones.find(
             (z) => centerX >= z.x && centerX <= z.x + z.w && centerY >= z.y && centerY <= z.y + z.h
           );
-          return { ...t, zoneId: container?.id };
+          return { ...tr, zoneId: container?.id };
         })
       );
     }
@@ -289,14 +291,14 @@ export function SeedlingMap({ seedlings = [], farmName, farmId, canEdit = true }
   function deleteZone(zoneId: string) {
     setZones((prev) => prev.filter((z) => z.id !== zoneId));
     // Unlink any trays that were tied to this zone
-    setTrays((prev) => prev.map((t) => (t.zoneId === zoneId ? { ...t, zoneId: undefined } : t)));
+    setTrays((prev) => prev.map((tr) => (tr.zoneId === zoneId ? { ...tr, zoneId: undefined } : tr)));
     if (selectedZone === zoneId) setSelectedZone(null);
   }
 
   function addTray() {
     if (!newTrayCode.trim()) return;
     const code = newTrayCode.trim().toUpperCase().replace(/\s+/g, "");
-    if (trays.find((t) => t.code === code)) return;
+    if (trays.find((tr) => tr.code === code)) return;
     const id = `T${Date.now().toString(36)}`;
     // Place inside selected zone if one is selected, else at (120,120)
     const parent = selectedZone ? zones.find((z) => z.id === selectedZone) : undefined;
@@ -311,7 +313,7 @@ export function SeedlingMap({ seedlings = [], farmName, farmId, canEdit = true }
   }
 
   function deleteTray(trayId: string) {
-    setTrays((prev) => prev.filter((t) => t.id !== trayId));
+    setTrays((prev) => prev.filter((tr) => tr.id !== trayId));
     if (selectedTray === trayId) setSelectedTray(null);
   }
 
@@ -324,12 +326,12 @@ export function SeedlingMap({ seedlings = [], farmName, farmId, canEdit = true }
   }
 
   function seedlingsForZone(zoneId: string): SeedlingEntry[] {
-    const zoneTrays = trays.filter((t) => t.zoneId === zoneId);
-    const codes = new Set(zoneTrays.map((t) => t.code.toUpperCase()));
+    const zoneTrays = trays.filter((tr) => tr.zoneId === zoneId);
+    const codes = new Set(zoneTrays.map((tr) => tr.code.toUpperCase()));
     return seedlings.filter((s) => codes.has((s.row_location ?? "").toUpperCase()));
   }
 
-  const selectedTrayObj = selectedTray ? trays.find((t) => t.id === selectedTray) ?? null : null;
+  const selectedTrayObj = selectedTray ? trays.find((tr) => tr.id === selectedTray) ?? null : null;
   const selectedZoneObj = selectedZone ? zones.find((z) => z.id === selectedZone) ?? null : null;
   const selectedTraySeedlings = selectedTrayObj ? seedlingsForCode(selectedTrayObj.code) : [];
   const selectedZoneSeedlings = selectedZoneObj ? seedlingsForZone(selectedZoneObj.id) : [];
@@ -347,10 +349,10 @@ export function SeedlingMap({ seedlings = [], farmName, farmId, canEdit = true }
               disabled={saving}
               className="rounded-xl bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60"
             >
-              {saving ? "Saving…" : "Save Layout"}
+              {saving ? t("Saving…") : t("Save Layout")}
             </button>
             <button onClick={cancelEdit} className="rounded-xl bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-300">
-              Cancel
+              {t("Cancel")}
             </button>
             <div className="h-5 w-px bg-zinc-300" />
             {addingZone ? (
@@ -360,16 +362,16 @@ export function SeedlingMap({ seedlings = [], farmName, farmId, canEdit = true }
                   value={newZoneLabel}
                   onChange={(e) => setNewZoneLabel(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addZone()}
-                  placeholder="Zone name (e.g. Nursery)"
+                  placeholder={t("Zone name (e.g. Nursery)")}
                   className="w-44 rounded-lg border border-zinc-300 px-2 py-1.5 text-sm"
                   autoFocus
                 />
-                <button onClick={addZone} className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-800">Add</button>
-                <button onClick={() => setAddingZone(false)} className="text-sm text-zinc-500 hover:text-zinc-700">Cancel</button>
+                <button onClick={addZone} className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-800">{t("Add")}</button>
+                <button onClick={() => setAddingZone(false)} className="text-sm text-zinc-500 hover:text-zinc-700">{t("Cancel")}</button>
               </div>
             ) : (
               <button onClick={() => setAddingZone(true)} className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">
-                + Add Seedling Zone
+                {t("+ Add Seedling Zone")}
               </button>
             )}
             {addingTray ? (
@@ -379,44 +381,44 @@ export function SeedlingMap({ seedlings = [], farmName, farmId, canEdit = true }
                   value={newTrayCode}
                   onChange={(e) => setNewTrayCode(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addTray()}
-                  placeholder="Tray code (e.g. T1)"
+                  placeholder={t("Tray code (e.g. T1)")}
                   className="w-36 rounded-lg border border-zinc-300 px-2 py-1.5 text-sm"
                   autoFocus
                 />
-                <button onClick={addTray} className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-800">Add</button>
-                <button onClick={() => setAddingTray(false)} className="text-sm text-zinc-500 hover:text-zinc-700">Cancel</button>
+                <button onClick={addTray} className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-800">{t("Add")}</button>
+                <button onClick={() => setAddingTray(false)} className="text-sm text-zinc-500 hover:text-zinc-700">{t("Cancel")}</button>
               </div>
             ) : (
               <button onClick={() => setAddingTray(true)} className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
-                + Add Tray
+                {t("+ Add Tray")}
               </button>
             )}
           </>
         ) : canEdit ? (
           <button onClick={() => setEditMode(true)} className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800">
-            Edit Map
+            {t("Edit Map")}
           </button>
         ) : (
-          <span className="text-xs font-medium text-zinc-400">View only</span>
+          <span className="text-xs font-medium text-zinc-400">{t("View only")}</span>
         )}
       </div>
 
       {/* Blank prompt */}
       {isBlank && !editMode && loaded && (
         <div className="mb-4 rounded-2xl border-2 border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
-          <p className="text-lg font-semibold text-zinc-600">No seedling map yet</p>
+          <p className="text-lg font-semibold text-zinc-600">{t("No seedling map yet")}</p>
           {canEdit ? (
             <>
-              <p className="mt-1 text-sm text-zinc-400">Click Edit Map to draw your seedling zones and add trays inside them.</p>
+              <p className="mt-1 text-sm text-zinc-400">{t("Click Edit Map to draw your seedling zones and add trays inside them.")}</p>
               <button
                 onClick={() => setEditMode(true)}
                 className="mt-4 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-medium text-white hover:bg-emerald-700"
               >
-                Start drawing
+                {t("Start drawing")}
               </button>
             </>
           ) : (
-            <p className="mt-1 text-sm text-zinc-400">The seedling map hasn&apos;t been set up yet.</p>
+            <p className="mt-1 text-sm text-zinc-400">{t("The seedling map hasn't been set up yet.")}</p>
           )}
         </div>
       )}
@@ -426,7 +428,7 @@ export function SeedlingMap({ seedlings = [], farmName, farmId, canEdit = true }
         <div className={`min-w-0 flex-1 overflow-auto rounded-2xl border bg-white ${editMode ? "border-blue-400 ring-2 ring-blue-100" : "border-zinc-200"}`}>
           {editMode && (
             <div className="bg-blue-50 px-3 py-1.5 text-xs text-blue-700 border-b border-blue-200">
-              Drag zones &amp; trays to move them. Drag corners to resize. Drop a tray inside a zone to link it.
+              {t("Drag zones & trays to move them. Drag corners to resize. Drop a tray inside a zone to link it.")}
             </div>
           )}
           <svg
@@ -652,7 +654,7 @@ export function SeedlingMap({ seedlings = [], farmName, farmId, canEdit = true }
                             className="pointer-events-none text-[11px] italic"
                             fill="#a1a1aa"
                           >
-                            empty
+                            {t("empty")}
                           </text>
                         )}
                       </>
@@ -683,17 +685,17 @@ export function SeedlingMap({ seedlings = [], farmName, farmId, canEdit = true }
           {/* Edit mode: selected zone controls */}
           {editMode && selectedZoneObj && (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm space-y-3">
-              <div className="text-lg font-semibold text-emerald-900">Zone: {selectedZoneObj.label}</div>
+              <div className="text-lg font-semibold text-emerald-900">{t("Zone: {zone}", { zone: selectedZoneObj.label })}</div>
               <div className="space-y-1 text-xs text-emerald-800">
-                <div>Position: ({selectedZoneObj.x}, {selectedZoneObj.y})</div>
-                <div>Size: {selectedZoneObj.w} × {selectedZoneObj.h}</div>
-                <div>Trays: {trays.filter((t) => t.zoneId === selectedZoneObj.id).length}</div>
+                <div>{t("Position: ({x}, {y})", { x: selectedZoneObj.x, y: selectedZoneObj.y })}</div>
+                <div>{t("Size: {w} × {h}", { w: selectedZoneObj.w, h: selectedZoneObj.h })}</div>
+                <div>{t("Trays: {n}", { n: trays.filter((tr) => tr.zoneId === selectedZoneObj.id).length })}</div>
               </div>
               <button
                 onClick={() => deleteZone(selectedZoneObj.id)}
                 className="w-full rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
               >
-                Delete Zone
+                {t("Delete Zone")}
               </button>
             </div>
           )}
@@ -701,21 +703,23 @@ export function SeedlingMap({ seedlings = [], farmName, farmId, canEdit = true }
           {/* Edit mode: selected tray controls */}
           {editMode && selectedTrayObj && (
             <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm space-y-3">
-              <div className="text-lg font-semibold text-blue-900">Tray: {selectedTrayObj.code}</div>
+              <div className="text-lg font-semibold text-blue-900">{t("Tray: {code}", { code: selectedTrayObj.code })}</div>
               <div className="space-y-1 text-xs text-blue-800">
-                <div>Position: ({selectedTrayObj.x}, {selectedTrayObj.y})</div>
-                <div>Size: {selectedTrayObj.w} × {selectedTrayObj.h}</div>
+                <div>{t("Position: ({x}, {y})", { x: selectedTrayObj.x, y: selectedTrayObj.y })}</div>
+                <div>{t("Size: {w} × {h}", { w: selectedTrayObj.w, h: selectedTrayObj.h })}</div>
                 <div>
-                  Zone: {selectedTrayObj.zoneId
-                    ? (zones.find((z) => z.id === selectedTrayObj.zoneId)?.label ?? "—")
-                    : "Unassigned"}
+                  {t("Zone: {zone}", {
+                    zone: selectedTrayObj.zoneId
+                      ? (zones.find((z) => z.id === selectedTrayObj.zoneId)?.label ?? "—")
+                      : t("Unassigned"),
+                  })}
                 </div>
               </div>
               <button
                 onClick={() => deleteTray(selectedTrayObj.id)}
                 className="w-full rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
               >
-                Delete Tray
+                {t("Delete Tray")}
               </button>
             </div>
           )}
@@ -729,12 +733,12 @@ export function SeedlingMap({ seedlings = [], farmName, farmId, canEdit = true }
                   onClick={() => setSelectedTray(null)}
                   className="text-xs text-zinc-400 hover:text-zinc-700"
                 >
-                  Close
+                  {t("Close")}
                 </button>
               </div>
               {selectedTrayObj.zoneId && (
                 <div className="mt-0.5 text-xs text-zinc-500">
-                  Zone: {zones.find((z) => z.id === selectedTrayObj.zoneId)?.label ?? "—"}
+                  {t("Zone: {zone}", { zone: zones.find((z) => z.id === selectedTrayObj.zoneId)?.label ?? "—" })}
                 </div>
               )}
               {selectedTraySeedlings.length > 0 ? (
@@ -758,14 +762,14 @@ export function SeedlingMap({ seedlings = [], farmName, farmId, canEdit = true }
                           {s.variety ? ` · ${s.variety}` : ""}
                         </span>
                       </div>
-                      {s.quantity && <div className="mt-0.5 text-xs text-zinc-500">Qty: {s.quantity}</div>}
-                      {s.date && <div className="text-[10px] text-zinc-400">Sown: {s.date}</div>}
+                      {s.quantity && <div className="mt-0.5 text-xs text-zinc-500">{t("Qty: {n}", { n: s.quantity })}</div>}
+                      {s.date && <div className="text-[10px] text-zinc-400">{t("Sown: {date}", { date: s.date })}</div>}
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="mt-3 text-xs text-zinc-400">
-                  No seedlings linked. Set a seedling&apos;s &quot;Row / Location&quot; to {selectedTrayObj.code} to link it.
+                  {t("No seedlings linked. Set a seedling's \"Row / Location\" to {code} to link it.", { code: selectedTrayObj.code })}
                 </div>
               )}
             </div>
@@ -776,7 +780,7 @@ export function SeedlingMap({ seedlings = [], farmName, farmId, canEdit = true }
             <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-sm">
               <div className="text-lg font-semibold">{selectedZoneObj.label}</div>
               <div className="mt-1 text-xs text-zinc-500">
-                {trays.filter((t) => t.zoneId === selectedZoneObj.id).length} trays
+                {(() => { const n = trays.filter((tr) => tr.zoneId === selectedZoneObj.id).length; return n === 1 ? t("1 tray") : t("{n} trays", { n }); })()}
               </div>
               {selectedZoneSeedlings.length > 0 ? (
                 <div className="mt-3 space-y-2">
@@ -785,40 +789,40 @@ export function SeedlingMap({ seedlings = [], farmName, farmId, canEdit = true }
                       <div className="font-medium text-xs">
                         {s.plant}{s.variety ? ` · ${s.variety}` : ""}
                       </div>
-                      {s.row_location && <div className="text-[10px] text-zinc-400">Tray: {s.row_location}</div>}
+                      {s.row_location && <div className="text-[10px] text-zinc-400">{t("Tray: {code}", { code: s.row_location })}</div>}
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="mt-3 text-xs text-zinc-400">No seedlings in this zone yet.</div>
+                <div className="mt-3 text-xs text-zinc-400">{t("No seedlings in this zone yet.")}</div>
               )}
             </div>
           )}
 
           {!editMode && !selectedTrayObj && !selectedZoneObj && !isBlank && (
             <div className="rounded-2xl border border-dashed border-zinc-200 p-4 text-center text-xs text-zinc-400">
-              Click a zone or tray on the map to see details
+              {t("Click a zone or tray on the map to see details")}
             </div>
           )}
 
           {/* Legend */}
           <div className="rounded-2xl border border-zinc-200 bg-white p-3">
-            <div className="mb-2 text-xs font-semibold text-zinc-500">Legend</div>
+            <div className="mb-2 text-xs font-semibold text-zinc-500">{t("Legend")}</div>
             <div className="space-y-1.5 text-xs text-zinc-500">
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-zinc-100" /> Empty tray
+                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-zinc-100" /> {t("Empty tray")}
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-sky-100" /> Seeded
+                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-sky-100" /> {t("Seeded")}
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-yellow-200" /> Partial germ.
+                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-yellow-200" /> {t("Partial germ.")}
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-green-200" /> Good germ.
+                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-green-200" /> {t("Good germ.")}
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-red-200" /> Failed germ.
+                <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-red-200" /> {t("Failed germ.")}
               </span>
             </div>
           </div>

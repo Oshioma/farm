@@ -32,6 +32,8 @@ import type {
 } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { useFarmRole } from "@/hooks/useFarmRole";
+import { useT, useLanguage } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -135,6 +137,8 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const router = useRouter();
+  const t = useT();
+  const [lang, setLang] = useLanguage();
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
   const { isManager } = useFarmRole(activeFarmId);
   const activeFarmIdRef = useRef(activeFarmId);
@@ -149,7 +153,7 @@ export default function CustomersPage() {
   useEffect(() => {
     getFarms()
       .then(setFarms)
-      .catch((err) => setError(errMsg(err, "Failed to load farms")))
+      .catch((err) => setError(errMsg(err, t("Failed to load farms"))))
       .finally(() => setLoading(false));
   }, []);
 
@@ -174,7 +178,7 @@ export default function CustomersPage() {
     if (!activeFarmId) return;
     setLoading(true);
     load(activeFarmId, year)
-      .catch((err) => setError(errMsg(err, "Failed to load")))
+      .catch((err) => setError(errMsg(err, t("Failed to load"))))
       .finally(() => setLoading(false));
   }, [activeFarmId, year]);
 
@@ -318,7 +322,7 @@ export default function CustomersPage() {
       }
       await load(activeFarmId, year);
     } catch (err) {
-      setError(errMsg(err, "Failed to update crops"));
+      setError(errMsg(err, t("Failed to update crops")));
     } finally {
       setTogglingCropId(null);
     }
@@ -335,7 +339,7 @@ export default function CustomersPage() {
       if (e) throw e;
       await load(activeFarmId, year);
     } catch (err) {
-      setError(errMsg(err, "Failed to update share"));
+      setError(errMsg(err, t("Failed to update share")));
     } finally {
       setTogglingCropId(null);
     }
@@ -382,7 +386,7 @@ export default function CustomersPage() {
       await load(activeFarmId, year);
       setCustomerModal(null);
     } catch (err) {
-      setError(errMsg(err, "Failed to save customer"));
+      setError(errMsg(err, t("Failed to save customer")));
     } finally {
       setSaving(false);
     }
@@ -395,7 +399,7 @@ export default function CustomersPage() {
       if (e) throw e;
       await load(activeFarmId, year);
     } catch (err) {
-      setError(errMsg(err, "Failed to remove customer"));
+      setError(errMsg(err, t("Failed to remove customer")));
     } finally {
       setDeletingId(null);
     }
@@ -454,7 +458,7 @@ export default function CustomersPage() {
       await load(activeFarmId, year);
       setOrderModal(null);
     } catch (err) {
-      setError(errMsg(err, "Failed to save order"));
+      setError(errMsg(err, t("Failed to save order")));
     } finally {
       setSaving(false);
     }
@@ -467,7 +471,7 @@ export default function CustomersPage() {
       if (e) throw e;
       setOrders((prev) => prev.filter((o) => o.id !== id));
     } catch (err) {
-      setError(errMsg(err, "Failed to delete order"));
+      setError(errMsg(err, t("Failed to delete order")));
     } finally {
       setDeletingId(null);
     }
@@ -495,13 +499,13 @@ export default function CustomersPage() {
 
   function orderLine(o: CustomerOrder): string {
     const crop = crops.find((c) => c.id === o.crop_id);
-    const cropName = crop ? cropLabel(crop) : "Any crop";
+    const cropName = crop ? cropLabel(crop) : t("Any crop");
     const when = o.season !== null && o.month_key
       ? (() => {
           const m = months.find((mm) => mm.season === o.season && mm.key === o.month_key);
-          return m ? `${m.label} ${m.calendarYear}` : `${o.month_key} ${o.season}`;
+          return m ? `${t(m.label)} ${m.calendarYear}` : `${o.month_key} ${o.season}`;
         })()
-      : "unscheduled";
+      : t("unscheduled");
     return `${cropName} · ${when}`;
   }
 
@@ -514,11 +518,11 @@ export default function CustomersPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                Shamba Farm Manager
+                {t("Shamba Farm Manager")}
               </p>
-              <h1 className="mt-1 text-3xl font-semibold tracking-tight">Customers</h1>
+              <h1 className="mt-1 text-3xl font-semibold tracking-tight">{t("Customers")}</h1>
               <p className="mt-1 text-sm text-zinc-500">
-                {activeFarm ? `${activeFarm.name} — ` : ""}orders against upcoming harvests
+                {activeFarm ? `${activeFarm.name} — ` : ""}{t("orders against upcoming harvests")}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -536,16 +540,17 @@ export default function CustomersPage() {
                 </button>
               ))}
               <Link href="/farm/produce-expected" className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
-                Produce expected
+                {t("Produce expected")}
               </Link>
               <Link href="/farm" className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
-                ← Farm
+                ← {t("Farm")}
               </Link>
+              <LanguageToggle lang={lang} onChange={setLang} />
               <button
                 onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                Sign out
+                {t("Sign out")}
               </button>
             </div>
           </div>
@@ -559,17 +564,17 @@ export default function CustomersPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex rounded-full border border-zinc-200 bg-white p-1">
             {[
-              { key: "customers" as const, label: `Customers (${customers.length})` },
-              { key: "schedule" as const, label: "Expected & ordered" },
-            ].map((t) => (
+              { key: "customers" as const, label: t("Customers ({n})", { n: customers.length }) },
+              { key: "schedule" as const, label: t("Expected & ordered") },
+            ].map((tabOpt) => (
               <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
+                key={tabOpt.key}
+                onClick={() => setTab(tabOpt.key)}
                 className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${
-                  tab === t.key ? "bg-zinc-900 text-white" : "text-zinc-600 hover:bg-zinc-100"
+                  tab === tabOpt.key ? "bg-zinc-900 text-white" : "text-zinc-600 hover:bg-zinc-100"
                 }`}
               >
-                {t.label}
+                {tabOpt.label}
               </button>
             ))}
           </div>
@@ -583,7 +588,7 @@ export default function CustomersPage() {
                   ←
                 </button>
                 <span className="rounded-full bg-zinc-900 px-4 py-2 text-xs font-semibold text-white">
-                  Mar {year} – {lastMonth.label} {lastMonth.calendarYear}
+                  {t("Mar")} {year} – {t(lastMonth.label)} {lastMonth.calendarYear}
                 </span>
                 <button
                   onClick={() => setYear((y) => y + 1)}
@@ -598,19 +603,19 @@ export default function CustomersPage() {
                 onClick={openAddCustomer}
                 className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
               >
-                + Add customer
+                {t("+ Add customer")}
               </button>
             )}
           </div>
         </div>
 
         {loading ? (
-          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">Loading...</div>
+          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">{t("Loading...")}</div>
         ) : tab === "customers" ? (
           /* ── Customers ─────────────────────────────────────── */
           customers.length === 0 ? (
             <div className="rounded-3xl border border-zinc-200 bg-white p-8 text-center text-sm text-zinc-500 shadow-sm">
-              No customers yet.{isManager ? " Click “+ Add customer” to add the first one." : ""}
+              {t("No customers yet.")}{isManager ? " " + t("Click “+ Add customer” to add the first one.") : ""}
             </div>
           ) : (
             <div className="space-y-3">
@@ -628,13 +633,13 @@ export default function CustomersPage() {
                       <div className="min-w-0">
                         <p className="truncate text-base font-semibold">{c.name}</p>
                         <p className="mt-0.5 truncate text-xs text-zinc-500">
-                          {[c.contact_name, c.phone, c.email].filter(Boolean).join(" · ") || "No contact details"}
-                          {c.default_share_pct != null && <span className="text-zinc-400"> · takes {c.default_share_pct}% by default</span>}
+                          {[c.contact_name, c.phone, c.email].filter(Boolean).join(" · ") || t("No contact details")}
+                          {c.default_share_pct != null && <span className="text-zinc-400"> · {t("takes {pct}% by default", { pct: c.default_share_pct })}</span>}
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-3">
                         <span className="text-xs text-zinc-500">
-                          {live.length} order{live.length === 1 ? "" : "s"}
+                          {t(live.length === 1 ? "{n} order" : "{n} orders", { n: live.length })}
                         </span>
                         {committed > 0 && (
                           <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
@@ -648,13 +653,13 @@ export default function CustomersPage() {
                     {isOpen && (
                       <div className="border-t border-zinc-100 bg-zinc-50/60 px-5 py-4">
                         <div className="mb-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
-                          <p className="text-zinc-600"><span className="text-zinc-400">Contact:</span> {c.contact_name || "—"}</p>
+                          <p className="text-zinc-600"><span className="text-zinc-400">{t("Contact:")}</span> {c.contact_name || "—"}</p>
                           <p className="text-zinc-600">
-                            <span className="text-zinc-400">Phone:</span>{" "}
+                            <span className="text-zinc-400">{t("Phone:")}</span>{" "}
                             {c.phone ? <a href={`tel:${c.phone}`} className="underline">{c.phone}</a> : "—"}
                           </p>
                           <p className="truncate text-zinc-600">
-                            <span className="text-zinc-400">Email:</span>{" "}
+                            <span className="text-zinc-400">{t("Email:")}</span>{" "}
                             {c.email ? <a href={`mailto:${c.email}`} className="underline">{c.email}</a> : "—"}
                           </p>
                         </div>
@@ -667,19 +672,17 @@ export default function CustomersPage() {
                           <div className="mb-4 rounded-2xl border border-zinc-200 bg-white p-3">
                             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                                Crops this customer takes
+                                {t("Crops this customer takes")}
                               </p>
                               <p className="text-xs text-zinc-500">
-                                Only crops with an expected harvest are listed. Ticking uses{" "}
-                                {c.default_share_pct ?? DEFAULT_SHARE}% — change it per crop below, or on the customer
-                                to change the default.
+                                {t("Only crops with an expected harvest are listed. Ticking uses {pct}% — change it per crop below, or on the customer to change the default.", { pct: c.default_share_pct ?? DEFAULT_SHARE })}
                               </p>
                             </div>
                             {orderableCrops.length === 0 ? (
                               <p className="text-sm text-zinc-400">
                                 {crops.length === 0
-                                  ? "No crops on this farm yet."
-                                  : "No crop has an expected harvest in this window yet — add estimates on the Harvest ETA sheet and they will appear here."}
+                                  ? t("No crops on this farm yet.")
+                                  : t("No crop has an expected harvest in this window yet — add estimates on the Harvest ETA sheet and they will appear here.")}
                               </p>
                             ) : (
                               <div className="max-h-72 space-y-1 overflow-y-auto">
@@ -729,12 +732,12 @@ export default function CustomersPage() {
                                           <span className="text-xs text-zinc-500">%</span>
                                           <span className="text-xs font-medium text-emerald-700">
                                             {total > 0
-                                              ? `${fmtKg(total)} over ${landsIn.length} month${landsIn.length === 1 ? "" : "s"}`
-                                              : "no estimates yet"}
+                                              ? t(landsIn.length === 1 ? "{kg} over {n} month" : "{kg} over {n} months", { kg: fmtKg(total), n: landsIn.length })
+                                              : t("no estimates yet")}
                                           </span>
                                         </div>
                                       )}
-                                      {togglingCropId === crop.id && <span className="text-xs text-zinc-400">saving…</span>}
+                                      {togglingCropId === crop.id && <span className="text-xs text-zinc-400">{t("saving…")}</span>}
                                     </div>
                                   );
                                 })}
@@ -744,15 +747,15 @@ export default function CustomersPage() {
                         )}
 
                         {custOrders.length === 0 ? (
-                          <p className="mb-3 text-sm text-zinc-400">No orders yet.</p>
+                          <p className="mb-3 text-sm text-zinc-400">{t("No orders yet.")}</p>
                         ) : (
                           <table className="mb-3 w-full text-xs">
                             <thead>
                               <tr className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                                <th className="py-1.5 text-left">Crop &amp; month</th>
-                                <th className="py-1.5 text-left">Order</th>
-                                <th className="py-1.5 text-right">Expected</th>
-                                <th className="py-1.5 text-left pl-3">Status</th>
+                                <th className="py-1.5 text-left">{t("Crop & month")}</th>
+                                <th className="py-1.5 text-left">{t("Order")}</th>
+                                <th className="py-1.5 text-right">{t("Expected")}</th>
+                                <th className="py-1.5 text-left pl-3">{t("Status")}</th>
                                 {isManager && <th className="py-1.5" />}
                               </tr>
                             </thead>
@@ -770,37 +773,37 @@ export default function CustomersPage() {
                                       )}
                                       {isStandingOrder(o) && (
                                         <span className="ml-1.5 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[9px] font-medium text-zinc-500">
-                                          standing
+                                          {t("standing")}
                                         </span>
                                       )}
                                     </td>
                                     <td className="py-1.5 pr-3 text-zinc-500">
-                                      {o.quantity_kg !== null ? `${o.quantity_kg} kg` : `${o.share_pct}% of harvest`}
+                                      {o.quantity_kg !== null ? `${o.quantity_kg} kg` : t("{pct}% of harvest", { pct: String(o.share_pct) })}
                                       {o.price_per_kg !== null && <span className="text-zinc-400"> · {o.price_per_kg}/kg</span>}
                                       {o.actual_quantity_kg !== null && (
                                         <span className="block font-medium text-violet-700">
-                                          Final: {o.actual_quantity_kg} kg
+                                          {t("Final: {kg} kg", { kg: o.actual_quantity_kg })}
                                           {o.actual_price_per_kg !== null ? ` · ${o.actual_price_per_kg}/kg` : ""}
                                         </span>
                                       )}
                                     </td>
                                     <td className={`py-1.5 text-right font-medium ${kg === null ? "text-amber-700" : "text-emerald-700"}`}>
-                                      {kg === null ? "no estimate yet" : fmtKg(kg)}
+                                      {kg === null ? t("no estimate yet") : fmtKg(kg)}
                                     </td>
                                     <td className="py-1.5 pl-3">
                                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLES[o.status] ?? "bg-zinc-100 text-zinc-600"}`}>
-                                        {o.status}
+                                        {t(o.status)}
                                       </span>
                                     </td>
                                     {isManager && (
                                       <td className="py-1.5 text-right whitespace-nowrap">
-                                        <button onClick={() => openEditOrder(c, o)} className="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] font-medium text-zinc-600 transition hover:bg-white">Edit</button>
+                                        <button onClick={() => openEditOrder(c, o)} className="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] font-medium text-zinc-600 transition hover:bg-white">{t("Edit")}</button>
                                         <button
                                           onClick={() => deleteOrder(o.id)}
                                           disabled={deletingId === o.id}
                                           className="ml-1 rounded-lg border border-rose-200 px-2 py-1 text-[10px] font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
                                         >
-                                          {deletingId === o.id ? "…" : "Del"}
+                                          {deletingId === o.id ? "…" : t("Del")}
                                         </button>
                                       </td>
                                     )}
@@ -817,20 +820,20 @@ export default function CustomersPage() {
                               onClick={() => openAddOrder(c)}
                               className="rounded-2xl bg-zinc-900 px-4 py-2 text-xs font-medium text-white transition hover:bg-zinc-800"
                             >
-                              + Add order
+                              {t("+ Add order")}
                             </button>
                             <button
                               onClick={() => openEditCustomer(c)}
                               className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-xs font-medium text-zinc-700 transition hover:bg-zinc-100"
                             >
-                              Edit customer
+                              {t("Edit customer")}
                             </button>
                             <button
                               onClick={() => deleteCustomer(c)}
                               disabled={deletingId === c.id}
                               className="rounded-2xl border border-rose-200 bg-white px-4 py-2 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
                             >
-                              {deletingId === c.id ? "Removing…" : "Remove customer"}
+                              {deletingId === c.id ? t("Removing…") : t("Remove customer")}
                             </button>
                           </div>
                         )}
@@ -846,32 +849,31 @@ export default function CustomersPage() {
           <div>
             <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="rounded-3xl border border-emerald-200 bg-emerald-50/60 p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Expected</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">{t("Expected")}</p>
                 <p className="mt-1 text-3xl font-semibold text-emerald-900">
                   {fmtKg(schedule.reduce((sum, s) => sum + s.expected, 0))}
                 </p>
-                <p className="mt-1 text-xs text-emerald-700">over the window</p>
+                <p className="mt-1 text-xs text-emerald-700">{t("over the window")}</p>
               </div>
               <div className="rounded-3xl border border-blue-200 bg-blue-50/60 p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Ordered</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">{t("Ordered")}</p>
                 <p className="mt-1 text-3xl font-semibold text-blue-900">{fmtKg(totalCommitted)}</p>
                 <p className="mt-1 text-xs text-blue-700">
-                  {liveOrders.length} live order{liveOrders.length === 1 ? "" : "s"}
+                  {t(liveOrders.length === 1 ? "{n} live order" : "{n} live orders", { n: liveOrders.length })}
                 </p>
               </div>
               <div className="rounded-3xl border border-zinc-200 bg-white p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">Unsold</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">{t("Unsold")}</p>
                 <p className="mt-1 text-3xl font-semibold">
                   {fmtKg(Math.max(0, schedule.reduce((sum, s) => sum + s.expected, 0) - totalCommitted))}
                 </p>
-                <p className="mt-1 text-xs text-zinc-500">expected minus ordered</p>
+                <p className="mt-1 text-xs text-zinc-500">{t("expected minus ordered")}</p>
               </div>
             </div>
 
             {unscheduled.length > 0 && (
               <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                {unscheduled.length} order{unscheduled.length === 1 ? "" : "s"} with no month set — they do not appear
-                in the schedule below. Edit them on the Customers tab to say when they are due.
+                {t(unscheduled.length === 1 ? "{n} order with no month set — it does not appear in the schedule below. Edit it on the Customers tab to say when it is due." : "{n} orders with no month set — they do not appear in the schedule below. Edit them on the Customers tab to say when they are due.", { n: unscheduled.length })}
               </div>
             )}
 
@@ -884,25 +886,25 @@ export default function CustomersPage() {
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
                         <span className={`w-24 text-sm font-semibold ${isEmpty ? "text-zinc-400" : "text-zinc-900"}`}>
-                          {s.month.label} {s.month.calendarYear}
+                          {t(s.month.label)} {s.month.calendarYear}
                         </span>
                         {s.lines.length > 0 && (
                           <span className="text-xs text-zinc-500">
-                            {s.lines.length} order{s.lines.length === 1 ? "" : "s"}
+                            {t(s.lines.length === 1 ? "{n} order" : "{n} orders", { n: s.lines.length })}
                           </span>
                         )}
                         {over && (
                           <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-medium text-rose-700">
-                            oversold by {fmtKg(s.committed - s.expected)}
+                            {t("oversold by {kg}", { kg: fmtKg(s.committed - s.expected) })}
                           </span>
                         )}
                       </div>
                       <div className="flex items-center gap-4 text-sm">
                         <span className="text-zinc-500">
-                          expected <span className="font-semibold text-emerald-700">{s.expected > 0 ? fmtKg(s.expected) : "—"}</span>
+                          {t("expected")} <span className="font-semibold text-emerald-700">{s.expected > 0 ? fmtKg(s.expected) : "—"}</span>
                         </span>
                         <span className="text-zinc-500">
-                          ordered <span className={`font-semibold ${over ? "text-rose-700" : "text-blue-700"}`}>{s.committed > 0 ? fmtKg(s.committed) : "—"}</span>
+                          {t("ordered")} <span className={`font-semibold ${over ? "text-rose-700" : "text-blue-700"}`}>{s.committed > 0 ? fmtKg(s.committed) : "—"}</span>
                         </span>
                       </div>
                     </div>
@@ -914,12 +916,12 @@ export default function CustomersPage() {
                             const customer = customers.find((c) => c.id === line.order.customer_id);
                             return (
                               <tr key={`${line.order.id}:${line.standing ? "s" : "d"}`} className="border-t border-zinc-100">
-                                <td className="py-1.5 pr-3 font-medium">{customer?.name ?? "Unknown customer"}</td>
+                                <td className="py-1.5 pr-3 font-medium">{customer?.name ?? t("Unknown customer")}</td>
                                 <td className="py-1.5 pr-3 text-zinc-500">
                                   {orderLine(line.order)}
                                   {line.standing && (
-                                    <span className="ml-1.5 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[9px] font-medium text-zinc-500" title="Standing order on this crop">
-                                      standing
+                                    <span className="ml-1.5 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[9px] font-medium text-zinc-500" title={t("Standing order on this crop")}>
+                                      {t("standing")}
                                     </span>
                                   )}
                                 </td>
@@ -927,11 +929,11 @@ export default function CustomersPage() {
                                   {line.order.quantity_kg !== null ? `${line.order.quantity_kg} kg` : `${line.order.share_pct}%`}
                                 </td>
                                 <td className={`py-1.5 text-right font-medium ${line.kg === null ? "text-amber-700" : "text-blue-700"}`}>
-                                  {line.kg === null ? "no estimate yet" : fmtKg(line.kg)}
+                                  {line.kg === null ? t("no estimate yet") : fmtKg(line.kg)}
                                 </td>
                                 <td className="py-1.5 pl-3 text-right">
                                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLES[line.order.status] ?? "bg-zinc-100 text-zinc-600"}`}>
-                                    {line.order.status}
+                                    {t(line.order.status)}
                                   </span>
                                 </td>
                               </tr>
@@ -943,8 +945,7 @@ export default function CustomersPage() {
 
                     {s.unresolved > 0 && (
                       <p className="mt-1.5 text-xs text-amber-700">
-                        {s.unresolved} order{s.unresolved === 1 ? "" : "s"} here take a share of a crop with no estimate
-                        on the Harvest ETA sheet yet, so they are not counted.
+                        {t(s.unresolved === 1 ? "{n} order here takes a share of a crop with no estimate on the Harvest ETA sheet yet, so it is not counted." : "{n} orders here take a share of a crop with no estimate on the Harvest ETA sheet yet, so they are not counted.", { n: s.unresolved })}
                       </p>
                     )}
                   </div>
@@ -953,8 +954,7 @@ export default function CustomersPage() {
             </div>
 
             <p className="mt-4 text-xs text-zinc-400">
-              Expected weights come from the Harvest ETA sheet. A share order is worked out against its crop&rsquo;s
-              estimate for that month, so it moves as the estimate does.
+              {t("Expected weights come from the Harvest ETA sheet. A share order is worked out against its crop’s estimate for that month, so it moves as the estimate does.")}
             </p>
           </div>
         )}
@@ -965,24 +965,24 @@ export default function CustomersPage() {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-8">
           <div className="w-full max-w-lg rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl">
             <h2 className="mb-5 text-lg font-semibold">
-              {customerModal === "new" ? "Add customer" : `Edit — ${customerModal.name}`}
+              {customerModal === "new" ? t("Add customer") : t("Edit — {name}", { name: customerModal.name })}
             </h2>
             <div className="space-y-3">
-              <Field label="Name *">
-                <input className={inp} value={customerForm.name} onChange={(e) => setCustomerForm((p) => ({ ...p, name: e.target.value }))} placeholder="Green Grocer Ltd" />
+              <Field label={t("Name *")}>
+                <input className={inp} value={customerForm.name} onChange={(e) => setCustomerForm((p) => ({ ...p, name: e.target.value }))} placeholder={t("Green Grocer Ltd")} />
               </Field>
-              <Field label="Contact person">
-                <input className={inp} value={customerForm.contact_name} onChange={(e) => setCustomerForm((p) => ({ ...p, contact_name: e.target.value }))} placeholder="Jane Doe" />
+              <Field label={t("Contact person")}>
+                <input className={inp} value={customerForm.contact_name} onChange={(e) => setCustomerForm((p) => ({ ...p, contact_name: e.target.value }))} placeholder={t("Jane Doe")} />
               </Field>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Telephone">
+                <Field label={t("Telephone")}>
                   <input className={inp} type="tel" value={customerForm.phone} onChange={(e) => setCustomerForm((p) => ({ ...p, phone: e.target.value }))} placeholder="+254…" />
                 </Field>
-                <Field label="Email">
+                <Field label={t("Email")}>
                   <input className={inp} type="email" value={customerForm.email} onChange={(e) => setCustomerForm((p) => ({ ...p, email: e.target.value }))} placeholder="orders@example.com" />
                 </Field>
               </div>
-              <Field label="Default share of a harvest">
+              <Field label={t("Default share of a harvest")}>
                 <div className="flex items-center gap-2">
                   <input
                     className={inp}
@@ -995,18 +995,18 @@ export default function CustomersPage() {
                   />
                   <span className="text-sm text-zinc-500">%</span>
                 </div>
-                <p className="mt-1 text-xs text-zinc-400">Used when ticking crops for this customer.</p>
+                <p className="mt-1 text-xs text-zinc-400">{t("Used when ticking crops for this customer.")}</p>
               </Field>
-              <Field label="Notes">
+              <Field label={t("Notes")}>
                 <textarea className={`${inp} min-h-[60px]`} value={customerForm.notes} onChange={(e) => setCustomerForm((p) => ({ ...p, notes: e.target.value }))} />
               </Field>
             </div>
             <div className="mt-5 flex gap-2">
               <button onClick={saveCustomer} disabled={saving || !customerForm.name.trim()} className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60">
-                {saving ? "Saving..." : "Save"}
+                {saving ? t("Saving...") : t("Save")}
               </button>
               <button onClick={() => setCustomerModal(null)} className="rounded-2xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
-                Cancel
+                {t("Cancel")}
               </button>
             </div>
           </div>
@@ -1018,15 +1018,15 @@ export default function CustomersPage() {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-8">
           <div className="w-full max-w-lg rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl">
             <h2 className="mb-1 text-lg font-semibold">
-              {orderModal.order ? "Edit order" : "Add order"} — {orderModal.customer.name}
+              {orderModal.order ? t("Edit order") : t("Add order")} — {orderModal.customer.name}
             </h2>
             <p className="mb-5 text-sm text-zinc-500">
-              Order a share of what a crop is expected to yield in a month, or a fixed weight.
+              {t("Order a share of what a crop is expected to yield in a month, or a fixed weight.")}
             </p>
             <div className="space-y-3">
-              <Field label="Crop">
+              <Field label={t("Crop")}>
                 <select className={inp} value={orderForm.crop_id} onChange={(e) => setOrderForm((p) => ({ ...p, crop_id: e.target.value }))}>
-                  <option value="">— Any / not tied to a crop —</option>
+                  <option value="">{t("— Any / not tied to a crop —")}</option>
                   {orderableCrops.map((c) => (
                     <option key={c.id} value={c.id}>
                       {cropLabel(c)}
@@ -1035,23 +1035,23 @@ export default function CustomersPage() {
                   ))}
                 </select>
               </Field>
-              <Field label="Expected in">
+              <Field label={t("Expected in")}>
                 <select className={inp} value={orderForm.monthId} onChange={(e) => setOrderForm((p) => ({ ...p, monthId: e.target.value }))}>
-                  <option value="">— Every month this crop yields —</option>
+                  <option value="">{t("— Every month this crop yields —")}</option>
                   {months.map((m) => (
                     <option key={monthId(m)} value={monthId(m)}>
-                      {m.label} {m.calendarYear}
+                      {t(m.label)} {m.calendarYear}
                     </option>
                   ))}
                 </select>
               </Field>
 
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Order size</label>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Order size")}</label>
                 <div className="mb-2 flex rounded-full border border-zinc-200 bg-white p-1">
                   {[
-                    { key: "share" as const, label: "% of harvest" },
-                    { key: "fixed" as const, label: "Fixed kg" },
+                    { key: "share" as const, label: t("% of harvest") },
+                    { key: "fixed" as const, label: t("Fixed kg") },
                   ].map((opt) => (
                     <button
                       key={opt.key}
@@ -1073,7 +1073,7 @@ export default function CustomersPage() {
                     step="1"
                     value={orderForm.share_pct}
                     onChange={(e) => setOrderForm((p) => ({ ...p, share_pct: e.target.value }))}
-                    placeholder="% of that month's harvest, e.g. 25"
+                    placeholder={t("% of that month's harvest, e.g. 25")}
                   />
                 ) : (
                   <input
@@ -1083,34 +1083,34 @@ export default function CustomersPage() {
                     step="0.1"
                     value={orderForm.quantity_kg}
                     onChange={(e) => setOrderForm((p) => ({ ...p, quantity_kg: e.target.value }))}
-                    placeholder="kilos, e.g. 40"
+                    placeholder={t("kilos, e.g. 40")}
                   />
                 )}
                 <div className="mt-2 rounded-xl bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
                   {orderForm.basis === "share" && previewExpected === null && orderForm.crop_id && orderForm.monthId ? (
-                    <>No estimate on the Harvest ETA sheet for that crop and month yet — the order saves, but its weight stays unknown until one is added.</>
+                    <>{t("No estimate on the Harvest ETA sheet for that crop and month yet — the order saves, but its weight stays unknown until one is added.")}</>
                   ) : previewKg !== null ? (
                     <>
-                      Comes to <span className="font-semibold text-zinc-900">{fmtKg(previewKg)}</span>
-                      {orderForm.basis === "share" && previewExpected !== null && <> of {fmtKg(previewExpected)} expected</>}
+                      {t("Comes to")} <span className="font-semibold text-zinc-900">{fmtKg(previewKg)}</span>
+                      {orderForm.basis === "share" && previewExpected !== null && <> {t("of {kg} expected", { kg: fmtKg(previewExpected) })}</>}
                       {orderForm.price_per_kg.trim() && Number.isFinite(Number(orderForm.price_per_kg)) && (
-                        <> · {(previewKg * Number(orderForm.price_per_kg)).toLocaleString(undefined, { maximumFractionDigits: 2 })} at {orderForm.price_per_kg}/kg</>
+                        <> · {t("{amount} at {price}/kg", { amount: (previewKg * Number(orderForm.price_per_kg)).toLocaleString(undefined, { maximumFractionDigits: 2 }), price: orderForm.price_per_kg })}</>
                       )}
                     </>
                   ) : (
-                    <>Pick a crop, a month and an amount to see what it comes to.</>
+                    <>{t("Pick a crop, a month and an amount to see what it comes to.")}</>
                   )}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Price per kg">
-                  <input className={inp} type="number" min="0" step="0.01" value={orderForm.price_per_kg} onChange={(e) => setOrderForm((p) => ({ ...p, price_per_kg: e.target.value }))} placeholder="Optional" />
+                <Field label={t("Price per kg")}>
+                  <input className={inp} type="number" min="0" step="0.01" value={orderForm.price_per_kg} onChange={(e) => setOrderForm((p) => ({ ...p, price_per_kg: e.target.value }))} placeholder={t("Optional")} />
                 </Field>
-                <Field label="Status">
+                <Field label={t("Status")}>
                   <select className={inp} value={orderForm.status} onChange={(e) => setOrderForm((p) => ({ ...p, status: e.target.value }))}>
                     {ORDER_STATUSES.map((s) => (
-                      <option key={s} value={s}>{s}</option>
+                      <option key={s} value={s}>{t(s)}</option>
                     ))}
                   </select>
                 </Field>
@@ -1118,10 +1118,10 @@ export default function CustomersPage() {
               {(orderForm.status === "ready" || orderForm.status === "collected") && (
                 <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-3">
                   <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">
-                    Final harvest
+                    {t("Final harvest")}
                   </p>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <Field label="Actual weight (kg)">
+                    <Field label={t("Actual weight (kg)")}>
                       <input
                         className={inp}
                         type="number"
@@ -1129,10 +1129,10 @@ export default function CustomersPage() {
                         step="0.1"
                         value={orderForm.actual_quantity_kg}
                         onChange={(e) => setOrderForm((p) => ({ ...p, actual_quantity_kg: e.target.value }))}
-                        placeholder={orderForm.quantity_kg || "Weight picked"}
+                        placeholder={orderForm.quantity_kg || t("Weight picked")}
                       />
                     </Field>
-                    <Field label="Actual price per kg">
+                    <Field label={t("Actual price per kg")}>
                       <input
                         className={inp}
                         type="number"
@@ -1140,18 +1140,18 @@ export default function CustomersPage() {
                         step="0.01"
                         value={orderForm.actual_price_per_kg}
                         onChange={(e) => setOrderForm((p) => ({ ...p, actual_price_per_kg: e.target.value }))}
-                        placeholder={orderForm.price_per_kg || "Final price"}
+                        placeholder={orderForm.price_per_kg || t("Final price")}
                       />
                     </Field>
                   </div>
                   {orderForm.actual_quantity_kg.trim() && orderForm.actual_price_per_kg.trim() && (
                     <p className="mt-2 text-sm font-semibold text-blue-900">
-                      Final total: {(Number(orderForm.actual_quantity_kg) * Number(orderForm.actual_price_per_kg)).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      {t("Final total:")} {(Number(orderForm.actual_quantity_kg) * Number(orderForm.actual_price_per_kg)).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                     </p>
                   )}
                 </div>
               )}
-              <Field label="Notes">
+              <Field label={t("Notes")}>
                 <textarea className={`${inp} min-h-[60px]`} value={orderForm.notes} onChange={(e) => setOrderForm((p) => ({ ...p, notes: e.target.value }))} />
               </Field>
             </div>
@@ -1161,10 +1161,10 @@ export default function CustomersPage() {
                 disabled={saving || !(orderForm.basis === "share" ? orderForm.share_pct.trim() : orderForm.quantity_kg.trim())}
                 className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60"
               >
-                {saving ? "Saving..." : "Save order"}
+                {saving ? t("Saving...") : t("Save order")}
               </button>
               <button onClick={() => setOrderModal(null)} className="rounded-2xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
-                Cancel
+                {t("Cancel")}
               </button>
             </div>
           </div>

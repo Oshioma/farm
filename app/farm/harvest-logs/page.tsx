@@ -9,6 +9,8 @@ import type { Farm, HarvestLog } from "@/lib/farm";
 import { formatDate } from "@/app/farm/utils";
 import { ChevronLeft } from "lucide-react";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
+import { useT, useLanguage } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -26,6 +28,8 @@ export default function HarvestLogsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const router = useRouter();
+  const t = useT();
+  const [lang, setLang] = useLanguage();
 
   const activeFarm = farms.find((f) => f.id === activeFarmId);
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
@@ -60,7 +64,7 @@ export default function HarvestLogsPage() {
         const farmRows = await getFarms();
         setFarms(farmRows);
       } catch (err) {
-        setError(errMsg(err, "Failed to load harvest logs"));
+        setError(errMsg(err, t("Failed to load harvest logs")));
       } finally {
         setLoading(false);
       }
@@ -78,7 +82,7 @@ export default function HarvestLogsPage() {
         if (cancelled) return;
         setHarvestLogs(logs);
       } catch (err) {
-        if (!cancelled) setError(errMsg(err, "Failed to load harvest logs"));
+        if (!cancelled) setError(errMsg(err, t("Failed to load harvest logs")));
       } finally {
         if (cancelled) return;
         setLoading(false);
@@ -99,7 +103,7 @@ export default function HarvestLogsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p className="text-zinc-500">Loading...</p>
+        <p className="text-zinc-500">{t("Loading...")}</p>
       </div>
     );
   }
@@ -108,11 +112,11 @@ export default function HarvestLogsPage() {
     return (
       <div className="min-h-screen bg-zinc-50 p-8">
         <div className="mx-auto max-w-2xl">
-          <h1 className="text-3xl font-bold">No farms yet</h1>
-          <p className="mt-2 text-zinc-600">Create or join a farm to get started.</p>
+          <h1 className="text-3xl font-bold">{t("No farms yet")}</h1>
+          <p className="mt-2 text-zinc-600">{t("Create or join a farm to get started.")}</p>
           <div className="mt-6 space-x-3">
             <Link href="/farm" className="inline-block rounded-lg bg-zinc-900 px-6 py-2 text-white hover:bg-zinc-800">
-              Go to Farm
+              {t("Go to Farm")}
             </Link>
           </div>
         </div>
@@ -127,15 +131,18 @@ export default function HarvestLogsPage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <Link href="/farm" className="flex items-center gap-2 text-zinc-600 hover:text-zinc-900">
             <ChevronLeft className="w-5 h-5" />
-            Back
+            {t("Back")}
           </Link>
-          <h1 className="text-2xl font-bold">Harvest Logs</h1>
-          <button
-            onClick={handleSignOut}
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm text-white hover:bg-zinc-800"
-          >
-            Sign out
-          </button>
+          <h1 className="text-2xl font-bold">{t("Harvest Logs")}</h1>
+          <div className="flex items-center gap-3">
+            <LanguageToggle lang={lang} onChange={setLang} />
+            <button
+              onClick={handleSignOut}
+              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm text-white hover:bg-zinc-800"
+            >
+              {t("Sign out")}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -143,7 +150,7 @@ export default function HarvestLogsPage() {
         {/* Farm selector */}
         {farms.length > 1 && (
           <div className="mb-6">
-            <label className="block text-sm font-medium text-zinc-700 mb-2">Select Farm</label>
+            <label className="block text-sm font-medium text-zinc-700 mb-2">{t("Select Farm")}</label>
             <select
               value={activeFarmId}
               onChange={(e) => setActiveFarmId(e.target.value)}
@@ -169,26 +176,26 @@ export default function HarvestLogsPage() {
         <div className="mb-6 rounded-lg border border-zinc-200 bg-white p-4">
           <div className="grid gap-3 sm:grid-cols-2">
               <label className="block">
-                <span className="mb-1 block text-sm font-medium text-zinc-700">Search</span>
+                <span className="mb-1 block text-sm font-medium text-zinc-700">{t("Search")}</span>
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Crop, zone, quality, notes..."
+                  placeholder={t("Crop, zone, quality, notes...")}
                   className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                 />
               </label>
               <label className="block">
-                <span className="mb-1 block text-sm font-medium text-zinc-700">Quality</span>
+                <span className="mb-1 block text-sm font-medium text-zinc-700">{t("Quality")}</span>
                 <select
                   value={qualityFilter}
                   onChange={(e) => setQualityFilter(e.target.value)}
                   className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                 >
-                  <option value="all">All qualities</option>
+                  <option value="all">{t("All qualities")}</option>
                   {qualityOptions.map((quality) => (
                     <option key={quality} value={quality}>
-                      {quality}
+                      {t(quality)}
                     </option>
                   ))}
                 </select>
@@ -200,11 +207,11 @@ export default function HarvestLogsPage() {
         {filteredHarvestLogs.length > 0 && (
           <div className="mb-6 grid gap-4 md:grid-cols-2">
             <div className="rounded-lg border border-zinc-200 bg-white p-6">
-              <p className="text-sm text-zinc-600">Total Harvests (filtered)</p>
+              <p className="text-sm text-zinc-600">{t("Total Harvests (filtered)")}</p>
               <p className="text-3xl font-bold">{filteredHarvestLogs.length}</p>
             </div>
             <div className="rounded-lg border border-zinc-200 bg-white p-6">
-              <p className="text-sm text-zinc-600">Total Quantity (kg, filtered)</p>
+              <p className="text-sm text-zinc-600">{t("Total Quantity (kg, filtered)")}</p>
               <p className="text-3xl font-bold">{totalQuantity.toFixed(2)}</p>
             </div>
           </div>
@@ -214,10 +221,10 @@ export default function HarvestLogsPage() {
         {filteredHarvestLogs.length === 0 ? (
           <div className="rounded-lg border border-zinc-200 bg-white p-8 text-center">
             <p className="text-zinc-500">
-              {harvestLogs.length === 0 ? "No harvest logs yet." : "No harvest logs match the current filters."}
+              {harvestLogs.length === 0 ? t("No harvest logs yet.") : t("No harvest logs match the current filters.")}
             </p>
             <Link href="/farm" className="mt-4 inline-block text-zinc-900 hover:text-zinc-700 font-medium">
-              Log a harvest →
+              {t("Log a harvest →")}
             </Link>
           </div>
         ) : (
@@ -225,12 +232,12 @@ export default function HarvestLogsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-zinc-200 bg-zinc-50">
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-900">Date</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-900">Crop</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-900">Zone</th>
-                  <th className="px-6 py-4 text-right text-sm font-semibold text-zinc-900">Quantity (kg)</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-900">Quality</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-900">Notes</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-900">{t("Date")}</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-900">{t("Crop")}</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-900">{t("Zone")}</th>
+                  <th className="px-6 py-4 text-right text-sm font-semibold text-zinc-900">{t("Quantity (kg)")}</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-900">{t("Quality")}</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-900">{t("Notes")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -248,7 +255,7 @@ export default function HarvestLogsPage() {
                     </td>
                     <td className="px-6 py-4 text-sm text-zinc-600">
                       <span className="inline-block px-2 py-1 rounded-full bg-zinc-100 text-zinc-800 text-xs font-medium">
-                        {log.quality}
+                        {t(log.quality)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-zinc-600 max-w-xs truncate">

@@ -8,6 +8,8 @@ import type { Farm } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { useFarmRole } from "@/hooks/useFarmRole";
 import { ManagerOnly } from "@/components/ManagerOnly";
+import { useT, useLanguage } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 type Member = {
   id: string;
@@ -31,6 +33,8 @@ function errMsg(err: unknown, fallback: string) {
 }
 
 export default function InvitePage() {
+  const t = useT();
+  const [lang, setLang] = useLanguage();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
   const [members, setMembers] = useState<Member[]>([]);
@@ -60,7 +64,7 @@ export default function InvitePage() {
         const text = await r.text();
         if (!text) return { members: [] };
         const json = JSON.parse(text);
-        if (!r.ok) throw new Error(json.error || `Failed to load members (${r.status})`);
+        if (!r.ok) throw new Error(json.error || t("Failed to load members ({status})", { status: r.status }));
         return json;
       }),
       supabase.from("join_requests")
@@ -81,7 +85,7 @@ export default function InvitePage() {
         const farmRows = await getFarms();
         setFarms(farmRows);
       } catch (err) {
-        setError(errMsg(err, "Failed to load"));
+        setError(errMsg(err, t("Failed to load")));
       } finally {
         setLoading(false);
       }
@@ -90,7 +94,7 @@ export default function InvitePage() {
 
   useEffect(() => {
     if (!activeFarmId) return;
-    loadData(activeFarmId).catch((err) => setError(errMsg(err, "Failed to load")));
+    loadData(activeFarmId).catch((err) => setError(errMsg(err, t("Failed to load"))));
   }, [activeFarmId]);
 
   async function handleAccept(req: JoinRequest) {
@@ -123,7 +127,7 @@ export default function InvitePage() {
       await loadData(activeFarmId);
     } catch (err: unknown) {
       const msg = err && typeof err === "object" && "message" in err ? (err as { message: string }).message : String(err);
-      setError("Failed to accept request: " + msg);
+      setError(t("Failed to accept request: {message}", { message: msg }));
     } finally {
       setProcessingId(null);
     }
@@ -137,7 +141,7 @@ export default function InvitePage() {
       if (err) throw err;
       setJoinRequests((prev) => prev.filter((r) => r.id !== id));
     } catch (err) {
-      setError(errMsg(err, "Failed to reject request"));
+      setError(errMsg(err, t("Failed to reject request")));
     } finally {
       setProcessingId(null);
     }
@@ -156,11 +160,11 @@ export default function InvitePage() {
         body: JSON.stringify({ email: inviteEmail.trim() }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to send invite");
-      setInviteSuccess(`Invite sent to ${inviteEmail.trim()}`);
+      if (!res.ok) throw new Error(data.error || t("Failed to send invite"));
+      setInviteSuccess(t("Invite sent to {email}", { email: inviteEmail.trim() }));
       setInviteEmail("");
     } catch (err) {
-      setError(errMsg(err, "Failed to send invite"));
+      setError(errMsg(err, t("Failed to send invite")));
     } finally {
       setInviting(false);
     }
@@ -176,10 +180,10 @@ export default function InvitePage() {
         body: JSON.stringify({ memberId: id, farmId: activeFarmId }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to remove member");
+      if (!res.ok) throw new Error(data.error || t("Failed to remove member"));
       await loadData(activeFarmId);
     } catch (err) {
-      setError(errMsg(err, "Failed to remove member"));
+      setError(errMsg(err, t("Failed to remove member")));
     } finally {
       setRemovingId(null);
     }
@@ -195,10 +199,10 @@ export default function InvitePage() {
         body: JSON.stringify({ memberId: id, farmId: activeFarmId, role: newRole }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update role");
+      if (!res.ok) throw new Error(data.error || t("Failed to update role"));
       await loadData(activeFarmId);
     } catch (err) {
-      setError(errMsg(err, "Failed to update role"));
+      setError(errMsg(err, t("Failed to update role")));
     } finally {
       setSavingRoleId(null);
     }
@@ -215,10 +219,10 @@ export default function InvitePage() {
         body: JSON.stringify({ profileId, farmId: activeFarmId }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to delete user");
+      if (!res.ok) throw new Error(data.error || t("Failed to delete user"));
       await loadData(activeFarmId);
     } catch (err) {
-      setError(errMsg(err, "Failed to delete user"));
+      setError(errMsg(err, t("Failed to delete user")));
     } finally {
       setDeletingId(null);
     }
@@ -231,7 +235,7 @@ export default function InvitePage() {
   const activeFarm = farms.find((f) => f.id === activeFarmId);
 
   if (activeFarmId && !roleLoading && !isManager) {
-    return <ManagerOnly title="Members — managers only" />;
+    return <ManagerOnly title={t("Members — managers only")} />;
   }
 
   return (
@@ -242,9 +246,9 @@ export default function InvitePage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                Shamba Farm Manager
+                {t("Shamba Farm Manager")}
               </p>
-              <h1 className="mt-1 text-3xl font-semibold tracking-tight">Members</h1>
+              <h1 className="mt-1 text-3xl font-semibold tracking-tight">{t("Members")}</h1>
               {activeFarm && <p className="mt-1 text-sm text-zinc-500">{activeFarm.name}</p>}
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -261,11 +265,12 @@ export default function InvitePage() {
                   {f.name}
                 </button>
               ))}
+              <LanguageToggle lang={lang} onChange={setLang} />
               <Link
                 href="/farm"
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                ← Farm
+                {t("← Farm")}
               </Link>
             </div>
           </div>
@@ -276,14 +281,14 @@ export default function InvitePage() {
         )}
 
         {loading ? (
-          <div className="rounded-3xl border border-zinc-200 bg-white p-10 text-center text-sm text-zinc-500">Loading…</div>
+          <div className="rounded-3xl border border-zinc-200 bg-white p-10 text-center text-sm text-zinc-500">{t("Loading…")}</div>
         ) : (
           <div className="space-y-6">
 
             {/* Invite new user */}
             <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold">Invite a new user</h2>
-              <p className="mt-1 text-sm text-zinc-500">Send an email invite so they can create an account and join the farm.</p>
+              <h2 className="text-xl font-semibold">{t("Invite a new user")}</h2>
+              <p className="mt-1 text-sm text-zinc-500">{t("Send an email invite so they can create an account and join the farm.")}</p>
               {inviteSuccess && (
                 <div className="mt-3 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{inviteSuccess}</div>
               )}
@@ -301,7 +306,7 @@ export default function InvitePage() {
                   disabled={inviting}
                   className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
                 >
-                  {inviting ? "Sending..." : "Send invite"}
+                  {inviting ? t("Sending...") : t("Send invite")}
                 </button>
               </form>
             </div>
@@ -310,12 +315,12 @@ export default function InvitePage() {
             {joinRequests.length > 0 && (
               <div className="rounded-3xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
                 <h2 className="text-xl font-semibold text-amber-900">
-                  Join requests
+                  {t("Join requests")}
                   <span className="ml-2 rounded-full bg-amber-200 px-2 py-0.5 text-sm font-medium text-amber-800">
                     {joinRequests.length}
                   </span>
                 </h2>
-                <p className="mt-1 text-sm text-amber-700">People requesting access to your farm.</p>
+                <p className="mt-1 text-sm text-amber-700">{t("People requesting access to your farm.")}</p>
                 <div className="mt-4 space-y-2">
                   {joinRequests.map((req) => (
                     <div key={req.id} className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-white px-4 py-3">
@@ -329,14 +334,14 @@ export default function InvitePage() {
                           disabled={processingId === req.id}
                           className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
                         >
-                          Accept
+                          {t("Accept")}
                         </button>
                         <button
                           onClick={() => handleReject(req.id)}
                           disabled={processingId === req.id}
                           className="rounded-xl border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
                         >
-                          Reject
+                          {t("Reject")}
                         </button>
                       </div>
                     </div>
@@ -347,31 +352,31 @@ export default function InvitePage() {
 
             {/* Current members */}
             <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold">Members</h2>
-              <p className="mt-1 text-sm text-zinc-500">{members.length} {members.length === 1 ? "person has" : "people have"} access to this farm.</p>
+              <h2 className="text-xl font-semibold">{t("Members")}</h2>
+              <p className="mt-1 text-sm text-zinc-500">{members.length === 1 ? t("1 person has access to this farm.") : t("{n} people have access to this farm.", { n: members.length })}</p>
               <div className="mt-4 space-y-2">
                 {members.map((m) => (
                   <div key={m.id} className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-100 px-4 py-3">
                     <div>
-                      <p className="text-sm font-medium text-zinc-900">{m.user_email ?? "No email"}</p>
+                      <p className="text-sm font-medium text-zinc-900">{m.user_email ?? t("No email")}</p>
                       <div className="mt-0.5 flex items-center gap-2">
                         <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
                           m.role_on_farm === "owner" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600"
-                        }`}>{m.role_on_farm}</span>
+                        }`}>{t(m.role_on_farm)}</span>
                         {isOwner && m.role_on_farm !== "owner" && (
                           <select
                             value={m.role_on_farm === "manager" ? "manager" : "worker"}
                             disabled={savingRoleId === m.id}
                             onChange={(e) => setMemberRole(m.id, e.target.value)}
-                            aria-label="Set member role"
+                            aria-label={t("Set member role")}
                             className="rounded-lg border border-zinc-300 px-2 py-1 text-xs outline-none focus:border-zinc-900 disabled:opacity-50"
                           >
-                            <option value="worker">Worker</option>
-                            <option value="manager">Manager</option>
+                            <option value="worker">{t("Worker")}</option>
+                            <option value="manager">{t("Manager")}</option>
                           </select>
                         )}
-                        {savingRoleId === m.id && <span className="text-xs text-zinc-400">saving…</span>}
-                        {!m.user_email && <span className="text-xs text-zinc-400">ID: {m.profile_id.slice(0, 8)}…</span>}
+                        {savingRoleId === m.id && <span className="text-xs text-zinc-400">{t("saving…")}</span>}
+                        {!m.user_email && <span className="text-xs text-zinc-400">{t("ID: {id}…", { id: m.profile_id.slice(0, 8) })}</span>}
                       </div>
                     </div>
                     {m.role_on_farm !== "owner" && (
@@ -381,7 +386,7 @@ export default function InvitePage() {
                           disabled={removingId === m.id}
                           className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-60"
                         >
-                          Remove
+                          {t("Remove")}
                         </button>
                         {confirmDeleteId === m.profile_id ? (
                           <div className="flex items-center gap-1">
@@ -390,13 +395,13 @@ export default function InvitePage() {
                               disabled={deletingId === m.profile_id}
                               className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60"
                             >
-                              {deletingId === m.profile_id ? "Deleting..." : "Confirm"}
+                              {deletingId === m.profile_id ? t("Deleting...") : t("Confirm")}
                             </button>
                             <button
                               onClick={() => setConfirmDeleteId(null)}
                               className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
                             >
-                              Cancel
+                              {t("Cancel")}
                             </button>
                           </div>
                         ) : (
@@ -404,7 +409,7 @@ export default function InvitePage() {
                             onClick={() => setConfirmDeleteId(m.profile_id)}
                             className="rounded-xl border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
                           >
-                            Delete user
+                            {t("Delete user")}
                           </button>
                         )}
                       </div>

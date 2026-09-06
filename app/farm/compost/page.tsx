@@ -8,6 +8,8 @@ import { getFarms, getCompost, getZones } from "@/lib/farm";
 import type { Farm, CompostEntry, Zone } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { useFarmRole } from "@/hooks/useFarmRole";
+import { useT, useLanguage } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -25,6 +27,8 @@ function fmt(d: string | null) {
 }
 
 export default function CompostPage() {
+  const t = useT();
+  const [lang, setLang] = useLanguage();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
   const [entries, setEntries] = useState<CompostEntry[]>([]);
@@ -64,7 +68,7 @@ export default function CompostPage() {
         const farmRows = await getFarms();
         setFarms(farmRows);
       } catch (err) {
-        setError(errMsg(err, "Failed to load"));
+        setError(errMsg(err, t("Failed to load")));
       } finally {
         setLoading(false);
       }
@@ -75,7 +79,7 @@ export default function CompostPage() {
     if (!activeFarmId) return;
     setLoading(true);
     loadEntries(activeFarmId)
-      .catch((err) => setError(errMsg(err, "Failed to load")))
+      .catch((err) => setError(errMsg(err, t("Failed to load"))))
       .finally(() => setLoading(false));
   }, [activeFarmId]);
 
@@ -161,7 +165,7 @@ export default function CompostPage() {
       await loadEntries(activeFarmId);
       setModal(null);
     } catch (err) {
-      setError(errMsg(err, "Failed to save"));
+      setError(errMsg(err, t("Failed to save")));
     } finally {
       setSaving(false);
     }
@@ -174,7 +178,7 @@ export default function CompostPage() {
       if (e) throw e;
       setEntries((prev) => prev.filter((e) => e.id !== id));
     } catch (err) {
-      setError(errMsg(err, "Failed to delete"));
+      setError(errMsg(err, t("Failed to delete")));
     } finally {
       setDeletingId(null);
     }
@@ -203,7 +207,7 @@ export default function CompostPage() {
   function zoneNamesFor(entry: CompostEntry) {
     const ids = entry.zone_ids?.length ? entry.zone_ids : entry.zone_id ? [entry.zone_id] : [];
     if (ids.length === 0) return <span className="text-zinc-300">—</span>;
-    return ids.map((id) => zones.find((z) => z.id === id)?.name ?? "Unknown zone").join(", ");
+    return ids.map((id) => zones.find((z) => z.id === id)?.name ?? t("Unknown zone")).join(", ");
   }
 
   const activeFarm = farms.find((f) => f.id === activeFarmId);
@@ -216,9 +220,9 @@ export default function CompostPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                Shamba Farm Manager
+                {t("Shamba Farm Manager")}
               </p>
-              <h1 className="mt-1 text-3xl font-semibold tracking-tight">Compost register</h1>
+              <h1 className="mt-1 text-3xl font-semibold tracking-tight">{t("Compost register")}</h1>
               {activeFarm && <p className="mt-1 text-sm text-zinc-500">{activeFarm.name}</p>}
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -235,14 +239,15 @@ export default function CompostPage() {
                   {f.name}
                 </button>
               ))}
+              <LanguageToggle lang={lang} onChange={setLang} />
               <Link href="/farm" className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
-                ← Farm
+                {t("← Farm")}
               </Link>
               <button
                 onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                Sign out
+                {t("Sign out")}
               </button>
             </div>
           </div>
@@ -253,20 +258,20 @@ export default function CompostPage() {
         )}
 
         <div className="mb-4 flex items-center justify-between">
-          <span className="text-sm text-zinc-500">{entries.length} entries</span>
+          <span className="text-sm text-zinc-500">{entries.length === 1 ? t("1 entry") : t("{n} entries", { n: entries.length })}</span>
           <button
             onClick={openAdd}
             className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
           >
-            + Add compost
+            {t("+ Add compost")}
           </button>
         </div>
 
         {loading ? (
-          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">Loading...</div>
+          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">{t("Loading...")}</div>
         ) : entries.length === 0 ? (
           <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-center text-sm text-zinc-500">
-            No compost entries yet.
+            {t("No compost entries yet.")}
           </div>
         ) : (
           <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
@@ -274,13 +279,13 @@ export default function CompostPage() {
               <table className="w-full min-w-[700px] text-sm">
                 <thead>
                   <tr className="border-b border-zinc-200 bg-zinc-50 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                    <th className="px-4 py-3 text-left">Type</th>
-                    <th className="px-4 py-3 text-left">Started</th>
-                    <th className="px-4 py-3 text-left">Ready to use</th>
-                    <th className="px-4 py-3 text-left">Materials</th>
-                    <th className="px-4 py-3 text-left">Place</th>
-                    <th className="px-4 py-3 text-left">Zone / Bed</th>
-                    <th className="px-4 py-3 text-left">Notes</th>
+                    <th className="px-4 py-3 text-left">{t("Type")}</th>
+                    <th className="px-4 py-3 text-left">{t("Started")}</th>
+                    <th className="px-4 py-3 text-left">{t("Ready to use")}</th>
+                    <th className="px-4 py-3 text-left">{t("Materials")}</th>
+                    <th className="px-4 py-3 text-left">{t("Place")}</th>
+                    <th className="px-4 py-3 text-left">{t("Zone / Bed")}</th>
+                    <th className="px-4 py-3 text-left">{t("Notes")}</th>
                     <th className="px-4 py-3" />
                   </tr>
                 </thead>
@@ -296,10 +301,10 @@ export default function CompostPage() {
                       <td className="px-4 py-3 text-zinc-500 max-w-[180px]">{row.notes ?? <span className="text-zinc-300">—</span>}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex gap-1">
-                          <button onClick={() => openEdit(row)} className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">Edit</button>
+                          <button onClick={() => openEdit(row)} className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">{t("Edit")}</button>
                           {isManager && (
                             <button onClick={() => handleDelete(row.id)} disabled={deletingId === row.id} className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">
-                              {deletingId === row.id ? "…" : "Delete"}
+                              {deletingId === row.id ? "…" : t("Delete")}
                             </button>
                           )}
                         </div>
@@ -318,46 +323,46 @@ export default function CompostPage() {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-6 sm:items-center sm:py-10">
           <div className="flex w-full max-w-lg max-h-[calc(100vh-2rem)] flex-col rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl sm:max-h-[calc(100vh-5rem)]">
             <h2 className="mb-5 text-lg font-semibold">
-              {modal === "new" ? "Add compost entry" : `Edit — ${(modal as CompostEntry).compost_type ?? "entry"}`}
+              {modal === "new" ? t("Add compost entry") : t("Edit — {name}", { name: (modal as CompostEntry).compost_type ?? t("entry") })}
             </h2>
             <div className="space-y-3 overflow-y-auto pr-1">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Compost type</label>
-                  <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.compost_type} onChange={(e) => setForm((p) => ({ ...p, compost_type: e.target.value }))} placeholder="Horse manure, Bokashi…" />
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Compost type")}</label>
+                  <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.compost_type} onChange={(e) => setForm((p) => ({ ...p, compost_type: e.target.value }))} placeholder={t("Horse manure, Bokashi…")} />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Place</label>
-                  <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.place} onChange={(e) => setForm((p) => ({ ...p, place: e.target.value }))} placeholder="Next to the fence" />
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Place")}</label>
+                  <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.place} onChange={(e) => setForm((p) => ({ ...p, place: e.target.value }))} placeholder={t("Next to the fence")} />
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Date started</label>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Date started")}</label>
                   <input type="date" className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Ready to use</label>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Ready to use")}</label>
                   <input type="date" className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.ready_to_use_date} onChange={(e) => setForm((p) => ({ ...p, ready_to_use_date: e.target.value }))} />
                 </div>
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Materials used</label>
-                <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.materials_used} onChange={(e) => setForm((p) => ({ ...p, materials_used: e.target.value }))} placeholder="Manure + food scraps" />
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Materials used")}</label>
+                <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.materials_used} onChange={(e) => setForm((p) => ({ ...p, materials_used: e.target.value }))} placeholder={t("Manure + food scraps")} />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Zones / Beds <span className="font-normal text-zinc-400">(select multiple)</span></label>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Zones / Beds")} <span className="font-normal text-zinc-400">{t("(select multiple)")}</span></label>
                 <input
                   value={zoneSearch}
                   onChange={(e) => setZoneSearch(e.target.value)}
-                  placeholder="Search beds…"
+                  placeholder={t("Search beds…")}
                   className="mb-2 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                 />
                 <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-xl border border-zinc-300 p-3">
                   {zones.length === 0 ? (
-                    <p className="text-xs text-zinc-400">No zones available</p>
+                    <p className="text-xs text-zinc-400">{t("No zones available")}</p>
                   ) : filteredZones.length === 0 ? (
-                    <p className="text-xs text-zinc-400">No beds match your search.</p>
+                    <p className="text-xs text-zinc-400">{t("No beds match your search.")}</p>
                   ) : (
                     filteredZones.map((z) => (
                       <label key={z.id} className="flex items-center gap-2 cursor-pointer">
@@ -378,16 +383,16 @@ export default function CompostPage() {
                 </div>
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Notes</label>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Notes")}</label>
                 <textarea className="min-h-[70px] w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
               </div>
             </div>
             <div className="mt-5 flex gap-2 border-t border-zinc-100 pt-4">
               <button onClick={handleSave} disabled={saving} className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60">
-                {saving ? "Saving..." : "Save"}
+                {saving ? t("Saving...") : t("Save")}
               </button>
               <button onClick={() => setModal(null)} className="rounded-2xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
-                Cancel
+                {t("Cancel")}
               </button>
             </div>
           </div>

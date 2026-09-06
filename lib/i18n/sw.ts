@@ -8,6 +8,14 @@ import { map } from "./sw/map";
 import { settings } from "./sw/settings";
 import { shop } from "./sw/shop";
 import { common } from "./sw/common";
+import { crops } from "./sw/crops";
+import { seedlings } from "./sw/seedlings";
+import { customers } from "./sw/customers";
+import { goals } from "./sw/goals";
+import { harvest } from "./sw/harvest";
+import { soil } from "./sw/soil";
+import { systems } from "./sw/systems";
+import { prepare } from "./sw/prepare";
 
 export const sw: Record<string, string> = {
   ...common,
@@ -17,4 +25,12 @@ export const sw: Record<string, string> = {
   ...map,
   ...settings,
   ...shop,
+  ...crops,
+  ...seedlings,
+  ...customers,
+  ...goals,
+  ...harvest,
+  ...soil,
+  ...systems,
+  ...prepare,
 };

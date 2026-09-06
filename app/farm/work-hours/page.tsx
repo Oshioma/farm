@@ -10,6 +10,9 @@ import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { useFarmRole } from "@/hooks/useFarmRole";
 import { ManagerOnly } from "@/components/ManagerOnly";
 import { WORKERS } from "@/lib/workers";
+import { useT, useLanguage } from "@/lib/i18n";
+import type { Translate } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -24,9 +27,14 @@ function fmt(d: string | null) {
   return `${day}/${m}/${y}`;
 }
 
-function formatMonthLabel(monthKey: string): string {
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+function formatMonthLabel(monthKey: string, t: Translate): string {
   const [y, m] = monthKey.split("-").map(Number);
-  return new Date(y, m - 1, 1).toLocaleString("en-US", { month: "long", year: "numeric" });
+  return `${t(MONTH_NAMES[m - 1])} ${y}`;
 }
 
 const blankForm = { date: "", worker_name: "", hours: "", role: "operational", notes: "" };
@@ -35,6 +43,8 @@ type QuickRow = { worker_name: string; hours: string; notes: string };
 const blankQuickRow: QuickRow = { worker_name: "", hours: "", notes: "" };
 
 export default function WorkHoursPage() {
+  const t = useT();
+  const [lang, setLang] = useLanguage();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [entries, setEntries] = useState<WorkHoursEntry[]>([]);
   const [activeFarmId, setActiveFarmId] = useState("");
@@ -76,7 +86,7 @@ export default function WorkHoursPage() {
         const farmRows = await getFarms();
         setFarms(farmRows);
       } catch (err) {
-        setError(errMsg(err, "Failed to load"));
+        setError(errMsg(err, t("Failed to load")));
       } finally {
         setLoading(false);
       }
@@ -87,7 +97,7 @@ export default function WorkHoursPage() {
     if (!activeFarmId) return;
     setLoading(true);
     loadEntries(activeFarmId)
-      .catch((err) => setError(errMsg(err, "Failed to load")))
+      .catch((err) => setError(errMsg(err, t("Failed to load"))))
       .finally(() => setLoading(false));
   }, [activeFarmId]);
 
@@ -114,7 +124,7 @@ export default function WorkHoursPage() {
       await loadEntries(activeFarmId);
       setModal(null);
     } catch (err) {
-      setError(errMsg(err, "Failed to save"));
+      setError(errMsg(err, t("Failed to save")));
     } finally {
       setSaving(false);
     }
@@ -142,7 +152,7 @@ export default function WorkHoursPage() {
       setQuickRows([{ ...blankQuickRow }]);
       setQuickMode(false);
     } catch (err) {
-      setError(errMsg(err, "Failed to save"));
+      setError(errMsg(err, t("Failed to save")));
     } finally {
       setQuickSaving(false);
     }
@@ -167,7 +177,7 @@ export default function WorkHoursPage() {
       if (e) throw e;
       setEntries((prev) => prev.filter((e) => e.id !== id));
     } catch (err) {
-      setError(errMsg(err, "Failed to delete"));
+      setError(errMsg(err, t("Failed to delete")));
     } finally {
       setDeletingId(null);
     }
@@ -237,7 +247,7 @@ export default function WorkHoursPage() {
   const inp = "w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900";
 
   if (activeFarmId && !roleLoading && !isManager) {
-    return <ManagerOnly title="Work hours — managers only" />;
+    return <ManagerOnly title={t("Work hours — managers only")} />;
   }
 
   return (
@@ -247,8 +257,8 @@ export default function WorkHoursPage() {
         <header className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Shamba Farm Manager</p>
-              <h1 className="mt-1 text-3xl font-semibold tracking-tight">Work hours</h1>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">{t("Shamba Farm Manager")}</p>
+              <h1 className="mt-1 text-3xl font-semibold tracking-tight">{t("Work hours")}</h1>
               {activeFarm && <p className="mt-1 text-sm text-zinc-500">{activeFarm.name}</p>}
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -263,14 +273,15 @@ export default function WorkHoursPage() {
                   {f.name}
                 </button>
               ))}
+              <LanguageToggle lang={lang} onChange={setLang} />
               <Link href="/farm" className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
-                ← Farm
+                {t("← Farm")}
               </Link>
               <button
                 onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                Sign out
+                {t("Sign out")}
               </button>
             </div>
           </div>
@@ -284,13 +295,13 @@ export default function WorkHoursPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex gap-2">
             <div className="flex rounded-full border border-zinc-200 p-0.5">
-              <button onClick={() => setTab("log")} className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${tab === "log" ? "bg-zinc-900 text-white" : "text-zinc-500"}`}>Log</button>
-              <button onClick={() => setTab("summary")} className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${tab === "summary" ? "bg-zinc-900 text-white" : "text-zinc-500"}`}>Summary</button>
+              <button onClick={() => setTab("log")} className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${tab === "log" ? "bg-zinc-900 text-white" : "text-zinc-500"}`}>{t("Log")}</button>
+              <button onClick={() => setTab("summary")} className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${tab === "summary" ? "bg-zinc-900 text-white" : "text-zinc-500"}`}>{t("Summary")}</button>
             </div>
             {tab === "log" && (
               <div className="flex rounded-full border border-zinc-200 p-0.5">
                 {(["all", "operational", "manager"] as const).map((r) => (
-                  <button key={r} onClick={() => setRoleFilter(r)} className={`rounded-full px-3 py-1.5 text-xs font-medium capitalize transition ${roleFilter === r ? "bg-zinc-900 text-white" : "text-zinc-500"}`}>{r}</button>
+                  <button key={r} onClick={() => setRoleFilter(r)} className={`rounded-full px-3 py-1.5 text-xs font-medium capitalize transition ${roleFilter === r ? "bg-zinc-900 text-white" : "text-zinc-500"}`}>{t(r)}</button>
                 ))}
               </div>
             )}
@@ -300,13 +311,13 @@ export default function WorkHoursPage() {
               onClick={() => setQuickMode(!quickMode)}
               className={`rounded-full px-4 py-2 text-sm font-medium transition ${quickMode ? "bg-zinc-900 text-white" : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"}`}
             >
-              Quick add day
+              {t("Quick add day")}
             </button>
             <button
               onClick={() => { setForm(blankForm); setModal("new"); }}
               className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
             >
-              + Add entry
+              {t("+ Add entry")}
             </button>
           </div>
         </div>
@@ -314,18 +325,18 @@ export default function WorkHoursPage() {
         {/* Quick add form — log an entire day's work for multiple people at once */}
         {quickMode && (
           <div className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-            <h2 className="text-base font-semibold">Log a day</h2>
-            <p className="mt-1 text-sm text-zinc-500">Add a line per person with their hours and what they did, then save once.</p>
+            <h2 className="text-base font-semibold">{t("Log a day")}</h2>
+            <p className="mt-1 text-sm text-zinc-500">{t("Add a line per person with their hours and what they did, then save once.")}</p>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Date</label>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Date")}</label>
                 <input type="date" className={inp} value={quickDate} onChange={(e) => setQuickDate(e.target.value)} />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Role</label>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Role")}</label>
                 <select className={inp} value={quickRole} onChange={(e) => setQuickRole(e.target.value)}>
-                  <option value="operational">Operational</option>
-                  <option value="manager">Manager</option>
+                  <option value="operational">{t("Operational")}</option>
+                  <option value="manager">{t("Manager")}</option>
                 </select>
               </div>
             </div>
@@ -334,34 +345,34 @@ export default function WorkHoursPage() {
               {quickRows.map((row, i) => (
                 <div key={i} className="grid grid-cols-1 gap-2 rounded-2xl border border-zinc-100 bg-zinc-50 p-3 sm:grid-cols-[1fr_100px_2fr_auto] sm:items-start">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600 sm:hidden">Worker</label>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600 sm:hidden">{t("Worker")}</label>
                     <input
                       className={inp}
                       list="quick-row-workers"
                       value={row.worker_name}
                       onChange={(e) => updateQuickRow(i, { worker_name: e.target.value })}
-                      placeholder="Name"
+                      placeholder={t("Name")}
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600 sm:hidden">Hours</label>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600 sm:hidden">{t("Hours")}</label>
                     <input
                       type="number"
                       step="0.5"
                       min="0"
                       className={inp}
-                      placeholder="Hours"
+                      placeholder={t("Hours")}
                       value={row.hours}
                       onChange={(e) => updateQuickRow(i, { hours: e.target.value })}
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600 sm:hidden">Description</label>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600 sm:hidden">{t("Description")}</label>
                     <input
                       className={inp}
                       value={row.notes}
                       onChange={(e) => updateQuickRow(i, { notes: e.target.value })}
-                      placeholder="What did they do…"
+                      placeholder={t("What did they do…")}
                     />
                   </div>
                   <button
@@ -370,7 +381,7 @@ export default function WorkHoursPage() {
                     disabled={quickRows.length === 1}
                     className="rounded-xl border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    Remove
+                    {t("Remove")}
                   </button>
                 </div>
               ))}
@@ -384,7 +395,7 @@ export default function WorkHoursPage() {
               onClick={addQuickRow}
               className="mt-3 rounded-full border border-zinc-200 px-4 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100"
             >
-              + Add person
+              {t("+ Add person")}
             </button>
 
             <div>
@@ -393,29 +404,29 @@ export default function WorkHoursPage() {
                 disabled={quickSaving || !quickDate}
                 className="mt-4 rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60"
               >
-                {quickSaving ? "Saving..." : "Save day"}
+                {quickSaving ? t("Saving...") : t("Save day")}
               </button>
             </div>
           </div>
         )}
 
         {loading ? (
-          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">Loading...</div>
+          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">{t("Loading...")}</div>
         ) : tab === "summary" ? (
           /* ── Summary view ── */
           <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3">
               <span className="text-sm font-medium text-zinc-600">
-                {summaryMonth === "all" ? "All time" : formatMonthLabel(summaryMonth)}
+                {summaryMonth === "all" ? t("All time") : formatMonthLabel(summaryMonth, t)}
               </span>
               <select
                 value={summaryMonth}
                 onChange={(e) => setSummaryMonth(e.target.value)}
                 className="rounded-xl border border-zinc-300 px-3 py-1.5 text-sm outline-none focus:border-zinc-900"
               >
-                <option value="all">All time</option>
+                <option value="all">{t("All time")}</option>
                 {availableMonths.map((m) => (
-                  <option key={m} value={m}>{formatMonthLabel(m)}</option>
+                  <option key={m} value={m}>{formatMonthLabel(m, t)}</option>
                 ))}
               </select>
             </div>
@@ -423,17 +434,17 @@ export default function WorkHoursPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-zinc-200 bg-zinc-50 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                    <th className="px-4 py-3 text-left">Worker</th>
-                    <th className="px-4 py-3 text-right">Operational</th>
-                    <th className="px-4 py-3 text-right">Manager</th>
-                    <th className="px-4 py-3 text-right">Total</th>
+                    <th className="px-4 py-3 text-left">{t("Worker")}</th>
+                    <th className="px-4 py-3 text-right">{t("Operational")}</th>
+                    <th className="px-4 py-3 text-right">{t("Manager")}</th>
+                    <th className="px-4 py-3 text-right">{t("Total")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {summary.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="px-4 py-6 text-center text-zinc-400">
-                        No hours logged {summaryMonth === "all" ? "yet" : `in ${formatMonthLabel(summaryMonth)}`}.
+                        {summaryMonth === "all" ? t("No hours logged yet.") : t("No hours logged in {month}.", { month: formatMonthLabel(summaryMonth, t) })}
                       </td>
                     </tr>
                   ) : (
@@ -448,7 +459,7 @@ export default function WorkHoursPage() {
                   )}
                   {summary.length > 0 && (
                     <tr className="bg-zinc-50 font-semibold">
-                      <td className="px-4 py-3">Total</td>
+                      <td className="px-4 py-3">{t("Total")}</td>
                       <td className="px-4 py-3 text-right">{summary.reduce((s, r) => s + r.operational, 0)}</td>
                       <td className="px-4 py-3 text-right">{summary.reduce((s, r) => s + r.manager, 0)}</td>
                       <td className="px-4 py-3 text-right">{totalAllHours}</td>
@@ -460,7 +471,7 @@ export default function WorkHoursPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-center text-sm text-zinc-500">
-            No work hours logged yet.
+            {t("No work hours logged yet.")}
           </div>
         ) : (
           /* ── Log view ── */
@@ -469,11 +480,11 @@ export default function WorkHoursPage() {
               <table className="w-full min-w-[600px] text-sm">
                 <thead>
                   <tr className="border-b border-zinc-200 bg-zinc-50 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                    <th className="px-4 py-3 text-left">Date</th>
-                    <th className="px-4 py-3 text-left">Worker</th>
-                    <th className="px-4 py-3 text-right">Hours</th>
-                    <th className="px-4 py-3 text-left">Role</th>
-                    <th className="px-4 py-3 text-left">Notes</th>
+                    <th className="px-4 py-3 text-left">{t("Date")}</th>
+                    <th className="px-4 py-3 text-left">{t("Worker")}</th>
+                    <th className="px-4 py-3 text-right">{t("Hours")}</th>
+                    <th className="px-4 py-3 text-left">{t("Role")}</th>
+                    <th className="px-4 py-3 text-left">{t("Notes")}</th>
                     <th className="px-4 py-3" />
                   </tr>
                 </thead>
@@ -486,14 +497,14 @@ export default function WorkHoursPage() {
                       <td className="px-4 py-3">
                         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                           row.role === "manager" ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700"
-                        }`}>{row.role}</span>
+                        }`}>{t(row.role)}</span>
                       </td>
                       <td className="px-4 py-3 text-zinc-500 max-w-[250px]">{row.notes ?? <span className="text-zinc-300">—</span>}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex gap-1">
-                          <button onClick={() => openEdit(row)} className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">Edit</button>
+                          <button onClick={() => openEdit(row)} className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100">{t("Edit")}</button>
                           <button onClick={() => handleDelete(row.id)} disabled={deletingId === row.id} className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">
-                            {deletingId === row.id ? "…" : "Del"}
+                            {deletingId === row.id ? "…" : t("Del")}
                           </button>
                         </div>
                       </td>
@@ -511,17 +522,17 @@ export default function WorkHoursPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-md rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl">
             <h2 className="mb-5 text-lg font-semibold">
-              {modal === "new" ? "Log hours" : `Edit — ${(modal as WorkHoursEntry).worker_name}`}
+              {modal === "new" ? t("Log hours") : t("Edit — {name}", { name: (modal as WorkHoursEntry).worker_name })}
             </h2>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Date</label>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Date")}</label>
                   <input type="date" className={inp} value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Worker</label>
-                  <input className={inp} list="workers" value={form.worker_name} onChange={(e) => setForm((p) => ({ ...p, worker_name: e.target.value }))} placeholder="Name" />
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Worker")}</label>
+                  <input className={inp} list="workers" value={form.worker_name} onChange={(e) => setForm((p) => ({ ...p, worker_name: e.target.value }))} placeholder={t("Name")} />
                   <datalist id="workers">
                     {WORKERS.map((w) => <option key={w} value={w} />)}
                   </datalist>
@@ -529,27 +540,27 @@ export default function WorkHoursPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Hours</label>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Hours")}</label>
                   <input type="number" step="0.5" min="0" className={inp} value={form.hours} onChange={(e) => setForm((p) => ({ ...p, hours: e.target.value }))} />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Role</label>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Role")}</label>
                   <select className={inp} value={form.role} onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}>
-                    <option value="operational">Operational</option>
-                    <option value="manager">Manager</option>
+                    <option value="operational">{t("Operational")}</option>
+                    <option value="manager">{t("Manager")}</option>
                   </select>
                 </div>
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Notes</label>
-                <textarea className={`${inp} min-h-[60px]`} value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} placeholder="What was done…" />
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Notes")}</label>
+                <textarea className={`${inp} min-h-[60px]`} value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} placeholder={t("What was done…")} />
               </div>
             </div>
             <div className="mt-5 flex gap-2">
               <button onClick={handleSave} disabled={saving || !form.worker_name.trim() || !form.hours} className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60">
-                {saving ? "Saving..." : "Save"}
+                {saving ? t("Saving...") : t("Save")}
               </button>
-              <button onClick={() => setModal(null)} className="rounded-2xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">Cancel</button>
+              <button onClick={() => setModal(null)} className="rounded-2xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">{t("Cancel")}</button>
             </div>
           </div>
         </div>

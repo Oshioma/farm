@@ -17,6 +17,8 @@ import {
 import type { Farm, HarvestEtaEntry, Zone, Crop, SeasonMonth } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { useFarmRole } from "@/hooks/useFarmRole";
+import { useT, useLanguage } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -208,6 +210,8 @@ export default function HarvestEtaPage() {
   const [saving, setSaving] = useState(false);
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
   const router = useRouter();
+  const t = useT();
+  const [lang, setLang] = useLanguage();
   useFarmSelection({ farms, activeFarmId, setActiveFarmId });
   const { isManager } = useFarmRole(activeFarmId);
   const activeFarmIdRef = useRef(activeFarmId);
@@ -231,7 +235,7 @@ export default function HarvestEtaPage() {
         const farmRows = await getFarms();
         setFarms(farmRows);
       } catch (err) {
-        setError(errMsg(err, "Failed to load"));
+        setError(errMsg(err, t("Failed to load")));
       } finally {
         setLoading(false);
       }
@@ -242,7 +246,7 @@ export default function HarvestEtaPage() {
     if (!activeFarmId) return;
     setLoading(true);
     loadEntries(activeFarmId, year)
-      .catch((err) => setError(errMsg(err, "Failed to load")))
+      .catch((err) => setError(errMsg(err, t("Failed to load"))))
       .finally(() => setLoading(false));
   }, [activeFarmId, year]);
 
@@ -311,7 +315,7 @@ export default function HarvestEtaPage() {
       await loadEntries(activeFarmId, year);
       setModal(null);
     } catch (err) {
-      setError(errMsg(err, "Failed to save"));
+      setError(errMsg(err, t("Failed to save")));
     } finally {
       setSaving(false);
     }
@@ -327,7 +331,7 @@ export default function HarvestEtaPage() {
       if (e) throw e;
       setEntries((prev) => prev.filter((entry) => !ids.includes(entry.id)));
     } catch (err) {
-      setError(errMsg(err, "Failed to delete"));
+      setError(errMsg(err, t("Failed to delete")));
     } finally {
       setDeletingKey(null);
     }
@@ -341,7 +345,7 @@ export default function HarvestEtaPage() {
       /* A row adopted by name keeps the link once it is saved. */
       if (!f.crop_id && row.crop) f.crop_id = row.crop.id;
       setForm(f);
-      setModalTitle(`Edit — ${title}`);
+      setModalTitle(t("Edit — {title}", { title }));
       setModal(row);
       return;
     }
@@ -352,22 +356,22 @@ export default function HarvestEtaPage() {
     f.crop_id = row.crop?.id ?? "";
     f.expected_harvest_date = row.expectedHarvestDate ?? "";
     setForm(f);
-    setModalTitle(`Add estimate — ${title}`);
+    setModalTitle(t("Add estimate — {title}", { title }));
     setModal("new");
   }
 
   function openAdd() {
     setForm(blankForm());
-    setModalTitle("Add row");
+    setModalTitle(t("Add row"));
     setModal("new");
   }
 
   const activeFarm = farms.find((f) => f.id === activeFarmId);
 
   const VIEWS: { key: ViewMode; label: string }[] = [
-    { key: "crops", label: "All crops" },
-    { key: "missing", label: "Needs an estimate" },
-    { key: "saved", label: "Saved entries" },
+    { key: "crops", label: t("All crops") },
+    { key: "missing", label: t("Needs an estimate") },
+    { key: "saved", label: t("Saved entries") },
   ];
 
   return (
@@ -379,9 +383,9 @@ export default function HarvestEtaPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                Shamba Farm Manager
+                {t("Shamba Farm Manager")}
               </p>
-              <h1 className="mt-1 text-3xl font-semibold tracking-tight">Harvest ETA</h1>
+              <h1 className="mt-1 text-3xl font-semibold tracking-tight">{t("Harvest ETA")}</h1>
               {activeFarm && <p className="mt-1 text-sm text-zinc-500">{activeFarm.name}</p>}
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -399,17 +403,18 @@ export default function HarvestEtaPage() {
                 </button>
               ))}
               <Link href="/farm/produce-expected" className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
-                Produce expected
+                {t("Produce expected")}
               </Link>
               <Link href="/farm" className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
-                ← Farm
+                {t("← Farm")}
               </Link>
               <button
                 onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }}
                 className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
-                Sign out
+                {t("Sign out")}
               </button>
+              <LanguageToggle lang={lang} onChange={setLang} />
             </div>
           </div>
         </header>
@@ -428,7 +433,7 @@ export default function HarvestEtaPage() {
               ← {year - 1}
             </button>
             <span className="rounded-full bg-zinc-900 px-5 py-2 text-sm font-semibold text-white">
-              Mar {year} – {lastMonth.label} {lastMonth.calendarYear}
+              {t("Mar")} {year} – {t(lastMonth.label)} {lastMonth.calendarYear}
             </span>
             <button
               onClick={() => setYear((y) => y + 1)}
@@ -439,15 +444,15 @@ export default function HarvestEtaPage() {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-zinc-500">
-              {rows.length} crop{rows.length === 1 ? "" : "s"}
-              {missingEstimates > 0 ? ` · ${missingEstimates} without an estimate` : ""}
+              {rows.length === 1 ? t("1 crop") : t("{n} crops", { n: rows.length })}
+              {missingEstimates > 0 ? t(" · {n} without an estimate", { n: missingEstimates }) : ""}
             </span>
             {isManager && (
               <button
                 onClick={openAdd}
                 className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
               >
-                + Add row
+                {t("+ Add row")}
               </button>
             )}
           </div>
@@ -470,24 +475,24 @@ export default function HarvestEtaPage() {
           </div>
           {missingEstimates > 0 && view !== "missing" && (
             <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700">
-              {missingEstimates} crop{missingEstimates === 1 ? "" : "s"} still need an estimate
+              {missingEstimates === 1 ? t("1 crop still needs an estimate") : t("{n} crops still need an estimate", { n: missingEstimates })}
             </span>
           )}
         </div>
 
         {/* Table */}
         {loading ? (
-          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">Loading...</div>
+          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">{t("Loading...")}</div>
         ) : rows.length === 0 ? (
           <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-center text-sm text-zinc-500">
             {view === "saved"
-              ? `No saved harvest ETA entries for ${year}.`
+              ? t("No saved harvest ETA entries for {year}.", { year })
               : view === "missing"
-                ? "Every crop has an estimate."
+                ? t("Every crop has an estimate.")
                 : crops.length === 0
-                  ? "No crops planted yet — add crops on the farm page, or transplant from the nursery."
-                  : `Nothing to show for ${year}.`}
-            {isManager && view !== "missing" ? " You can also click “+ Add row”." : ""}
+                  ? t("No crops planted yet — add crops on the farm page, or transplant from the nursery.")
+                  : t("Nothing to show for {year}.", { year })}
+            {isManager && view !== "missing" ? t(" You can also click “+ Add row”.") : ""}
           </div>
         ) : (
           <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
@@ -502,33 +507,33 @@ export default function HarvestEtaPage() {
                         colSpan={HARVEST_MONTHS.length * 2}
                         className="border-l border-zinc-200 px-2 py-1.5 text-center text-zinc-400"
                       >
-                        Season {season}/{String(season + 1).slice(-2)}
+                        {t("Season {a}/{b}", { a: season, b: String(season + 1).slice(-2) })}
                       </th>
                     ))}
                     <th className="px-3 py-1.5" colSpan={2} />
                   </tr>
                   <tr className="border-b border-zinc-200 bg-zinc-50 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                    <th className="sticky left-0 z-10 bg-zinc-50 px-3 py-2.5 text-left">Crop</th>
-                    <th className="px-3 py-2.5 text-left">Bed(s)</th>
-                    <th className="px-3 py-2.5 text-left">Harvest Date</th>
-                    <th className="px-3 py-2.5 text-left">Companions</th>
+                    <th className="sticky left-0 z-10 bg-zinc-50 px-3 py-2.5 text-left">{t("Crop")}</th>
+                    <th className="px-3 py-2.5 text-left">{t("Bed(s)")}</th>
+                    <th className="px-3 py-2.5 text-left">{t("Harvest Date")}</th>
+                    <th className="px-3 py-2.5 text-left">{t("Companions")}</th>
                     {months.map((m, i) => (
                       <th
                         key={`${m.season}:${m.key}`}
                         className={`px-2 py-2.5 text-center ${i % HARVEST_MONTHS.length === 0 ? "border-l border-zinc-200" : ""}`}
                         colSpan={2}
                       >
-                        <div>{m.label}</div>
+                        <div>{t(m.label)}</div>
                         <div className="text-[9px] font-normal normal-case tracking-normal text-zinc-400">
                           &rsquo;{String(m.calendarYear).slice(-2)}
                         </div>
                         <div className="mt-0.5 flex gap-0 text-[9px] font-normal normal-case tracking-normal text-zinc-400">
-                          <span className="flex-1">Exp</span>
-                          <span className="flex-1">Act</span>
+                          <span className="flex-1">{t("Exp")}</span>
+                          <span className="flex-1">{t("Act")}</span>
                         </div>
                       </th>
                     ))}
-                    <th className="px-3 py-2.5 text-left">Notes</th>
+                    <th className="px-3 py-2.5 text-left">{t("Notes")}</th>
                     <th className="px-3 py-2.5" />
                   </tr>
                 </thead>
@@ -540,8 +545,8 @@ export default function HarvestEtaPage() {
                         <td className={`sticky left-0 z-10 px-3 py-2 font-semibold text-zinc-900 whitespace-nowrap ${saved ? "bg-white" : "bg-amber-50/60"}`}>
                           {row.cropName}
                           {!row.crop && (
-                            <span className="ml-1.5 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[9px] font-medium text-zinc-500" title="Saved row with no matching crop">
-                              no crop
+                            <span className="ml-1.5 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[9px] font-medium text-zinc-500" title={t("Saved row with no matching crop")}>
+                              {t("no crop")}
                             </span>
                           )}
                         </td>
@@ -580,7 +585,7 @@ export default function HarvestEtaPage() {
                                     : "bg-zinc-900 text-white hover:bg-zinc-800"
                                 }`}
                               >
-                                {saved ? "Edit" : "+ Estimate"}
+                                {saved ? t("Edit") : t("+ Estimate")}
                               </button>
                               {saved && (
                                 <button
@@ -588,7 +593,7 @@ export default function HarvestEtaPage() {
                                   disabled={deletingKey === row.key}
                                   className="rounded-lg border border-rose-200 px-2 py-1 text-[10px] font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
                                 >
-                                  {deletingKey === row.key ? "…" : "Del"}
+                                  {deletingKey === row.key ? "…" : t("Del")}
                                 </button>
                               )}
                             </div>
@@ -605,9 +610,9 @@ export default function HarvestEtaPage() {
 
         {/* Legend */}
         <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-zinc-500">
-          <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded bg-emerald-50 border border-emerald-200" /> Expected</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded bg-blue-50 border border-blue-200" /> Actual</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded bg-amber-50 border border-amber-200" /> No estimate saved for this crop yet</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded bg-emerald-50 border border-emerald-200" /> {t("Expected")}</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded bg-blue-50 border border-blue-200" /> {t("Actual")}</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded bg-amber-50 border border-amber-200" /> {t("No estimate saved for this crop yet")}</span>
         </div>
       </div>
 
@@ -615,13 +620,13 @@ export default function HarvestEtaPage() {
       {isManager && modal !== null && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-8">
           <div className="w-full max-w-2xl rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl">
-            <h2 className="mb-5 text-lg font-semibold">{modalTitle || "Bed entry"}</h2>
+            <h2 className="mb-5 text-lg font-semibold">{modalTitle || t("Bed entry")}</h2>
             <div className="space-y-3">
               {/* Link to existing crop */}
               {crops.length > 0 && (
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-zinc-600">
-                    Crop <span className="font-normal text-zinc-400">(the row belongs to this crop; auto-fills bed &amp; name)</span>
+                    {t("Crop")} <span className="font-normal text-zinc-400">{t("(the row belongs to this crop; auto-fills bed & name)")}</span>
                   </label>
                   <select
                     className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
@@ -645,7 +650,7 @@ export default function HarvestEtaPage() {
                       }
                     }}
                   >
-                    <option value="">— Select a crop (optional) —</option>
+                    <option value="">{t("— Select a crop (optional) —")}</option>
                     {crops.map((c) => (
                       <option key={c.id} value={c.id}>
                         {cropLabel(c)}
@@ -659,38 +664,38 @@ export default function HarvestEtaPage() {
               {/* Core fields */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Bed name</label>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Bed name")}</label>
                   <input
                     className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                     value={form.bed_name}
                     onChange={(e) => setForm((p) => ({ ...p, bed_name: e.target.value }))}
-                    placeholder="TR1, R1, CL1…"
+                    placeholder={t("TR1, R1, CL1…")}
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Main crop</label>
-                  <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.main_crop} onChange={(e) => setForm((p) => ({ ...p, main_crop: e.target.value }))} placeholder="Tomatoes" />
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Main crop")}</label>
+                  <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.main_crop} onChange={(e) => setForm((p) => ({ ...p, main_crop: e.target.value }))} placeholder={t("Tomatoes")} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Expected harvest date</label>
-                  <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.expected_harvest_date} onChange={(e) => setForm((p) => ({ ...p, expected_harvest_date: e.target.value }))} placeholder="Jun 2025" />
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Expected harvest date")}</label>
+                  <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.expected_harvest_date} onChange={(e) => setForm((p) => ({ ...p, expected_harvest_date: e.target.value }))} placeholder={t("Jun 2025")} />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Beneficial companions</label>
-                  <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.beneficial_companions} onChange={(e) => setForm((p) => ({ ...p, beneficial_companions: e.target.value }))} placeholder="Basil, Marigold" />
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Beneficial companions")}</label>
+                  <input className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.beneficial_companions} onChange={(e) => setForm((p) => ({ ...p, beneficial_companions: e.target.value }))} placeholder={t("Basil, Marigold")} />
                 </div>
               </div>
               {zones.length > 0 && (
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Link to zone <span className="font-normal text-zinc-400">(optional)</span></label>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Link to zone")} <span className="font-normal text-zinc-400">{t("(optional)")}</span></label>
                   <select
                     className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900"
                     value={form.zone_id}
                     onChange={(e) => setForm((p) => ({ ...p, zone_id: e.target.value }))}
                   >
-                    <option value="">— None —</option>
+                    <option value="">{t("— None —")}</option>
                     {zones.map((z) => (
                       <option key={z.id} value={z.id}>
                         {z.code ? `${z.code} — ${z.name}` : z.name}
@@ -703,16 +708,15 @@ export default function HarvestEtaPage() {
               {/* Monthly fields, running across every season on the sheet */}
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                  Monthly yields (Expected / Actual)
+                  {t("Monthly yields (Expected / Actual)")}
                 </p>
                 <p className="mb-3 text-xs text-zinc-400">
-                  Mar {year} – {lastMonth.label} {lastMonth.calendarYear}. Fill in whichever months this crop is
-                  expected to yield in; leave the rest blank.
+                  {t("Mar")} {year} – {t(lastMonth.label)} {lastMonth.calendarYear}. {t("Fill in whichever months this crop is expected to yield in; leave the rest blank.")}
                 </p>
                 {Array.from({ length: SEASON_SPAN }, (_, i) => year + i).map((season) => (
                   <div key={season} className="mb-3 last:mb-0">
                     <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
-                      Season {season}/{String(season + 1).slice(-2)}
+                      {t("Season {a}/{b}", { a: season, b: String(season + 1).slice(-2) })}
                     </p>
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                       {months
@@ -720,7 +724,7 @@ export default function HarvestEtaPage() {
                         .map((m) => (
                           <div key={`${m.season}:${m.key}`} className="rounded-xl border border-zinc-200 p-2.5">
                             <p className="mb-1.5 text-[11px] font-semibold text-zinc-600">
-                              {m.label} {m.calendarYear}
+                              {t(m.label)} {m.calendarYear}
                             </p>
                             <div className="flex gap-1.5">
                               <input
@@ -729,7 +733,7 @@ export default function HarvestEtaPage() {
                                 onChange={(e) =>
                                   setForm((p) => ({ ...p, months: { ...p.months, [cellKey(m, "exp")]: e.target.value } }))
                                 }
-                                placeholder="Exp"
+                                placeholder={t("Exp")}
                               />
                               <input
                                 className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs outline-none focus:border-blue-500 bg-blue-50/30"
@@ -737,7 +741,7 @@ export default function HarvestEtaPage() {
                                 onChange={(e) =>
                                   setForm((p) => ({ ...p, months: { ...p.months, [cellKey(m, "act")]: e.target.value } }))
                                 }
-                                placeholder="Act"
+                                placeholder={t("Act")}
                               />
                             </div>
                           </div>
@@ -748,16 +752,16 @@ export default function HarvestEtaPage() {
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Notes</label>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">{t("Notes")}</label>
                 <textarea className="min-h-[60px] w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
               </div>
             </div>
             <div className="mt-5 flex gap-2">
               <button onClick={handleSave} disabled={saving || !form.bed_name.trim()} className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-60">
-                {saving ? "Saving..." : "Save"}
+                {saving ? t("Saving...") : t("Save")}
               </button>
               <button onClick={() => setModal(null)} className="rounded-2xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
-                Cancel
+                {t("Cancel")}
               </button>
             </div>
           </div>

@@ -22,7 +22,7 @@ function ManageFarmLink({ farmId }: { farmId: string }) {
   if (!isMember) return null;
   return (
     <a
-      href={`/farm?farmId=${encodeURIComponent(farmId)}`}
+      href={`/farm/prepare?farmId=${encodeURIComponent(farmId)}`}
       style={{
         color: GREEN, border: `1px solid ${GREEN}`, borderRadius: 999, padding: "10px 16px",
         fontSize: 13, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap", minHeight: 44,
