@@ -322,4 +322,6 @@ export const dashboard: Record<string, string> = {
   "Asset": "Mali",
   "The basics are enough to create the crop. The rest is optional.": "Taarifa za msingi zinatosha kusajili zao. Zilizobaki ni hiari.",
   "Basics": "Taarifa za msingi",
+  "Shrink map": "Punguza ramani",
+  "Expand map": "Panua ramani",
 };
