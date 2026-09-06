@@ -4,6 +4,7 @@
 export const shop: Record<string, string> = {
   /* ── top bar ── */
   "Manage farm": "Simamia shamba",
+  "Add crops": "Ongeza mazao",
   "Your pre-order · {n}": "Oda yako ya awali · {n}",
   "Nothing reserved yet": "Bado hujahifadhi chochote",
 

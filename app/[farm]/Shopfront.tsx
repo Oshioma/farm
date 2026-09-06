@@ -20,17 +20,17 @@ function ManageFarmLink({ farmId }: { farmId: string }) {
     return () => { cancelled = true; };
   }, [farmId]);
   if (!isMember) return null;
+  const pill: React.CSSProperties = {
+    color: GREEN, border: `1px solid ${GREEN}`, borderRadius: 999, padding: "10px 16px",
+    fontSize: 13, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap", minHeight: 44,
+    display: "inline-flex", alignItems: "center",
+  };
+  const id = encodeURIComponent(farmId);
   return (
-    <a
-      href={`/farm/prepare?farmId=${encodeURIComponent(farmId)}`}
-      style={{
-        color: GREEN, border: `1px solid ${GREEN}`, borderRadius: 999, padding: "10px 16px",
-        fontSize: 13, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap", minHeight: 44,
-        display: "inline-flex", alignItems: "center",
-      }}
-    >
-      {t("Manage farm")}
-    </a>
+    <>
+      <a href={`/farm/onboarding?farmId=${id}`} style={pill}>{t("Add crops")}</a>
+      <a href={`/farm/prepare?farmId=${id}`} style={pill}>{t("Manage farm")}</a>
+    </>
   );
 }
 
