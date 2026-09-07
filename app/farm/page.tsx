@@ -1746,7 +1746,9 @@ export default function FarmPage() {
         {/* Keep the full app navigation out of the focused setup flow and away from accounts with no farm yet. */}
         {!hideChrome && <nav aria-label={t("Farm navigation")} className="mb-6 rounded-2xl border border-zinc-200 bg-white px-2 py-2 shadow-sm">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center divide-x divide-zinc-100">
+            {/* On phones the groups take the whole line and the "+ Add" button drops
+                below them, so two or three groups fit per row instead of one. */}
+            <div className="flex w-full min-w-0 flex-wrap items-center gap-y-1 sm:w-auto sm:flex-1 sm:divide-x sm:divide-zinc-100">
               {navSections.map((section, index) => (
                 <div key={section.key} className="px-1 first:pl-0">
                   <NavMenu
@@ -1762,7 +1764,7 @@ export default function FarmPage() {
               ))}
             </div>
             {activeFarm && (
-              <div className="flex items-center gap-2">
+              <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
                 {activeForm && quickActions.some((action) => action.key === activeForm) && (
                   <button
                     onClick={() => setActiveForm(null)}

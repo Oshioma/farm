@@ -438,22 +438,45 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
     return () => { cancelled = true; };
   }, [farmId, farmName]);
 
+  // Beds rebuilt from the zones themselves. Every saved bed is mirrored into a
+  // zone with its map position, so when the saved layout cannot be fetched
+  // (offline, a failed request, a device that never saved it) the map still
+  // shows the farm's real beds instead of the built-in starter rows.
+  const seenZoneBedIds = new Set<string>();
+  const zoneBeds: BedDef[] = zones.flatMap((zone) => {
+    const pos = zone.map_position;
+    if (!pos || !(pos.w > 0) || !(pos.h > 0)) return [];
+    const id = (zone.code || zone.name).trim();
+    if (!id || seenZoneBedIds.has(id)) return [];
+    seenZoneBedIds.add(id);
+    return [{
+      id,
+      label: zone.name || id,
+      bed_uid: zone.bed_uid ?? undefined,
+      x: pos.x,
+      y: pos.y,
+      w: pos.w,
+      h: pos.h,
+      ...(typeof pos.rotate === "number" ? { rotate: pos.rotate } : {}),
+    }];
+  });
+
   // The active layout merges saved customisations
   const hasCustom = editBeds.length > 0 || editLandmarks.length > 0;
+  const savedBeds = hasCustom ? editBeds : zoneBeds.length > 0 ? zoneBeds : baseLayout.beds;
   const layout: FarmLayout = {
     ...baseLayout,
-    beds: editMode ? editBeds : (hasCustom ? editBeds : baseLayout.beds),
+    beds: editMode ? editBeds : savedBeds,
     landmarks: editMode ? editLandmarks : (editLandmarks.length > 0 ? editLandmarks : baseLayout.landmarks),
     backgroundImage: customBg || baseLayout.backgroundImage,
   };
 
   // Enter edit mode
   function startEdit() {
-    setEditBeds(
-      ensureBedsHaveUid(
-        editBeds.length > 0 ? [...editBeds] : baseLayout.beds.map((b) => ({ ...b }))
-      )
-    );
+    // Start from the beds the farmer can see. Saving replaces the zones that
+    // are not in the layout, so editing must never begin from the starter
+    // rows while the farm's own beds exist.
+    setEditBeds(ensureBedsHaveUid(savedBeds.map((b) => ({ ...b }))));
     setEditLandmarks(editLandmarks.length > 0 ? [...editLandmarks] : baseLayout.landmarks.map((l) => ({ ...l })));
     setEditMode(true);
     setSelectedBed(null);
@@ -711,6 +734,11 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
 
   // Try to match beds to zones by code
   function getZoneForBed(bedId: string): Zone | undefined {
+    const bedUid = layout.beds.find((b) => b.id === bedId)?.bed_uid;
+    if (bedUid) {
+      const byUid = zones.find((z) => z.bed_uid === bedUid);
+      if (byUid) return byUid;
+    }
     const id = bedId.toUpperCase();
     return zones.find(
       (z) => {
@@ -824,7 +852,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
   }
 
   // Check if this is a new/unknown farm with no layout
-  const isBlankFarm = baseLayout.beds.length === 0 && editBeds.length === 0 && !customBg;
+  const isBlankFarm = baseLayout.beds.length === 0 && editBeds.length === 0 && zoneBeds.length === 0 && !customBg;
 
   return (
     <div>
@@ -937,9 +965,11 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
         </div>
       )}
 
-      <div className="flex gap-4">
+      {/* On phones the map takes the full width and the bed panel sits under
+          it; from the large breakpoint the panel returns to the right-hand column. */}
+      <div className="flex flex-col gap-4 lg:flex-row">
         {/* Map */}
-        <div className={`flex-1 overflow-auto rounded-2xl border bg-white ${editMode ? "border-blue-400 ring-2 ring-blue-100" : "border-zinc-200"}`}>
+        <div className={`min-w-0 flex-1 overflow-auto rounded-2xl border bg-white ${editMode ? "border-blue-400 ring-2 ring-blue-100" : "border-zinc-200"}`}>
           {editMode && (
             <div className="bg-blue-50 px-3 py-1.5 text-xs text-blue-700 border-b border-blue-200">
               {t("Drag beds & labels to move them. Drag corners to resize beds. Double-click text to edit it.")}
@@ -1226,7 +1256,7 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
         </div>
 
         {/* Side panel — bed info */}
-        <div className="w-56 shrink-0 space-y-3">
+        <div className="w-full shrink-0 space-y-3 lg:w-56">
           {/* Edit mode: selected bed controls */}
           {editMode && selectedBed && (
             <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm space-y-3">
@@ -1612,9 +1642,9 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
           ) : null}
 
           {/* Legend */}
-          <div className="rounded-2xl border border-zinc-200 bg-white p-3">
-            <div className="mb-2 text-xs font-semibold text-zinc-500">{t("Legend")}</div>
-            <div className="space-y-1.5 text-xs text-zinc-500">
+          <div className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 lg:p-3">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-zinc-500 lg:flex-col lg:items-stretch lg:gap-y-1.5">
+              <span className="font-semibold lg:mb-0.5">{t("Legend")}</span>
               <span className="flex items-center gap-1.5">
                 <span className="inline-block h-2.5 w-2.5 rounded border border-zinc-300 bg-zinc-100" /> {t("Unmapped")}
               </span>

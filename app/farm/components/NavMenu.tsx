@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, ChevronDown } from "lucide-react";
 
@@ -39,8 +39,26 @@ type Props = {
    "+ Add" quick actions. */
 export function NavMenu({ label, icon, items, active = false, align = "left", variant = "pill", columns = 1, ariaLabel, className = "" }: Props) {
   const [open, setOpen] = useState(false);
+  /* Which edge of the trigger the panel hangs from. Starts from the `align`
+     prop and flips whenever the panel would run off the side of the screen,
+     which happens on phones where the nav wraps onto several lines. */
+  const [side, setSide] = useState<"left" | "right">(align);
   const root = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const menuId = useId();
+
+  useLayoutEffect(() => {
+    if (!open) { setSide(align); return; }
+    const node = panel.current;
+    if (!node) return;
+    /* Measured once per opening, from the preferred side, so a panel that is
+       wider than the screen cannot flip back and forth. */
+    const rect = node.getBoundingClientRect();
+    const margin = 8;
+    const width = document.documentElement.clientWidth;
+    if (rect.left < margin) setSide("left");
+    else if (rect.right > width - margin) setSide("right");
+  }, [open, align]);
 
   useEffect(() => {
     if (!open) return;
@@ -112,10 +130,11 @@ export function NavMenu({ label, icon, items, active = false, align = "left", va
       </button>
       {open && (
         <div
+          ref={panel}
           id={menuId}
           role="menu"
           onKeyDown={onMenuKey}
-          className={"absolute z-40 mt-2 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-zinc-200 bg-white p-2 shadow-lg " + (columns === 2 ? "w-[26rem] " : "min-w-[14rem] ") + (align === "right" ? "right-0" : "left-0")}
+          className={"absolute z-40 mt-2 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-zinc-200 bg-white p-2 shadow-lg " + (columns === 2 ? "w-[26rem] " : "min-w-[14rem] ") + (side === "right" ? "right-0" : "left-0")}
         >
           <div className={columns === 2 ? "grid grid-cols-2 gap-x-1" : ""}>
             {items.map((item) => {
