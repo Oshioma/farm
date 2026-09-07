@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { emailConfigured, sendEmail } from "@/lib/email";
+import { checkSender, emailConfigured, sendEmail } from "@/lib/email";
 
 /* Password reset, sent by the app rather than by Supabase.
 
@@ -91,6 +91,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Email sending is not configured" }, { status: 503 });
   }
 
+  /* Make sure Resend can deliver from our sender before asking Supabase for
+     a token. Asking Supabase counts as "reset email sent" on the account and
+     starts its one-a-minute limit, so a refused send after that would leave
+     the fallback to Supabase's own email rate-limited too. */
+  const sender = await checkSender();
+  if (!sender.ok) {
+    console.error("[forgot-password] sender not ready:", sender.reason);
+    return NextResponse.json({ error: "Email sending is not configured", detail: sender.reason }, { status: 503 });
+  }
+
   const now = Date.now();
   const last = recent.get(email) ?? 0;
   if (now - last < 60_000) return NextResponse.json({ ok: true, throttled: true });
@@ -130,12 +140,11 @@ export async function POST(request: Request) {
   const message = renderEmail(lang, link);
   const sent = await sendEmail({ to: email, ...message });
   if (sent.error) {
-    /* Resend refused (unverified domain, test sender, quota). Answer 503 so
-       the page falls back to Supabase's own reset email and the farmer still
-       gets a link. The admin system page reports the reason. */
+    /* Supabase has already counted this as a sent reset, so a fallback to
+       its own email would be refused for a minute. Say what went wrong. */
     console.error("[forgot-password] send failed:", sent.error);
     recent.delete(email);
-    return NextResponse.json({ error: "Email provider refused the message", detail: sent.error }, { status: 503 });
+    return NextResponse.json({ error: "Could not send the reset email", detail: sent.error }, { status: 502 });
   }
 
   return NextResponse.json({ ok: true });

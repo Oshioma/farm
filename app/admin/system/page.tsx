@@ -119,6 +119,29 @@ export default function SystemPage() {
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; text: string } | null>(null);
+
+  /* Sends one email to the super admin through Resend and shows exactly
+     what Resend answered. */
+  async function sendTestEmail() {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/admin/system/test-email", { method: "POST" });
+      const data = (await res.json()) as { ok?: boolean; from?: string; to?: string; sender?: string; error?: string | null };
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+      setTestResult(
+        data.ok
+          ? { ok: true, text: `Sent to ${data.to} as ${data.from}. ${data.sender ?? ""}` }
+          : { ok: false, text: `Resend refused: ${data.error}. Sender check: ${data.sender ?? ""}` }
+      );
+    } catch (err) {
+      setTestResult({ ok: false, text: err instanceof Error ? err.message : "Failed" });
+    } finally {
+      setTesting(false);
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -192,11 +215,24 @@ export default function SystemPage() {
               >
                 {loading ? "Checking…" : "Re-run checks"}
               </button>
+              <button
+                onClick={sendTestEmail}
+                disabled={testing}
+                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-60"
+              >
+                {testing ? "Sending…" : "Send test email"}
+              </button>
               <Link href="/admin" className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100">
                 &larr; Admin
               </Link>
             </div>
           </div>
+
+          {testResult && (
+            <div className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${testResult.ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-700"}`}>
+              {testResult.text}
+            </div>
+          )}
 
           {report && (
             <div className="mt-5 flex flex-wrap items-center gap-3">

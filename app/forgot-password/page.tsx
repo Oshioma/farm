@@ -33,8 +33,9 @@ export default function ForgotPasswordPage() {
         return;
       }
       if (response.status !== 503) {
-        const body = (await response.json().catch(() => null)) as { error?: string } | null;
-        setError(body?.error ? t(body.error) : t("Could not send the reset email. Please try again."));
+        const body = (await response.json().catch(() => null)) as { error?: string; detail?: string } | null;
+        const headline = body?.error ? t(body.error) : t("Could not send the reset email. Please try again.");
+        setError(body?.detail ? `${headline}: ${body.detail}` : headline);
         setLoading(false);
         return;
       }
