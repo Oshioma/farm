@@ -138,6 +138,10 @@ export type Zone = {
   name: string;
   code: string | null;
   size_acres: number | null;
+  /* Set by the beds map when a bed is saved: the bed's stable id and where it
+     sits on the map, so the map can be rebuilt from the zones alone. */
+  bed_uid?: string | null;
+  map_position?: { x: number; y: number; w: number; h: number; rotate?: number } | null;
 };
 
 export type Crop = {
@@ -268,7 +272,7 @@ export async function getZones(farmId: string): Promise<Zone[]> {
     async () => {
       const { data, error } = await supabase
         .from("zones")
-        .select("id, farm_id, name, code, size_acres")
+        .select("id, farm_id, name, code, size_acres, bed_uid, map_position")
         .eq("farm_id", farmId)
         .eq("is_active", true)
         .order("name");

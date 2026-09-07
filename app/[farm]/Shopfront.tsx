@@ -21,19 +21,20 @@ function ManageFarmLink({ farmId, farmName, slug }: { farmId: string; farmName: 
     return () => { cancelled = true; };
   }, [farmId]);
   if (!isMember) return null;
-  const pill: React.CSSProperties = {
-    color: GREEN, border: `1px solid ${GREEN}`, borderRadius: 999, padding: "10px 16px",
-    fontSize: 13, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap", minHeight: 44,
-    display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", cursor: "pointer", fontFamily: sans,
-  };
-  const pillClass = "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[#166534] px-4 py-2.5 text-[13px] font-semibold text-[#166534] min-h-[44px] bg-transparent";
+  /* Compact pills that wrap into as many rows as the screen needs. They live
+     in their own strip under the top bar rather than inside it, so on a phone
+     they scroll away with the page instead of pinning half the screen. */
+  const pillClass = "inline-flex min-h-[40px] items-center gap-1.5 whitespace-nowrap rounded-full border border-[#166534] bg-transparent px-3.5 py-2 text-[13px] font-semibold text-[#166534] no-underline";
   const id = encodeURIComponent(farmId);
   const shopLink = typeof window === "undefined" ? `/${slug}` : `${window.location.origin}/${slug}`;
   return (
-    <>
-      <a href={`/farm/add-crop?farmId=${id}&back=${encodeURIComponent(`/${slug}`)}`} style={pill}>{t("Add crops")}</a>
-      <a href={`/farm/prepare?farmId=${id}`} style={pill}>{t("Add photos and delivery details")}</a>
-      <a href={`/farm?farmId=${id}`} style={pill}>{t("Manage farm")}</a>
+    <div
+      className="flex flex-wrap items-center gap-2 px-5 py-3 sm:px-[clamp(20px,5vw,64px)]"
+      style={{ borderBottom: `1px solid ${LINE}`, fontFamily: sans }}
+    >
+      <a href={`/farm/add-crop?farmId=${id}&back=${encodeURIComponent(`/${slug}`)}`} className={pillClass}>{t("Add crops")}</a>
+      <a href={`/farm/prepare?farmId=${id}`} className={pillClass}>{t("Add photos and delivery details")}</a>
+      <a href={`/farm?farmId=${id}`} className={pillClass}>{t("Manage farm")}</a>
       <ShareWhatsAppButton
         text={t("{farm} is now on Shamba Online. Reserve fresh produce here: {link}", { farm: farmName, link: shopLink })}
         label={t("Share on WhatsApp")}
@@ -42,7 +43,7 @@ function ManageFarmLink({ farmId, farmName, slug }: { farmId: string; farmName: 
         className={pillClass}
         copyClassName={pillClass}
       />
-    </>
+    </div>
   );
 }
 
@@ -145,36 +146,37 @@ export function Shopfront({ shop }: { shop: ShopData }) {
 
   return (
     <main style={{ background: PAPER, color: INK, fontFamily: sans, minHeight: "100vh" }}>
-      {/* Top bar */}
+      {/* Top bar. Only the farm name, the language toggle and the pre-order
+          button stay pinned; on a phone that is one or two short lines. */}
       <header
-        style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24,
-          padding: "20px clamp(20px, 5vw, 64px)", borderBottom: `1px solid ${LINE}`,
-          position: "sticky", top: 0, background: PAPER, zIndex: 20,
-        }}
+        className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-5 py-4 sm:px-[clamp(20px,5vw,64px)] sm:py-5"
+        style={{ borderBottom: `1px solid ${LINE}`, position: "sticky", top: 0, background: PAPER, zIndex: 20 }}
       >
-        <div style={{ display: "flex", alignItems: "baseline", gap: 12, minWidth: 0 }}>
-          <span style={{ fontFamily: sans, fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.05 }}>{shop.farm.name}</span>
+        <div className="flex min-w-0 items-baseline gap-3">
+          <span className="text-[26px] sm:text-[clamp(28px,4vw,44px)]" style={{ fontFamily: sans, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.05 }}>{shop.farm.name}</span>
           <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#a8a29e" }}>
             Shamba Online
           </span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <div className="flex flex-wrap items-center justify-end gap-2.5">
         <LanguageToggle lang={lang} onChange={setLang} />
-        <ManageFarmLink farmId={shop.farm.id} farmName={shop.farm.name} slug={shop.farm.slug} />
         <button
           onClick={() => { setSent(null); setCheckout(true); }}
           disabled={basket.length === 0}
+          className="min-h-[40px] px-4 py-2 text-[13px] sm:min-h-[44px] sm:px-[22px] sm:py-3 sm:text-[14px]"
           style={{
             background: basket.length ? GREEN : "#ffffff", color: basket.length ? "#ffffff" : "#a8a29e",
-            border: `1px solid ${basket.length ? GREEN : LINE}`, fontFamily: sans, fontSize: 14, fontWeight: 600,
-            padding: "12px 22px", borderRadius: 999, cursor: basket.length ? "pointer" : "default", minHeight: 44,
+            border: `1px solid ${basket.length ? GREEN : LINE}`, fontFamily: sans, fontWeight: 600,
+            borderRadius: 999, cursor: basket.length ? "pointer" : "default",
           }}
         >
           {basket.length ? t("Your pre-order · {n}", { n: basket.length }) : t("Nothing reserved yet")}
         </button>
         </div>
       </header>
+
+      {/* Farmer tools, shown to members of the farm only. Not pinned. */}
+      <ManageFarmLink farmId={shop.farm.id} farmName={shop.farm.name} slug={shop.farm.slug} />
 
       {/* Hero */}
       <section
