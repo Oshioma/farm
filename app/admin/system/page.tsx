@@ -151,6 +151,27 @@ export default function SystemPage() {
           : "ok";
   const pendingMigrations = report?.migrations.filter((m) => m.status === "fail") ?? [];
 
+  /* Everything that is not OK, from every section, worst first, so the
+     things to fix sit at the top of the page instead of scattered below. */
+  const RANK: Record<Status, number> = { fail: 0, warn: 1, unknown: 2, ok: 3 };
+  type Attention = Check & { source: string; mono?: boolean };
+  const attention: Attention[] = report
+    ? ([
+        ...report.env.map((c) => ({ ...c, source: "Environment", mono: true, label: `${c.key}${c.required ? "" : " (optional)"}`, detail: `${c.detail} — ${c.label}` })),
+        ...(report.crossChecks ?? []).map((c) => ({ ...c, source: "Configuration" })),
+        ...report.connections.map((c) => ({ ...c, source: "Connections" })),
+        ...report.tables.map((c) => ({ ...c, source: "Tables" })),
+        ...report.migrations.map((m) => ({ ...m, source: "Migrations", mono: true, label: `${m.version}_${m.label}` })),
+      ] as Attention[])
+        .filter((c) => c.status !== "ok")
+        .sort((a, b) => RANK[a.status] - RANK[b.status])
+    : [];
+  const attentionCounts = {
+    fail: attention.filter((c) => c.status === "fail").length,
+    warn: attention.filter((c) => c.status === "warn").length,
+    unknown: attention.filter((c) => c.status === "unknown").length,
+  };
+
   return (
     <main className="min-h-screen bg-stone-50 text-zinc-900">
       <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
@@ -218,6 +239,32 @@ export default function SystemPage() {
           </div>
         ) : report ? (
           <div className="space-y-6">
+            {attention.length > 0 && (
+              <section className={`rounded-3xl border bg-white shadow-sm ${attentionCounts.fail > 0 ? "border-rose-200" : "border-amber-200"}`}>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4">
+                  <div>
+                    <h2 className="text-lg font-semibold">Needs attention</h2>
+                    <p className="mt-0.5 text-xs text-zinc-500">
+                      {[
+                        attentionCounts.fail > 0 ? `${attentionCounts.fail} broken` : null,
+                        attentionCounts.warn > 0 ? `${attentionCounts.warn} to check` : null,
+                        attentionCounts.unknown > 0 ? `${attentionCounts.unknown} unverified` : null,
+                      ].filter(Boolean).join(" · ")}
+                      . Everything else passed and is listed in the sections below.
+                    </p>
+                  </div>
+                  <span className={`rounded-full px-3 py-1 text-xs font-medium ${PILL[attentionCounts.fail > 0 ? "fail" : attentionCounts.warn > 0 ? "warn" : "unknown"]}`}>
+                    {attention.length} item{attention.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <div className="px-5">
+                  {attention.map((c) => (
+                    <StatusRow key={`${c.source}-${c.key}`} mono={c.mono} check={{ ...c, label: `${c.source} · ${c.label}` }} />
+                  ))}
+                </div>
+              </section>
+            )}
+
             {pendingMigrations.length > 0 && (
               <div className="rounded-3xl border border-rose-200 bg-rose-50 p-5">
                 <h2 className="text-sm font-semibold text-rose-800">
