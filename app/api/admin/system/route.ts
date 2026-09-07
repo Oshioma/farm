@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { checkSender } from "@/lib/email";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -373,49 +374,16 @@ async function checkConnections(admin: SupabaseClient | null): Promise<Check[]> 
     }
   }
 
-  /* Resend: ask the API whether the key is live rather than guessing, and
-     whether the sender address can actually deliver to farmers. */
-  const emailFrom = process.env.EMAIL_FROM?.trim() ?? "";
-  const fromAddress = (emailFrom.match(/<([^>]+)>/)?.[1] ?? emailFrom).trim().toLowerCase();
-  const fromDomain = fromAddress.split("@")[1] ?? "";
+  /* Resend: ask the API whether the key is live and whether the sender
+     address can actually deliver to farmers. */
   if (resendKey) {
-    const { result, error, ms } = await timed(async () => {
-      const res = await fetch("https://api.resend.com/domains", {
-        headers: { Authorization: `Bearer ${resendKey}` },
-        cache: "no-store",
-        signal: AbortSignal.timeout(8000),
-      });
-      const body = res.status === 200 ? ((await res.json()) as { data?: { name?: string; status?: string }[] }) : null;
-      const verified = (body?.data ?? []).filter((d) => d.status === "verified").map((d) => (d.name ?? "").toLowerCase());
-      return { status: res.status, verified };
-    });
-    let status: Status;
-    let detail: string;
-    if (error || !result) {
-      status = "fail";
-      detail = message(error ?? "No answer from Resend");
-    } else if (result.status === 401 || result.status === 403) {
-      status = "fail";
-      detail = "Key rejected (401/403) — regenerate it in Resend";
-    } else if (result.status !== 200) {
-      status = "warn";
-      detail = `Resend answered ${result.status}`;
-    } else if (!fromDomain || fromDomain === "resend.dev") {
-      status = "warn";
-      detail = `Key accepted, but the sender is ${fromAddress || "onboarding@resend.dev"}, which Resend only delivers to your own inbox. Set EMAIL_FROM to an address on a verified domain${result.verified.length ? ` (verified: ${result.verified.join(", ")})` : " — none is verified yet"}.`;
-    } else if (!result.verified.includes(fromDomain)) {
-      status = "fail";
-      detail = `Key accepted, but EMAIL_FROM uses ${fromDomain}, which is not verified in Resend${result.verified.length ? ` (verified: ${result.verified.join(", ")})` : " — no domain is verified yet"}. Add the domain in Resend and finish its DNS records.`;
-    } else {
-      status = "ok";
-      detail = `Key accepted; sending as ${emailFrom} from verified domain ${fromDomain}`;
-    }
+    const { result, error, ms } = await timed(() => checkSender());
     checks.push({
       key: "resend",
       label: "Resend email API",
-      status,
-      detail,
-      impact: "Password reset, new-signup and join-request emails go through this. Resets fall back to Supabase's email when it refuses.",
+      status: error || !result ? "fail" : result.ok ? "ok" : result.verified.length ? "fail" : "warn",
+      detail: error || !result ? message(error ?? "No answer from Resend") : result.reason,
+      impact: "Password reset, new-signup and join-request emails go through this. Resets fall back to Supabase's email while it is not ready.",
       ms,
     });
   } else {
