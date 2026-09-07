@@ -4,7 +4,21 @@ import { Resend } from "resend";
    a domain verified in Resend (for example "Shamba Online <hello@shamba.online>").
    The resend.dev fallback only delivers to the Resend account owner, which is
    fine for trying things out and useless for real farmers. */
-export const EMAIL_FROM = process.env.EMAIL_FROM?.trim() || "Shamba Online <onboarding@resend.dev>";
+const RAW_EMAIL_FROM = process.env.EMAIL_FROM?.trim() ?? "";
+
+/* Reads a sender written as "Name <address>", "<address>" or a bare address,
+   forgiving stray quotes and a missing closing bracket, and rebuilds it in
+   the exact shape Resend accepts. Null when no address can be found. */
+export function parseSender(raw: string): { name: string; address: string; from: string } | null {
+  const match = raw.trim().match(/^"?([^"<>]*?)"?\s*<?\s*([^\s<>"@]+@[^\s<>"@]+\.[^\s<>"@]+)\s*>?\s*"?\s*$/);
+  if (!match) return null;
+  const name = match[1].trim();
+  const address = match[2].trim().toLowerCase();
+  return { name, address, from: name ? `${name} <${address}>` : address };
+}
+
+const parsedSender = parseSender(RAW_EMAIL_FROM);
+export const EMAIL_FROM = parsedSender?.from || "Shamba Online <onboarding@resend.dev>";
 
 export function emailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY?.trim());
@@ -12,7 +26,7 @@ export function emailConfigured(): boolean {
 
 /* The bare address inside EMAIL_FROM, and its domain. */
 export function senderAddress(): { address: string; domain: string } {
-  const address = (EMAIL_FROM.match(/<([^>]+)>/)?.[1] ?? EMAIL_FROM).trim().toLowerCase();
+  const address = parseSender(EMAIL_FROM)?.address ?? "";
   return { address, domain: address.split("@")[1] ?? "" };
 }
 
@@ -27,6 +41,9 @@ export async function checkSender(): Promise<SenderCheck> {
   const key = process.env.RESEND_API_KEY?.trim();
   if (!key) return { ok: false, reason: "RESEND_API_KEY is not set", verified: [] };
   if (senderCache && Date.now() - senderCache.at < 5 * 60_000) return senderCache.result;
+  if (RAW_EMAIL_FROM && !parsedSender) {
+    return { ok: false, reason: `EMAIL_FROM is not a usable sender: ${JSON.stringify(RAW_EMAIL_FROM)}. Write it as "Shamba Online <hello@shamba.online>".`, verified: [] };
+  }
 
   const { address, domain } = senderAddress();
   let result: SenderCheck;
@@ -45,9 +62,9 @@ export async function checkSender(): Promise<SenderCheck> {
       const verified = (body.data ?? []).filter((d) => d.status === "verified").map((d) => (d.name ?? "").toLowerCase());
       const list = verified.length ? `verified: ${verified.join(", ")}` : "no domain is verified in this Resend team";
       if (!domain || domain === "resend.dev") {
-        result = { ok: false, reason: `Sender ${address || "onboarding@resend.dev"} only delivers to the Resend account owner; set EMAIL_FROM to an address on a verified domain (${list}). EMAIL_FROM is currently ${JSON.stringify(process.env.EMAIL_FROM ?? "")}.`, verified };
+        result = { ok: false, reason: `Sender ${address || "onboarding@resend.dev"} only delivers to the Resend account owner; set EMAIL_FROM to an address on a verified domain (${list}). EMAIL_FROM is currently ${JSON.stringify(RAW_EMAIL_FROM)}.`, verified };
       } else if (!verified.includes(domain)) {
-        result = { ok: false, reason: `EMAIL_FROM domain ${domain} is not verified in the Resend team this API key belongs to (${list}). EMAIL_FROM is ${JSON.stringify(process.env.EMAIL_FROM ?? "")}.`, verified };
+        result = { ok: false, reason: `EMAIL_FROM domain ${domain} is not verified in the Resend team this API key belongs to (${list}). EMAIL_FROM is ${JSON.stringify(RAW_EMAIL_FROM)}.`, verified };
       } else {
         result = { ok: true, reason: `Sending as ${EMAIL_FROM} from verified domain ${domain}`, verified };
       }
