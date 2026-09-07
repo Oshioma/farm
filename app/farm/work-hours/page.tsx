@@ -4,15 +4,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { getFarms, getWorkHours } from "@/lib/farm";
-import type { Farm, WorkHoursEntry } from "@/lib/farm";
+import { getFarms, getWorkHoursForMonth, getWorkHoursMonths } from "@/lib/farm";
+import type { Farm, WorkHoursEntry, WorkHoursMonth } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { useFarmRole } from "@/hooks/useFarmRole";
 import { ManagerOnly } from "@/components/ManagerOnly";
 import { WORKERS } from "@/lib/workers";
 import { useT, useLanguage } from "@/lib/i18n";
-import type { Translate } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { MonthlyChart, currentMonthKey, fmtHours, formatMonthLabel } from "./MonthlyChart";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -27,16 +27,6 @@ function fmt(d: string | null) {
   return `${day}/${m}/${y}`;
 }
 
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-
-function formatMonthLabel(monthKey: string, t: Translate): string {
-  const [y, m] = monthKey.split("-").map(Number);
-  return `${t(MONTH_NAMES[m - 1])} ${y}`;
-}
-
 const blankForm = { date: "", worker_name: "", hours: "", role: "operational", notes: "" };
 
 type QuickRow = { worker_name: string; hours: string; notes: string };
@@ -46,7 +36,11 @@ export default function WorkHoursPage() {
   const t = useT();
   const [lang, setLang] = useLanguage();
   const [farms, setFarms] = useState<Farm[]>([]);
-  const [entries, setEntries] = useState<WorkHoursEntry[]>([]);
+  const [months, setMonths] = useState<WorkHoursMonth[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState<string>("");
+  /* Entries per month, kept once fetched so switching tabs back is instant. */
+  const [entriesByMonth, setEntriesByMonth] = useState<Record<string, WorkHoursEntry[]>>({});
+  const [monthLoading, setMonthLoading] = useState(false);
   const [activeFarmId, setActiveFarmId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -73,10 +67,38 @@ export default function WorkHoursPage() {
     activeFarmIdRef.current = activeFarmId;
   }, [activeFarmId]);
 
-  async function loadEntries(farmId: string) {
-    const rows = await getWorkHours(farmId);
-    if (activeFarmIdRef.current !== farmId) return;
-    setEntries(rows);
+  /* Monthly totals for the chart and tabs: three small columns per row,
+     rather than every note in the log, so the page opens quickly. */
+  async function loadMonths(farmId: string): Promise<WorkHoursMonth[]> {
+    const rows = await getWorkHoursMonths(farmId);
+    if (activeFarmIdRef.current !== farmId) return [];
+    setMonths(rows);
+    return rows;
+  }
+
+  async function loadMonth(farmId: string, month: string) {
+    if (!month) return;
+    setMonthLoading(true);
+    try {
+      const rows = await getWorkHoursForMonth(farmId, month);
+      if (activeFarmIdRef.current !== farmId) return;
+      setEntriesByMonth((prev) => ({ ...prev, [month]: rows }));
+    } catch (err) {
+      setError(errMsg(err, t("Failed to load")));
+    } finally {
+      setMonthLoading(false);
+    }
+  }
+
+  /* After a save or delete: refresh the totals and the months that changed. */
+  async function refresh(touchedMonths: string[]) {
+    const farmId = activeFarmIdRef.current;
+    if (!farmId) return;
+    const rows = await loadMonths(farmId);
+    const wanted = new Set(touchedMonths.filter(Boolean));
+    if (selectedMonth) wanted.add(selectedMonth);
+    await Promise.all(Array.from(wanted).map((m) => loadMonth(farmId, m)));
+    if (!rows.some((m) => m.month === selectedMonth) && rows.length > 0) setSelectedMonth(rows[0].month);
   }
 
   useEffect(() => {
@@ -96,10 +118,25 @@ export default function WorkHoursPage() {
   useEffect(() => {
     if (!activeFarmId) return;
     setLoading(true);
-    loadEntries(activeFarmId)
+    setMonths([]);
+    setEntriesByMonth({});
+    setSelectedMonth("");
+    loadMonths(activeFarmId)
+      .then((rows) => {
+        if (activeFarmIdRef.current !== activeFarmId) return;
+        /* Open on the current month when it has hours, else the latest one. */
+        const now = currentMonthKey();
+        const first = rows.find((m) => m.month === now)?.month ?? rows[0]?.month ?? now;
+        setSelectedMonth(first);
+      })
       .catch((err) => setError(errMsg(err, t("Failed to load"))))
       .finally(() => setLoading(false));
   }, [activeFarmId]);
+
+  useEffect(() => {
+    if (!activeFarmId || !selectedMonth || entriesByMonth[selectedMonth]) return;
+    loadMonth(activeFarmId, selectedMonth);
+  }, [activeFarmId, selectedMonth]);
 
   async function handleSave() {
     if (!activeFarmId || !form.worker_name.trim() || !form.hours) return;
@@ -121,7 +158,9 @@ export default function WorkHoursPage() {
         const { error: e } = await supabase.from("work_hours").update(payload).eq("id", (modal as WorkHoursEntry).id);
         if (e) throw e;
       }
-      await loadEntries(activeFarmId);
+      const touched = [payload.date?.slice(0, 7) ?? "", modal !== "new" && modal ? (modal as WorkHoursEntry).date?.slice(0, 7) ?? "" : ""];
+      await refresh(touched);
+      if (payload.date) setSelectedMonth(payload.date.slice(0, 7));
       setModal(null);
     } catch (err) {
       setError(errMsg(err, t("Failed to save")));
@@ -148,7 +187,8 @@ export default function WorkHoursPage() {
       setError("");
       const { error: e } = await supabase.from("work_hours").insert(rows);
       if (e) throw e;
-      await loadEntries(activeFarmId);
+      await refresh([quickDate.slice(0, 7)]);
+      setSelectedMonth(quickDate.slice(0, 7));
       setQuickRows([{ ...blankQuickRow }]);
       setQuickMode(false);
     } catch (err) {
@@ -175,7 +215,9 @@ export default function WorkHoursPage() {
       setDeletingId(id);
       const { error: e } = await supabase.from("work_hours").delete().eq("id", id);
       if (e) throw e;
-      setEntries((prev) => prev.filter((e) => e.id !== id));
+      const month = selectedMonth;
+      setEntriesByMonth((prev) => ({ ...prev, [month]: (prev[month] ?? []).filter((row) => row.id !== id) }));
+      await loadMonths(activeFarmId);
     } catch (err) {
       setError(errMsg(err, t("Failed to delete")));
     } finally {
@@ -193,6 +235,8 @@ export default function WorkHoursPage() {
     });
     setModal(entry);
   }
+
+  const entries = useMemo(() => entriesByMonth[selectedMonth] ?? [], [entriesByMonth, selectedMonth]);
 
   const filtered = useMemo(() => {
     if (roleFilter === "all") return entries;
@@ -212,35 +256,17 @@ export default function WorkHoursPage() {
       .sort((a, b) => b.total - a.total);
   }
 
-  // Months with logged hours, most recent first, for the summary month picker.
-  const availableMonths = useMemo(() => {
-    const set = new Set<string>();
-    for (const e of entries) {
-      if (e.date) set.add(e.date.slice(0, 7));
-    }
-    return Array.from(set).sort((a, b) => b.localeCompare(a));
-  }, [entries]);
-
-  const [summaryMonth, setSummaryMonth] = useState<"all" | string>("all");
-
-  // Default the summary to the most recent month with logged hours whenever
-  // the active farm changes, so it opens on a useful monthly view rather
-  // than an empty or all-time one; only once per farm switch.
-  const defaultedMonthFarmRef = useRef<string>("");
-  useEffect(() => {
-    if (!activeFarmId || defaultedMonthFarmRef.current === activeFarmId) return;
-    if (availableMonths.length === 0) return;
-    defaultedMonthFarmRef.current = activeFarmId;
-    setSummaryMonth(availableMonths[0]);
-  }, [activeFarmId, availableMonths]);
-
-  const summaryRows = useMemo(() => {
-    if (summaryMonth === "all") return entries;
-    return entries.filter((e) => e.date?.slice(0, 7) === summaryMonth);
-  }, [entries, summaryMonth]);
-
-  // Summary: total hours per worker, for the selected month (or all time)
-  const summary = useMemo(() => summarise(summaryRows), [summaryRows]);
+  // Summary: total hours per worker in the selected month
+  const summary = useMemo(() => summarise(entries), [entries]);
+  const selectedTotals = months.find((m) => m.month === selectedMonth);
+  const monthTabs = useMemo(() => {
+    const now = currentMonthKey();
+    const keys = months.map((m) => m.month);
+    /* Always offer the current month, so hours can be logged into it before
+       it has any. */
+    if (!keys.includes(now)) keys.unshift(now);
+    return keys.sort((a, b) => b.localeCompare(a));
+  }, [months]);
 
   const totalAllHours = summary.reduce((s, r) => s + r.total, 0);
   const activeFarm = farms.find((f) => f.id === activeFarmId);
@@ -289,6 +315,51 @@ export default function WorkHoursPage() {
 
         {error && (
           <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+        )}
+
+        {/* Hours by month */}
+        {!loading && (
+          <section className="mb-4 rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <div>
+                <h2 className="text-base font-semibold">{t("Hours by month")}</h2>
+                <p className="mt-0.5 text-xs text-zinc-500">{t("Every month with logged hours. Tap a month to open it.")}</p>
+              </div>
+              {selectedTotals && (
+                <p className="text-sm text-zinc-600">
+                  <span className="font-semibold text-zinc-900">{formatMonthLabel(selectedMonth, t)}</span> · {t("{n} h", { n: fmtHours(selectedTotals.total) })} · {t("{n} entries", { n: selectedTotals.entries })}
+                </p>
+              )}
+            </div>
+            <div className="mt-4">
+              {months.length === 0 ? (
+                <p className="text-sm text-zinc-400">{t("Log hours to see the months here.")}</p>
+              ) : (
+                <MonthlyChart months={months} selected={selectedMonth} onSelect={setSelectedMonth} t={t} />
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* Month tabs */}
+        {!loading && monthTabs.length > 0 && (
+          <div className="mb-4 -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+            {monthTabs.map((m) => {
+              const totals = months.find((x) => x.month === m);
+              const active = m === selectedMonth;
+              return (
+                <button
+                  key={m}
+                  onClick={() => setSelectedMonth(m)}
+                  aria-pressed={active}
+                  className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition ${active ? "bg-zinc-900 text-white" : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"}`}
+                >
+                  {formatMonthLabel(m, t)}
+                  <span className={`ml-2 text-xs ${active ? "text-zinc-300" : "text-zinc-400"}`}>{totals ? fmtHours(totals.total) : m === currentMonthKey() ? t("This month") : "0"}</span>
+                </button>
+              );
+            })}
+          </div>
         )}
 
         {/* Controls */}
@@ -412,23 +483,13 @@ export default function WorkHoursPage() {
 
         {loading ? (
           <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">{t("Loading...")}</div>
+        ) : monthLoading && !entriesByMonth[selectedMonth] ? (
+          <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-sm text-zinc-500">{t("Loading month…")}</div>
         ) : tab === "summary" ? (
-          /* ── Summary view ── */
+          /* ── Summary view: hours per worker in the selected month ── */
           <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3">
-              <span className="text-sm font-medium text-zinc-600">
-                {summaryMonth === "all" ? t("All time") : formatMonthLabel(summaryMonth, t)}
-              </span>
-              <select
-                value={summaryMonth}
-                onChange={(e) => setSummaryMonth(e.target.value)}
-                className="rounded-xl border border-zinc-300 px-3 py-1.5 text-sm outline-none focus:border-zinc-900"
-              >
-                <option value="all">{t("All time")}</option>
-                {availableMonths.map((m) => (
-                  <option key={m} value={m}>{formatMonthLabel(m, t)}</option>
-                ))}
-              </select>
+              <span className="text-sm font-medium text-zinc-600">{formatMonthLabel(selectedMonth, t)}</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -444,7 +505,7 @@ export default function WorkHoursPage() {
                   {summary.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="px-4 py-6 text-center text-zinc-400">
-                        {summaryMonth === "all" ? t("No hours logged yet.") : t("No hours logged in {month}.", { month: formatMonthLabel(summaryMonth, t) })}
+                        {t("No hours logged in {month}.", { month: formatMonthLabel(selectedMonth, t) })}
                       </td>
                     </tr>
                   ) : (
@@ -471,7 +532,7 @@ export default function WorkHoursPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-center text-sm text-zinc-500">
-            {t("No work hours logged yet.")}
+            {t("No hours logged in this month.")}
           </div>
         ) : (
           /* ── Log view ── */
