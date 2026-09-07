@@ -373,7 +373,11 @@ async function checkConnections(admin: SupabaseClient | null): Promise<Check[]> 
     }
   }
 
-  /* Resend: ask the API whether the key is live rather than guessing. */
+  /* Resend: ask the API whether the key is live rather than guessing, and
+     whether the sender address can actually deliver to farmers. */
+  const emailFrom = process.env.EMAIL_FROM?.trim() ?? "";
+  const fromAddress = (emailFrom.match(/<([^>]+)>/)?.[1] ?? emailFrom).trim().toLowerCase();
+  const fromDomain = fromAddress.split("@")[1] ?? "";
   if (resendKey) {
     const { result, error, ms } = await timed(async () => {
       const res = await fetch("https://api.resend.com/domains", {
@@ -381,20 +385,37 @@ async function checkConnections(admin: SupabaseClient | null): Promise<Check[]> 
         cache: "no-store",
         signal: AbortSignal.timeout(8000),
       });
-      return res.status;
+      const body = res.status === 200 ? ((await res.json()) as { data?: { name?: string; status?: string }[] }) : null;
+      const verified = (body?.data ?? []).filter((d) => d.status === "verified").map((d) => (d.name ?? "").toLowerCase());
+      return { status: res.status, verified };
     });
+    let status: Status;
+    let detail: string;
+    if (error || !result) {
+      status = "fail";
+      detail = message(error ?? "No answer from Resend");
+    } else if (result.status === 401 || result.status === 403) {
+      status = "fail";
+      detail = "Key rejected (401/403) — regenerate it in Resend";
+    } else if (result.status !== 200) {
+      status = "warn";
+      detail = `Resend answered ${result.status}`;
+    } else if (!fromDomain || fromDomain === "resend.dev") {
+      status = "warn";
+      detail = `Key accepted, but the sender is ${fromAddress || "onboarding@resend.dev"}, which Resend only delivers to your own inbox. Set EMAIL_FROM to an address on a verified domain${result.verified.length ? ` (verified: ${result.verified.join(", ")})` : " — none is verified yet"}.`;
+    } else if (!result.verified.includes(fromDomain)) {
+      status = "fail";
+      detail = `Key accepted, but EMAIL_FROM uses ${fromDomain}, which is not verified in Resend${result.verified.length ? ` (verified: ${result.verified.join(", ")})` : " — no domain is verified yet"}. Add the domain in Resend and finish its DNS records.`;
+    } else {
+      status = "ok";
+      detail = `Key accepted; sending as ${emailFrom} from verified domain ${fromDomain}`;
+    }
     checks.push({
       key: "resend",
       label: "Resend email API",
-      status: error ? "fail" : result === 200 ? "ok" : result === 401 || result === 403 ? "fail" : "warn",
-      detail: error
-        ? message(error)
-        : result === 200
-          ? "Key accepted"
-          : result === 401 || result === 403
-            ? "Key rejected (401/403) — regenerate it in Resend"
-            : `Resend answered ${result}`,
-      impact: "New-signup and join-request emails go through this.",
+      status,
+      detail,
+      impact: "Password reset, new-signup and join-request emails go through this. Resets fall back to Supabase's email when it refuses.",
       ms,
     });
   } else {
@@ -403,7 +424,7 @@ async function checkConnections(admin: SupabaseClient | null): Promise<Check[]> 
       label: "Resend email API",
       status: "warn",
       detail: "Not configured — RESEND_API_KEY is unset",
-      impact: "New-signup and join-request emails go through this.",
+      impact: "Password reset emails come from Supabase; new-signup and join-request emails are never sent.",
     });
   }
 

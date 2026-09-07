@@ -130,8 +130,12 @@ export async function POST(request: Request) {
   const message = renderEmail(lang, link);
   const sent = await sendEmail({ to: email, ...message });
   if (sent.error) {
+    /* Resend refused (unverified domain, test sender, quota). Answer 503 so
+       the page falls back to Supabase's own reset email and the farmer still
+       gets a link. The admin system page reports the reason. */
     console.error("[forgot-password] send failed:", sent.error);
-    return NextResponse.json({ error: "Could not send the reset email" }, { status: 502 });
+    recent.delete(email);
+    return NextResponse.json({ error: "Email provider refused the message", detail: sent.error }, { status: 503 });
   }
 
   return NextResponse.json({ ok: true });
