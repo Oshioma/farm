@@ -1111,6 +1111,55 @@ export type WorkHoursEntry = {
   created_at: string | null;
 };
 
+export type WorkHoursMonth = { month: string; operational: number; manager: number; total: number; entries: number };
+
+/* Hours per month for the whole history, fetched as three small columns in
+   pages of 1000 so a long log stays quick and never hits the row cap. */
+export async function getWorkHoursMonths(farmId: string): Promise<WorkHoursMonth[]> {
+  const totals = new Map<string, WorkHoursMonth>();
+  const page = 1000;
+  for (let from = 0; ; from += page) {
+    const { data, error } = await supabase
+      .from("work_hours")
+      .select("date, hours, role")
+      .eq("farm_id", farmId)
+      .order("date", { ascending: false })
+      .range(from, from + page - 1);
+    if (error) throw new Error(`getWorkHoursMonths failed: ${error.message}`);
+    const rows = (data ?? []) as { date: string | null; hours: number | null; role: string | null }[];
+    for (const row of rows) {
+      const month = row.date?.slice(0, 7);
+      if (!month) continue;
+      const cur = totals.get(month) ?? { month, operational: 0, manager: 0, total: 0, entries: 0 };
+      const hours = Number(row.hours) || 0;
+      if (row.role === "manager") cur.manager += hours;
+      else cur.operational += hours;
+      cur.total += hours;
+      cur.entries += 1;
+      totals.set(month, cur);
+    }
+    if (rows.length < page) break;
+  }
+  return Array.from(totals.values()).sort((a, b) => b.month.localeCompare(a.month));
+}
+
+/* Every entry in one month (YYYY-MM), newest first. */
+export async function getWorkHoursForMonth(farmId: string, month: string): Promise<WorkHoursEntry[]> {
+  const [y, m] = month.split("-").map(Number);
+  const start = `${month}-01`;
+  const next = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
+  const { data, error } = await supabase
+    .from("work_hours")
+    .select("id, farm_id, date, worker_name, hours, role, notes, created_at")
+    .eq("farm_id", farmId)
+    .gte("date", start)
+    .lt("date", next)
+    .order("date", { ascending: false })
+    .range(0, 4999);
+  if (error) throw new Error(`getWorkHoursForMonth failed: ${error.message}`);
+  return (data ?? []) as WorkHoursEntry[];
+}
+
 export async function getWorkHours(farmId: string): Promise<WorkHoursEntry[]> {
   const { data, error } = await supabase
     .from("work_hours")
