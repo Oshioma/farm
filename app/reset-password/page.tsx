@@ -18,8 +18,18 @@ function ResetPasswordInner() {
   const [userEmail, setUserEmail] = useState("");
   const router = useRouter();
   const searchParams = useSearchParams();
+  /* A link from the app's own reset email carries the recovery token. It is
+     only handed to Supabase when the farmer submits the form, so opening the
+     link on another device, or a mail scanner following it, spends nothing. */
+  const tokenHash = searchParams.get("token_hash");
 
   useEffect(() => {
+    if (tokenHash) {
+      setReady(true);
+      setChecking(false);
+      return;
+    }
+
     // Check for Supabase error query params (e.g. expired link redirect)
     const errorDesc = searchParams.get("error_description");
     if (errorDesc) {
@@ -36,7 +46,7 @@ function ResetPasswordInner() {
       }
       setChecking(false);
     });
-  }, [searchParams]);
+  }, [searchParams, tokenHash]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -50,6 +60,17 @@ function ResetPasswordInner() {
     }
     setLoading(true);
     setError("");
+
+    if (tokenHash) {
+      const { error: verifyError } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "recovery" });
+      if (verifyError) {
+        /* The token was used already or has run out: send the farmer to ask for a fresh link. */
+        setReady(false);
+        setError(t("This reset link is invalid or has expired."));
+        setLoading(false);
+        return;
+      }
+    }
 
     const { error: updateError } = await supabase.auth.updateUser({ password });
 
