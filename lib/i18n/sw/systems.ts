@@ -143,6 +143,10 @@ export const systems: Record<string, string> = {
   "Sending...": "Inatuma...",
   "Send reset link": "Tuma kiungo cha kuweka upya",
   "Back to sign in": "Rudi kwenye kuingia",
+  "Could not send the reset email. Please try again.": "Barua pepe ya kuweka upya haikutumwa. Tafadhali jaribu tena.",
+  "Enter a valid email address": "Weka anwani sahihi ya barua pepe",
+  "Could not create a reset link": "Kiungo cha kuweka upya hakikuundwa",
+  "Could not send the reset email": "Barua pepe ya kuweka upya haikutumwa",
 
   /* Reset password */
   "Passwords do not match.": "Manenosiri hayalingani.",

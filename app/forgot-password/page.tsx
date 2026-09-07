@@ -19,6 +19,29 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     setError("");
 
+    /* The app sends its own reset email (see /api/auth/forgot-password). Its
+       link carries a token that works from any device. Supabase's own email
+       is only used when the server has no email provider configured. */
+    try {
+      const response = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, lang }),
+      });
+      if (response.ok) {
+        setSent(true);
+        return;
+      }
+      if (response.status !== 503) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        setError(body?.error ? t(body.error) : t("Could not send the reset email. Please try again."));
+        setLoading(false);
+        return;
+      }
+    } catch {
+      /* Network trouble: fall through to Supabase's email below. */
+    }
+
     const { error: authError } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth/callback`,
     });
