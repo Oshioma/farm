@@ -184,12 +184,17 @@ export function Shopfront({ shop }: { shop: ShopData }) {
         }}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 22, alignItems: "flex-start" }}>
-          <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: OCHRE }}>
-            {shop.farm.name}{shop.farm.location ? ` · ${shop.farm.location}` : ""}
-          </span>
-          <h1 style={{ fontFamily: serif, fontWeight: 400, fontSize: "clamp(38px, 5vw, 60px)", lineHeight: 1.05, letterSpacing: "-0.02em", margin: 0, textWrap: "pretty" }}>
-            {t("Claim your share before it is picked.")}
+          {shop.farm.location && (
+            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: OCHRE }}>
+              {shop.farm.location}
+            </span>
+          )}
+          <h1 style={{ fontFamily: sans, fontWeight: 800, fontSize: "clamp(52px, 8vw, 96px)", lineHeight: 0.98, letterSpacing: "-0.035em", margin: 0, color: DEEP, textWrap: "balance" }}>
+            {shop.farm.name}
           </h1>
+          <p style={{ fontFamily: serif, fontWeight: 400, fontSize: "clamp(24px, 3vw, 34px)", lineHeight: 1.15, letterSpacing: "-0.01em", margin: 0, textWrap: "pretty" }}>
+            {t("Claim your share before it is picked.")}
+          </p>
           <p style={{ fontSize: 18, lineHeight: 1.6, color: "#57534e", maxWidth: "46ch", margin: 0, textWrap: "pretty" }}>
             {t("Everything on this page is already in the ground with a harvest expected against it. Reserve the kilos you want, and collect them the week they come out.")}
           </p>
