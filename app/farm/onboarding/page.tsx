@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, ChevronRight, ExternalLink, Sprout } from "lucide-react";
+import { Check, ChevronRight, ExternalLink, Pencil, Sprout } from "lucide-react";
 import {
   getCrops,
   getFarms,
@@ -30,12 +30,13 @@ const copy = {
     joinInstead: "Joining a farm that already exists? Request access instead",
     complete: "complete", done: "Done", review: "Review", continue: "Continue",
     farmName: "Farm name", location: "Location", saveDetails: "Save and continue", savingDetails: "Saving…",
+    changeName: "Change name", keepName: "Keep this name",
     locationPlaceholder: "Village, district or region",
-    cropName: "Crop name", variety: "Variety", plantedOn: "Planted on", expectedHarvestStart: "Expected harvest date", expectedKg: "Expected kilograms", pricePerKg: "Expected price per kg",
-    optional: "optional", addCrop: "Add crop", addingCrop: "Adding…", cropsSoFar: "Crops on this farm", addAnotherCrop: "Add another crop", kg: "kg",
+    cropName: "Crop name", variety: "Variety", expectedHarvestStart: "Expected harvest date", expectedKg: "Expected kilograms", pricePerKg: "Expected price per kg",
+    optional: "optional", addCrop: "Add crop and go to shop", addingCrop: "Adding crop and opening your shop…", cropsSoFar: "Crops on this farm", addAnotherCrop: "Add another crop", kg: "kg",
     cropPlaceholder: "e.g. Tomatoes", varietyPlaceholder: "e.g. Roma",
     openShop: "Continue to my shop", opening: "Opening your shop…", openShopBody: "Your shop goes live and buyers can reserve the crops above. You can add photos, prices and delivery details afterwards.",
-    detailsHint: "Farm name and location are needed to continue.",
+    detailsHint: "Add a location to continue.",
     cropHint: "Crop name, expected harvest date and expected kilograms are needed.",
     skip: "Skip setup for now and go to the farm dashboard",
     live: "Your shop is live", open: "Open shop",
@@ -52,12 +53,13 @@ const copy = {
     joinInstead: "Unajiunga na shamba lililopo? Omba ruhusa badala yake",
     complete: "zimekamilika", done: "Imekamilika", review: "Kagua", continue: "Endelea",
     farmName: "Jina la shamba", location: "Eneo", saveDetails: "Hifadhi na uendelee", savingDetails: "Inahifadhi…",
+    changeName: "Badilisha jina", keepName: "Baki na jina hili",
     locationPlaceholder: "Kijiji, wilaya au mkoa",
-    cropName: "Jina la zao", variety: "Aina", plantedOn: "Tarehe ya kupanda", expectedHarvestStart: "Tarehe ya mavuno inayotarajiwa", expectedKg: "Kilo zinazotarajiwa", pricePerKg: "Bei inayotarajiwa kwa kilo",
-    optional: "hiari", addCrop: "Ongeza zao", addingCrop: "Inaongeza…", cropsSoFar: "Mazao ya shamba hili", addAnotherCrop: "Ongeza zao lingine", kg: "kg",
+    cropName: "Jina la zao", variety: "Aina", expectedHarvestStart: "Tarehe ya mavuno inayotarajiwa", expectedKg: "Kilo zinazotarajiwa", pricePerKg: "Bei inayotarajiwa kwa kilo",
+    optional: "hiari", addCrop: "Ongeza zao na uende dukani", addingCrop: "Inaongeza zao na kufungua duka lako…", cropsSoFar: "Mazao ya shamba hili", addAnotherCrop: "Ongeza zao lingine", kg: "kg",
     cropPlaceholder: "mf. Nyanya", varietyPlaceholder: "mf. Roma",
     openShop: "Endelea kwenye duka langu", opening: "Inafungua duka lako…", openShopBody: "Duka lako linaingia hewani na wanunuzi wanaweza kuagiza mazao yaliyo hapo juu. Unaweza kuongeza picha, bei na maelezo ya usafirishaji baadaye.",
-    detailsHint: "Jina la shamba na eneo vinahitajika ili kuendelea.",
+    detailsHint: "Weka eneo ili kuendelea.",
     cropHint: "Jina la zao, tarehe ya mavuno inayotarajiwa na kilo zinazotarajiwa vinahitajika.",
     skip: "Ruka maandalizi kwa sasa na uende kwenye dashibodi ya shamba",
     live: "Duka lako liko hewani", open: "Fungua duka",
@@ -72,7 +74,7 @@ const inputClass = "mt-1.5 block w-full rounded-xl border border-zinc-300 bg-whi
 const primaryButton = "rounded-full bg-emerald-700 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50";
 const secondaryButton = "rounded-full border border-emerald-700 px-5 py-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50";
 
-const blankCrop = { name: "", variety: "", plantedOn: "", expectedHarvestStart: "", expectedKg: "", pricePerKg: "" };
+const blankCrop = { name: "", variety: "", expectedHarvestStart: "", expectedKg: "", pricePerKg: "" };
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -103,6 +105,8 @@ export default function FarmerOnboardingPage() {
 
   const [detailsForm, setDetailsForm] = useState({ name: "", location: "" });
   const [savingDetails, setSavingDetails] = useState(false);
+  /* The farm name is shown as text; the input only appears on "Change name". */
+  const [editingName, setEditingName] = useState(false);
 
   const [cropForm, setCropForm] = useState(blankCrop);
   const [savingCrop, setSavingCrop] = useState(false);
@@ -151,6 +155,7 @@ export default function FarmerOnboardingPage() {
   useEffect(() => {
     if (!farm) return;
     setDetailsForm({ name: farm.name, location: farm.location ?? "" });
+    setEditingName(false);
     setActiveStep(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [farm?.id]);
@@ -206,6 +211,7 @@ export default function FarmerOnboardingPage() {
       setError(updateError.message);
     } else {
       setFarms((current) => current.map((item) => item.id === farm.id ? { ...item, name, location } : item));
+      setEditingName(false);
       goToStep(1);
     }
     setSavingDetails(false);
@@ -229,8 +235,8 @@ export default function FarmerOnboardingPage() {
         extra_zone_ids: null,
         crop_name: cropName,
         variety: cropForm.variety.trim() || null,
-        status: cropForm.plantedOn ? "planted" : "planned",
-        planted_on: cropForm.plantedOn || null,
+        status: "planned",
+        planted_on: null,
         expected_harvest_start: cropForm.expectedHarvestStart,
         estimated_yield_kg: kg,
         expected_sale_price_per_kg: cropForm.pricePerKg ? Number(cropForm.pricePerKg) : null,
@@ -264,6 +270,8 @@ export default function FarmerOnboardingPage() {
       setHarvests(harvestRows);
       setCropForm(blankCrop);
       setShowCropForm(false);
+      /* The first save goes straight to the shop; no second click needed. */
+      if (listing.slug) await openShop();
     } catch (err) {
       setError(errMsg(err, "Failed to add crop"));
     } finally {
@@ -378,7 +386,17 @@ export default function FarmerOnboardingPage() {
             {/* Step 1: farm name and location */}
             {stepCard(0, (
               <form onSubmit={saveFarmDetails} className="grid gap-4">
-                <label className="text-sm font-medium text-zinc-700">{t.farmName}<input required value={detailsForm.name} onChange={(event) => setDetailsForm((current) => ({ ...current, name: event.target.value }))} className={inputClass} /></label>
+                {editingName ? (
+                  <div>
+                    <label className="text-sm font-medium text-zinc-700">{t.farmName}<input required autoFocus value={detailsForm.name} onChange={(event) => setDetailsForm((current) => ({ ...current, name: event.target.value }))} className={inputClass} /></label>
+                    <button type="button" onClick={() => { setDetailsForm((current) => ({ ...current, name: farm.name })); setEditingName(false); }} className="mt-2 text-sm font-semibold text-emerald-800 hover:underline">{t.keepName}</button>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <p className="text-2xl font-bold tracking-tight text-zinc-950">{detailsForm.name || farm.name}</p>
+                    <button type="button" onClick={() => setEditingName(true)} className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-800 hover:underline"><Pencil className="h-3.5 w-3.5" />{t.changeName}</button>
+                  </div>
+                )}
                 <label className="text-sm font-medium text-zinc-700">{t.location}<input required value={detailsForm.location} onChange={(event) => setDetailsForm((current) => ({ ...current, location: event.target.value }))} placeholder={t.locationPlaceholder} className={inputClass} /></label>
                 <div>
                   <button type="submit" disabled={savingDetails || !detailsForm.name.trim() || !detailsForm.location.trim()} className={"w-full sm:w-auto " + primaryButton}>{savingDetails ? t.savingDetails : t.saveDetails}</button>
@@ -410,12 +428,11 @@ export default function FarmerOnboardingPage() {
                   <form onSubmit={addCrop} className="grid gap-4 sm:grid-cols-2">
                     <label className="text-sm font-medium text-zinc-700">{t.cropName}<input required value={cropForm.name} onChange={(event) => setCropForm((current) => ({ ...current, name: event.target.value }))} placeholder={t.cropPlaceholder} className={inputClass} /></label>
                     <label className="text-sm font-medium text-zinc-700">{t.variety} <span className="font-normal text-zinc-400">({t.optional})</span><input value={cropForm.variety} onChange={(event) => setCropForm((current) => ({ ...current, variety: event.target.value }))} placeholder={t.varietyPlaceholder} className={inputClass} /></label>
-                    <label className="text-sm font-medium text-zinc-700">{t.plantedOn} <span className="font-normal text-zinc-400">({t.optional})</span><input type="date" value={cropForm.plantedOn} onChange={(event) => setCropForm((current) => ({ ...current, plantedOn: event.target.value }))} className={inputClass} /></label>
                     <label className="text-sm font-medium text-zinc-700">{t.expectedHarvestStart}<input required type="date" value={cropForm.expectedHarvestStart} onChange={(event) => setCropForm((current) => ({ ...current, expectedHarvestStart: event.target.value }))} className={inputClass} /></label>
                     <label className="text-sm font-medium text-zinc-700">{t.expectedKg}<input required type="number" min="0.1" step="0.1" value={cropForm.expectedKg} onChange={(event) => setCropForm((current) => ({ ...current, expectedKg: event.target.value }))} className={inputClass} /></label>
                     <label className="text-sm font-medium text-zinc-700">{t.pricePerKg} <span className="font-normal text-zinc-400">({t.optional})</span><input type="number" min="0" step="0.01" value={cropForm.pricePerKg} onChange={(event) => setCropForm((current) => ({ ...current, pricePerKg: event.target.value }))} className={inputClass} /></label>
                     <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
-                      <button type="submit" disabled={savingCrop || !cropFormReady} className={primaryButton}>{savingCrop ? t.addingCrop : t.addCrop}</button>
+                      <button type="submit" disabled={savingCrop || opening || !cropFormReady} className={primaryButton}>{savingCrop || opening ? t.addingCrop : t.addCrop}<ChevronRight className="ml-1 inline h-4 w-4" /></button>
                       {crops.length > 0 && <button type="button" onClick={() => setShowCropForm(false)} className={secondaryButton}>{t.continue}</button>}
                     </div>
                     {!cropFormReady && <p className="text-xs text-zinc-500 sm:col-span-2">{t.cropHint}</p>}
