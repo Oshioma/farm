@@ -2143,6 +2143,10 @@ export default function FarmPage() {
 
             <LunarPlanner embedded farmId={activeFarmId} members={members} />
 
+            <div className="mb-6">
+              <ActivityFeed activities={activities} />
+            </div>
+
             <section className="mb-6 grid gap-4 sm:grid-cols-3">
               <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
@@ -3051,7 +3055,6 @@ export default function FarmPage() {
                     </div>
                   )}
                 </div>
-              <ActivityFeed activities={activities} />
             </div>
 
             {isManager && (
