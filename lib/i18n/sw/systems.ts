@@ -134,6 +134,7 @@ export const systems: Record<string, string> = {
   "Monitor soil, compost, and seedling progress over time": "Kufuatilia udongo, mboji, na maendeleo ya miche kadri muda unavyopita",
   "Open Farm Manager": "Fungua Msimamizi wa Shamba",
   "Create your farm": "Anzisha shamba lako",
+  "Sign up with WhatsApp": "Jisajili kwa WhatsApp",
 
   /* Forgot password */
   "Reset password": "Weka upya nenosiri",

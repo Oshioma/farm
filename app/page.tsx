@@ -64,6 +64,12 @@ export default function HomePage() {
           >
             {t("Create your farm")}
           </Link>
+          <Link
+            href="/jisajili"
+            className="inline-flex items-center justify-center rounded-2xl bg-emerald-700 px-7 py-4 text-base font-semibold text-white transition hover:-translate-y-0.5 hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+          >
+            {t("Sign up with WhatsApp")}
+          </Link>
         </div>
       </section>
     </main>

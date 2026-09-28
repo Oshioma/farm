@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, ChevronRight, ExternalLink } from "lucide-react";
+import Link from "next/link";
+import { Check, ChevronRight, ExternalLink, KeyRound } from "lucide-react";
 import type { InviteState } from "@/lib/invites";
 import { useLanguage } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/LanguageToggle";
@@ -40,6 +41,18 @@ const copy = {
     entering: "Opening your farm…",
     step: (n: number) => `Step ${n} of 3`,
     error: "Something went wrong. Please try again.",
+    pinQ: "Choose a 4-number PIN",
+    pinHint: "You will sign in with your phone number and this PIN next time. Keep it secret.",
+    pinAgain: "Type the PIN again",
+    pinMismatch: "The two PINs are different.",
+    pinSet: "Set a PIN to sign in",
+    pinChange: "Change my PIN",
+    pinSave: "Save PIN",
+    pinSaved: "PIN saved.",
+    pinMissing: "You have no PIN yet. Choose one now so you can sign in later with your phone number.",
+    nextTime: "Next time, sign in with your phone number and PIN:",
+    signInPin: "Sign in with my number",
+    expiredBody: "This link no longer signs you in. Use your phone number and PIN instead.",
   },
   sw: {
     brand: "Shamba Online",
@@ -69,6 +82,18 @@ const copy = {
     entering: "Inafungua shamba lako…",
     step: (n: number) => `Hatua ${n} kati ya 3`,
     error: "Kuna hitilafu imetokea. Tafadhali jaribu tena.",
+    pinQ: "Chagua PIN ya tarakimu 4",
+    pinHint: "Utaingia kwa namba yako ya simu na PIN hii wakati ujao. Usimwambie mtu.",
+    pinAgain: "Andika PIN tena",
+    pinMismatch: "PIN mbili hazilingani.",
+    pinSet: "Weka PIN ya kuingia",
+    pinChange: "Badilisha PIN yangu",
+    pinSave: "Hifadhi PIN",
+    pinSaved: "PIN imehifadhiwa.",
+    pinMissing: "Bado huna PIN. Chagua moja sasa ili uweze kuingia baadaye kwa namba yako ya simu.",
+    nextTime: "Wakati ujao, ingia kwa namba yako ya simu na PIN:",
+    signInPin: "Ingia kwa namba yangu",
+    expiredBody: "Kiungo hiki hakikuingizi tena. Tumia namba yako ya simu na PIN.",
   },
 };
 
@@ -77,6 +102,33 @@ const primary = "inline-flex items-center justify-center gap-1 rounded-full bg-e
 const secondary = "inline-flex items-center justify-center gap-1 rounded-full border border-emerald-700 px-6 py-4 text-base font-semibold text-emerald-800 hover:bg-emerald-50";
 
 const blankCrop = { name: "", variety: "", harvestDate: "", expectedKg: "", pricePerKg: "" };
+
+const onlyDigits = (value: string) => value.replace(/\D/g, "").slice(0, 4);
+
+/** A PIN typed twice. Big numeric boxes, hidden like a mobile-money PIN. */
+function PinFields({ t, pin, again, setPin, setAgain }: {
+  t: (typeof copy)["en"];
+  pin: string;
+  again: string;
+  setPin: (value: string) => void;
+  setAgain: (value: string) => void;
+}) {
+  const pinInput = input + " tracking-[0.5em]";
+  return (
+    <div className="space-y-3">
+      <label className="block text-sm font-medium text-zinc-700">
+        {t.pinQ}
+        <input required type="password" inputMode="numeric" pattern="\d{4}" maxLength={4} autoComplete="new-password" value={pin} onChange={(event) => setPin(onlyDigits(event.target.value))} placeholder="••••" className={pinInput} />
+      </label>
+      <label className="block text-sm font-medium text-zinc-700">
+        {t.pinAgain}
+        <input required type="password" inputMode="numeric" pattern="\d{4}" maxLength={4} autoComplete="new-password" value={again} onChange={(event) => setAgain(onlyDigits(event.target.value))} placeholder="••••" className={pinInput} />
+      </label>
+      <p className="text-xs text-zinc-500">{t.pinHint}</p>
+      {pin.length === 4 && again.length === 4 && pin !== again && <p className="text-xs font-medium text-red-700">{t.pinMismatch}</p>}
+    </div>
+  );
+}
 
 export function StartWizard({ initial }: { initial: InviteState }) {
   const [state, setState] = useState<InviteState>(initial);
@@ -87,6 +139,10 @@ export function StartWizard({ initial }: { initial: InviteState }) {
   const [showCropForm, setShowCropForm] = useState(initial.crops.length === 0);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [pin, setPin] = useState("");
+  const [pinAgain, setPinAgain] = useState("");
+  const [showPinForm, setShowPinForm] = useState(false);
+  const [pinSaved, setPinSaved] = useState(false);
 
   /* The sender chose the language for this farmer; honour it on first open. */
   useEffect(() => {
@@ -120,8 +176,12 @@ export function StartWizard({ initial }: { initial: InviteState }) {
 
   async function saveFarm(event: React.FormEvent) {
     event.preventDefault();
-    const next = await post("farm", { name: farmName.trim() });
-    if (next) setState(next);
+    const next = await post("farm", state.hasPin ? { name: farmName.trim() } : { name: farmName.trim(), pin });
+    if (next) {
+      setState(next);
+      setPin("");
+      setPinAgain("");
+    }
   }
 
   async function saveLocation(event: React.FormEvent) {
@@ -153,6 +213,17 @@ export function StartWizard({ initial }: { initial: InviteState }) {
     window.location.href = data?.url ?? `${window.location.origin}/${slug}`;
   }
 
+  async function savePin(event: React.FormEvent) {
+    event.preventDefault();
+    const next = await post("pin", { pin });
+    if (!next) return;
+    setState(next);
+    setPin("");
+    setPinAgain("");
+    setShowPinForm(false);
+    setPinSaved(true);
+  }
+
   async function enterFarm() {
     const data = await post("enter", { next: "/farm/prepare" });
     if (data?.url) window.location.href = data.url;
@@ -160,10 +231,15 @@ export function StartWizard({ initial }: { initial: InviteState }) {
 
   async function viewShop() {
     if (!state.farm) return;
+    if (!state.linkActive) {
+      window.location.href = shopLink;
+      return;
+    }
     const data = await post("enter", { next: `/${state.farm.slug}` });
     window.location.href = data?.url ?? shopLink;
   }
 
+  const pinReady = pin.length === 4 && pin === pinAgain;
   const cropReady = !!crop.name.trim() && !!crop.harvestDate && Number(crop.expectedKg) > 0;
   const stepNumber = state.step === "farm" ? 1 : state.step === "location" ? 2 : 3;
 
@@ -190,8 +266,13 @@ export function StartWizard({ initial }: { initial: InviteState }) {
               <p className="text-sm text-zinc-500">{t.hello(state.farmerName)}</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-tight">{t.farmQ}</h1>
               <input autoFocus required value={farmName} onChange={(event) => setFarmName(event.target.value)} placeholder={t.farmPlaceholder} className={input} />
-              <button type="submit" disabled={busy === "farm" || !farmName.trim()} className={"mt-5 w-full " + primary}>{busy === "farm" ? t.saving : t.next}<ChevronRight className="h-5 w-5" /></button>
-              {!farmName.trim() && <p className="mt-2 text-xs text-zinc-500">{t.need}</p>}
+              {!state.hasPin && (
+                <div className="mt-5 border-t border-zinc-100 pt-5">
+                  <PinFields t={t} pin={pin} again={pinAgain} setPin={setPin} setAgain={setPinAgain} />
+                </div>
+              )}
+              <button type="submit" disabled={busy === "farm" || !farmName.trim() || (!state.hasPin && !pinReady)} className={"mt-5 w-full " + primary}>{busy === "farm" ? t.saving : t.next}<ChevronRight className="h-5 w-5" /></button>
+              {(!farmName.trim() || (!state.hasPin && !pinReady)) && <p className="mt-2 text-xs text-zinc-500">{t.need}</p>}
             </form>
           )}
 
@@ -257,7 +338,37 @@ export function StartWizard({ initial }: { initial: InviteState }) {
                   className={secondary}
                   copyClassName="inline-flex items-center justify-center gap-1 text-sm font-semibold text-zinc-600 hover:text-zinc-900"
                 />
-                <button type="button" onClick={enterFarm} disabled={busy === "enter"} className="text-sm font-semibold text-emerald-800 hover:underline">{busy === "enter" ? t.entering : t.enterFarm}</button>
+                {state.linkActive && (
+                  <button type="button" onClick={enterFarm} disabled={busy === "enter"} className="text-sm font-semibold text-emerald-800 hover:underline">{busy === "enter" ? t.entering : t.enterFarm}</button>
+                )}
+              </div>
+
+              <div className="mt-6 rounded-2xl border border-zinc-200 bg-stone-50 p-4">
+                {state.linkActive ? (
+                  <>
+                    {!state.hasPin && <p className="mb-3 text-sm font-medium text-amber-800">{t.pinMissing}</p>}
+                    {pinSaved && <p className="mb-3 text-sm font-medium text-emerald-800">{t.pinSaved}</p>}
+                    {showPinForm || !state.hasPin ? (
+                      <form onSubmit={savePin} className="space-y-4">
+                        <PinFields t={t} pin={pin} again={pinAgain} setPin={setPin} setAgain={setPinAgain} />
+                        <button type="submit" disabled={busy === "pin" || !pinReady} className={"w-full " + primary}>{busy === "pin" ? t.saving : t.pinSave}</button>
+                      </form>
+                    ) : (
+                      <>
+                        <p className="text-sm text-zinc-600">{t.nextTime}</p>
+                        <div className="mt-3 flex flex-wrap items-center gap-3">
+                          <Link href="/ingia" className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-800 hover:underline"><KeyRound className="h-4 w-4" /> {t.signInPin}</Link>
+                          <button type="button" onClick={() => { setShowPinForm(true); setPinSaved(false); }} className="text-sm font-semibold text-zinc-600 hover:text-zinc-900">{t.pinChange}</button>
+                        </div>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-zinc-600">{t.expiredBody}</p>
+                    <Link href="/ingia" className={"mt-3 w-full " + primary}><KeyRound className="h-5 w-5" /> {t.signInPin}</Link>
+                  </>
+                )}
               </div>
             </div>
           )}

@@ -58,3 +58,10 @@ export function inviteMessage(lang: InviteLang, vars: Vars): string {
 export function nudgeMessage(lang: InviteLang, step: InviteStep, vars: Vars): string {
   return messages[lang][step](vars);
 }
+
+/** Sent with a renewed link when a farmer forgot their PIN or has none yet. */
+export function pinMessage(lang: InviteLang, vars: Vars): string {
+  return lang === "sw"
+    ? `Habari ${vars.name}, bonyeza kiungo hiki uchague PIN mpya ya kuingia Shamba Online. Kiungo kinafanya kazi kwa siku 14:\n${vars.link}\nBaadaye ingia kwa namba yako ya simu na PIN.`
+    : `Hello ${vars.name}, tap this link to choose a new PIN for Shamba Online. The link works for 14 days:\n${vars.link}\nAfter that, sign in with your phone number and PIN.`;
+}
