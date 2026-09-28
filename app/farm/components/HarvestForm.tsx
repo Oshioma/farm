@@ -2,12 +2,20 @@
 
 import { useState, useEffect } from "react";
 import type { Zone, Crop } from "@/lib/farm";
+import { isCountedCrop } from "@/lib/harvest";
 import { useT } from "@/lib/i18n";
+
+export type HarvestUnitMode = "units" | "kg";
 
 export type HarvestFormData = {
   crop_id: string;
   zone_id: string;
   harvest_date: string;
+  /** How the farmer is recording this harvest — a count or a weight. */
+  unit_mode: HarvestUnitMode;
+  /** Pieces picked; used when unit_mode is "units". */
+  quantity_units: string;
+  /** Kilos; required for "kg", optional alongside a count. */
   quantity_kg: string;
   quality: string;
   notes: string;
@@ -17,10 +25,17 @@ const blank: HarvestFormData = {
   crop_id: "",
   zone_id: "",
   harvest_date: "",
+  unit_mode: "kg",
+  quantity_units: "",
   quantity_kg: "",
   quality: "standard",
   notes: "",
 };
+
+/* Counted crops (mangoes, watermelons) start on a count; everything else on kilos. */
+function modeFor(crop: Crop | null | undefined): HarvestUnitMode {
+  return isCountedCrop(crop?.crop_name) ? "units" : "kg";
+}
 
 type Props = {
   zones: Zone[];
@@ -35,23 +50,49 @@ export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubm
   const [form, setForm] = useState<HarvestFormData>(blank);
   const [saving, setSaving] = useState(false);
 
+  const selectedCrop = crops.find((c) => c.id === form.crop_id) ?? null;
+  const canCount = isCountedCrop(selectedCrop?.crop_name);
+  const counting = canCount && form.unit_mode === "units";
+
   useEffect(() => {
     if (defaultCropId) {
       setForm((prev) =>
         prev.crop_id
           ? prev
-          : { ...prev, crop_id: defaultCropId, zone_id: defaultZoneId }
+          : {
+              ...prev,
+              crop_id: defaultCropId,
+              zone_id: defaultZoneId,
+              unit_mode: modeFor(crops.find((c) => c.id === defaultCropId)),
+            }
       );
     }
-  }, [defaultCropId, defaultZoneId]);
+  }, [defaultCropId, defaultZoneId, crops]);
+
+  function stepCount(delta: number) {
+    setForm((prev) => {
+      const current = Math.max(0, Math.floor(Number(prev.quantity_units) || 0));
+      const next = Math.max(0, current + delta);
+      return { ...prev, quantity_units: next ? String(next) : "" };
+    });
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const ok = await onSubmit(form);
+    /* A crop that cannot be counted is always recorded in kilos, whatever
+       mode was left over from a previously selected crop. */
+    const ok = await onSubmit(canCount ? form : { ...form, unit_mode: "kg", quantity_units: "" });
     setSaving(false);
     if (ok) setForm(blank);
   }
+
+  const inputClass =
+    "w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900";
+  const toggleClass = (active: boolean) =>
+    `flex-1 rounded-xl px-4 py-2.5 text-sm font-medium transition ${
+      active ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:text-zinc-900"
+    }`;
 
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
@@ -73,9 +114,12 @@ export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubm
                 ...prev,
                 crop_id: e.target.value,
                 zone_id: selected?.zone_id ?? "",
+                unit_mode: modeFor(selected),
+                quantity_units: "",
+                quantity_kg: "",
               }));
             }}
-            className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+            className={inputClass}
             required
           >
             <option value="">{t("Select crop")}</option>
@@ -93,7 +137,7 @@ export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubm
           <select
             value={form.zone_id}
             onChange={(e) => setForm((prev) => ({ ...prev, zone_id: e.target.value }))}
-            className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+            className={inputClass}
           >
             <option value="">{t("No bed")}</option>
             {zones.map((zone) => (
@@ -110,31 +154,120 @@ export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubm
             type="date"
             value={form.harvest_date}
             onChange={(e) => setForm((prev) => ({ ...prev, harvest_date: e.target.value }))}
-            className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+            className={inputClass}
             required
           />
         </div>
 
-        <div>
-          <label className="mb-2 block text-sm font-medium">{t("Quantity (kg)")}</label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={form.quantity_kg}
-            onChange={(e) => setForm((prev) => ({ ...prev, quantity_kg: e.target.value }))}
-            className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            placeholder="120"
-            required
-          />
-        </div>
+        {canCount && (
+          <div>
+            <label className="mb-2 block text-sm font-medium">{t("Record by")}</label>
+            <div className="flex gap-1 rounded-2xl bg-zinc-100 p-1">
+              <button
+                type="button"
+                onClick={() => setForm((prev) => ({ ...prev, unit_mode: "units" }))}
+                className={toggleClass(form.unit_mode === "units")}
+                aria-pressed={form.unit_mode === "units"}
+              >
+                {t("Count (pieces)")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm((prev) => ({ ...prev, unit_mode: "kg" }))}
+                className={toggleClass(form.unit_mode === "kg")}
+                aria-pressed={form.unit_mode === "kg"}
+              >
+                {t("Weight (kg)")}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {counting ? (
+          <>
+            <div>
+              <label className="mb-2 block text-sm font-medium">{t("How many picked?")}</label>
+              <div className="flex items-stretch gap-2">
+                <button
+                  type="button"
+                  onClick={() => stepCount(-1)}
+                  className="w-14 rounded-2xl border border-zinc-300 text-2xl font-semibold text-zinc-700 hover:bg-zinc-50"
+                  aria-label={t("One less")}
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  step="1"
+                  min="1"
+                  value={form.quantity_units}
+                  onChange={(e) => setForm((prev) => ({ ...prev, quantity_units: e.target.value }))}
+                  className={`${inputClass} text-center text-lg font-semibold`}
+                  placeholder="0"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => stepCount(1)}
+                  className="w-14 rounded-2xl border border-zinc-300 text-2xl font-semibold text-zinc-700 hover:bg-zinc-50"
+                  aria-label={t("One more")}
+                >
+                  +
+                </button>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {[5, 10, 50].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => stepCount(n)}
+                    className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
+                  >
+                    +{n}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium">
+                {t("Total weight (kg)")}{" "}
+                <span className="font-normal text-zinc-400">{t("(optional)")}</span>
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.quantity_kg}
+                onChange={(e) => setForm((prev) => ({ ...prev, quantity_kg: e.target.value }))}
+                className={inputClass}
+                placeholder={t("Leave blank if not weighed")}
+              />
+            </div>
+          </>
+        ) : (
+          <div>
+            <label className="mb-2 block text-sm font-medium">{t("Quantity (kg)")}</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.quantity_kg}
+              onChange={(e) => setForm((prev) => ({ ...prev, quantity_kg: e.target.value }))}
+              className={inputClass}
+              placeholder="120"
+              required
+            />
+          </div>
+        )}
 
         <div>
           <label className="mb-2 block text-sm font-medium">{t("Quality")}</label>
           <select
             value={form.quality}
             onChange={(e) => setForm((prev) => ({ ...prev, quality: e.target.value }))}
-            className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+            className={inputClass}
           >
             <option value="premium">{t("premium")}</option>
             <option value="standard">{t("standard")}</option>

@@ -953,6 +953,7 @@ export {
   parseYieldKg,
   isStandingOrder,
   orderKg,
+  isCountedCrop,
 } from "./harvest";
 export type { HarvestMonthKey, SeasonMonth, ParsedYield } from "./harvest";
 import type { HarvestMonthKey } from "./harvest";
@@ -1177,7 +1178,10 @@ export type HarvestLog = {
   crop_id: string;
   zone_id: string | null;
   harvest_date: string;
-  quantity_kg: number;
+  /** Weight in kilos; null when the harvest was only counted. */
+  quantity_kg: number | null;
+  /** Pieces picked (mangoes, watermelons); null when only weighed. */
+  quantity_units: number | null;
   quality: string;
   notes: string | null;
   created_at: string | null;
@@ -1192,7 +1196,7 @@ export async function getHarvestLogs(farmId: string): Promise<HarvestLog[]> {
     async () => {
       const { data: harvests, error: harvestError } = await supabase
         .from("harvests")
-        .select("id, farm_id, crop_id, zone_id, harvest_date, quantity_kg, quality, notes, created_at")
+        .select("id, farm_id, crop_id, zone_id, harvest_date, quantity_kg, quantity_units, quality, notes, created_at")
         .eq("farm_id", farmId)
         .order("harvest_date", { ascending: false });
 

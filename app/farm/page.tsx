@@ -1131,10 +1131,19 @@ export default function FarmPage() {
       setError("");
       if (!data.crop_id) throw new Error(t("Choose a crop before logging harvest."));
       if (!data.harvest_date) throw new Error(t("Harvest date is required."));
-      if (!data.quantity_kg) throw new Error(t("Harvest quantity is required."));
+      const counting = data.unit_mode === "units";
+      const harvestUnits = counting ? Math.floor(Number(data.quantity_units)) : null;
+      const harvestQty = data.quantity_kg.trim() ? Number(data.quantity_kg) : null;
+      if (counting) {
+        if (!harvestUnits || harvestUnits < 1) throw new Error(t("Enter how many were picked."));
+      } else if (harvestQty === null) {
+        throw new Error(t("Harvest quantity is required."));
+      }
+      if (harvestQty !== null && (!Number.isFinite(harvestQty) || harvestQty < 0)) {
+        throw new Error(t("Harvest quantity is required."));
+      }
 
       const selectedCrop = crops.find((crop) => crop.id === data.crop_id) ?? null;
-      const harvestQty = Number(data.quantity_kg);
 
       const { error: harvestError } = await supabase.from("harvests").insert({
         farm_id: activeFarmId,
@@ -1142,30 +1151,43 @@ export default function FarmPage() {
         zone_id: data.zone_id || null,
         harvest_date: data.harvest_date,
         quantity_kg: harvestQty,
+        quantity_units: harvestUnits,
         quality: data.quality,
         notes: data.notes.trim() || null,
       });
       if (harvestError) throw harvestError;
 
-      const nextActualYield = Number(selectedCrop?.actual_yield_kg ?? 0) + harvestQty;
-      const cropUpdates: Record<string, unknown> = { actual_yield_kg: nextActualYield };
+      /* Actual yield is tracked in kilos, so a count with no weight leaves it as it was. */
+      const cropUpdates: Record<string, unknown> = {};
+      if (harvestQty !== null) {
+        cropUpdates.actual_yield_kg = Number(selectedCrop?.actual_yield_kg ?? 0) + harvestQty;
+      }
 
       if (selectedCrop?.status !== "harvested") {
         cropUpdates.status = "harvested";
         cropUpdates.actual_harvest_date = data.harvest_date;
       }
 
-      const { error: cropUpdateError } = await supabase
-        .from("crops")
-        .update(cropUpdates)
-        .eq("id", data.crop_id);
-      if (cropUpdateError) throw cropUpdateError;
+      if (Object.keys(cropUpdates).length > 0) {
+        const { error: cropUpdateError } = await supabase
+          .from("crops")
+          .update(cropUpdates)
+          .eq("id", data.crop_id);
+        if (cropUpdateError) throw cropUpdateError;
+      }
+
+      const amount = [
+        harvestUnits !== null ? `${harvestUnits} pcs` : null,
+        harvestQty !== null ? `${harvestQty} kg` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
 
       await supabase.from("activities").insert({
         farm_id: activeFarmId,
         type: "harvest_logged",
         title: `${selectedCrop?.crop_name ?? "Harvest"} logged`,
-        meta: `${harvestQty} kg · ${data.quality}`,
+        meta: `${amount} · ${data.quality}`,
       });
 
       await loadFarmData(activeFarmId);

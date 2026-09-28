@@ -164,3 +164,15 @@ export function orderKg(order: AmountLike, expectedKg: number | null): number | 
   return (expectedKg * order.share_pct) / 100;
 }
 
+
+/* ── Counted produce ──────────────────────────────────────────
+   Some fruit is picked and sold by the piece, so the harvest form offers a
+   count for these crops (and starts on it). Everything else stays in kilos. */
+
+const COUNTED_CROPS = [/mango/i, /\bembe\b/i, /water\s*melon/i, /tikiti/i];
+
+/** True when a crop is usually harvested by count (mangoes, watermelons). */
+export function isCountedCrop(cropName: string | null | undefined): boolean {
+  const name = (cropName ?? "").trim();
+  return !!name && COUNTED_CROPS.some((re) => re.test(name));
+}

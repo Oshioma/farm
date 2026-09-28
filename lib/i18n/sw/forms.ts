@@ -21,6 +21,17 @@ export const forms: Record<string, string> = {
   "Leave blank if unknown": "Acha wazi kama haijulikani",
   "Save changes": "Hifadhi mabadiliko",
 
+  /* HarvestForm — counted crops (mangoes, watermelons) */
+  "Record by": "Rekodi kwa",
+  "Count (pieces)": "Idadi (vipande)",
+  "Weight (kg)": "Uzito (kg)",
+  "How many picked?": "Umevuna ngapi?",
+  "One less": "Punguza moja",
+  "One more": "Ongeza moja",
+  "Total weight (kg)": "Uzito wote (kg)",
+  "Leave blank if not weighed": "Acha wazi kama hujapima",
+  "Enter how many were picked.": "Weka idadi uliyovuna.",
+
   /* CropForm */
   "Create crop": "Sajili zao",
   "Creating crop...": "Inasajili zao...",
