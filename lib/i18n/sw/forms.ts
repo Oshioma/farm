@@ -37,6 +37,8 @@ export const forms: Record<string, string> = {
   "No scale? We'll save ≈ {kg} kg as an estimate.": "Huna mizani? Tutahifadhi ≈ kg {kg} kama makadirio.",
   "Set this once and the weight is estimated from the count next time.": "Weka hii mara moja na uzito utakadiriwa kutoka idadi wakati ujao.",
   "The weight of one piece must be more than 0.": "Uzito wa kipande kimoja lazima uwe zaidi ya 0.",
+  "kg per piece": "kg kwa kipande",
+  "Used to estimate weight when a harvest is only counted.": "Hutumika kukadiria uzito mavuno yanapohesabiwa tu.",
 
   /* CropForm */
   "Create crop": "Sajili zao",

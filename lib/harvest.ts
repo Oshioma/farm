@@ -192,3 +192,9 @@ export function estimatedKg(units: string, kgPerUnit: string): number | null {
   if (!n || n < 1 || !kgPerUnit.trim() || !Number.isFinite(each) || each <= 0) return null;
   return Math.round(n * each * 100) / 100;
 }
+
+/** Piece weight typed into a form, as a column value: blank or not above 0 clears it. */
+export function kgPerUnitValue(text: string): number | null {
+  const n = Number(text);
+  return text.trim() && Number.isFinite(n) && n > 0 ? n : null;
+}

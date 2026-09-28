@@ -31,7 +31,7 @@ import { formatDate, formatMoney, badgeClass } from "@/app/farm/utils";
 import { CropForm } from "@/app/farm/components/CropForm";
 import { TaskForm } from "@/app/farm/components/TaskForm";
 import { HarvestForm } from "@/app/farm/components/HarvestForm";
-import { estimatedKg, formatYield } from "@/lib/harvest";
+import { estimatedKg, formatYield, isCountedCrop, kgPerUnitValue } from "@/lib/harvest";
 import { ExpenseForm } from "@/app/farm/components/ExpenseForm";
 import { AssetForm } from "@/app/farm/components/AssetForm";
 import { PestForm } from "@/app/farm/components/PestForm";
@@ -123,7 +123,7 @@ export default function FarmPage() {
   const [editingCropId, setEditingCropId] = useState<string | null>(null);
   const [editingCropForm, setEditingCropForm] = useState({
     crop_name: "", variety: "", zone_ids: [] as string[], status: "", planted_on: "",
-    expected_harvest_start: "", estimated_yield_kg: "", expected_sale_price_per_kg: "",
+    expected_harvest_start: "", estimated_yield_kg: "", expected_sale_price_per_kg: "", kg_per_unit: "",
     notes: "", medicinal_properties: "", ...blankCropDetails(), image_file: null as File | null, image_url: "" as string,
   });
   const [cropImagePreview, setCropImagePreview] = useState("");
@@ -823,6 +823,7 @@ export default function FarmPage() {
       expected_harvest_start: crop.expected_harvest_start ?? "",
       estimated_yield_kg: crop.estimated_yield_kg != null ? String(crop.estimated_yield_kg) : "",
       expected_sale_price_per_kg: crop.expected_sale_price_per_kg != null ? String(crop.expected_sale_price_per_kg) : "",
+      kg_per_unit: crop.kg_per_unit != null ? String(crop.kg_per_unit) : "",
       notes: crop.notes ?? "",
       medicinal_properties: crop.medicinal_properties ?? "",
       ...cropDetailsToForm(crop as unknown as Record<string, unknown>),
@@ -872,6 +873,7 @@ export default function FarmPage() {
         notes: editingCropForm.notes.trim() || null,
         medicinal_properties: editingCropForm.medicinal_properties.trim() || null,
         ...cropDetailsPayload(editingCropForm as unknown as Record<string, string>),
+        ...(isCountedCrop(editingCropForm.crop_name) ? { kg_per_unit: kgPerUnitValue(editingCropForm.kg_per_unit) } : {}),
         image_url: imageUrl,
       };
       console.log("Crop update payload:", JSON.stringify(payload), "id:", id);
@@ -2729,6 +2731,15 @@ export default function FarmPage() {
                                     <input type="number" step="0.01" value={editingCropForm.estimated_yield_kg} placeholder={t("kg")}
                                       onChange={(e) => setEditingCropForm((p) => ({ ...p, estimated_yield_kg: e.target.value }))}
                                       className="w-full min-w-[70px] rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
+                                    {isCountedCrop(editingCropForm.crop_name) && (
+                                      <label className="mt-2 block">
+                                        <span className="mb-1 block text-xs font-medium text-zinc-500">{t("kg per piece")}</span>
+                                        <input type="number" step="0.01" min="0" inputMode="decimal" value={editingCropForm.kg_per_unit}
+                                          placeholder={/melon|tikiti/i.test(editingCropForm.crop_name) ? "5" : "0.3"}
+                                          onChange={(e) => setEditingCropForm((p) => ({ ...p, kg_per_unit: e.target.value }))}
+                                          className="w-full min-w-[70px] rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-900" />
+                                      </label>
+                                    )}
                                   </td>
                                   <td className="px-3 py-2" colSpan={2}>
                                     <div className="space-y-2">
