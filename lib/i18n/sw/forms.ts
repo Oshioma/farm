@@ -21,6 +21,25 @@ export const forms: Record<string, string> = {
   "Leave blank if unknown": "Acha wazi kama haijulikani",
   "Save changes": "Hifadhi mabadiliko",
 
+  /* HarvestForm — counted crops (mangoes, watermelons) */
+  "Record by": "Rekodi kwa",
+  "Count (pieces)": "Idadi (vipande)",
+  "Weight (kg)": "Uzito (kg)",
+  "How many picked?": "Umevuna ngapi?",
+  "One less": "Punguza moja",
+  "One more": "Ongeza moja",
+  "Total weight (kg)": "Uzito wote (kg)",
+  "Leave blank if not weighed": "Acha wazi kama hujapima",
+  "Enter how many were picked.": "Weka idadi uliyovuna.",
+  "One piece weighs about": "Kipande kimoja kina uzito wa takriban",
+  "Average weight of one piece (kg)": "Uzito wa wastani wa kipande kimoja (kg)",
+  "≈ {kg} kg estimated": "≈ kg {kg} (makadirio)",
+  "No scale? We'll save ≈ {kg} kg as an estimate.": "Huna mizani? Tutahifadhi ≈ kg {kg} kama makadirio.",
+  "Set this once and the weight is estimated from the count next time.": "Weka hii mara moja na uzito utakadiriwa kutoka idadi wakati ujao.",
+  "The weight of one piece must be more than 0.": "Uzito wa kipande kimoja lazima uwe zaidi ya 0.",
+  "kg per piece": "kg kwa kipande",
+  "Used to estimate weight when a harvest is only counted.": "Hutumika kukadiria uzito mavuno yanapohesabiwa tu.",
+
   /* CropForm */
   "Create crop": "Sajili zao",
   "Creating crop...": "Inasajili zao...",

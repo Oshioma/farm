@@ -154,6 +154,10 @@ export type Crop = {
   expected_harvest_end: string | null;
   estimated_yield_kg: number | null;
   actual_yield_kg: number | null;
+  /** Pieces harvested so far, for counted crops (mangoes, watermelons). */
+  actual_yield_units?: number | null;
+  /** Average weight of one piece, used to estimate kilos from a count. */
+  kg_per_unit?: number | null;
   expected_sale_price_per_kg: number | null;
   notes: string | null;
   medicinal_properties: string | null;
@@ -953,6 +957,7 @@ export {
   parseYieldKg,
   isStandingOrder,
   orderKg,
+  isCountedCrop,
 } from "./harvest";
 export type { HarvestMonthKey, SeasonMonth, ParsedYield } from "./harvest";
 import type { HarvestMonthKey } from "./harvest";
@@ -1177,7 +1182,12 @@ export type HarvestLog = {
   crop_id: string;
   zone_id: string | null;
   harvest_date: string;
-  quantity_kg: number;
+  /** Weight in kilos; null when the harvest was only counted. */
+  quantity_kg: number | null;
+  /** Pieces picked (mangoes, watermelons); null when only weighed. */
+  quantity_units: number | null;
+  /** True when quantity_kg was estimated from the count, not weighed. */
+  weight_estimated?: boolean | null;
   quality: string;
   notes: string | null;
   created_at: string | null;
@@ -1192,7 +1202,7 @@ export async function getHarvestLogs(farmId: string): Promise<HarvestLog[]> {
     async () => {
       const { data: harvests, error: harvestError } = await supabase
         .from("harvests")
-        .select("id, farm_id, crop_id, zone_id, harvest_date, quantity_kg, quality, notes, created_at")
+        .select("id, farm_id, crop_id, zone_id, harvest_date, quantity_kg, quantity_units, weight_estimated, quality, notes, created_at")
         .eq("farm_id", farmId)
         .order("harvest_date", { ascending: false });
 

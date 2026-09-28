@@ -8,6 +8,7 @@ import { Camera, Info, Pencil, Sprout, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getFarms, getCrops, getZones } from "@/lib/farm";
 import type { Crop, Farm, Zone } from "@/lib/farm";
+import { formatYield, isCountedCrop, kgPerUnitValue } from "@/lib/harvest";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { useFarmRole } from "@/hooks/useFarmRole";
 import { badgeClass, formatDate } from "@/app/farm/utils";
@@ -49,6 +50,7 @@ export default function CropsGalleryPage() {
     crop_name: "",
     variety: "",
     status: "planned",
+    kg_per_unit: "",
     notes: "",
     medicinal_properties: "",
     ...blankCropDetails(),
@@ -158,6 +160,7 @@ export default function CropsGalleryPage() {
       crop_name: crop.crop_name ?? "",
       variety: crop.variety ?? "",
       status: crop.status ?? "planned",
+      kg_per_unit: crop.kg_per_unit != null ? String(crop.kg_per_unit) : "",
       notes: crop.notes ?? "",
       medicinal_properties: crop.medicinal_properties ?? "",
       ...cropDetailsToForm(crop as unknown as Record<string, unknown>),
@@ -201,9 +204,12 @@ export default function CropsGalleryPage() {
 
       const primaryZone = editForm.zone_ids[0] || null;
       const extraZones = editForm.zone_ids.slice(1);
+      /* Only counted crops carry a piece weight; others leave the column alone. */
+      const perPiece = isCountedCrop(editForm.crop_name) ? { kg_per_unit: kgPerUnitValue(editForm.kg_per_unit) } : {};
       const { error: updateError } = await supabase
         .from("crops")
         .update({
+          ...perPiece,
           crop_name: editForm.crop_name.trim() || "Unnamed crop",
           variety: editForm.variety.trim() || null,
           status: editForm.status,
@@ -223,6 +229,7 @@ export default function CropsGalleryPage() {
           c.id === editCrop.id
             ? {
                 ...c,
+                ...perPiece,
                 crop_name: editForm.crop_name.trim() || "Unnamed crop",
                 variety: editForm.variety.trim() || null,
                 status: editForm.status,
@@ -456,8 +463,11 @@ export default function CropsGalleryPage() {
                         <div className="flex justify-between gap-2">
                           <dt className="text-white/70">{t("Yield")}</dt>
                           <dd className="text-right font-medium">
-                            {crop.actual_yield_kg ?? crop.estimated_yield_kg ?? "—"}
-                            {crop.actual_yield_kg || crop.estimated_yield_kg ? " kg" : ""}
+                            {crop.actual_yield_kg || crop.actual_yield_units
+                              ? formatYield(crop.actual_yield_kg, crop.actual_yield_units)
+                              : crop.estimated_yield_kg
+                                ? `${crop.estimated_yield_kg} kg`
+                                : "—"}
                           </dd>
                         </div>
                       </dl>
@@ -602,6 +612,28 @@ export default function CropsGalleryPage() {
                   ))}
                 </select>
               </div>
+
+              {isCountedCrop(editForm.crop_name) && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium">
+                    {t("Average weight of one piece (kg)")}{" "}
+                    <span className="font-normal text-zinc-400">{t("(optional)")}</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    inputMode="decimal"
+                    value={editForm.kg_per_unit}
+                    onChange={(e) => setEditForm((p) => ({ ...p, kg_per_unit: e.target.value }))}
+                    className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
+                    placeholder={/melon|tikiti/i.test(editForm.crop_name) ? "5" : "0.3"}
+                  />
+                  <p className="mt-1 text-xs text-zinc-500">
+                    {t("Used to estimate weight when a harvest is only counted.")}
+                  </p>
+                </div>
+              )}
 
               <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 p-4">
                 <p className="text-sm font-medium">{t("For the shop")} <span className="font-normal text-zinc-400">{t("(all optional)")}</span></p>

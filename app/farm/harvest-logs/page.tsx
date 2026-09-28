@@ -99,6 +99,7 @@ export default function HarvestLogsPage() {
   }
 
   const totalQuantity = filteredHarvestLogs.reduce((sum, log) => sum + (log.quantity_kg || 0), 0);
+  const totalUnits = filteredHarvestLogs.reduce((sum, log) => sum + (log.quantity_units || 0), 0);
 
   if (loading) {
     return (
@@ -205,7 +206,7 @@ export default function HarvestLogsPage() {
 
         {/* Stats */}
         {filteredHarvestLogs.length > 0 && (
-          <div className="mb-6 grid gap-4 md:grid-cols-2">
+          <div className={`mb-6 grid gap-4 ${totalUnits > 0 ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
             <div className="rounded-lg border border-zinc-200 bg-white p-6">
               <p className="text-sm text-zinc-600">{t("Total Harvests (filtered)")}</p>
               <p className="text-3xl font-bold">{filteredHarvestLogs.length}</p>
@@ -214,6 +215,12 @@ export default function HarvestLogsPage() {
               <p className="text-sm text-zinc-600">{t("Total Quantity (kg, filtered)")}</p>
               <p className="text-3xl font-bold">{totalQuantity.toFixed(2)}</p>
             </div>
+            {totalUnits > 0 && (
+              <div className="rounded-lg border border-zinc-200 bg-white p-6">
+                <p className="text-sm text-zinc-600">{t("Total pieces (filtered)")}</p>
+                <p className="text-3xl font-bold">{totalUnits.toLocaleString()}</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -235,7 +242,7 @@ export default function HarvestLogsPage() {
                   <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-900">{t("Date")}</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-900">{t("Crop")}</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-900">{t("Zone")}</th>
-                  <th className="px-6 py-4 text-right text-sm font-semibold text-zinc-900">{t("Quantity (kg)")}</th>
+                  <th className="px-6 py-4 text-right text-sm font-semibold text-zinc-900">{t("Quantity")}</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-900">{t("Quality")}</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-900">{t("Notes")}</th>
                 </tr>
@@ -251,7 +258,15 @@ export default function HarvestLogsPage() {
                       {log.zone?.[0]?.name || "—"}
                     </td>
                     <td className="px-6 py-4 text-right text-sm font-medium text-zinc-900">
-                      {log.quantity_kg.toFixed(2)}
+                      {log.quantity_units !== null && (
+                        <div>{t("{n} pcs", { n: log.quantity_units.toLocaleString() })}</div>
+                      )}
+                      {log.quantity_kg !== null && (
+                        <div className={log.quantity_units !== null ? "text-xs font-normal text-zinc-500" : ""}>
+                          {log.weight_estimated ? "≈ " : ""}
+                          {log.quantity_kg.toFixed(2)} kg
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm text-zinc-600">
                       <span className="inline-block px-2 py-1 rounded-full bg-zinc-100 text-zinc-800 text-xs font-medium">

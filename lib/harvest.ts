@@ -164,3 +164,37 @@ export function orderKg(order: AmountLike, expectedKg: number | null): number | 
   return (expectedKg * order.share_pct) / 100;
 }
 
+
+/* ── Counted produce ──────────────────────────────────────────
+   Some fruit is picked and sold by the piece, so the harvest form offers a
+   count for these crops (and starts on it). Everything else stays in kilos. */
+
+const COUNTED_CROPS = [/mango/i, /\bembe\b/i, /water\s*melon/i, /tikiti/i];
+
+/** True when a crop is usually harvested by count (mangoes, watermelons). */
+export function isCountedCrop(cropName: string | null | undefined): boolean {
+  const name = (cropName ?? "").trim();
+  return !!name && COUNTED_CROPS.some((re) => re.test(name));
+}
+
+/** "320 pcs · 45 kg" — a crop's yield so far, pieces first when it has any. */
+export function formatYield(kg: number | null | undefined, units: number | null | undefined): string {
+  const parts: string[] = [];
+  if (units) parts.push(`${units.toLocaleString()} pcs`);
+  if (kg || !units) parts.push(`${Number((kg ?? 0).toFixed(2))} kg`);
+  return parts.join(" · ");
+}
+
+/** Count × average piece weight, or null when either is missing. */
+export function estimatedKg(units: string, kgPerUnit: string): number | null {
+  const n = Math.floor(Number(units));
+  const each = Number(kgPerUnit);
+  if (!n || n < 1 || !kgPerUnit.trim() || !Number.isFinite(each) || each <= 0) return null;
+  return Math.round(n * each * 100) / 100;
+}
+
+/** Piece weight typed into a form, as a column value: blank or not above 0 clears it. */
+export function kgPerUnitValue(text: string): number | null {
+  const n = Number(text);
+  return text.trim() && Number.isFinite(n) && n > 0 ? n : null;
+}

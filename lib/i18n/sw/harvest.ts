@@ -101,6 +101,8 @@ export const harvest: Record<string, string> = {
   "Log a harvest →": "Rekodi mavuno →",
   "Zone": "Eneo",
   "Quantity (kg)": "Kiasi (kilo)",
+  "Total pieces (filtered)": "Jumla ya vipande (vilivyochujwa)",
+  "{n} pcs": "vipande {n}",
 
   /* ── Produce expected ── */
   "Unnamed": "Bila jina",
