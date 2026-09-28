@@ -1,5 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { InviteLang, InviteStep } from "@/lib/whatsapp";
+import { hasPin } from "@/lib/phone-accounts";
+
+export type InviteSource = "admin" | "self";
 
 export type InviteRow = {
   id: string;
@@ -14,7 +17,16 @@ export type InviteRow = {
   created_at: string;
   opened_at: string | null;
   completed_at: string | null;
+  source: InviteSource;
+  signin_until: string;
 };
+
+/** Whether the link itself may still sign the farmer in (and change their PIN). */
+export function linkSignsIn(invite: InviteRow): boolean {
+  // Before the signin_until migration has run the column is missing: keep the old behaviour.
+  if (!invite.signin_until) return true;
+  return new Date(invite.signin_until).getTime() > Date.now();
+}
 
 /** The token is the credential: validate its shape before touching the database. */
 export function isInviteToken(token: string): boolean {
@@ -33,6 +45,11 @@ export type InviteState = {
   farmerName: string;
   lang: InviteLang;
   step: InviteStep;
+  source: InviteSource;
+  /** A PIN is set for this phone, so the farmer can sign in at /ingia. */
+  hasPin: boolean;
+  /** The link can still sign in; once false the page points to /ingia instead. */
+  linkActive: boolean;
   farm: { id: string; name: string; slug: string; location: string | null; listed: boolean } | null;
   crops: { id: string; name: string; variety: string | null; harvestDate: string | null; expectedKg: number | null; pricePerKg: number | null }[];
 };
@@ -64,7 +81,17 @@ export async function inviteState(admin: SupabaseClient, invite: InviteRow): Pro
       }));
     }
   }
-  return { token: invite.token, farmerName: invite.farmer_name, lang: invite.lang, step: invite.step, farm, crops };
+  return {
+    token: invite.token,
+    farmerName: invite.farmer_name,
+    lang: invite.lang,
+    step: invite.step,
+    source: invite.source ?? "admin",
+    hasPin: await hasPin(admin, invite.phone),
+    linkActive: linkSignsIn(invite),
+    farm,
+    crops,
+  };
 }
 
 /** A URL-safe slug that no other farm uses, mirroring create_farm_with_owner(). */

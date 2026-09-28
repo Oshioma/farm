@@ -18,6 +18,7 @@ const copy = {
     submitting: "Signing in...",
     noAccount: "No account?",
     create: "Create one",
+    phone: "Signed up with WhatsApp? Sign in with your number",
   },
   sw: {
     brand: "Shamba Farm Manager",
@@ -29,6 +30,7 @@ const copy = {
     submitting: "Inaingia...",
     noAccount: "Huna akaunti?",
     create: "Fungua moja",
+    phone: "Ulisajili kwa WhatsApp? Ingia kwa namba yako",
   },
 };
 
@@ -134,6 +136,14 @@ function LoginInner() {
               className="font-medium text-zinc-900 hover:underline"
             >
               {t.create}
+            </Link>
+          </p>
+          <p className="mt-3 text-center text-sm">
+            <Link
+              href={requestedRedirect ? `/ingia?redirectTo=${encodeURIComponent(requestedRedirect)}` : "/ingia"}
+              className="font-medium text-emerald-700 hover:underline"
+            >
+              {t.phone}
             </Link>
           </p>
         </div>

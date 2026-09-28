@@ -25,6 +25,7 @@ const copy = {
     checkTitle: "Check your email",
     checkBody: (email: string) => <>We sent a confirmation link to <strong>{email}</strong>. Click it to activate your account and sign in.</>,
     backToSignIn: "Back to sign in",
+    whatsapp: "No email? Sign up with just your WhatsApp number",
   },
   sw: {
     brand: "Shamba Farm Manager",
@@ -43,6 +44,7 @@ const copy = {
     checkTitle: "Angalia barua pepe yako",
     checkBody: (email: string) => <>Tumetuma kiungo cha uthibitisho kwa <strong>{email}</strong>. Kibonyeze ili kuwasha akaunti yako na uingie.</>,
     backToSignIn: "Rudi kuingia",
+    whatsapp: "Huna barua pepe? Jisajili kwa namba yako ya WhatsApp tu",
   },
 };
 
@@ -204,6 +206,11 @@ function SignUpInner() {
               className="font-medium text-zinc-900 hover:underline"
             >
               {t.signIn}
+            </Link>
+          </p>
+          <p className="mt-3 text-center text-sm">
+            <Link href="/jisajili" className="font-medium text-emerald-700 hover:underline">
+              {t.whatsapp}
             </Link>
           </p>
         </div>

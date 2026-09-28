@@ -1,108 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { inviteState, loadInviteByToken, uniqueFarmSlug } from "@/lib/invites";
-import type { InviteRow } from "@/lib/invites";
+import { inviteState, linkSignsIn, loadInviteByToken, uniqueFarmSlug } from "@/lib/invites";
+import { ensureUser, hasPin, isPin, phoneEmail, setPin, signInUrl } from "@/lib/phone-accounts";
 import { harvestMonthKeyFor, harvestSeasonYear } from "@/lib/harvest";
 
 export const dynamic = "force-dynamic";
 
 /* The no-login setup that a WhatsApp invite opens. Every request carries the
    invite token in the URL; that token is the only credential, so each action
-   re-reads the invite row with the service role before writing anything. */
+   re-reads the invite row with the service role before writing anything.
+   The link signs the farmer in only until invite.signin_until (14 days, cut
+   to an hour once the shop opens); after that they use phone + PIN at /ingia. */
 
 type Ctx = { params: Promise<{ token: string }> };
 
 const invalid = () => NextResponse.json({ error: "This link is not valid." }, { status: 404 });
+const expired = () =>
+  NextResponse.json({ error: "This link has expired. Sign in with your phone number and PIN. / Kiungo hiki kimeisha muda. Ingia kwa namba ya simu na PIN." }, { status: 403 });
+const badPin = () => NextResponse.json({ error: "Choose a PIN of 4 numbers. / Chagua PIN ya tarakimu 4." }, { status: 400 });
 
-/** The email that stands in for a farmer who signed up by phone. */
-function phoneEmail(phone: string) {
-  return `wa-${phone}@farmers.shamba.online`;
-}
-
-/** True when the auth account still exists (a test user may have been deleted). */
-async function userExists(admin: ReturnType<typeof getSupabaseAdmin>, userId: string): Promise<boolean> {
-  const { data, error } = await admin.auth.admin.getUserById(userId);
-  return !error && !!data?.user;
-}
-
-/** Supabase has no lookup by email for admins, so page through the list. */
-async function findUserIdByEmail(admin: ReturnType<typeof getSupabaseAdmin>, email: string): Promise<string | null> {
-  const wanted = email.toLowerCase();
-  for (let page = 1; page <= 25; page++) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
-    if (error || !data?.users?.length) return null;
-    const hit = data.users.find((user) => user.email?.toLowerCase() === wanted);
-    if (hit) return hit.id;
-    if (data.users.length < 200) return null;
-  }
-  return null;
-}
-
-/** Find or create the Supabase user behind an invite, remembering it on the row. */
-async function ensureUser(admin: ReturnType<typeof getSupabaseAdmin>, invite: InviteRow): Promise<string> {
-  const email = phoneEmail(invite.phone);
-
-  // An id remembered from an earlier attempt is only good if the account still exists.
-  let userId: string | null = invite.user_id && (await userExists(admin, invite.user_id)) ? invite.user_id : null;
-
-  if (!userId) {
-    // Another invite for the same phone may already have made the account.
-    const { data: earlier } = await admin
-      .from("whatsapp_invites")
-      .select("user_id")
-      .eq("phone", invite.phone)
-      .not("user_id", "is", null)
-      .neq("id", invite.id)
-      .limit(1)
-      .maybeSingle();
-    if (earlier?.user_id && (await userExists(admin, earlier.user_id))) userId = earlier.user_id;
-  }
-
-  if (!userId) userId = await findUserIdByEmail(admin, email);
-
-  if (!userId) {
-    const { data, error } = await admin.auth.admin.createUser({
-      email,
-      email_confirm: true,
-      password: crypto.randomUUID() + crypto.randomUUID(),
-      user_metadata: { full_name: invite.farmer_name, phone: invite.phone, signed_up_via: "whatsapp_invite", lang: invite.lang },
-    });
-    if (error && !/already/i.test(error.message)) throw error;
-    userId = data?.user?.id ?? (await findUserIdByEmail(admin, email));
-  }
-  if (!userId) throw new Error("Could not create the farmer's account.");
-
-  await ensureProfile(admin, userId, email, invite.farmer_name);
-  if (invite.user_id !== userId) {
-    await admin.from("whatsapp_invites").update({ user_id: userId }).eq("id", invite.id);
-    invite.user_id = userId;
-  }
-  return userId;
-}
-
-/* farms.created_by and farm_members.profile_id point at public.profiles, a
-   table the app never writes itself: a database trigger fills it for web
-   signups, but an account made here through the admin API arrived without
-   one. The table is not in this repo's migrations, so its exact columns are
-   unknown: try the usual shape first, then fall back to the id alone. */
-async function ensureProfile(admin: ReturnType<typeof getSupabaseAdmin>, userId: string, email: string, fullName: string) {
-  const { data: existing } = await admin.from("profiles").select("id").eq("id", userId).maybeSingle();
-  if (existing) return;
-  const attempts: Record<string, unknown>[] = [
-    { id: userId, email, full_name: fullName },
-    { id: userId, email },
-    { id: userId },
-  ];
-  let lastError: unknown = null;
-  for (const row of attempts) {
-    const { error } = await admin.from("profiles").upsert(row, { onConflict: "id", ignoreDuplicates: true });
-    if (!error) return;
-    lastError = error;
-    // A missing column means this shape is wrong; anything else is final.
-    if (!/column|schema cache/i.test(error.message)) break;
-  }
-  throw lastError ?? new Error("Could not create the farmer's profile.");
-}
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
   const { token } = await params;
@@ -121,11 +37,18 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const body = await req.json().catch(() => ({}));
   const action = String(body.action ?? "");
 
+  // A finished invite whose sign-in window has closed can only switch language.
+  if (!linkSignsIn(invite) && invite.step === "done" && action !== "lang") return expired();
+
   try {
     if (action === "farm") {
       const name = String(body.name ?? "").trim().slice(0, 120);
       if (!name) return NextResponse.json({ error: "Farm name is required." }, { status: 400 });
+      // The first question also asks for the PIN they will sign in with later.
+      const needsPin = !(await hasPin(admin, invite.phone));
+      if (needsPin && !isPin(body.pin)) return badPin();
       const userId = await ensureUser(admin, invite);
+      if (needsPin) await setPin(admin, invite.phone, userId, body.pin);
       if (invite.farm_id) {
         const { error } = await admin.from("farms").update({ name }).eq("id", invite.farm_id);
         if (error) throw error;
@@ -208,8 +131,15 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       if (!count) return NextResponse.json({ error: "Add at least one crop before opening the shop." }, { status: 400 });
       const { error } = await admin.from("farms").update({ list_in_market: true }).eq("id", invite.farm_id);
       if (error) throw error;
-      await admin.from("whatsapp_invites").update({ step: "done", completed_at: invite.completed_at ?? new Date().toISOString() }).eq("id", invite.id);
+      // The link keeps signing in for an hour so the farmer lands in their shop; after that it is PIN only.
+      const hourFromNow = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      const signinUntil = invite.signin_until && Date.parse(invite.signin_until) < Date.parse(hourFromNow) ? invite.signin_until : hourFromNow;
+      await admin
+        .from("whatsapp_invites")
+        .update({ step: "done", completed_at: invite.completed_at ?? new Date().toISOString(), signin_until: signinUntil })
+        .eq("id", invite.id);
       invite.step = "done";
+      invite.signin_until = signinUntil;
       return NextResponse.json(await inviteState(admin, invite));
     }
 
@@ -223,21 +153,21 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       return NextResponse.json(await inviteState(admin, invite));
     }
 
+    if (action === "pin") {
+      // Set a new PIN from the link, e.g. after forgetting it. Only while the link still signs in.
+      if (!linkSignsIn(invite)) return expired();
+      if (!isPin(body.pin)) return badPin();
+      const userId = await ensureUser(admin, invite);
+      await setPin(admin, invite.phone, userId, body.pin);
+      return NextResponse.json(await inviteState(admin, invite));
+    }
+
     if (action === "enter") {
       // A one-tap sign-in so the farmer can reach the dashboard without a password.
+      if (!linkSignsIn(invite)) return expired();
       const userId = await ensureUser(admin, invite);
-      const { data: userData } = await admin.auth.admin.getUserById(userId);
-      const email = userData?.user?.email ?? phoneEmail(invite.phone);
-      const { data, error } = await admin.auth.admin.generateLink({ type: "magiclink", email });
-      if (error) throw error;
-      const hashed = data.properties?.hashed_token;
-      if (!hashed) throw new Error("Could not create a sign-in link.");
-      const next = String(body.next ?? "/farm/prepare");
-      const url = new URL("/auth/callback", req.nextUrl.origin);
-      url.searchParams.set("token_hash", hashed);
-      url.searchParams.set("type", "magiclink");
-      url.searchParams.set("next", next.startsWith("/") ? next : "/farm/prepare");
-      return NextResponse.json({ url: url.toString() });
+      const url = await signInUrl(admin, userId, req.nextUrl.origin, String(body.next ?? "/farm/prepare"));
+      return NextResponse.json({ url });
     }
 
     return NextResponse.json({ error: "Unknown action." }, { status: 400 });
