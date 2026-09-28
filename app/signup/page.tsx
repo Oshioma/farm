@@ -209,7 +209,7 @@ function SignUpInner() {
             </Link>
           </p>
           <p className="mt-3 text-center text-sm">
-            <Link href="/jisajili" className="font-medium text-emerald-700 hover:underline">
+            <Link href={lang === "en" ? "/signup/whatsapp" : "/jisajili"} className="font-medium text-emerald-700 hover:underline">
               {t.whatsapp}
             </Link>
           </p>

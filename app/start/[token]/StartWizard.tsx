@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Check, ChevronRight, ExternalLink, KeyRound } from "lucide-react";
 import type { InviteState } from "@/lib/invites";
-import { useLanguage } from "@/lib/i18n";
+import { usePageLanguage } from "@/hooks/usePageLanguage";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { ShareWhatsAppButton } from "@/components/ShareWhatsAppButton";
 
@@ -132,7 +132,8 @@ function PinFields({ t, pin, again, setPin, setAgain }: {
 
 export function StartWizard({ initial }: { initial: InviteState }) {
   const [state, setState] = useState<InviteState>(initial);
-  const [lang, setLang] = useLanguage();
+  // The sender chose the language for this farmer: it is the first thing they see, until they touch the toggle.
+  const [lang, setLang] = usePageLanguage(initial.lang, { preferSaved: false });
   const [farmName, setFarmName] = useState(initial.farm?.name ?? "");
   const [location, setLocation] = useState(initial.farm?.location ?? "");
   const [crop, setCrop] = useState(blankCrop);
@@ -143,12 +144,6 @@ export function StartWizard({ initial }: { initial: InviteState }) {
   const [pinAgain, setPinAgain] = useState("");
   const [showPinForm, setShowPinForm] = useState(false);
   const [pinSaved, setPinSaved] = useState(false);
-
-  /* The sender chose the language for this farmer; honour it on first open. */
-  useEffect(() => {
-    setLang(initial.lang);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const t = copy[lang];
   const origin = typeof window === "undefined" ? "" : window.location.origin;

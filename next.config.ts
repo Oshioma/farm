@@ -19,6 +19,9 @@ const nextConfig: NextConfig = {
         destination: "/farm/goals",
         permanent: true,
       },
+      // English addresses for the WhatsApp sign-up and PIN sign-in pages.
+      { source: "/signup/whatsapp", destination: "/jisajili?lang=en", permanent: false },
+      { source: "/signin/phone", destination: "/ingia?lang=en", permanent: false },
     ];
   },
 };
