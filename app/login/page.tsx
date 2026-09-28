@@ -140,7 +140,10 @@ function LoginInner() {
           </p>
           <p className="mt-3 text-center text-sm">
             <Link
-              href={requestedRedirect ? `/ingia?redirectTo=${encodeURIComponent(requestedRedirect)}` : "/ingia"}
+              href={`/ingia?${new URLSearchParams({
+                ...(lang === "en" ? { lang: "en" } : {}),
+                ...(requestedRedirect ? { redirectTo: requestedRedirect } : {}),
+              }).toString()}`}
               className="font-medium text-emerald-700 hover:underline"
             >
               {t.phone}
