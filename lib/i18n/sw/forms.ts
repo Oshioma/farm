@@ -31,6 +31,12 @@ export const forms: Record<string, string> = {
   "Total weight (kg)": "Uzito wote (kg)",
   "Leave blank if not weighed": "Acha wazi kama hujapima",
   "Enter how many were picked.": "Weka idadi uliyovuna.",
+  "One piece weighs about": "Kipande kimoja kina uzito wa takriban",
+  "Average weight of one piece (kg)": "Uzito wa wastani wa kipande kimoja (kg)",
+  "≈ {kg} kg estimated": "≈ kg {kg} (makadirio)",
+  "No scale? We'll save ≈ {kg} kg as an estimate.": "Huna mizani? Tutahifadhi ≈ kg {kg} kama makadirio.",
+  "Set this once and the weight is estimated from the count next time.": "Weka hii mara moja na uzito utakadiriwa kutoka idadi wakati ujao.",
+  "The weight of one piece must be more than 0.": "Uzito wa kipande kimoja lazima uwe zaidi ya 0.",
 
   /* CropForm */
   "Create crop": "Sajili zao",

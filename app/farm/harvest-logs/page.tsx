@@ -263,6 +263,7 @@ export default function HarvestLogsPage() {
                       )}
                       {log.quantity_kg !== null && (
                         <div className={log.quantity_units !== null ? "text-xs font-normal text-zinc-500" : ""}>
+                          {log.weight_estimated ? "≈ " : ""}
                           {log.quantity_kg.toFixed(2)} kg
                         </div>
                       )}

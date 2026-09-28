@@ -8,6 +8,7 @@ import { Camera, Info, Pencil, Sprout, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getFarms, getCrops, getZones } from "@/lib/farm";
 import type { Crop, Farm, Zone } from "@/lib/farm";
+import { formatYield } from "@/lib/harvest";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { useFarmRole } from "@/hooks/useFarmRole";
 import { badgeClass, formatDate } from "@/app/farm/utils";
@@ -456,8 +457,11 @@ export default function CropsGalleryPage() {
                         <div className="flex justify-between gap-2">
                           <dt className="text-white/70">{t("Yield")}</dt>
                           <dd className="text-right font-medium">
-                            {crop.actual_yield_kg ?? crop.estimated_yield_kg ?? "—"}
-                            {crop.actual_yield_kg || crop.estimated_yield_kg ? " kg" : ""}
+                            {crop.actual_yield_kg || crop.actual_yield_units
+                              ? formatYield(crop.actual_yield_kg, crop.actual_yield_units)
+                              : crop.estimated_yield_kg
+                                ? `${crop.estimated_yield_kg} kg`
+                                : "—"}
                           </dd>
                         </div>
                       </dl>

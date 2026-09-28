@@ -31,6 +31,7 @@ import { formatDate, formatMoney, badgeClass } from "@/app/farm/utils";
 import { CropForm } from "@/app/farm/components/CropForm";
 import { TaskForm } from "@/app/farm/components/TaskForm";
 import { HarvestForm } from "@/app/farm/components/HarvestForm";
+import { estimatedKg, formatYield } from "@/lib/harvest";
 import { ExpenseForm } from "@/app/farm/components/ExpenseForm";
 import { AssetForm } from "@/app/farm/components/AssetForm";
 import { PestForm } from "@/app/farm/components/PestForm";
@@ -1133,17 +1134,25 @@ export default function FarmPage() {
       if (!data.harvest_date) throw new Error(t("Harvest date is required."));
       const counting = data.unit_mode === "units";
       const harvestUnits = counting ? Math.floor(Number(data.quantity_units)) : null;
-      const harvestQty = data.quantity_kg.trim() ? Number(data.quantity_kg) : null;
+      const weighedKg = data.quantity_kg.trim() ? Number(data.quantity_kg) : null;
       if (counting) {
         if (!harvestUnits || harvestUnits < 1) throw new Error(t("Enter how many were picked."));
-      } else if (harvestQty === null) {
+      } else if (weighedKg === null) {
         throw new Error(t("Harvest quantity is required."));
       }
-      if (harvestQty !== null && (!Number.isFinite(harvestQty) || harvestQty < 0)) {
+      if (weighedKg !== null && (!Number.isFinite(weighedKg) || weighedKg < 0)) {
         throw new Error(t("Harvest quantity is required."));
+      }
+      const perPiece = counting && data.kg_per_unit.trim() ? Number(data.kg_per_unit) : null;
+      if (perPiece !== null && (!Number.isFinite(perPiece) || perPiece <= 0)) {
+        throw new Error(t("The weight of one piece must be more than 0."));
       }
 
       const selectedCrop = crops.find((crop) => crop.id === data.crop_id) ?? null;
+
+      /* No scale: estimate the weight from the count and the average piece. */
+      const estimatedHarvestKg = counting && weighedKg === null ? estimatedKg(data.quantity_units, data.kg_per_unit) : null;
+      const harvestQty = weighedKg ?? estimatedHarvestKg;
 
       const { error: harvestError } = await supabase.from("harvests").insert({
         farm_id: activeFarmId,
@@ -1152,15 +1161,27 @@ export default function FarmPage() {
         harvest_date: data.harvest_date,
         quantity_kg: harvestQty,
         quantity_units: harvestUnits,
+        weight_estimated: estimatedHarvestKg !== null,
         quality: data.quality,
         notes: data.notes.trim() || null,
       });
       if (harvestError) throw harvestError;
 
-      /* Actual yield is tracked in kilos, so a count with no weight leaves it as it was. */
       const cropUpdates: Record<string, unknown> = {};
       if (harvestQty !== null) {
         cropUpdates.actual_yield_kg = Number(selectedCrop?.actual_yield_kg ?? 0) + harvestQty;
+      }
+      if (harvestUnits !== null) {
+        cropUpdates.actual_yield_units = Number(selectedCrop?.actual_yield_units ?? 0) + harvestUnits;
+      }
+
+      /* Remember the piece weight the farmer typed; if they weighed a count and
+         none is set yet, learn it from this harvest. */
+      const currentPerPiece = selectedCrop?.kg_per_unit ? Number(selectedCrop.kg_per_unit) : null;
+      if (perPiece !== null && perPiece !== currentPerPiece) {
+        cropUpdates.kg_per_unit = perPiece;
+      } else if (perPiece === null && currentPerPiece === null && harvestUnits && weighedKg) {
+        cropUpdates.kg_per_unit = Math.round((weighedKg / harvestUnits) * 1000) / 1000;
       }
 
       if (selectedCrop?.status !== "harvested") {
@@ -1178,7 +1199,7 @@ export default function FarmPage() {
 
       const amount = [
         harvestUnits !== null ? `${harvestUnits} pcs` : null,
-        harvestQty !== null ? `${harvestQty} kg` : null,
+        harvestQty !== null ? `${estimatedHarvestKg !== null ? "≈" : ""}${harvestQty} kg` : null,
       ]
         .filter(Boolean)
         .join(" · ");
@@ -2787,7 +2808,7 @@ export default function FarmPage() {
                                   </td>
                                   <td className="px-4 py-4">{formatDate(crop.planted_on)}</td>
                                   <td className="px-4 py-4">{formatDate(crop.expected_harvest_start)}</td>
-                                  <td className="px-4 py-4">{crop.actual_yield_kg ?? 0} {t("kg")}</td>
+                                  <td className="px-4 py-4">{formatYield(crop.actual_yield_kg, crop.actual_yield_units)}</td>
                                   <td className="px-4 py-4">
                                     <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                                       {selectedMapZoneId ? (

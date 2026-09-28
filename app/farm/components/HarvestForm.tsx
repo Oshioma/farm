@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Zone, Crop } from "@/lib/farm";
-import { isCountedCrop } from "@/lib/harvest";
+import { estimatedKg, isCountedCrop } from "@/lib/harvest";
 import { useT } from "@/lib/i18n";
 
 export type HarvestUnitMode = "units" | "kg";
@@ -17,6 +17,8 @@ export type HarvestFormData = {
   quantity_units: string;
   /** Kilos; required for "kg", optional alongside a count. */
   quantity_kg: string;
+  /** Average weight of one piece; turns a count into an estimated weight. */
+  kg_per_unit: string;
   quality: string;
   notes: string;
 };
@@ -28,6 +30,7 @@ const blank: HarvestFormData = {
   unit_mode: "kg",
   quantity_units: "",
   quantity_kg: "",
+  kg_per_unit: "",
   quality: "standard",
   notes: "",
 };
@@ -35,6 +38,10 @@ const blank: HarvestFormData = {
 /* Counted crops (mangoes, watermelons) start on a count; everything else on kilos. */
 function modeFor(crop: Crop | null | undefined): HarvestUnitMode {
   return isCountedCrop(crop?.crop_name) ? "units" : "kg";
+}
+
+function perPieceFor(crop: Crop | null | undefined): string {
+  return crop?.kg_per_unit ? String(crop.kg_per_unit) : "";
 }
 
 type Props = {
@@ -53,6 +60,7 @@ export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubm
   const selectedCrop = crops.find((c) => c.id === form.crop_id) ?? null;
   const canCount = isCountedCrop(selectedCrop?.crop_name);
   const counting = canCount && form.unit_mode === "units";
+  const estimate = counting && !form.quantity_kg.trim() ? estimatedKg(form.quantity_units, form.kg_per_unit) : null;
 
   useEffect(() => {
     if (defaultCropId) {
@@ -64,6 +72,7 @@ export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubm
               crop_id: defaultCropId,
               zone_id: defaultZoneId,
               unit_mode: modeFor(crops.find((c) => c.id === defaultCropId)),
+              kg_per_unit: perPieceFor(crops.find((c) => c.id === defaultCropId)),
             }
       );
     }
@@ -82,7 +91,9 @@ export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubm
     setSaving(true);
     /* A crop that cannot be counted is always recorded in kilos, whatever
        mode was left over from a previously selected crop. */
-    const ok = await onSubmit(canCount ? form : { ...form, unit_mode: "kg", quantity_units: "" });
+    const ok = await onSubmit(
+      canCount ? form : { ...form, unit_mode: "kg", quantity_units: "", kg_per_unit: "" }
+    );
     setSaving(false);
     if (ok) setForm(blank);
   }
@@ -117,6 +128,7 @@ export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubm
                 unit_mode: modeFor(selected),
                 quantity_units: "",
                 quantity_kg: "",
+                kg_per_unit: perPieceFor(selected),
               }));
             }}
             className={inputClass}
@@ -242,8 +254,32 @@ export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubm
                 value={form.quantity_kg}
                 onChange={(e) => setForm((prev) => ({ ...prev, quantity_kg: e.target.value }))}
                 className={inputClass}
-                placeholder={t("Leave blank if not weighed")}
+                placeholder={
+                  estimate !== null
+                    ? t("≈ {kg} kg estimated", { kg: estimate })
+                    : t("Leave blank if not weighed")
+                }
               />
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-zinc-600">
+                <span>{t("One piece weighs about")}</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  inputMode="decimal"
+                  value={form.kg_per_unit}
+                  onChange={(e) => setForm((prev) => ({ ...prev, kg_per_unit: e.target.value }))}
+                  className="w-24 rounded-xl border border-zinc-300 px-3 py-1.5 text-center outline-none focus:border-zinc-900"
+                  placeholder={/melon|tikiti/i.test(selectedCrop?.crop_name ?? "") ? "5" : "0.3"}
+                  aria-label={t("Average weight of one piece (kg)")}
+                />
+                <span>{t("kg")}</span>
+              </div>
+              <p className="mt-1 text-xs text-zinc-500">
+                {estimate !== null
+                  ? t("No scale? We'll save ≈ {kg} kg as an estimate.", { kg: estimate })
+                  : t("Set this once and the weight is estimated from the count next time.")}
+              </p>
             </div>
           </>
         ) : (
