@@ -563,11 +563,40 @@ export async function getSales(farmId: string): Promise<Sale[]> {
     `
     )
     .eq("farm_id", farmId)
-    .order("sale_date", { ascending: false })
-    .limit(20);
+    .order("sale_date", { ascending: false });
 
   if (error) throw new Error(`getSales failed: ${error.message}`);
   return (data ?? []) as Sale[];
+}
+
+/* A shop order the customer has collected: money in, alongside logged sales. */
+export type CollectedOrder = {
+  id: string;
+  crop_id: string | null;
+  quantity_kg: number | null;
+  price_per_kg: number | null;
+  actual_quantity_kg: number | null;
+  actual_price_per_kg: number | null;
+  reservation_reference: string | null;
+  collected_at: string | null;
+  updated_at: string | null;
+  notes: string | null;
+  customer: { name: string }[] | { name: string } | null;
+  crop: { crop_name: string }[] | { crop_name: string } | null;
+};
+
+export async function getCollectedOrders(farmId: string): Promise<CollectedOrder[]> {
+  const { data, error } = await supabase
+    .from("customer_orders")
+    .select(
+      "id, crop_id, quantity_kg, price_per_kg, actual_quantity_kg, actual_price_per_kg, reservation_reference, collected_at, updated_at, notes, customer:customers(name), crop:crops(crop_name)"
+    )
+    .eq("farm_id", farmId)
+    .eq("status", "collected")
+    .order("collected_at", { ascending: false });
+
+  if (error) throw new Error(`getCollectedOrders failed: ${error.message}`);
+  return (data ?? []) as CollectedOrder[];
 }
 
 export type Plant = {
