@@ -102,7 +102,6 @@ export default function FarmPage() {
   const hasLoadedInitialFarm = React.useRef(false);
   const latestFarmIdRef = React.useRef("");
   const [activeForm, setActiveForm] = useState<"crop" | "task" | "harvest" | "expense" | "asset" | "pest" | "sale" | "want" | null>(null);
-  const [showAssets, setShowAssets] = useState(false);
   const [showWants, setShowWants] = useState(true);
   const [deletingWantId, setDeletingWantId] = useState<string | null>(null);
   const [convertingWantId, setConvertingWantId] = useState<string | null>(null);
@@ -542,41 +541,12 @@ export default function FarmPage() {
   // Managers (owner/manager) get financial + admin features; workers don't.
   const isManager = userRoleOnFarm === "owner" || userRoleOnFarm === "manager";
 
-  /* Section links. Expenses and Sales moved to their own pages, so
-     /farm#expenses and /farm#sales forward there. #assets points at a
-     section that only exists once the farm data and the manager role have
-     loaded, so the browser's own jump (made on first paint) misses it:
-     scroll once it's drawn, and open the asset list on the way. */
-  const sectionLinkHandledRef = React.useRef(false);
+  /* Old section links: Expenses, Sales and Assets moved to their own pages,
+     so /farm#expenses, /farm#sales and /farm#assets forward there. */
   useEffect(() => {
-    if (window.location.hash === "#expenses") {
-      router.replace(`/farm/expenses${window.location.search}`);
-    } else if (window.location.hash === "#sales") {
-      router.replace(`/farm/sales${window.location.search}`);
-    }
+    const target = { "#expenses": "/farm/expenses", "#sales": "/farm/sales", "#assets": "/farm/assets" }[window.location.hash];
+    if (target) router.replace(`${target}${window.location.search}`);
   }, [router]);
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    function goToSection(isFirstLoad: boolean) {
-      const id = window.location.hash.slice(1);
-      if (id !== "assets") return;
-      setShowAssets(true);
-      timer = setTimeout(() => {
-        const el = document.getElementById(id);
-        /* Not drawn yet: try again on the next load step. */
-        if (!el) return;
-        if (isFirstLoad) sectionLinkHandledRef.current = true;
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 150);
-    }
-    if (!loading && isManager && !sectionLinkHandledRef.current) goToSection(true);
-    const onHashChange = () => goToSection(false);
-    window.addEventListener("hashchange", onHashChange);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener("hashchange", onHashChange);
-    };
-  }, [loading, isManager, activeFarmId]);
 
   const tasksToday = monthGoals.filter(
     (task) =>
@@ -672,10 +642,6 @@ export default function FarmPage() {
   }, 0);
 
   const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount ?? 0), 0);
-  const thisMonthKey = new Date().toISOString().slice(0, 7);
-  const expensesThisMonth = expenses
-    .filter((e) => (e.expense_date ?? "").startsWith(thisMonthKey))
-    .reduce((sum, e) => sum + Number(e.amount ?? 0), 0);
   const buyerSuggestions = Array.from(
     new Map(
       sales
@@ -703,11 +669,6 @@ export default function FarmPage() {
   const totalSales =
     sales.reduce((sum, s) => sum + Number(s.total_amount ?? 0), 0) +
     collectedOrders.reduce((sum, o) => sum + orderAmount(o), 0);
-  const salesThisMonth =
-    sales.filter((s) => (s.sale_date ?? "").startsWith(thisMonthKey)).reduce((sum, s) => sum + Number(s.total_amount ?? 0), 0) +
-    collectedOrders
-      .filter((o) => (o.collected_at ?? o.updated_at ?? "").startsWith(thisMonthKey))
-      .reduce((sum, o) => sum + orderAmount(o), 0);
 
   const defaultZoneId = zones.length === 1 ? zones[0].id : "";
   const defaultCropId = crops.length === 1 ? crops[0].id : "";
@@ -1621,7 +1582,7 @@ export default function FarmPage() {
       leaf("#map", "Map", <MapIcon className={iconClass} />),
       leaf(withFarmContext("/farm/systems"), "Systems", <Layers className={iconClass} />, "/farm/systems"),
       leaf(withFarmContext("/farm/work-hours"), "Work hours", <Clock className={iconClass} />, "/farm/work-hours", true),
-      leaf("#assets", "Assets", <Package className={iconClass} />, undefined, true),
+      leaf(withFarmContext("/farm/assets"), "Assets", <Package className={iconClass} />, "/farm/assets", true),
     ] },
     { key: "growing", label: "Growing", icon: <Leaf className={iconClass} />, items: [
       leaf("#crops", "Crops", <Leaf className={iconClass} />),
@@ -2924,77 +2885,6 @@ export default function FarmPage() {
                   </div>
                 </div>
 
-                {isManager && (
-                <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-                  <button
-                    onClick={() => setShowAssets((v) => !v)}
-                    className="flex w-full items-center justify-between gap-4 text-left"
-                  >
-                    <div>
-                      <h2 id="assets" className="scroll-mt-4 text-xl font-semibold">{t("Assets")}</h2>
-                      <p className="mt-1 text-sm text-zinc-500">{t("{n} logged", { n: assets.length })}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setActiveForm(activeForm === "asset" ? null : "asset"); }}
-                        className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-                      >
-                        {activeForm === "asset" ? t("Cancel") : t("+ Log asset")}
-                      </button>
-                      <span className="text-sm text-zinc-500">{showAssets ? t("Hide") : t("Show")}</span>
-                    </div>
-                  </button>
-
-                  {activeForm === "asset" && (
-                    <div className="mt-5 max-w-sm">
-                      <AssetForm
-                        draftKey={`asset-new:${activeFarmId}`}
-                        payerSuggestions={payerSuggestions}
-                        onSubmit={async (data) => {
-                          const ok = await handleLogAsset(data);
-                          if (ok) setActiveForm(null);
-                          return ok;
-                        }}
-                      />
-                    </div>
-                  )}
-
-                  {showAssets ? (
-                  <div className="mt-5 overflow-hidden rounded-2xl border border-zinc-200">
-                    <div className="grid grid-cols-5 gap-4 border-b border-zinc-200 bg-zinc-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                      <div>{t("Name")}</div>
-                      <div>{t("Category")}</div>
-                      <div>{t("Paid by")}</div>
-                      <div>{t("Price")}</div>
-                      <div>{t("Condition")}</div>
-                    </div>
-
-                    {assets.length === 0 ? (
-                      <div className="px-4 py-6 text-sm text-zinc-500">{t("No assets logged yet.")}</div>
-                    ) : (
-                      assets.map((asset) => (
-                        <div
-                          key={asset.id}
-                          className="grid grid-cols-5 gap-4 border-b border-zinc-100 px-4 py-4 text-sm last:border-b-0"
-                        >
-                          <div>
-                            <div className="font-medium">{asset.name}</div>
-                            {asset.notes ? (
-                              <div className="text-zinc-500">{asset.notes}</div>
-                            ) : null}
-                          </div>
-                          <div className="capitalize">{t(asset.category)}</div>
-                          <div>{asset.paid_by ?? "—"}</div>
-                          <div>{asset.purchase_price ? formatMoney(asset.purchase_price) : "—"}</div>
-                          <div className="capitalize">{asset.condition ? t(asset.condition) : "—"}</div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                  ) : null}
-                </div>
-                )}
-
                 <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                   <div className="flex items-center justify-between gap-4">
                     <div>
@@ -3153,66 +3043,28 @@ export default function FarmPage() {
             {isManager && (
             <section className="mt-6 space-y-6">
               <div className="grid gap-4 sm:grid-cols-3">
-                <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
+                <Link href={withFarmContext("/farm/sales")} className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
                     {t("Total sales")}
                   </p>
                   <p className="mt-3 text-3xl font-semibold">{formatMoney(totalSales)}</p>
-                  <p className="mt-1 text-xs text-zinc-400">{t("Actual revenue from logged sales")}</p>
-                </div>
-                <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
+                  <p className="mt-1 text-xs text-zinc-400">{t("Open sales →")}</p>
+                </Link>
+                <Link href={withFarmContext("/farm/expenses")} className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
                     {t("Total expenses")}
                   </p>
                   <p className="mt-3 text-3xl font-semibold">{formatMoney(totalExpenses)}</p>
                   <p className="mt-1 text-xs text-zinc-400">
-                    {t("Net: {amount}", { amount: formatMoney(totalSales - totalExpenses) })}
+                    {t("Net: {amount}", { amount: formatMoney(totalSales - totalExpenses) })} · {t("Open expenses →")}
                   </p>
-                </div>
+                </Link>
                 <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
                     {t("Expected income")}
                   </p>
                   <p className="mt-3 text-3xl font-semibold">{formatMoney(forecastRevenue)}</p>
                   <p className="mt-1 text-xs text-zinc-400">{t("Based on estimated yield × price per kg")}</p>
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <h2 id="sales" className="scroll-mt-4 text-xl font-semibold">{t("Sales")}</h2>
-                    <p className="mt-1 text-sm text-zinc-500">
-                      {t("This month: {amount}", { amount: formatMoney(salesThisMonth) })}
-                      {" · "}
-                      {t("{n} logged", { n: sales.length + collectedOrders.length })}
-                    </p>
-                  </div>
-                  <Link
-                    href={withFarmContext("/farm/sales")}
-                    className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-                  >
-                    {t("Open sales →")}
-                  </Link>
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <h2 id="expenses" className="scroll-mt-4 text-xl font-semibold">{t("Expenses")}</h2>
-                    <p className="mt-1 text-sm text-zinc-500">
-                      {t("This month: {amount}", { amount: formatMoney(expensesThisMonth) })}
-                      {" · "}
-                      {t("{n} logged", { n: expenses.length })}
-                    </p>
-                  </div>
-                  <Link
-                    href={withFarmContext("/farm/expenses")}
-                    className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-                  >
-                    {t("Open expenses →")}
-                  </Link>
                 </div>
               </div>
 

@@ -17,8 +17,6 @@ import { formatMonthLabel } from "@/app/farm/work-hours/MonthlyChart";
 import { ALL_MONTHS, MonthNavigator, initialMonth } from "@/app/farm/components/MonthNavigator";
 import { ExpenseForm } from "@/app/farm/components/ExpenseForm";
 import type { ExpenseFormData } from "@/app/farm/components/ExpenseForm";
-import { AssetForm } from "@/app/farm/components/AssetForm";
-import type { AssetFormData } from "@/app/farm/components/AssetForm";
 import { NOT_RECORDED, PayerTotals, assetMonth, payerKey, summariseSpend } from "./spend";
 import { StackedMonthChart, StackedMonthTable } from "@/app/farm/components/StackedMonthChart";
 
@@ -43,18 +41,6 @@ function expenseToForm(e: Expense): ExpenseFormData {
   };
 }
 
-function assetToForm(a: Asset): AssetFormData {
-  return {
-    name: a.name,
-    category: a.category,
-    purchase_date: a.purchase_date ?? "",
-    purchase_price: a.purchase_price != null ? String(a.purchase_price) : "",
-    paid_by: a.paid_by ?? "",
-    condition: a.condition ?? "good",
-    notes: a.notes ?? "",
-  };
-}
-
 export default function ExpensesPage() {
   const t = useT();
   const [lang, setLang] = useLanguage();
@@ -69,7 +55,6 @@ export default function ExpensesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [tab, setTab] = useState<"expenses" | "assets">("expenses");
   const [view, setView] = useState<"chart" | "table">("chart");
   const [selectedMonth, setSelectedMonth] = useState<string>(ALL);
   const [payerFilter, setPayerFilter] = useState<string>(ALL);
@@ -87,10 +72,6 @@ export default function ExpensesPage() {
     activeFarmIdRef.current = activeFarmId;
   }, [activeFarmId]);
 
-  /* /farm/expenses#assets opens on the Assets tab. */
-  useEffect(() => {
-    if (window.location.hash === "#assets") setTab("assets");
-  }, []);
 
   useEffect(() => {
     (async () => {
@@ -169,10 +150,8 @@ export default function ExpensesPage() {
     [assets, selectedMonth, payerFilter]
   );
 
-  const shownTotal =
-    tab === "expenses"
-      ? shownExpenses.reduce((s, e) => s + Number(e.amount ?? 0), 0)
-      : shownAssets.reduce((s, a) => s + Number(a.purchase_price ?? 0), 0);
+  const shownTotal = shownExpenses.reduce((s, e) => s + Number(e.amount ?? 0), 0);
+  const shownAssetsTotal = shownAssets.reduce((s, a) => s + Number(a.purchase_price ?? 0), 0);
 
   async function reload() {
     if (activeFarmIdRef.current) await loadSpend(activeFarmIdRef.current);
@@ -241,88 +220,23 @@ export default function ExpensesPage() {
     }
   }
 
-  async function handleLogAsset(data: AssetFormData): Promise<boolean> {
-    if (!activeFarmId) return false;
-    try {
-      setError("");
-      if (!data.name.trim()) throw new Error(t("Asset name is required."));
-      const { error: insertError } = await supabase.from("assets").insert({
-        farm_id: activeFarmId,
-        name: data.name.trim(),
-        category: data.category,
-        purchase_date: data.purchase_date || null,
-        purchase_price: data.purchase_price ? Number(data.purchase_price) : null,
-        paid_by: data.paid_by.trim() || null,
-        condition: data.condition,
-        notes: data.notes.trim() || null,
-      });
-      if (insertError) throw insertError;
-      await supabase.from("activities").insert({
-        farm_id: activeFarmId,
-        type: "asset_logged",
-        title: `${data.name.trim()} logged`,
-        meta: [data.category, data.paid_by.trim() ? `paid by ${data.paid_by.trim()}` : null].filter(Boolean).join(" · "),
-      });
-      await reload();
-      if (data.purchase_date) goToMonth(data.purchase_date);
-      setShowForm(false);
-      return true;
-    } catch (err) {
-      setError(errMsg(err, t("Failed to log asset")));
-      return false;
-    }
-  }
-
-  async function handleUpdateAsset(id: string, data: AssetFormData): Promise<boolean> {
-    try {
-      setError("");
-      if (!data.name.trim()) throw new Error(t("Asset name is required."));
-      const { error: updateError } = await supabase
-        .from("assets")
-        .update({
-          name: data.name.trim(),
-          category: data.category,
-          purchase_date: data.purchase_date || null,
-          purchase_price: data.purchase_price ? Number(data.purchase_price) : null,
-          paid_by: data.paid_by.trim() || null,
-          condition: data.condition,
-          notes: data.notes.trim() || null,
-        })
-        .eq("id", id);
-      if (updateError) throw updateError;
-      await reload();
-      setEditingId(null);
-      return true;
-    } catch (err) {
-      setError(errMsg(err, t("Failed to update asset")));
-      return false;
-    }
-  }
-
-  async function handleDelete(table: "expenses" | "assets", id: string) {
+  async function handleDelete(id: string) {
     try {
       setError("");
       setDeletingId(id);
-      const { error: deleteError } = await supabase.from(table).delete().eq("id", id);
+      const { error: deleteError } = await supabase.from("expenses").delete().eq("id", id);
       if (deleteError) throw deleteError;
       await reload();
       setConfirmDeleteId(null);
     } catch (err) {
-      setError(errMsg(err, table === "expenses" ? t("Failed to delete expense") : t("Failed to delete asset")));
+      setError(errMsg(err, t("Failed to delete expense")));
     } finally {
       setDeletingId(null);
     }
   }
 
-  function switchTab(next: "expenses" | "assets") {
-    setTab(next);
-    setShowForm(false);
-    setEditingId(null);
-    setConfirmDeleteId(null);
-    setCategoryFilter(ALL);
-  }
-
   const activeFarm = farms.find((f) => f.id === activeFarmId);
+  const withFarm = (path: string) => (activeFarmId ? `${path}?farmId=${activeFarmId}` : path);
   const pill = (active: boolean) =>
     `shrink-0 rounded-full px-4 py-2 text-sm font-medium transition ${active ? "bg-zinc-900 text-white" : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"}`;
   const select = "rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 outline-none focus:border-zinc-900";
@@ -331,13 +245,13 @@ export default function ExpensesPage() {
     return <ManagerOnly title={t("Expenses — managers only")} />;
   }
 
-  function rowActions(table: "expenses" | "assets", id: string, onEdit: () => void) {
+  function rowActions(id: string, onEdit: () => void) {
     if (confirmDeleteId === id) {
       return (
         <>
           <span className="text-xs text-red-600">{t("Sure?")}</span>
           <button
-            onClick={() => handleDelete(table, id)}
+            onClick={() => handleDelete(id)}
             disabled={deletingId === id}
             className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60"
           >
@@ -449,45 +363,33 @@ export default function ExpensesPage() {
               </section>
             )}
 
-            {/* Expenses | Assets */}
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex rounded-full border border-zinc-200 bg-white p-0.5">
-                <button onClick={() => switchTab("expenses")} className={`rounded-full px-5 py-2 text-sm font-medium transition ${tab === "expenses" ? "bg-zinc-900 text-white" : "text-zinc-500"}`}>
-                  {t("Expenses")} <span className={tab === "expenses" ? "text-zinc-300" : "text-zinc-400"}>{expenses.length}</span>
-                </button>
-                <button onClick={() => switchTab("assets")} className={`rounded-full px-5 py-2 text-sm font-medium transition ${tab === "assets" ? "bg-zinc-900 text-white" : "text-zinc-500"}`}>
-                  {t("Assets")} <span className={tab === "assets" ? "text-zinc-300" : "text-zinc-400"}>{assets.length}</span>
-                </button>
-              </div>
+              <Link
+                href={withFarm("/farm/assets")}
+                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+              >
+                {t("Assets →")}
+              </Link>
               <button
                 onClick={() => { setShowForm((v) => !v); setEditingId(null); }}
                 className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
               >
-                {showForm ? t("Cancel") : tab === "expenses" ? t("+ Log expense") : t("+ Log asset")}
+                {showForm ? t("Cancel") : t("+ Log expense")}
               </button>
             </div>
 
             {showForm && (
               <div className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-                <h2 className="mb-4 text-base font-semibold">{tab === "expenses" ? t("Log expense") : t("Log asset")}</h2>
+                <h2 className="mb-4 text-base font-semibold">{t("Log expense")}</h2>
                 <div className="max-w-xl">
-                  {tab === "expenses" ? (
-                    <ExpenseForm
-                      zones={zones}
-                      crops={crops}
-                      defaultZoneId=""
-                      draftKey={`expense-new:${activeFarmId}`}
-                      payerSuggestions={payerNames}
-                      onSubmit={handleLogExpense}
-                    />
-                  ) : (
-                    <AssetForm
-                      bare
-                      draftKey={`asset-new:${activeFarmId}`}
-                      payerSuggestions={payerNames}
-                      onSubmit={handleLogAsset}
-                    />
-                  )}
+                  <ExpenseForm
+                    zones={zones}
+                    crops={crops}
+                    defaultZoneId=""
+                    draftKey={`expense-new:${activeFarmId}`}
+                    payerSuggestions={payerNames}
+                    onSubmit={handleLogExpense}
+                  />
                 </div>
               </div>
             )}
@@ -510,26 +412,34 @@ export default function ExpensesPage() {
                     <option key={p.key} value={p.key}>{p.label}</option>
                   ))}
                 </select>
-                {tab === "expenses" && (
-                  <select className={select} value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} aria-label={t("Category")}>
-                    <option value={ALL}>{t("All categories")}</option>
-                    {categories.map((c) => (
-                      <option key={c} value={c}>{t(c)}</option>
-                    ))}
-                  </select>
-                )}
+                <select className={select} value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} aria-label={t("Category")}>
+                  <option value={ALL}>{t("All categories")}</option>
+                  {categories.map((c) => (
+                    <option key={c} value={c}>{t(c)}</option>
+                  ))}
+                </select>
               </div>
               <p className="text-sm text-zinc-600">
                 <span className="font-semibold text-zinc-900">{selectedMonth === ALL ? t("All months") : formatMonthLabel(selectedMonth, t)}</span>
                 {" · "}
                 {formatMoney(shownTotal)}
                 {" · "}
-                {t("{n} logged", { n: tab === "expenses" ? shownExpenses.length : shownAssets.length })}
+                {t("{n} logged", { n: shownExpenses.length })}
               </p>
             </div>
 
-            {tab === "expenses" ? (
-              shownExpenses.length === 0 ? (
+            {/* Asset purchases count in the totals above but live on their own page. */}
+            {shownAssets.length > 0 && (
+              <Link
+                href={withFarm("/farm/assets")}
+                className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-dashed border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-600 hover:bg-zinc-50"
+              >
+                <span>{t("Plus {n} asset purchases: {amount}", { n: shownAssets.length, amount: formatMoney(shownAssetsTotal) })}</span>
+                <span className="font-medium text-zinc-900">{t("Assets →")}</span>
+              </Link>
+            )}
+
+            {shownExpenses.length === 0 ? (
                 <div className="rounded-3xl border border-zinc-200 bg-white p-8 text-center text-sm text-zinc-500 shadow-sm">{t("No expenses here.")}</div>
               ) : (
                 <div className="space-y-2">
@@ -567,59 +477,13 @@ export default function ExpensesPage() {
                             </p>
                           </div>
                           <div className="flex shrink-0 items-center gap-2">
-                            {rowActions("expenses", expense.id, () => setEditingId(expense.id))}
+                            {rowActions(expense.id, () => setEditingId(expense.id))}
                           </div>
                         </div>
                       )}
                     </div>
                   ))}
                 </div>
-              )
-            ) : shownAssets.length === 0 ? (
-              <div className="rounded-3xl border border-zinc-200 bg-white p-8 text-center text-sm text-zinc-500 shadow-sm">{t("No assets here.")}</div>
-            ) : (
-              <div className="space-y-2">
-                {shownAssets.map((asset) => (
-                  <div key={asset.id} className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
-                    {editingId === asset.id ? (
-                      <div className="max-w-xl p-4">
-                        <AssetForm
-                          bare
-                          initial={assetToForm(asset)}
-                          draftKey={`asset-edit:${asset.id}`}
-                          payerSuggestions={payerNames}
-                          submitLabel={t("Save changes")}
-                          onSubmit={(data) => handleUpdateAsset(asset.id, data)}
-                        />
-                        <button onClick={() => { discardDraft(`asset-edit:${asset.id}`); setEditingId(null); }} className="mt-2 text-sm text-zinc-500 hover:text-zinc-800">
-                          {t("Cancel")}
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-medium">{asset.name}</span>
-                            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium capitalize text-zinc-700">{t(asset.category)}</span>
-                            {asset.condition && <span className="text-xs capitalize text-zinc-400">{t(asset.condition)}</span>}
-                          </div>
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-                            <span className="text-zinc-400">{asset.purchase_date ? formatDate(asset.purchase_date) : t("No purchase date")}</span>
-                            <span className="text-zinc-500">· {asset.paid_by?.trim() || t("Not recorded")}</span>
-                          </div>
-                          {asset.notes && <p className="mt-1 text-sm text-zinc-700">{asset.notes}</p>}
-                          <p className="mt-1 text-sm font-semibold">
-                            {asset.purchase_price != null ? formatMoney(asset.purchase_price) : <span className="font-normal text-zinc-400">{t("Amount TBC")}</span>}
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          {rowActions("assets", asset.id, () => setEditingId(asset.id))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
             )}
           </>
         )}

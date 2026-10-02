@@ -305,6 +305,17 @@ export const dashboard: Record<string, string> = {
   "{n} kg": "kilo {n}",
   "{amount}/kg": "{amount}/kilo",
   "No crop": "Hakuna zao",
+
+  /* Assets page (app/farm/assets) */
+  "Assets — managers only": "Mali — wasimamizi pekee",
+  "Total paid for assets": "Jumla iliyolipwa kwa mali",
+  "Spend with expenses, by month →": "Matumizi pamoja na gharama, kwa mwezi →",
+  "By category": "Kwa aina",
+  "Any condition": "Hali yoyote",
+  "Assets →": "Mali →",
+  "Plus {n} asset purchases: {amount}": "Pamoja na manunuzi {n} ya mali: {amount}",
+  "tools": "zana",
+  "supplies": "vifaa",
   "Failed to update asset": "Imeshindwa kusasisha mali",
   "Failed to delete asset": "Imeshindwa kufuta mali",
   "Sure?": "Una uhakika?",
