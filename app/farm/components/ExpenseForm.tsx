@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import type { Zone, Crop } from "@/lib/farm";
 import { useT } from "@/lib/i18n";
+import { useFormDraft } from "@/hooks/useFormDraft";
 
 export type ExpenseFormData = {
   category: string;
@@ -48,27 +49,35 @@ type Props = {
   onSubmit: (data: ExpenseFormData) => Promise<boolean>;
   initial?: ExpenseFormData;
   submitLabel?: string;
+  /* Where to keep the unsaved draft, e.g. "expense-new:<farmId>". */
+  draftKey?: string;
+  /* Names already used in Paid by, offered so spellings stay consistent. */
+  payerSuggestions?: string[];
 };
 
-export function ExpenseForm({ zones, crops, defaultZoneId, onSubmit, initial, submitLabel }: Props) {
+export function ExpenseForm({ zones, crops, defaultZoneId, onSubmit, initial, submitLabel, draftKey, payerSuggestions = [] }: Props) {
   const t = useT();
-  const [form, setForm] = useState<ExpenseFormData>(initial ?? blank);
+  const baseline = initial ?? { ...blank, zone_id: defaultZoneId };
+  const [form, setForm, clearDraft] = useFormDraft<ExpenseFormData>(draftKey ?? null, baseline);
   const [saving, setSaving] = useState(false);
+  const payerListId = useId();
 
+  /* Beds load after the form can mount: pick the default bed once known,
+     unless one is already chosen (or restored from a draft). */
   useEffect(() => {
-    if (initial) {
-      setForm(initial);
-    } else if (defaultZoneId) {
-      setForm((prev) => (prev.zone_id ? prev : { ...prev, zone_id: defaultZoneId }));
-    }
-  }, [initial, defaultZoneId]);
+    if (initial || !defaultZoneId) return;
+    setForm((prev) => (prev.zone_id ? prev : { ...prev, zone_id: defaultZoneId }));
+  }, [initial, defaultZoneId, setForm]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     const ok = await onSubmit(form);
     setSaving(false);
-    if (ok && !initial) setForm({ ...blank, zone_id: defaultZoneId });
+    if (ok) {
+      clearDraft();
+      if (!initial) setForm({ ...blank, zone_id: defaultZoneId });
+    }
   }
 
   return (
@@ -122,8 +131,14 @@ export function ExpenseForm({ zones, crops, defaultZoneId, onSubmit, initial, su
             value={form.vendor_name}
             onChange={(e) => setForm((prev) => ({ ...prev, vendor_name: e.target.value }))}
             className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
-            placeholder={t("e.g. Eh")}
+            placeholder={t("e.g. EH")}
+            list={payerSuggestions.length > 0 ? payerListId : undefined}
           />
+          {payerSuggestions.length > 0 && (
+            <datalist id={payerListId}>
+              {payerSuggestions.map((name) => <option key={name} value={name} />)}
+            </datalist>
+          )}
         </div>
       </div>
 

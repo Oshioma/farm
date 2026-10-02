@@ -141,7 +141,7 @@ export const forms: Record<string, string> = {
   "utilities": "huduma (umeme/maji)",
   "other": "nyingine",
   "Amount (TZS)": "Kiasi (TZS)",
-  "e.g. Eh": "mf. Eh",
+  "e.g. EH": "mf. EH",
   "What was purchased?": "Kilichonunuliwa ni nini?",
 
   /* AssetForm */
