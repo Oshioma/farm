@@ -15,6 +15,7 @@ import {
   getAssets,
   getPests,
   getSales,
+  getCollectedOrders,
   getFertilisations,
   getCompost,
   getMulch,
@@ -26,7 +27,7 @@ import {
   saveActiveFarmId,
   getActiveFarmId,
 } from "@/lib/farm";
-import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, FertilisationEntry, CompostEntry, MulchEntry, PestControlEntry, Plant, HarvestEtaEntry, FarmMember, Want, WantWithFarm } from "@/lib/farm";
+import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, CollectedOrder, FertilisationEntry, CompostEntry, MulchEntry, PestControlEntry, Plant, HarvestEtaEntry, FarmMember, Want, WantWithFarm } from "@/lib/farm";
 import { formatDate, formatMoney, badgeClass } from "@/app/farm/utils";
 import { CropForm } from "@/app/farm/components/CropForm";
 import { TaskForm } from "@/app/farm/components/TaskForm";
@@ -86,6 +87,7 @@ export default function FarmPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [pests, setPests] = useState<Pest[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
+  const [collectedOrders, setCollectedOrders] = useState<CollectedOrder[]>([]);
   const [fertilisations, setFertilisations] = useState<FertilisationEntry[]>([]);
   const [compostEntries, setCompostEntries] = useState<CompostEntry[]>([]);
   const [mulchEntries, setMulchEntries] = useState<MulchEntry[]>([]);
@@ -362,6 +364,11 @@ export default function FarmPage() {
     setAssets(assetRows);
     setPests(pestRows);
     setSales(saleRows);
+    /* Collected shop orders count as sales too. Loaded on their own so a
+       role that can't read orders still gets the rest of the dashboard. */
+    getCollectedOrders(farmId)
+      .then((rows) => { if (latestFarmIdRef.current === farmId) setCollectedOrders(rows); })
+      .catch(() => { if (latestFarmIdRef.current === farmId) setCollectedOrders([]); });
     setFertilisations(fertilisationRows);
     setCompostEntries(compostRows);
     setMulchEntries(mulchRows);
@@ -535,23 +542,25 @@ export default function FarmPage() {
   // Managers (owner/manager) get financial + admin features; workers don't.
   const isManager = userRoleOnFarm === "owner" || userRoleOnFarm === "manager";
 
-  /* Section links. Expenses moved to their own page, so /farm#expenses
-     forwards there. #sales and #assets point at sections that only exist
-     once the farm data and the manager role have loaded, so the browser's
-     own jump (made on first paint) misses them: scroll once they're drawn,
-     and open the asset list on the way. */
+  /* Section links. Expenses and Sales moved to their own pages, so
+     /farm#expenses and /farm#sales forward there. #assets points at a
+     section that only exists once the farm data and the manager role have
+     loaded, so the browser's own jump (made on first paint) misses it:
+     scroll once it's drawn, and open the asset list on the way. */
   const sectionLinkHandledRef = React.useRef(false);
   useEffect(() => {
     if (window.location.hash === "#expenses") {
       router.replace(`/farm/expenses${window.location.search}`);
+    } else if (window.location.hash === "#sales") {
+      router.replace(`/farm/sales${window.location.search}`);
     }
   }, [router]);
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     function goToSection(isFirstLoad: boolean) {
       const id = window.location.hash.slice(1);
-      if (id !== "sales" && id !== "assets") return;
-      if (id === "assets") setShowAssets(true);
+      if (id !== "assets") return;
+      setShowAssets(true);
       timer = setTimeout(() => {
         const el = document.getElementById(id);
         /* Not drawn yet: try again on the next load step. */
@@ -667,6 +676,14 @@ export default function FarmPage() {
   const expensesThisMonth = expenses
     .filter((e) => (e.expense_date ?? "").startsWith(thisMonthKey))
     .reduce((sum, e) => sum + Number(e.amount ?? 0), 0);
+  const buyerSuggestions = Array.from(
+    new Map(
+      sales
+        .map((x) => (x.buyer_name ?? "").trim())
+        .filter(Boolean)
+        .map((n) => [n.toLowerCase(), n] as [string, string])
+    ).values()
+  );
   /* Names already used in Paid by, offered in the forms so spellings stay consistent. */
   const payerSuggestions = Array.from(
     new Map(
@@ -676,7 +693,21 @@ export default function FarmPage() {
         .map((n) => [n.toLowerCase(), n] as [string, string])
     ).values()
   );
-  const totalSales = sales.reduce((sum, s) => sum + Number(s.total_amount ?? 0), 0);
+  /* A collected order counts at what was handed over and charged, falling
+     back to what was reserved (the same rule as the Sales page). */
+  const orderAmount = (o: CollectedOrder) => {
+    const kg = o.actual_quantity_kg ?? o.quantity_kg;
+    const price = o.actual_price_per_kg ?? o.price_per_kg;
+    return kg != null && price != null ? Math.round(kg * price) : 0;
+  };
+  const totalSales =
+    sales.reduce((sum, s) => sum + Number(s.total_amount ?? 0), 0) +
+    collectedOrders.reduce((sum, o) => sum + orderAmount(o), 0);
+  const salesThisMonth =
+    sales.filter((s) => (s.sale_date ?? "").startsWith(thisMonthKey)).reduce((sum, s) => sum + Number(s.total_amount ?? 0), 0) +
+    collectedOrders
+      .filter((o) => (o.collected_at ?? o.updated_at ?? "").startsWith(thisMonthKey))
+      .reduce((sum, o) => sum + orderAmount(o), 0);
 
   const defaultZoneId = zones.length === 1 ? zones[0].id : "";
   const defaultCropId = crops.length === 1 ? crops[0].id : "";
@@ -1615,7 +1646,7 @@ export default function FarmPage() {
     { key: "business", label: "Business", icon: <Wallet className={iconClass} />, items: [
       leaf(withFarmContext("/farm/orders"), "Orders", <ShoppingBag className={iconClass} />, "/farm/orders", true),
       leaf(withFarmContext("/farm/customers"), "Customers", <Users className={iconClass} />, "/farm/customers", true),
-      leaf("#sales", "Sales", <Receipt className={iconClass} />, undefined, true),
+      leaf(withFarmContext("/farm/sales"), "Sales", <Receipt className={iconClass} />, "/farm/sales", true),
       leaf(withFarmContext("/farm/expenses"), "Expenses", <Wallet className={iconClass} />, "/farm/expenses", true),
     ] },
   ].map((section) => ({
@@ -2171,6 +2202,8 @@ export default function FarmPage() {
                 {activeForm === "sale" && (
                   <SaleForm
                     crops={crops}
+                    draftKey={`sale-new:${activeFarmId}`}
+                    buyerSuggestions={buyerSuggestions}
                     onSubmit={async (data) => {
                       const ok = await handleLogSale(data);
                       if (ok) setActiveForm(null);
@@ -3146,63 +3179,21 @@ export default function FarmPage() {
               </div>
 
               <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <h2 id="sales" className="scroll-mt-4 text-xl font-semibold">{t("Sales")}</h2>
-                    <p className="mt-1 text-sm text-zinc-500">{t("Most recent 20 sales.")}</p>
+                    <p className="mt-1 text-sm text-zinc-500">
+                      {t("This month: {amount}", { amount: formatMoney(salesThisMonth) })}
+                      {" · "}
+                      {t("{n} logged", { n: sales.length + collectedOrders.length })}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-zinc-500">{t("{n} logged", { n: sales.length })}</span>
-                    <button
-                      onClick={() => setActiveForm(activeForm === "sale" ? null : "sale")}
-                      className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-                    >
-                      {activeForm === "sale" ? t("Cancel") : t("+ Log sale")}
-                    </button>
-                  </div>
-                </div>
-
-                {activeForm === "sale" && (
-                  <div className="mt-5 max-w-sm">
-                    <SaleForm
-                      crops={crops}
-                      onSubmit={async (data) => {
-                        const ok = await handleLogSale(data);
-                        if (ok) setActiveForm(null);
-                        return ok;
-                      }}
-                    />
-                  </div>
-                )}
-
-                <div className="mt-5 space-y-2">
-                  {sales.length === 0 ? (
-                    <div className="rounded-2xl border border-zinc-200 px-4 py-6 text-sm text-zinc-500">{t("No sales yet.")}</div>
-                  ) : (
-                    sales.map((sale) => (
-                      <div key={sale.id} className="rounded-2xl border border-zinc-200 bg-white">
-                        <div className="flex items-start justify-between gap-3 px-4 py-4">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              {sale.crop?.[0]?.crop_name && (
-                                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">{sale.crop[0].crop_name}</span>
-                              )}
-                              <span className="text-xs text-zinc-400">{formatDate(sale.sale_date)}</span>
-                              {sale.buyer_name && <span className="text-xs text-zinc-400">· {sale.buyer_name}</span>}
-                            </div>
-                            {sale.quantity_kg != null && (
-                              <p className="mt-1 text-sm text-zinc-600">
-                                {sale.quantity_kg} {t("kg")}
-                                {sale.price_per_kg != null ? ` @ ${formatMoney(sale.price_per_kg)}/kg` : ""}
-                              </p>
-                            )}
-                            {sale.notes && <p className="mt-1 text-sm text-zinc-500">{sale.notes}</p>}
-                            <p className="mt-1 text-sm font-semibold">{sale.total_amount != null ? formatMoney(sale.total_amount) : <span className="text-zinc-400 font-normal">{t("Amount TBC")}</span>}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
+                  <Link
+                    href={withFarmContext("/farm/sales")}
+                    className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+                  >
+                    {t("Open sales →")}
+                  </Link>
                 </div>
               </div>
 

@@ -13,12 +13,14 @@ import { discardDraft } from "@/hooks/useFormDraft";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useT, useLanguage } from "@/lib/i18n";
 import { formatDate, formatMoney } from "@/app/farm/utils";
-import { currentMonthKey, formatMonthLabel } from "@/app/farm/work-hours/MonthlyChart";
+import { formatMonthLabel } from "@/app/farm/work-hours/MonthlyChart";
+import { ALL_MONTHS, MonthNavigator, initialMonth } from "@/app/farm/components/MonthNavigator";
 import { ExpenseForm } from "@/app/farm/components/ExpenseForm";
 import type { ExpenseFormData } from "@/app/farm/components/ExpenseForm";
 import { AssetForm } from "@/app/farm/components/AssetForm";
 import type { AssetFormData } from "@/app/farm/components/AssetForm";
-import { MonthlyTable, NOT_RECORDED, PayerTotals, SpendChart, assetMonth, payerKey, summariseSpend } from "./spend";
+import { NOT_RECORDED, PayerTotals, assetMonth, payerKey, summariseSpend } from "./spend";
+import { StackedMonthChart, StackedMonthTable } from "@/app/farm/components/StackedMonthChart";
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message;
@@ -27,7 +29,7 @@ function errMsg(err: unknown, fallback: string): string {
   return fallback;
 }
 
-const ALL = "all";
+const ALL = ALL_MONTHS;
 
 function expenseToForm(e: Expense): ExpenseFormData {
   return {
@@ -132,10 +134,7 @@ export default function ExpensesPage() {
           ...loaded.expenseRows.map((e) => (e.expense_date ?? "").slice(0, 7)),
           ...loaded.assetRows.map(assetMonth),
         ].filter(Boolean).sort();
-        const requested = new URLSearchParams(window.location.search).get("month") ?? "";
-        setSelectedMonth(
-          requested === ALL || /^\d{4}-\d{2}$/.test(requested) ? requested : months[months.length - 1] ?? ALL
-        );
+        setSelectedMonth(initialMonth(months));
       } catch (err) {
         setError(errMsg(err, t("Failed to load")));
       } finally {
@@ -145,53 +144,9 @@ export default function ExpensesPage() {
   }, [activeFarmId]);
 
   const summary = useMemo(() => summariseSpend(expenses, assets, t), [expenses, assets, t]);
+  const chartData = useMemo(() => ({ series: summary.payers, months: summary.months, grandTotal: summary.grandTotal }), [summary]);
   const payerNames = useMemo(() => summary.payers.filter((p) => p.key !== NOT_RECORDED).map((p) => p.label), [summary]);
   const categories = useMemo(() => [...new Set(expenses.map((e) => e.category))].sort(), [expenses]);
-  const monthTotals = useMemo(() => new Map(summary.months.map((m) => [m.month, m.total])), [summary]);
-
-  /* The months to step through, oldest first: every month with spend, plus
-     this month so there's always somewhere to log into, plus whatever month
-     is open (an empty one reached from a link). */
-  const navMonths = useMemo(() => {
-    const keys = new Set(summary.months.map((m) => m.month));
-    keys.add(currentMonthKey());
-    if (selectedMonth !== ALL) keys.add(selectedMonth);
-    return [...keys].sort();
-  }, [summary, selectedMonth]);
-  const navIndex = selectedMonth === ALL ? -1 : navMonths.indexOf(selectedMonth);
-  const prevMonth = selectedMonth === ALL ? navMonths[navMonths.length - 1] : navIndex > 0 ? navMonths[navIndex - 1] : null;
-  const nextMonth = selectedMonth !== ALL && navIndex < navMonths.length - 1 ? navMonths[navIndex + 1] : null;
-
-  /* Keep the open month in the address so a refresh, the back button or a
-     shared link comes back to it. */
-  useEffect(() => {
-    if (loading || !selectedMonth) return;
-    const url = new URL(window.location.href);
-    if (url.searchParams.get("month") === selectedMonth) return;
-    url.searchParams.set("month", selectedMonth);
-    window.history.replaceState(window.history.state, "", url.toString());
-  }, [selectedMonth, loading]);
-
-  /* Left and right arrow keys step months, unless typing in a field. */
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      const el = e.target as HTMLElement | null;
-      if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))) return;
-      if (e.altKey || e.ctrlKey || e.metaKey) return;
-      if (e.key === "ArrowLeft" && prevMonth) setSelectedMonth(prevMonth);
-      if (e.key === "ArrowRight" && nextMonth) setSelectedMonth(nextMonth);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [prevMonth, nextMonth]);
-
-  /* Bring the open month's pill into view when stepping with the arrows. */
-  const pillsRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    pillsRef.current
-      ?.querySelector<HTMLElement>('[aria-pressed="true"]')
-      ?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
-  }, [selectedMonth]);
 
   const shownExpenses = useMemo(
     () =>
@@ -470,9 +425,9 @@ export default function ExpensesPage() {
                 {summary.months.length === 0 ? (
                   <p className="text-sm text-zinc-400">{t("Log an expense to see the months here.")}</p>
                 ) : view === "chart" ? (
-                  <SpendChart summary={summary} selected={selectedMonth} onSelect={setSelectedMonth} t={t} />
+                  <StackedMonthChart data={chartData} selected={selectedMonth} onSelect={setSelectedMonth} t={t} label={t("Monthly spend by person")} />
                 ) : (
-                  <MonthlyTable summary={summary} t={t} onSelect={setSelectedMonth} />
+                  <StackedMonthTable data={chartData} t={t} onSelect={setSelectedMonth} />
                 )}
               </div>
             </section>
@@ -537,55 +492,14 @@ export default function ExpensesPage() {
               </div>
             )}
 
-            {/* Month navigator: step back and forward a month at a time */}
-            <div className="mb-3 flex items-center justify-between gap-2 rounded-3xl border border-zinc-200 bg-white p-2 shadow-sm">
-              <button
-                onClick={() => prevMonth && setSelectedMonth(prevMonth)}
-                disabled={!prevMonth}
-                aria-label={t("Previous month")}
-                className="flex h-11 items-center gap-1 rounded-2xl px-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                <span aria-hidden className="text-xl leading-none">‹</span>
-                <span className="hidden sm:inline">{prevMonth ? formatMonthLabel(prevMonth, t) : ""}</span>
-              </button>
-              <div className="min-w-0 text-center">
-                <p className="truncate text-lg font-semibold">
-                  {selectedMonth === ALL ? t("All months") : formatMonthLabel(selectedMonth, t)}
-                </p>
-                <p className="text-xs text-zinc-500">
-                  {selectedMonth === ALL
-                    ? formatMoney(summary.grandTotal)
-                    : monthTotals.get(selectedMonth)
-                      ? formatMoney(monthTotals.get(selectedMonth) ?? 0)
-                      : t("Nothing logged")}
-                </p>
-              </div>
-              <button
-                onClick={() => nextMonth && setSelectedMonth(nextMonth)}
-                disabled={!nextMonth}
-                aria-label={t("Next month")}
-                className="flex h-11 items-center gap-1 rounded-2xl px-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                <span className="hidden sm:inline">{nextMonth ? formatMonthLabel(nextMonth, t) : ""}</span>
-                <span aria-hidden className="text-xl leading-none">›</span>
-              </button>
-            </div>
-
-            {/* Month pills */}
-            <div ref={pillsRef} className="mb-3 -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
-              <button onClick={() => setSelectedMonth(ALL)} aria-pressed={selectedMonth === ALL} className={pill(selectedMonth === ALL)}>
-                {t("All months")}
-              </button>
-              {summary.months.map((m) => {
-                const active = m.month === selectedMonth;
-                return (
-                  <button key={m.month} onClick={() => setSelectedMonth(m.month)} aria-pressed={active} className={pill(active)}>
-                    {formatMonthLabel(m.month, t)}
-                    <span className={`ml-2 text-xs ${active ? "text-zinc-300" : "text-zinc-400"}`}>{formatMoney(monthTotals.get(m.month) ?? 0).replace("TZS ", "")}</span>
-                  </button>
-                );
-              })}
-            </div>
+            <MonthNavigator
+              months={summary.months}
+              grandTotal={summary.grandTotal}
+              selected={selectedMonth}
+              onSelect={setSelectedMonth}
+              ready={!loading}
+              t={t}
+            />
 
             {/* Filters */}
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

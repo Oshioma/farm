@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useId, useState } from "react";
 import type { Crop } from "@/lib/farm";
 import { useT } from "@/lib/i18n";
+import { useFormDraft } from "@/hooks/useFormDraft";
 
 export type SaleFormData = {
   crop_id: string;
@@ -29,16 +30,17 @@ type Props = {
   onSubmit: (data: SaleFormData) => Promise<boolean>;
   initial?: SaleFormData;
   submitLabel?: string;
+  /* Where to keep the unsaved draft, e.g. "sale-new:<farmId>". */
+  draftKey?: string;
+  /* Buyer names already used, offered so spellings stay consistent. */
+  buyerSuggestions?: string[];
 };
 
-export function SaleForm({ crops, onSubmit, initial, submitLabel }: Props) {
+export function SaleForm({ crops, onSubmit, initial, submitLabel, draftKey, buyerSuggestions = [] }: Props) {
   const t = useT();
-  const [form, setForm] = useState<SaleFormData>(initial ?? blank);
+  const [form, setForm, clearDraft] = useFormDraft<SaleFormData>(draftKey ?? null, initial ?? blank);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (initial) setForm(initial);
-  }, [initial]);
+  const buyerListId = useId();
 
   function updateField(field: keyof SaleFormData, value: string) {
     setForm((prev) => {
@@ -59,7 +61,10 @@ export function SaleForm({ crops, onSubmit, initial, submitLabel }: Props) {
     setSaving(true);
     const ok = await onSubmit(form);
     setSaving(false);
-    if (ok && !initial) setForm(blank);
+    if (ok) {
+      clearDraft();
+      if (!initial) setForm(blank);
+    }
   }
 
   return (
@@ -90,7 +95,13 @@ export function SaleForm({ crops, onSubmit, initial, submitLabel }: Props) {
             onChange={(e) => updateField("buyer_name", e.target.value)}
             className="w-full rounded-2xl border border-zinc-300 px-4 py-3 outline-none focus:border-zinc-900"
             placeholder={t("e.g. Market vendor")}
+            list={buyerSuggestions.length > 0 ? buyerListId : undefined}
           />
+          {buyerSuggestions.length > 0 && (
+            <datalist id={buyerListId}>
+              {buyerSuggestions.map((name) => <option key={name} value={name} />)}
+            </datalist>
+          )}
         </div>
       </div>
 
