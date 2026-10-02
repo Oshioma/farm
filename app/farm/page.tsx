@@ -33,7 +33,6 @@ import { TaskForm } from "@/app/farm/components/TaskForm";
 import { HarvestForm } from "@/app/farm/components/HarvestForm";
 import { estimatedKg, formatYield, isCountedCrop, kgPerUnitValue } from "@/lib/harvest";
 import { ExpenseForm } from "@/app/farm/components/ExpenseForm";
-import { ExpenseSummary } from "@/app/farm/components/ExpenseSummary";
 import { AssetForm } from "@/app/farm/components/AssetForm";
 import { PestForm } from "@/app/farm/components/PestForm";
 import { SaleForm } from "@/app/farm/components/SaleForm";
@@ -101,7 +100,6 @@ export default function FarmPage() {
   const hasLoadedInitialFarm = React.useRef(false);
   const latestFarmIdRef = React.useRef("");
   const [activeForm, setActiveForm] = useState<"crop" | "task" | "harvest" | "expense" | "asset" | "pest" | "sale" | "want" | null>(null);
-  const [showExpenses, setShowExpenses] = useState(false);
   const [showAssets, setShowAssets] = useState(false);
   const [showWants, setShowWants] = useState(true);
   const [deletingWantId, setDeletingWantId] = useState<string | null>(null);
@@ -155,11 +153,6 @@ export default function FarmPage() {
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
   const [error, setError] = useState<string>("");
-  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
-  const [editingExpenseForm, setEditingExpenseForm] = useState<ExpenseFormData | null>(null);
-  const [savingExpenseId, setSavingExpenseId] = useState<string | null>(null);
-  const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
-  const [confirmDeleteExpenseId, setConfirmDeleteExpenseId] = useState<string | null>(null);
   const [editingPestId, setEditingPestId] = useState<string | null>(null);
   const [deletingPestId, setDeletingPestId] = useState<string | null>(null);
   const [confirmDeletePestId, setConfirmDeletePestId] = useState<string | null>(null);
@@ -542,6 +535,40 @@ export default function FarmPage() {
   // Managers (owner/manager) get financial + admin features; workers don't.
   const isManager = userRoleOnFarm === "owner" || userRoleOnFarm === "manager";
 
+  /* Section links. Expenses moved to their own page, so /farm#expenses
+     forwards there. #sales and #assets point at sections that only exist
+     once the farm data and the manager role have loaded, so the browser's
+     own jump (made on first paint) misses them: scroll once they're drawn,
+     and open the asset list on the way. */
+  const sectionLinkHandledRef = React.useRef(false);
+  useEffect(() => {
+    if (window.location.hash === "#expenses") {
+      router.replace(`/farm/expenses${window.location.search}`);
+    }
+  }, [router]);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    function goToSection(isFirstLoad: boolean) {
+      const id = window.location.hash.slice(1);
+      if (id !== "sales" && id !== "assets") return;
+      if (id === "assets") setShowAssets(true);
+      timer = setTimeout(() => {
+        const el = document.getElementById(id);
+        /* Not drawn yet: try again on the next load step. */
+        if (!el) return;
+        if (isFirstLoad) sectionLinkHandledRef.current = true;
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 150);
+    }
+    if (!loading && isManager && !sectionLinkHandledRef.current) goToSection(true);
+    const onHashChange = () => goToSection(false);
+    window.addEventListener("hashchange", onHashChange);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("hashchange", onHashChange);
+    };
+  }, [loading, isManager, activeFarmId]);
+
   const tasksToday = monthGoals.filter(
     (task) =>
       task.due_date === today &&
@@ -635,7 +662,20 @@ export default function FarmPage() {
     return sum + Number(crop.estimated_yield_kg ?? 0) * Number(crop.expected_sale_price_per_kg ?? 0);
   }, 0);
 
-  const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount ?? 0), 0);
+  const thisMonthKey = new Date().toISOString().slice(0, 7);
+  const expensesThisMonth = expenses
+    .filter((e) => (e.expense_date ?? "").startsWith(thisMonthKey))
+    .reduce((sum, e) => sum + Number(e.amount ?? 0), 0);
+  /* Names already used in Paid by, offered in the forms so spellings stay consistent. */
+  const payerSuggestions = Array.from(
+    new Map(
+      [...expenses.map((e) => e.vendor_name), ...assets.map((a) => a.paid_by)]
+        .map((n) => (n ?? "").trim())
+        .filter(Boolean)
+        .map((n) => [n.toLowerCase(), n] as [string, string])
+    ).values()
+  );
   const totalSales = sales.reduce((sum, s) => sum + Number(s.total_amount ?? 0), 0);
 
   const defaultZoneId = zones.length === 1 ? zones[0].id : "";
@@ -1255,47 +1295,6 @@ export default function FarmPage() {
     }
   }
 
-  async function handleUpdateExpense(id: string, data: ExpenseFormData): Promise<boolean> {
-    try {
-      setError("");
-      setSavingExpenseId(id);
-      const { error: updateError } = await supabase.from("expenses").update({
-        category: data.category,
-        amount: data.amount ? Number(data.amount) : null,
-        expense_date: data.expense_date,
-        notes: data.notes || null,
-        vendor_name: data.vendor_name || null,
-        zone_id: data.zone_id || null,
-        crop_id: data.crop_id || null,
-      }).eq("id", id);
-      if (updateError) throw updateError;
-      await loadFarmData(activeFarmId);
-      setEditingExpenseId(null);
-      setEditingExpenseForm(null);
-      return true;
-    } catch (err) {
-      setError(errMsg(err, t("Failed to update expense")));
-      return false;
-    } finally {
-      setSavingExpenseId(null);
-    }
-  }
-
-  async function handleDeleteExpense(id: string) {
-    try {
-      setError("");
-      setDeletingExpenseId(id);
-      const { error: deleteError } = await supabase.from("expenses").delete().eq("id", id);
-      if (deleteError) throw deleteError;
-      await loadFarmData(activeFarmId);
-      setConfirmDeleteExpenseId(null);
-    } catch (err) {
-      setError(errMsg(err, t("Failed to delete expense")));
-    } finally {
-      setDeletingExpenseId(null);
-    }
-  }
-
   async function handleLogAsset(data: AssetFormData): Promise<boolean> {
     if (!activeFarmId) return false;
     try {
@@ -1591,7 +1590,7 @@ export default function FarmPage() {
       leaf("#map", "Map", <MapIcon className={iconClass} />),
       leaf(withFarmContext("/farm/systems"), "Systems", <Layers className={iconClass} />, "/farm/systems"),
       leaf(withFarmContext("/farm/work-hours"), "Work hours", <Clock className={iconClass} />, "/farm/work-hours", true),
-      leaf("#assets", "Assets", <Package className={iconClass} />),
+      leaf("#assets", "Assets", <Package className={iconClass} />, undefined, true),
     ] },
     { key: "growing", label: "Growing", icon: <Leaf className={iconClass} />, items: [
       leaf("#crops", "Crops", <Leaf className={iconClass} />),
@@ -1616,8 +1615,8 @@ export default function FarmPage() {
     { key: "business", label: "Business", icon: <Wallet className={iconClass} />, items: [
       leaf(withFarmContext("/farm/orders"), "Orders", <ShoppingBag className={iconClass} />, "/farm/orders", true),
       leaf(withFarmContext("/farm/customers"), "Customers", <Users className={iconClass} />, "/farm/customers", true),
-      leaf("#sales", "Sales", <Receipt className={iconClass} />),
-      leaf("#expenses", "Expenses", <Wallet className={iconClass} />),
+      leaf("#sales", "Sales", <Receipt className={iconClass} />, undefined, true),
+      leaf(withFarmContext("/farm/expenses"), "Expenses", <Wallet className={iconClass} />, "/farm/expenses", true),
     ] },
   ].map((section) => ({
     ...section,
@@ -2137,6 +2136,8 @@ export default function FarmPage() {
                     zones={zones}
                     crops={crops}
                     defaultZoneId={defaultZoneId}
+                    draftKey={`expense-new:${activeFarmId}`}
+                    payerSuggestions={payerSuggestions}
                     onSubmit={async (data) => {
                       const ok = await handleLogExpense(data);
                       if (ok) setActiveForm(null);
@@ -2146,6 +2147,8 @@ export default function FarmPage() {
                 )}
                 {activeForm === "asset" && (
                   <AssetForm
+                    draftKey={`asset-new:${activeFarmId}`}
+                    payerSuggestions={payerSuggestions}
                     onSubmit={async (data) => {
                       const ok = await handleLogAsset(data);
                       if (ok) setActiveForm(null);
@@ -2912,6 +2915,8 @@ export default function FarmPage() {
                   {activeForm === "asset" && (
                     <div className="mt-5 max-w-sm">
                       <AssetForm
+                        draftKey={`asset-new:${activeFarmId}`}
+                        payerSuggestions={payerSuggestions}
                         onSubmit={async (data) => {
                           const ok = await handleLogAsset(data);
                           if (ok) setActiveForm(null);
@@ -3202,130 +3207,22 @@ export default function FarmPage() {
               </div>
 
               <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
-                <button
-                  onClick={() => setShowExpenses((v) => !v)}
-                  className="flex w-full items-center justify-between gap-4 text-left"
-                >
+                <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <h2 id="expenses" className="scroll-mt-4 text-xl font-semibold">{t("Expenses")}</h2>
-                    <p className="mt-1 text-sm text-zinc-500">{t("{n} logged", { n: expenses.length })}</p>
+                    <p className="mt-1 text-sm text-zinc-500">
+                      {t("This month: {amount}", { amount: formatMoney(expensesThisMonth) })}
+                      {" · "}
+                      {t("{n} logged", { n: expenses.length })}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setActiveForm(activeForm === "expense" ? null : "expense"); }}
-                      className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-                    >
-                      {activeForm === "expense" ? t("Cancel") : t("+ Log expense")}
-                    </button>
-                    <span className="text-sm text-zinc-500">{showExpenses ? t("Hide") : t("Show")}</span>
-                  </div>
-                </button>
-
-                {activeForm === "expense" && (
-                  <div className="mt-5 max-w-sm">
-                    <ExpenseForm
-                      zones={zones}
-                      crops={crops}
-                      defaultZoneId={defaultZoneId}
-                      onSubmit={async (data) => {
-                        const ok = await handleLogExpense(data);
-                        if (ok) setActiveForm(null);
-                        return ok;
-                      }}
-                    />
-                  </div>
-                )}
-
-                <ExpenseSummary expenses={expenses} assets={assets} />
-
-                {showExpenses ? (
-                <div className="mt-5 space-y-2" id="expenses-list">
-                  {expenses.length === 0 ? (
-                    <div className="rounded-2xl border border-zinc-200 px-4 py-6 text-sm text-zinc-500">{t("No expenses yet.")}</div>
-                  ) : (
-                    expenses.map((expense) => (
-                      <div key={expense.id} className="rounded-2xl border border-zinc-200 bg-white">
-                        {editingExpenseId === expense.id && editingExpenseForm ? (
-                          <div className="p-4">
-                            <ExpenseForm
-                              zones={zones}
-                              crops={crops}
-                              defaultZoneId={defaultZoneId}
-                              initial={editingExpenseForm}
-                              submitLabel={t("Save changes")}
-                              onSubmit={async (data) => handleUpdateExpense(expense.id, data)}
-                            />
-                            <button
-                              onClick={() => { setEditingExpenseId(null); setEditingExpenseForm(null); }}
-                              className="mt-2 text-sm text-zinc-500 hover:text-zinc-800"
-                            >
-                              {t("Cancel")}
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-start justify-between gap-3 px-4 py-4">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium capitalize text-zinc-700">{t(expense.category)}</span>
-                                <span className="text-xs text-zinc-400">{formatDate(expense.expense_date)}</span>
-                                {expense.vendor_name && <span className="text-xs text-zinc-400">· {expense.vendor_name}</span>}
-                              </div>
-                              {expense.notes && <p className="mt-1 text-sm text-zinc-700">{expense.notes}</p>}
-                              <p className="mt-1 text-sm font-semibold">{expense.amount != null ? formatMoney(expense.amount) : <span className="text-zinc-400 font-normal">{t("Amount TBC")}</span>}</p>
-                            </div>
-                            <div className="flex shrink-0 items-center gap-2">
-                              {confirmDeleteExpenseId === expense.id ? (
-                                <>
-                                  <span className="text-xs text-red-600">{t("Sure?")}</span>
-                                  <button
-                                    onClick={() => handleDeleteExpense(expense.id)}
-                                    disabled={deletingExpenseId === expense.id}
-                                    className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60"
-                                  >
-                                    {deletingExpenseId === expense.id ? t("Deleting…") : t("Yes, delete")}
-                                  </button>
-                                  <button
-                                    onClick={() => setConfirmDeleteExpenseId(null)}
-                                    className="rounded-xl border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
-                                  >
-                                    {t("Cancel")}
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <button
-                                    onClick={() => {
-                                      setEditingExpenseId(expense.id);
-                                      setEditingExpenseForm({
-                                        category: expense.category,
-                                        amount: expense.amount != null ? String(expense.amount) : "",
-                                        expense_date: expense.expense_date,
-                                        notes: expense.notes ?? "",
-                                        vendor_name: expense.vendor_name ?? "",
-                                        crop_id: expense.crop_id ?? "",
-                                        zone_id: expense.zone_id ?? "",
-                                      });
-                                    }}
-                                    className="rounded-xl border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
-                                  >
-                                    {t("Edit")}
-                                  </button>
-                                  <button
-                                    onClick={() => setConfirmDeleteExpenseId(expense.id)}
-                                    className="rounded-xl border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
-                                  >
-                                    {t("Delete")}
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
+                  <Link
+                    href={withFarmContext("/farm/expenses")}
+                    className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+                  >
+                    {t("Open expenses →")}
+                  </Link>
                 </div>
-                ) : null}
               </div>
 
               <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">

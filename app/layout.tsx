@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
+import { DraftCleaner } from "@/components/DraftCleaner";
 import { LanguageProvider } from "@/lib/i18n";
 
 export const metadata: Metadata = {
@@ -26,6 +27,7 @@ export default function RootLayout({
         <LanguageProvider>
           {children}
           <OfflineIndicator />
+          <DraftCleaner />
         </LanguageProvider>
       </body>
     </html>
