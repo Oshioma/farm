@@ -400,8 +400,7 @@ export async function getExpenses(farmId: string): Promise<Expense[]> {
         `
         )
         .eq("farm_id", farmId)
-        .order("expense_date", { ascending: false })
-        .limit(20);
+        .order("expense_date", { ascending: false });
 
       if (error) throw new Error(`getExpenses failed: ${error.message}`);
       return (data ?? []) as Expense[];

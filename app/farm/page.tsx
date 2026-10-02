@@ -33,6 +33,7 @@ import { TaskForm } from "@/app/farm/components/TaskForm";
 import { HarvestForm } from "@/app/farm/components/HarvestForm";
 import { estimatedKg, formatYield, isCountedCrop, kgPerUnitValue } from "@/lib/harvest";
 import { ExpenseForm } from "@/app/farm/components/ExpenseForm";
+import { ExpenseSummary } from "@/app/farm/components/ExpenseSummary";
 import { AssetForm } from "@/app/farm/components/AssetForm";
 import { PestForm } from "@/app/farm/components/PestForm";
 import { SaleForm } from "@/app/farm/components/SaleForm";
@@ -3234,6 +3235,8 @@ export default function FarmPage() {
                     />
                   </div>
                 )}
+
+                <ExpenseSummary expenses={expenses} />
 
                 {showExpenses ? (
                 <div className="mt-5 space-y-2" id="expenses-list">
