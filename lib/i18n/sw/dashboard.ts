@@ -280,6 +280,8 @@ export const dashboard: Record<string, string> = {
   "No assets here.": "Hakuna mali hapa.",
   "No purchase date": "Hakuna tarehe ya ununuzi",
   "Nothing logged": "Hakuna kilichorekodiwa",
+  "Previous month": "Mwezi uliopita",
+  "Next month": "Mwezi ujao",
   "Failed to update asset": "Imeshindwa kusasisha mali",
   "Failed to delete asset": "Imeshindwa kufuta mali",
   "Sure?": "Una uhakika?",
