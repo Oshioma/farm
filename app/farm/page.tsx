@@ -3236,7 +3236,7 @@ export default function FarmPage() {
                   </div>
                 )}
 
-                <ExpenseSummary expenses={expenses} />
+                <ExpenseSummary expenses={expenses} assets={assets} />
 
                 {showExpenses ? (
                 <div className="mt-5 space-y-2" id="expenses-list">
