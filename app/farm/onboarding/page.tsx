@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, ChevronRight, ExternalLink, Pencil, Sprout } from "lucide-react";
+import { Check, ChevronRight, ExternalLink, LayoutDashboard, Pencil, Sprout } from "lucide-react";
 import {
   getCrops,
   getFarms,
@@ -16,6 +16,7 @@ import {
 import type { Crop, Farm, HarvestEtaEntry } from "@/lib/farm";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useFormDraft } from "@/hooks/useFormDraft";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { supabase } from "@/lib/supabase";
 
@@ -38,7 +39,9 @@ const copy = {
     openShop: "Continue to my shop", opening: "Opening your shop…", openShopBody: "Your shop goes live and buyers can reserve the crops above. You can add photos, prices and delivery details afterwards.",
     detailsHint: "Add a location to continue.",
     cropHint: "Crop name, expected harvest date and expected kilograms are needed.",
-    skip: "Skip setup for now and go to the farm dashboard",
+    skipShopTitle: "Skip the farm shop, just take me to the Farm app",
+    skipShopBody: "Manage crops, harvests, workers and sales. You can open a shop any time later.",
+    skipShopNeedsName: "Type your farm name above first, then tap this button.",
     live: "Your shop is live", open: "Open shop",
     steps: [
       ["Farm name and location", "", "Add farm name and location"],
@@ -61,7 +64,9 @@ const copy = {
     openShop: "Endelea kwenye duka langu", opening: "Inafungua duka lako…", openShopBody: "Duka lako linaingia hewani na wanunuzi wanaweza kuagiza mazao yaliyo hapo juu. Unaweza kuongeza picha, bei na maelezo ya usafirishaji baadaye.",
     detailsHint: "Weka eneo ili kuendelea.",
     cropHint: "Jina la zao, tarehe ya mavuno inayotarajiwa na kilo zinazotarajiwa vinahitajika.",
-    skip: "Ruka maandalizi kwa sasa na uende kwenye dashibodi ya shamba",
+    skipShopTitle: "Ruka duka la shamba, nipeleke tu kwenye programu ya Shamba",
+    skipShopBody: "Simamia mazao, mavuno, wafanyakazi na mauzo. Unaweza kufungua duka wakati wowote baadaye.",
+    skipShopNeedsName: "Andika jina la shamba lako hapo juu kwanza, kisha bonyeza kitufe hiki.",
     live: "Duka lako liko hewani", open: "Fungua duka",
     steps: [
       ["Jina na eneo la shamba", "", "Weka jina na eneo la shamba"],
@@ -100,8 +105,13 @@ export default function FarmerOnboardingPage() {
   /* Which step card is expanded. null = not decided yet (set once data loads). */
   const [activeStep, setActiveStep] = useState<number | null>(null);
 
-  const [newFarmName, setNewFarmName] = useState("");
+  const [newFarmDraft, setNewFarmDraft, clearNewFarmDraft] = useFormDraft("onboarding-new-farm", { name: "" });
+  const newFarmName = newFarmDraft.name;
+  const setNewFarmName = (name: string) => setNewFarmDraft({ name });
   const [creatingFarm, setCreatingFarm] = useState(false);
+  /* Which button started the farm creation: the shop setup or the plain farm app. */
+  const [skippingShop, setSkippingShop] = useState(false);
+  const [skipNeedsName, setSkipNeedsName] = useState(false);
 
   const [detailsForm, setDetailsForm] = useState({ name: "", location: "" });
   const [savingDetails, setSavingDetails] = useState(false);
@@ -172,9 +182,28 @@ export default function FarmerOnboardingPage() {
 
   async function createFarm(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    await createFarmNamed(false);
+  }
+
+  /* No shop: the farm app needs a farm to manage, so create it first, then go straight to /farm. */
+  async function skipShopToFarmApp() {
+    if (farm) {
+      router.push("/farm");
+      return;
+    }
+    if (!newFarmName.trim()) {
+      setSkipNeedsName(true);
+      document.getElementById("new-farm-name")?.focus();
+      return;
+    }
+    await createFarmNamed(true);
+  }
+
+  async function createFarmNamed(goToFarmApp: boolean) {
     const name = newFarmName.trim();
     if (!name) return;
     setCreatingFarm(true);
+    setSkippingShop(goToFarmApp);
     setError("");
     try {
       const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -182,13 +211,19 @@ export default function FarmerOnboardingPage() {
       if (rpcError) throw rpcError;
       if (!farmId) throw new Error("The farm was not created.");
       await saveActiveFarmId(farmId);
+      clearNewFarmDraft();
+      if (goToFarmApp) {
+        router.push("/farm");
+        return;
+      }
       setFarms(await getFarms());
       setActiveFarmId(farmId);
       setNewFarmName("");
+      setCreatingFarm(false);
     } catch (err) {
       setError(errMsg(err, "Failed to create farm"));
-    } finally {
       setCreatingFarm(false);
+      setSkippingShop(false);
     }
   }
 
@@ -320,6 +355,19 @@ export default function FarmerOnboardingPage() {
   const expectedKgFor = (cropId: string) => harvests.filter((row) => row.crop_id === cropId).reduce((sum, row) => sum + expectedTotal(row), 0);
   const cropFormReady = !!cropForm.name.trim() && !!cropForm.expectedHarvestStart && Number(cropForm.expectedKg) > 0;
 
+  function skipShopButton() {
+    return (
+      <button type="button" onClick={skipShopToFarmApp} disabled={creatingFarm} className="flex w-full items-center gap-4 rounded-2xl border-2 border-emerald-700 bg-white p-5 text-left shadow-sm transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800"><LayoutDashboard className="h-6 w-6" /></span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-lg font-semibold text-emerald-900">{creatingFarm && skippingShop ? t.creating : t.skipShopTitle}</span>
+          <span className="mt-1 block text-sm text-zinc-600">{t.skipShopBody}</span>
+        </span>
+        <ChevronRight className="h-6 w-6 shrink-0 text-emerald-800" />
+      </button>
+    );
+  }
+
   function stepHeader(index: number) {
     const step = steps[index];
     const isOpen = expanded === index;
@@ -370,10 +418,14 @@ export default function FarmerOnboardingPage() {
           <h2 className="mt-3 text-center text-xl font-semibold">{t.createTitle}</h2>
           <p className="mt-2 text-center text-sm text-zinc-600">{t.createBody}</p>
           <form onSubmit={createFarm} className="mx-auto mt-6 max-w-sm">
-            <label className="text-sm font-medium text-zinc-700">{t.farmName}<input required autoFocus value={newFarmName} onChange={(event) => setNewFarmName(event.target.value)} className={inputClass} /></label>
-            <button type="submit" disabled={creatingFarm || !newFarmName.trim()} className={"mt-4 w-full " + primaryButton}>{creatingFarm ? t.creating : t.create}</button>
+            <label className="text-sm font-medium text-zinc-700">{t.farmName}<input id="new-farm-name" required autoFocus value={newFarmName} onChange={(event) => { setNewFarmName(event.target.value); setSkipNeedsName(false); }} className={inputClass} /></label>
+            <button type="submit" disabled={creatingFarm || !newFarmName.trim()} className={"mt-4 w-full " + primaryButton}>{creatingFarm && !skippingShop ? t.creating : t.create}</button>
           </form>
           <p className="mt-5 text-center text-sm"><Link href="/farm?join=1" className="font-medium text-emerald-800 hover:underline">{t.joinInstead}</Link></p>
+          <div className="mx-auto mt-8 max-w-xl border-t border-zinc-200 pt-6">
+            {skipShopButton()}
+            {skipNeedsName && <p className="mt-2 text-center text-sm text-amber-700">{t.skipShopNeedsName}</p>}
+          </div>
         </div>
       ) : (
         <>
@@ -454,7 +506,7 @@ export default function FarmerOnboardingPage() {
             <section className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-6"><div className="flex items-center gap-2 font-semibold text-emerald-950"><Check className="h-5 w-5" />{t.live}</div>{listing.slug && <Link href={`/${listing.slug}`} className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-emerald-800">{t.open} <ExternalLink className="h-4 w-4" /></Link>}</section>
           )}
 
-          <p className="mt-6 text-center text-sm"><Link href="/farm" className="text-zinc-500 hover:text-zinc-900 hover:underline">{t.skip}</Link></p>
+          <div className="mt-6">{skipShopButton()}</div>
         </>
       )}
     </main>
