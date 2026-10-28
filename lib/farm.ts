@@ -988,7 +988,7 @@ export {
   isCountedCrop,
 } from "./harvest";
 export type { HarvestMonthKey, SeasonMonth, ParsedYield } from "./harvest";
-import type { HarvestMonthKey } from "./harvest";
+import type { HarvestMonthKey, HarvestSplit, HarvestDestination } from "./harvest";
 
 export type HarvestEstimateInput = {
   farmId: string;
@@ -1221,6 +1221,8 @@ export type HarvestLog = {
   created_at: string | null;
   crop: { crop_name: string }[] | null;
   zone: { name: string }[] | null;
+  /** Where the harvest went, in kilos per destination. Empty when not assigned. */
+  splits: HarvestSplit[];
 };
 
 export async function getHarvestLogs(farmId: string): Promise<HarvestLog[]> {
@@ -1244,6 +1246,18 @@ export async function getHarvestLogs(farmId: string): Promise<HarvestLog[]> {
       let crops: Array<{id: string; crop_name: string}> = [];
       let zones: Array<{id: string; name: string}> = [];
 
+      const { data: splitRows, error: splitError } = await supabase
+        .from("harvest_splits")
+        .select("harvest_id, destination, quantity_kg")
+        .eq("farm_id", farmId);
+      if (splitError) console.error("Failed to fetch harvest splits:", splitError);
+      const splitMap = new Map<string, HarvestSplit[]>();
+      for (const row of splitRows ?? []) {
+        const list = splitMap.get(row.harvest_id) ?? [];
+        list.push({ destination: row.destination as HarvestDestination, quantity_kg: Number(row.quantity_kg) });
+        splitMap.set(row.harvest_id, list);
+      }
+
       if (cropIds.length > 0) {
         const { data, error } = await supabase.from("crops").select("id, crop_name").in("id", cropIds);
         if (error) console.error("Failed to fetch crops:", error);
@@ -1263,9 +1277,36 @@ export async function getHarvestLogs(farmId: string): Promise<HarvestLog[]> {
       return harvests.map(h => ({
         ...h,
         crop: h.crop_id && cropMap.has(h.crop_id) ? [cropMap.get(h.crop_id)!] : null,
-        zone: h.zone_id && zoneMap.has(h.zone_id) ? [zoneMap.get(h.zone_id)!] : null
+        zone: h.zone_id && zoneMap.has(h.zone_id) ? [zoneMap.get(h.zone_id)!] : null,
+        splits: splitMap.get(h.id) ?? []
       })) as HarvestLog[];
     },
     farmId
   );
+}
+
+/**
+ * Replace where a harvest went with these shares. Destinations left out (or
+ * at 0 kg) are removed, so saving an empty list clears the harvest back to
+ * "not assigned".
+ */
+export async function saveHarvestSplits(farmId: string, harvestId: string, splits: HarvestSplit[]): Promise<void> {
+  const keep = splits.filter((s) => s.quantity_kg > 0);
+  if (keep.length > 0) {
+    const { error } = await supabase.from("harvest_splits").upsert(
+      keep.map((s) => ({
+        farm_id: farmId,
+        harvest_id: harvestId,
+        destination: s.destination,
+        quantity_kg: s.quantity_kg,
+        updated_at: new Date().toISOString(),
+      })),
+      { onConflict: "harvest_id,destination" }
+    );
+    if (error) throw new Error(`saveHarvestSplits failed: ${error.message}`);
+  }
+  let remove = supabase.from("harvest_splits").delete().eq("harvest_id", harvestId);
+  if (keep.length > 0) remove = remove.not("destination", "in", `(${keep.map((s) => s.destination).join(",")})`);
+  const { error: deleteError } = await remove;
+  if (deleteError) throw new Error(`saveHarvestSplits failed: ${deleteError.message}`);
 }

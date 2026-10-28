@@ -26,13 +26,14 @@ import {
   getOtherFarmsWants,
   saveActiveFarmId,
   getActiveFarmId,
+  saveHarvestSplits,
 } from "@/lib/farm";
 import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, CollectedOrder, FertilisationEntry, CompostEntry, MulchEntry, PestControlEntry, Plant, HarvestEtaEntry, FarmMember, Want, WantWithFarm } from "@/lib/farm";
 import { formatDate, formatMoney, badgeClass } from "@/app/farm/utils";
 import { CropForm } from "@/app/farm/components/CropForm";
 import { TaskForm } from "@/app/farm/components/TaskForm";
 import { HarvestForm } from "@/app/farm/components/HarvestForm";
-import { estimatedKg, formatYield, isCountedCrop, kgPerUnitValue } from "@/lib/harvest";
+import { estimatedKg, formatYield, isCountedCrop, kgPerUnitValue, splitsFromFields } from "@/lib/harvest";
 import { ExpenseForm } from "@/app/farm/components/ExpenseForm";
 import { AssetForm } from "@/app/farm/components/AssetForm";
 import { PestForm } from "@/app/farm/components/PestForm";
@@ -1189,7 +1190,14 @@ export default function FarmPage() {
       const estimatedHarvestKg = counting && weighedKg === null ? estimatedKg(data.quantity_units, data.kg_per_unit) : null;
       const harvestQty = weighedKg ?? estimatedHarvestKg;
 
-      const { error: harvestError } = await supabase.from("harvests").insert({
+      /* Where it went (EH / ORG). Shares only make sense against a weight. */
+      const splits = harvestQty !== null && data.split ? splitsFromFields(data.split) : [];
+      const assignedKg = splits.reduce((sum, s) => sum + s.quantity_kg, 0);
+      if (harvestQty !== null && assignedKg > harvestQty + 0.0005) {
+        throw new Error(t("EH and ORG add up to more than the harvest."));
+      }
+
+      const { data: harvestRow, error: harvestError } = await supabase.from("harvests").insert({
         farm_id: activeFarmId,
         crop_id: data.crop_id,
         zone_id: data.zone_id || null,
@@ -1199,8 +1207,19 @@ export default function FarmPage() {
         weight_estimated: estimatedHarvestKg !== null,
         quality: data.quality,
         notes: data.notes.trim() || null,
-      });
+      }).select("id").single();
       if (harvestError) throw harvestError;
+
+      /* The harvest is saved by now, so a failed split must not send the farmer
+         back to the form (submitting again would log the harvest twice). */
+      let splitError = "";
+      if (splits.length > 0 && harvestRow?.id) {
+        try {
+          await saveHarvestSplits(activeFarmId, harvestRow.id, splits);
+        } catch {
+          splitError = t("Harvest logged, but where it went was not saved. Set EH / ORG on the Harvest Logs page.");
+        }
+      }
 
       const cropUpdates: Record<string, unknown> = {};
       if (harvestQty !== null) {
@@ -1247,6 +1266,7 @@ export default function FarmPage() {
       });
 
       await loadFarmData(activeFarmId);
+      if (splitError) setError(splitError);
       return true;
     } catch (err) {
       setError(errMsg(err, t("Failed to log harvest")));
@@ -2116,6 +2136,7 @@ export default function FarmPage() {
                     crops={crops}
                     defaultCropId={defaultCropId}
                     defaultZoneId={defaultZoneId}
+                    draftKey={`harvest-new:${activeFarmId}`}
                     onSubmit={async (data) => {
                       const ok = await handleLogHarvest(data);
                       if (ok) setActiveForm(null);

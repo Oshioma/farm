@@ -246,4 +246,16 @@ export const forms: Record<string, string> = {
   "Next: growing details": "Inayofuata: maelezo ya ukuaji",
   "Next: for the shop": "Inayofuata: kwa ajili ya duka",
   "Enter a crop name to continue.": "Andika jina la zao ili kuendelea.",
+
+  /* Harvest destination split (HarvestSplitFields) */
+  "Where did it go?": "Yalipelekwa wapi?",
+  "of {kg} kg": "kati ya kg {kg}",
+  "All EH": "Yote EH",
+  "50 / 50": "50 / 50",
+  "All ORG": "Yote ORG",
+  "Kilos to {dest}": "Kilo kwa {dest}",
+  "EH and ORG add up to {assigned} kg, more than the {total} kg harvested.": "EH na ORG zinafika kg {assigned}, zaidi ya kg {total} zilizovunwa.",
+  "EH and ORG add up to more than the harvest.": "EH na ORG zinazidi mavuno.",
+  "Enter the weight to say where this harvest went (EH or ORG).": "Andika uzito ili kusema mavuno yalipelekwa wapi (EH au ORG).",
+  "Harvest logged, but where it went was not saved. Set EH / ORG on the Harvest Logs page.": "Mavuno yamerekodiwa, lakini yalikopelekwa hakujahifadhiwa. Weka EH / ORG kwenye ukurasa wa Kumbukumbu za Mavuno.",
 };

@@ -168,4 +168,21 @@ export const harvest: Record<string, string> = {
   "No data yet. Add a species above.": "Bado hakuna data. Ongeza aina ya mmea hapo juu.",
   "Species": "Aina ya mmea",
   "Total": "Jumla",
+
+  /* Harvest destinations (EH / ORG splits) */
+  "Destination": "Ilikopelekwa",
+  "All destinations": "Kote ilikopelekwa",
+  "Went to EH": "Ilipelekwa EH",
+  "Went to ORG": "Ilipelekwa ORG",
+  "Split EH + ORG": "Imegawanywa EH + ORG",
+  "Not assigned": "Haijapangwa",
+  "To EH (kg)": "Kwa EH (kg)",
+  "To ORG (kg)": "Kwa ORG (kg)",
+  "Not assigned (kg)": "Haijapangwa (kg)",
+  "{pct}% of total": "{pct}% ya jumla",
+  "{n} harvests to sort": "Mavuno {n} ya kupanga",
+  "{kg} kg not assigned": "kg {kg} hazijapangwa",
+  "Not assigned · set": "Haijapangwa · weka",
+  "Edit destination": "Badilisha ilikopelekwa",
+  "Where did this harvest go?": "Mavuno haya yalipelekwa wapi?",
 };

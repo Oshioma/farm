@@ -4,6 +4,9 @@ import { useState, useEffect } from "react";
 import type { Zone, Crop } from "@/lib/farm";
 import { estimatedKg, isCountedCrop } from "@/lib/harvest";
 import { useT } from "@/lib/i18n";
+import { useFormDraft } from "@/hooks/useFormDraft";
+import { HarvestSplitFields, blankSplitFields, splitIsOver } from "@/app/farm/components/HarvestSplitFields";
+import type { SplitFields } from "@/app/farm/components/HarvestSplitFields";
 
 export type HarvestUnitMode = "units" | "kg";
 
@@ -21,6 +24,8 @@ export type HarvestFormData = {
   kg_per_unit: string;
   quality: string;
   notes: string;
+  /** Kilos that went to each destination (EH, ORG); blank means none. */
+  split: SplitFields;
 };
 
 const blank: HarvestFormData = {
@@ -33,6 +38,7 @@ const blank: HarvestFormData = {
   kg_per_unit: "",
   quality: "standard",
   notes: "",
+  split: blankSplitFields,
 };
 
 /* Counted crops (mangoes, watermelons) start on a count; everything else on kilos. */
@@ -50,17 +56,24 @@ type Props = {
   defaultCropId: string;
   defaultZoneId: string;
   onSubmit: (data: HarvestFormData) => Promise<boolean>;
+  /* Where to keep the unsaved draft, e.g. "harvest-new:<farmId>". */
+  draftKey?: string;
 };
 
-export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubmit }: Props) {
+export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubmit, draftKey }: Props) {
   const t = useT();
-  const [form, setForm] = useState<HarvestFormData>(blank);
+  const [form, setForm, clearDraft] = useFormDraft<HarvestFormData>(draftKey ?? null, blank);
   const [saving, setSaving] = useState(false);
 
   const selectedCrop = crops.find((c) => c.id === form.crop_id) ?? null;
   const canCount = isCountedCrop(selectedCrop?.crop_name);
   const counting = canCount && form.unit_mode === "units";
   const estimate = counting && !form.quantity_kg.trim() ? estimatedKg(form.quantity_units, form.kg_per_unit) : null;
+  /* The weight the destination shares are split from: weighed, else estimated. */
+  const typedKg = form.quantity_kg.trim() ? Number(form.quantity_kg) : null;
+  const splitTotalKg = typedKg !== null && Number.isFinite(typedKg) && typedKg > 0 ? typedKg : estimate;
+  const split = form.split ?? blankSplitFields;
+  const splitOver = splitIsOver(splitTotalKg, split);
 
   useEffect(() => {
     if (defaultCropId) {
@@ -95,7 +108,10 @@ export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubm
       canCount ? form : { ...form, unit_mode: "kg", quantity_units: "", kg_per_unit: "" }
     );
     setSaving(false);
-    if (ok) setForm(blank);
+    if (ok) {
+      clearDraft();
+      setForm(blank);
+    }
   }
 
   const inputClass =
@@ -312,6 +328,17 @@ export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubm
           </select>
         </div>
 
+        {splitTotalKg !== null && splitTotalKg > 0 ? (
+          <HarvestSplitFields
+            totalKg={splitTotalKg}
+            estimated={estimate !== null && typedKg === null}
+            value={split}
+            onChange={(next) => setForm((prev) => ({ ...prev, split: next }))}
+          />
+        ) : (
+          <p className="text-xs text-zinc-500">{t("Enter the weight to say where this harvest went (EH or ORG).")}</p>
+        )}
+
         <div>
           <label className="mb-2 block text-sm font-medium">{t("Notes")}</label>
           <textarea
@@ -324,7 +351,7 @@ export function HarvestForm({ zones, crops, defaultCropId, defaultZoneId, onSubm
 
         <button
           type="submit"
-          disabled={saving || !form.crop_id}
+          disabled={saving || !form.crop_id || splitOver}
           className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving ? t("Logging harvest...") : t("Log harvest")}
