@@ -778,186 +778,180 @@ function HarvestRowEditor({
       cancel();
     }
   };
-  const input = "w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-zinc-900";
+  const input = "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-900";
+  const label = "mb-1 block text-xs font-medium text-zinc-500";
   const cropMissing = log && fields.crop_id && !crops.some((c) => c.id === fields.crop_id);
 
+  /* One full-width cell rather than a cell per column: the inputs wrap inside
+     the table's own width, so Save is always in view without scrolling. */
   return (
-    <>
-      <tr className="border-b border-amber-200 bg-amber-50/60 align-top">
-        <td className="px-3 py-3">
-          <input
-            type="date"
-            value={fields.harvest_date}
-            onChange={(e) => set({ harvest_date: e.target.value })}
-            onKeyDown={onEnter}
-            className={`${input} min-w-[140px]`}
-            aria-label={t("Harvest date")}
-          />
-        </td>
-        <td className="px-3 py-3">
-          <select
-            value={fields.crop_id}
-            onChange={(e) => {
-              const next = crops.find((c) => c.id === e.target.value);
-              set({ crop_id: e.target.value, zone_id: fields.zone_id || next?.zone_id || "" });
-            }}
-            className={`${input} min-w-[140px]`}
-            aria-label={t("Crop")}
-          >
-            <option value="">{t("Select crop")}</option>
-            {cropMissing && <option value={fields.crop_id}>{log?.crop?.[0]?.crop_name ?? t("Crop")}</option>}
-            {crops.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.crop_name}
-                {c.variety ? ` · ${c.variety}` : ""}
-              </option>
-            ))}
-          </select>
-        </td>
-        <td className="px-3 py-3">
-          <select
-            value={fields.zone_id}
-            onChange={(e) => set({ zone_id: e.target.value })}
-            className={`${input} min-w-[100px]`}
-            aria-label={t("Bed")}
-          >
-            <option value="">{t("No bed")}</option>
-            {zones.map((z) => (
-              <option key={z.id} value={z.id}>
-                {z.name}
-              </option>
-            ))}
-          </select>
-        </td>
-        <td className="px-3 py-3">
-          <div className="flex min-w-[110px] flex-col gap-1.5">
-            <label className="flex items-center gap-1.5">
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                inputMode="decimal"
-                value={fields.quantity_kg}
-                onChange={(e) => set({ quantity_kg: e.target.value })}
-                onKeyDown={onEnter}
-                className={`${input} text-right`}
-                placeholder={estimate !== null ? `≈ ${estimate}` : "0.00"}
-                aria-label={t("Quantity (kg)")}
-              />
-              <span className="text-xs text-zinc-500">kg</span>
-            </label>
-            {showUnits && (
-              <label className="flex items-center gap-1.5">
-                <input
-                  type="number"
-                  step="1"
-                  min="0"
-                  inputMode="numeric"
-                  value={fields.quantity_units}
-                  onChange={(e) => set({ quantity_units: e.target.value })}
-                  onKeyDown={onEnter}
-                  className={`${input} text-right`}
-                  placeholder="0"
-                  aria-label={t("Count (pieces)")}
-                />
-                <span className="text-xs text-zinc-500">{t("pcs")}</span>
-              </label>
-            )}
-          </div>
-        </td>
-        <td className="px-3 py-3">
-          <select
-            value={fields.quality}
-            onChange={(e) => set({ quality: e.target.value })}
-            className={`${input} min-w-[110px]`}
-            aria-label={t("Quality")}
-          >
-            {QUALITIES.map((q) => (
-              <option key={q} value={q}>
-                {t(q)}
-              </option>
-            ))}
-          </select>
-        </td>
-        <td className="px-3 py-3">
-          <div className="flex min-w-[170px] flex-col gap-1.5">
-            {(["EH", "ORG"] as const).map((dest) => (
-              <label key={dest} className="flex items-center gap-1.5">
-                <span className={`w-9 text-xs font-semibold ${dest === "EH" ? "text-emerald-700" : "text-blue-700"}`}>{dest}</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  inputMode="decimal"
-                  value={split[dest]}
-                  onChange={(e) => set({ split: { ...split, [dest]: e.target.value } })}
-                  onKeyDown={onEnter}
-                  disabled={!splitTotalKg}
-                  className={`${input} text-right disabled:bg-zinc-100`}
-                  placeholder="0"
-                  aria-label={t("Kilos to {dest}", { dest })}
-                />
-                <span className="text-xs text-zinc-500">kg</span>
-              </label>
-            ))}
-            {splitTotalKg ? (
-              <div className="flex gap-1">
-                {[
-                  { label: "All EH", eh: 1 },
-                  { label: "50 / 50", eh: 0.5 },
-                  { label: "All ORG", eh: 0 },
-                ].map((p) => (
-                  <button
-                    key={p.label}
-                    type="button"
-                    onClick={() => set({ split: presetSplitFields(splitTotalKg, p.eh) })}
-                    className="rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[11px] font-medium text-zinc-700 hover:bg-zinc-100"
-                  >
-                    {t(p.label)}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </td>
-        <td className="px-3 py-3">
-          <textarea
-            value={fields.notes}
-            onChange={(e) => set({ notes: e.target.value })}
-            rows={2}
-            className={`${input} min-w-[180px]`}
-            placeholder={t("Notes")}
-            aria-label={t("Notes")}
-          />
-        </td>
-        <td className="px-3 py-3">
-          <div className="flex flex-col gap-1.5">
+    <tr className="border-b border-amber-200 bg-amber-50/60">
+      <td colSpan={8} className="px-4 py-4">
+        {/* Pinned to the visible part of the table on narrow screens, where
+            the table itself scrolls sideways. */}
+        <div className="sticky left-4 max-w-[calc(100vw-5rem)] lg:max-w-none">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-zinc-900">{log ? t("Edit harvest") : t("Log harvest")}</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={cancel}
+              className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+            >
+              {t("Cancel")}
+            </button>
             <button
               type="button"
               onClick={save}
               disabled={saving || over || !fields.crop_id}
-              className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving ? t("Saving...") : log ? t("Save") : t("Log harvest")}
             </button>
-            <button
-              type="button"
-              onClick={cancel}
-              className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-white"
-            >
-              {t("Cancel")}
-            </button>
           </div>
-        </td>
-      </tr>
-      {(error || over) && (
-        <tr className="border-b border-amber-200 bg-amber-50/60">
-          <td colSpan={8} className="px-3 pb-3 text-sm text-red-700">
-            {error ||
-              t("EH and ORG add up to more than the harvest.")}
-          </td>
-        </tr>
-      )}
-    </>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+          <label className="block">
+            <span className={label}>{t("Date")}</span>
+            <input
+              type="date"
+              value={fields.harvest_date}
+              onChange={(e) => set({ harvest_date: e.target.value })}
+              onKeyDown={onEnter}
+              className={input}
+            />
+          </label>
+          <label className="block">
+            <span className={label}>{t("Crop")}</span>
+            <select
+              value={fields.crop_id}
+              onChange={(e) => {
+                const next = crops.find((c) => c.id === e.target.value);
+                set({ crop_id: e.target.value, zone_id: fields.zone_id || next?.zone_id || "" });
+              }}
+              className={input}
+            >
+              <option value="">{t("Select crop")}</option>
+              {cropMissing && <option value={fields.crop_id}>{log?.crop?.[0]?.crop_name ?? t("Crop")}</option>}
+              {crops.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.crop_name}
+                  {c.variety ? ` · ${c.variety}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className={label}>{t("Zone")}</span>
+            <select value={fields.zone_id} onChange={(e) => set({ zone_id: e.target.value })} className={input}>
+              <option value="">{t("No bed")}</option>
+              {zones.map((z) => (
+                <option key={z.id} value={z.id}>
+                  {z.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className={label}>{t("Quantity (kg)")}</span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              inputMode="decimal"
+              value={fields.quantity_kg}
+              onChange={(e) => set({ quantity_kg: e.target.value })}
+              onKeyDown={onEnter}
+              className={input}
+              placeholder={estimate !== null ? `≈ ${estimate}` : "0.00"}
+            />
+          </label>
+          {showUnits && (
+            <label className="block">
+              <span className={label}>{t("Count (pieces)")}</span>
+              <input
+                type="number"
+                step="1"
+                min="0"
+                inputMode="numeric"
+                value={fields.quantity_units}
+                onChange={(e) => set({ quantity_units: e.target.value })}
+                onKeyDown={onEnter}
+                className={input}
+                placeholder="0"
+              />
+            </label>
+          )}
+          <label className="block">
+            <span className={label}>{t("Quality")}</span>
+            <select value={fields.quality} onChange={(e) => set({ quality: e.target.value })} className={input}>
+              {QUALITIES.map((q) => (
+                <option key={q} value={q}>
+                  {t(q)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+          <div>
+            <span className={label}>{t("Destination")}</span>
+            <div className="flex flex-wrap items-center gap-2">
+              {(["EH", "ORG"] as const).map((dest) => (
+                <label key={dest} className="flex items-center gap-1.5">
+                  <span className={`text-xs font-semibold ${dest === "EH" ? "text-emerald-700" : "text-blue-700"}`}>{dest}</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    inputMode="decimal"
+                    value={split[dest]}
+                    onChange={(e) => set({ split: { ...split, [dest]: e.target.value } })}
+                    onKeyDown={onEnter}
+                    disabled={!splitTotalKg}
+                    className={`${input} w-24 disabled:bg-zinc-100`}
+                    placeholder="0"
+                    aria-label={t("Kilos to {dest}", { dest })}
+                  />
+                  <span className="text-xs text-zinc-500">kg</span>
+                </label>
+              ))}
+              {splitTotalKg
+                ? [
+                    { label: "All EH", eh: 1 },
+                    { label: "50 / 50", eh: 0.5 },
+                    { label: "All ORG", eh: 0 },
+                  ].map((p) => (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => set({ split: presetSplitFields(splitTotalKg, p.eh) })}
+                      className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
+                    >
+                      {t(p.label)}
+                    </button>
+                  ))
+                : null}
+            </div>
+          </div>
+          <label className="block">
+            <span className={label}>{t("Notes")}</span>
+            <textarea
+              value={fields.notes}
+              onChange={(e) => set({ notes: e.target.value })}
+              rows={2}
+              className={input}
+            />
+          </label>
+        </div>
+
+        {(error || over) && (
+          <p className="mt-3 text-sm text-red-700">{error || t("EH and ORG add up to more than the harvest.")}</p>
+        )}
+        </div>
+      </td>
+    </tr>
   );
 }
