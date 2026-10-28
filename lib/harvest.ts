@@ -198,3 +198,45 @@ export function kgPerUnitValue(text: string): number | null {
   const n = Number(text);
   return text.trim() && Number.isFinite(n) && n > 0 ? n : null;
 }
+
+/* ── Harvest destinations ─────────────────────────────────────
+   Where a harvest went. A harvest can be split, so each destination gets its
+   own share in kilos (harvest_splits). Whatever is left is "not assigned". */
+
+export const HARVEST_DESTINATIONS = [
+  { key: "EH", label: "EH" },
+  { key: "ORG", label: "ORG" },
+] as const;
+
+export type HarvestDestination = (typeof HARVEST_DESTINATIONS)[number]["key"];
+
+export type HarvestSplit = { destination: HarvestDestination; quantity_kg: number };
+
+/* Kilos as typed in a split field; blank or invalid counts as nothing. */
+export function splitKgValue(text: string): number {
+  const n = Number(text);
+  return text.trim() && Number.isFinite(n) && n > 0 ? Math.round(n * 1000) / 1000 : 0;
+}
+
+/* Typed split fields -> rows to save, dropping empty shares. */
+export function splitsFromFields(fields: Record<HarvestDestination, string>): HarvestSplit[] {
+  return HARVEST_DESTINATIONS.map((d) => ({ destination: d.key, quantity_kg: splitKgValue(fields[d.key]) })).filter(
+    (s) => s.quantity_kg > 0
+  );
+}
+
+/* Share kilos for a preset like "half to EH", keeping the two adding up exactly. */
+export function presetSplitFields(totalKg: number, ehShare: number): Record<HarvestDestination, string> {
+  const eh = Math.round(totalKg * ehShare * 100) / 100;
+  const org = Math.round((totalKg - eh) * 100) / 100;
+  return { EH: eh > 0 ? String(eh) : "", ORG: org > 0 ? String(org) : "" };
+}
+
+/* Kilos of a harvest each destination got, plus what is still unassigned. */
+export function splitTotals(totalKg: number | null, splits: HarvestSplit[] | null | undefined) {
+  const byDest = { EH: 0, ORG: 0 } as Record<HarvestDestination, number>;
+  for (const s of splits ?? []) byDest[s.destination] = (byDest[s.destination] ?? 0) + Number(s.quantity_kg);
+  const assigned = byDest.EH + byDest.ORG;
+  const unassigned = Math.max(0, (totalKg ?? 0) - assigned);
+  return { ...byDest, assigned, unassigned };
+}
