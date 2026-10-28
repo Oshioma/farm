@@ -1,6 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { sendEmail } from "@/lib/email";
+import { sw } from "@/lib/i18n/sw";
+
+type Lang = "en" | "sw";
+
+/* Email copy in the language the assignee chose in the app (saved on their
+   account as user_metadata.lang). */
+const copy = {
+  en: {
+    subject: (title: string) => `New goal for you: ${title}`,
+    introBy: (actor: string) => `${actor} assigned you a goal`,
+    intro: "You were assigned a goal",
+    on: (farm: string) => ` on ${farm}`,
+    due: "Due",
+    date: "Date",
+    priority: "Priority",
+    category: "Category",
+    crop: "Crop",
+    bed: "Bed",
+    button: "Open the goal",
+    fallback: "If the button doesn't open, copy this link into your browser:",
+  },
+  sw: {
+    subject: (title: string) => `Lengo jipya kwako: ${title}`,
+    introBy: (actor: string) => `${actor} amekupa lengo`,
+    intro: "Umepewa lengo",
+    on: (farm: string) => ` kwenye ${farm}`,
+    due: "Mwisho",
+    date: "Tarehe",
+    priority: "Kipaumbele",
+    category: "Aina",
+    crop: "Zao",
+    bed: "Tuta",
+    button: "Fungua lengo",
+    fallback: "Kama kitufe hakifunguki, nakili kiungo hiki kwenye kivinjari chako:",
+  },
+} as const;
+
+/* App values such as priority "high" read in the assignee's language. */
+function word(lang: Lang, value: string): string {
+  return lang === "sw" ? sw[value] ?? value : value;
+}
 
 /* Called by the database (trigger trg_email_task_assigned) whenever a
    'task_assigned' notification is written, i.e. someone was assigned a goal or
@@ -27,17 +68,24 @@ function siteOrigin(): string {
   return (process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://www.shamba.online").replace(/\/+$/, "");
 }
 
-/* "2026-10-30" -> "Fri 30 Oct 2026" */
-function formatDue(date: string | null | undefined): string | null {
+/* "2026-10-30" -> "Fri 30 Oct 2026" / "Ijumaa, 30 Okt 2026" */
+function formatDue(date: string | null | undefined, lang: Lang): string | null {
   if (!date) return null;
   const d = new Date(`${date.slice(0, 10)}T00:00:00Z`);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  return d.toLocaleDateString(lang === "sw" ? "sw" : "en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 type Detail = { label: string; value: string };
 
 function renderEmail(input: {
+  lang: Lang;
   taskTitle: string;
   actorName: string | null;
   farmName: string | null;
@@ -45,9 +93,10 @@ function renderEmail(input: {
   description: string | null;
   link: string;
 }) {
-  const { taskTitle, actorName, farmName, details, description, link } = input;
-  const subject = `New goal for you: ${taskTitle}`;
-  const intro = [actorName ? `${actorName} assigned you a goal` : "You were assigned a goal", farmName ? ` on ${farmName}` : ""].join("") + ".";
+  const { lang, taskTitle, actorName, farmName, details, description, link } = input;
+  const c = copy[lang];
+  const subject = c.subject(taskTitle);
+  const intro = (actorName ? c.introBy(actorName) : c.intro) + (farmName ? c.on(farmName) : "") + ".";
   const safeLink = escapeHtml(link);
   const detailRows = details
     .map(
@@ -64,9 +113,9 @@ function renderEmail(input: {
     ${description ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.5;white-space:pre-line">${escapeHtml(description)}</p>` : ""}
     ${detailRows ? `<table style="border-collapse:collapse;margin:0 0 24px">${detailRows}</table>` : ""}
     <p style="margin:0 0 24px">
-      <a href="${safeLink}" style="display:inline-block;background:#166534;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:14px 24px;border-radius:999px">Open the goal</a>
+      <a href="${safeLink}" style="display:inline-block;background:#166534;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:14px 24px;border-radius:999px">${escapeHtml(c.button)}</a>
     </p>
-    <p style="margin:0 0 4px;font-size:12px;line-height:1.5;color:#78716c">If the button doesn't open, copy this link into your browser:</p>
+    <p style="margin:0 0 4px;font-size:12px;line-height:1.5;color:#78716c">${escapeHtml(c.fallback)}</p>
     <p style="margin:0;font-size:12px;line-height:1.5;word-break:break-all"><a href="${safeLink}" style="color:#166534">${safeLink}</a></p>
   </div>
 </div>`;
@@ -77,7 +126,7 @@ function renderEmail(input: {
     description ?? "",
     ...details.map((d) => `${d.label}: ${d.value}`),
     "",
-    `Open the goal: ${link}`,
+    `${c.button}: ${link}`,
   ]
     .filter((line, i, all) => line !== "" || all[i - 1] !== "")
     .join("\n");
@@ -107,6 +156,8 @@ export async function POST(req: NextRequest) {
   if (!to || to.endsWith(PLACEHOLDER_DOMAIN)) {
     return NextResponse.json({ ok: true, skipped: "no email address" });
   }
+  const lang: Lang = recipient?.user?.user_metadata?.lang === "sw" ? "sw" : "en";
+  const c = copy[lang];
 
   /* The notification links to the task: /farm?task=<id> for goals,
      /lunar-planner?task=<id> for lunar planner tasks. */
@@ -123,9 +174,9 @@ export async function POST(req: NextRequest) {
       if (data) {
         taskTitle = data.title || taskTitle;
         description = data.notes || null;
-        const due = formatDue(data.date);
-        if (due) details.push({ label: "Date", value: due });
-        if (data.category) details.push({ label: "Category", value: String(data.category) });
+        const due = formatDue(data.date, lang);
+        if (due) details.push({ label: c.date, value: due });
+        if (data.category) details.push({ label: c.category, value: word(lang, String(data.category)) });
       }
     } else {
       const { data } = await admin
@@ -136,15 +187,15 @@ export async function POST(req: NextRequest) {
       if (data) {
         taskTitle = data.title || taskTitle;
         description = data.description || null;
-        const due = formatDue(data.due_date);
-        if (due) details.push({ label: "Due", value: data.due_time ? `${due}, ${String(data.due_time).slice(0, 5)}` : due });
-        if (data.priority) details.push({ label: "Priority", value: String(data.priority) });
+        const due = formatDue(data.due_date, lang);
+        if (due) details.push({ label: c.due, value: data.due_time ? `${due}, ${String(data.due_time).slice(0, 5)}` : due });
+        if (data.priority) details.push({ label: c.priority, value: word(lang, String(data.priority)) });
         const crop = (data.crop as { crop_name?: string } | { crop_name?: string }[] | null);
         const cropName = Array.isArray(crop) ? crop[0]?.crop_name : crop?.crop_name;
-        if (cropName) details.push({ label: "Crop", value: cropName });
+        if (cropName) details.push({ label: c.crop, value: cropName });
         const zone = (data.zone as { name?: string } | { name?: string }[] | null);
         const zoneName = Array.isArray(zone) ? zone[0]?.name : zone?.name;
-        if (zoneName) details.push({ label: "Bed", value: zoneName });
+        if (zoneName) details.push({ label: c.bed, value: zoneName });
       }
     }
   }
@@ -163,7 +214,7 @@ export async function POST(req: NextRequest) {
     farmName = farm?.name ?? null;
   }
 
-  const message = renderEmail({ taskTitle, actorName, farmName, details, description, link: `${siteOrigin()}${link}` });
+  const message = renderEmail({ lang, taskTitle, actorName, farmName, details, description, link: `${siteOrigin()}${link}` });
   const { error } = await sendEmail({ to, ...message });
   if (error) {
     console.error("[task-assigned] email failed:", error);
