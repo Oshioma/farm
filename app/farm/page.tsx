@@ -16,6 +16,7 @@ import {
   getPests,
   getSales,
   getCollectedOrders,
+  getHarvestLogs,
   getFertilisations,
   getCompost,
   getMulch,
@@ -26,14 +27,14 @@ import {
   getOtherFarmsWants,
   saveActiveFarmId,
   getActiveFarmId,
-  saveHarvestSplits,
 } from "@/lib/farm";
-import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, CollectedOrder, FertilisationEntry, CompostEntry, MulchEntry, PestControlEntry, Plant, HarvestEtaEntry, FarmMember, Want, WantWithFarm } from "@/lib/farm";
+import type { Farm, Zone, Crop, Task, Activity, Expense, Asset, Pest, Sale, CollectedOrder, FertilisationEntry, CompostEntry, MulchEntry, PestControlEntry, Plant, HarvestEtaEntry, FarmMember, Want, WantWithFarm, HarvestLog } from "@/lib/farm";
 import { formatDate, formatMoney, badgeClass } from "@/app/farm/utils";
 import { CropForm } from "@/app/farm/components/CropForm";
 import { TaskForm } from "@/app/farm/components/TaskForm";
 import { HarvestForm } from "@/app/farm/components/HarvestForm";
-import { estimatedKg, formatYield, isCountedCrop, kgPerUnitValue, splitsFromFields } from "@/lib/harvest";
+import { formatYield, isCountedCrop, kgPerUnitValue, splitTotals } from "@/lib/harvest";
+import { logHarvest } from "@/lib/harvestLog";
 import { ExpenseForm } from "@/app/farm/components/ExpenseForm";
 import { AssetForm } from "@/app/farm/components/AssetForm";
 import { PestForm } from "@/app/farm/components/PestForm";
@@ -89,6 +90,7 @@ export default function FarmPage() {
   const [pests, setPests] = useState<Pest[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [collectedOrders, setCollectedOrders] = useState<CollectedOrder[]>([]);
+  const [harvestLogs, setHarvestLogs] = useState<HarvestLog[]>([]);
   const [fertilisations, setFertilisations] = useState<FertilisationEntry[]>([]);
   const [compostEntries, setCompostEntries] = useState<CompostEntry[]>([]);
   const [mulchEntries, setMulchEntries] = useState<MulchEntry[]>([]);
@@ -369,6 +371,11 @@ export default function FarmPage() {
     getCollectedOrders(farmId)
       .then((rows) => { if (latestFarmIdRef.current === farmId) setCollectedOrders(rows); })
       .catch(() => { if (latestFarmIdRef.current === farmId) setCollectedOrders([]); });
+    /* Harvest logs feed the EH / ORG card; loaded on their own so a failure
+       there never holds up the rest of the dashboard. */
+    getHarvestLogs(farmId)
+      .then((rows) => { if (latestFarmIdRef.current === farmId) setHarvestLogs(rows); })
+      .catch(() => { if (latestFarmIdRef.current === farmId) setHarvestLogs([]); });
     setFertilisations(fertilisationRows);
     setCompostEntries(compostRows);
     setMulchEntries(mulchRows);
@@ -637,6 +644,26 @@ export default function FarmPage() {
   );
 
   const readyToHarvest = crops.filter((crop) => crop.status === "harvest_ready");
+  /* Where harvests went, all time and this month (by harvest date). */
+  const thisMonthPrefix = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+  const harvestDestinations = harvestLogs.reduce(
+    (acc, log) => {
+      const totals = splitTotals(log.quantity_kg, log.splits ?? []);
+      const buckets = log.harvest_date?.startsWith(thisMonthPrefix) ? [acc.all, acc.month] : [acc.all];
+      for (const b of buckets) {
+        b.total += log.quantity_kg ?? 0;
+        b.EH += totals.EH;
+        b.ORG += totals.ORG;
+        b.unassigned += totals.unassigned;
+        if (totals.unassigned > 0.0005) b.toSort += 1;
+      }
+      return acc;
+    },
+    {
+      all: { total: 0, EH: 0, ORG: 0, unassigned: 0, toSort: 0 },
+      month: { total: 0, EH: 0, ORG: 0, unassigned: 0, toSort: 0 },
+    }
+  );
 
   const forecastRevenue = crops.reduce((sum, crop) => {
     return sum + Number(crop.estimated_yield_kg ?? 0) * Number(crop.expected_sale_price_per_kg ?? 0);
@@ -1166,105 +1193,7 @@ export default function FarmPage() {
     if (!activeFarmId) return false;
     try {
       setError("");
-      if (!data.crop_id) throw new Error(t("Choose a crop before logging harvest."));
-      if (!data.harvest_date) throw new Error(t("Harvest date is required."));
-      const counting = data.unit_mode === "units";
-      const harvestUnits = counting ? Math.floor(Number(data.quantity_units)) : null;
-      const weighedKg = data.quantity_kg.trim() ? Number(data.quantity_kg) : null;
-      if (counting) {
-        if (!harvestUnits || harvestUnits < 1) throw new Error(t("Enter how many were picked."));
-      } else if (weighedKg === null) {
-        throw new Error(t("Harvest quantity is required."));
-      }
-      if (weighedKg !== null && (!Number.isFinite(weighedKg) || weighedKg < 0)) {
-        throw new Error(t("Harvest quantity is required."));
-      }
-      const perPiece = counting && data.kg_per_unit.trim() ? Number(data.kg_per_unit) : null;
-      if (perPiece !== null && (!Number.isFinite(perPiece) || perPiece <= 0)) {
-        throw new Error(t("The weight of one piece must be more than 0."));
-      }
-
-      const selectedCrop = crops.find((crop) => crop.id === data.crop_id) ?? null;
-
-      /* No scale: estimate the weight from the count and the average piece. */
-      const estimatedHarvestKg = counting && weighedKg === null ? estimatedKg(data.quantity_units, data.kg_per_unit) : null;
-      const harvestQty = weighedKg ?? estimatedHarvestKg;
-
-      /* Where it went (EH / ORG). Shares only make sense against a weight. */
-      const splits = harvestQty !== null && data.split ? splitsFromFields(data.split) : [];
-      const assignedKg = splits.reduce((sum, s) => sum + s.quantity_kg, 0);
-      if (harvestQty !== null && assignedKg > harvestQty + 0.0005) {
-        throw new Error(t("EH and ORG add up to more than the harvest."));
-      }
-
-      const { data: harvestRow, error: harvestError } = await supabase.from("harvests").insert({
-        farm_id: activeFarmId,
-        crop_id: data.crop_id,
-        zone_id: data.zone_id || null,
-        harvest_date: data.harvest_date,
-        quantity_kg: harvestQty,
-        quantity_units: harvestUnits,
-        weight_estimated: estimatedHarvestKg !== null,
-        quality: data.quality,
-        notes: data.notes.trim() || null,
-      }).select("id").single();
-      if (harvestError) throw harvestError;
-
-      /* The harvest is saved by now, so a failed split must not send the farmer
-         back to the form (submitting again would log the harvest twice). */
-      let splitError = "";
-      if (splits.length > 0 && harvestRow?.id) {
-        try {
-          await saveHarvestSplits(activeFarmId, harvestRow.id, splits);
-        } catch {
-          splitError = t("Harvest logged, but where it went was not saved. Set EH / ORG on the Harvest Logs page.");
-        }
-      }
-
-      const cropUpdates: Record<string, unknown> = {};
-      if (harvestQty !== null) {
-        cropUpdates.actual_yield_kg = Number(selectedCrop?.actual_yield_kg ?? 0) + harvestQty;
-      }
-      if (harvestUnits !== null) {
-        cropUpdates.actual_yield_units = Number(selectedCrop?.actual_yield_units ?? 0) + harvestUnits;
-      }
-
-      /* Remember the piece weight the farmer typed; if they weighed a count and
-         none is set yet, learn it from this harvest. */
-      const currentPerPiece = selectedCrop?.kg_per_unit ? Number(selectedCrop.kg_per_unit) : null;
-      if (perPiece !== null && perPiece !== currentPerPiece) {
-        cropUpdates.kg_per_unit = perPiece;
-      } else if (perPiece === null && currentPerPiece === null && harvestUnits && weighedKg) {
-        cropUpdates.kg_per_unit = Math.round((weighedKg / harvestUnits) * 1000) / 1000;
-      }
-
-      if (selectedCrop?.status !== "harvested") {
-        cropUpdates.status = "harvested";
-        cropUpdates.actual_harvest_date = data.harvest_date;
-      }
-
-      if (Object.keys(cropUpdates).length > 0) {
-        const { error: cropUpdateError } = await supabase
-          .from("crops")
-          .update(cropUpdates)
-          .eq("id", data.crop_id);
-        if (cropUpdateError) throw cropUpdateError;
-      }
-
-      const amount = [
-        harvestUnits !== null ? `${harvestUnits} pcs` : null,
-        harvestQty !== null ? `${estimatedHarvestKg !== null ? "≈" : ""}${harvestQty} kg` : null,
-      ]
-        .filter(Boolean)
-        .join(" · ");
-
-      await supabase.from("activities").insert({
-        farm_id: activeFarmId,
-        type: "harvest_logged",
-        title: `${selectedCrop?.crop_name ?? "Harvest"} logged`,
-        meta: `${amount} · ${data.quality}`,
-      });
-
+      const { splitError } = await logHarvest(activeFarmId, data, crops, t);
       await loadFarmData(activeFarmId);
       if (splitError) setError(splitError);
       return true;
@@ -2233,6 +2162,59 @@ export default function FarmPage() {
                 <p className="mt-3 text-3xl font-semibold">{readyToHarvest.length}</p>
               </div>
             </section>
+
+            {harvestDestinations.all.total > 0 && (
+              <section className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-semibold">{t("Where harvests went")}</h2>
+                    <p className="mt-1 text-sm text-zinc-500">{t("Kilos to EH and ORG, from the harvest logs.")}</p>
+                  </div>
+                  <Link
+                    href={withFarmContext("/farm/harvest-logs")}
+                    className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+                  >
+                    {harvestDestinations.all.toSort > 0
+                      ? t("Sort {n} harvests →", { n: harvestDestinations.all.toSort })
+                      : t("Harvest logs →")}
+                  </Link>
+                </div>
+                <div className="mt-5 grid gap-6 md:grid-cols-2">
+                  {([
+                    ["This month", harvestDestinations.month],
+                    ["All time", harvestDestinations.all],
+                  ] as const).map(([label, b]) => {
+                    const pct = (n: number) => (b.total > 0 ? Math.min(100, (n / b.total) * 100) : 0);
+                    return (
+                      <div key={label}>
+                        <div className="flex items-baseline justify-between gap-2">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">{t(label)}</p>
+                          <p className="text-sm tabular-nums text-zinc-500">{b.total.toFixed(2)} kg</p>
+                        </div>
+                        <div className="mt-3 flex h-3 overflow-hidden rounded-full bg-zinc-200">
+                          <div className="bg-emerald-600" style={{ width: `${pct(b.EH)}%` }} />
+                          <div className="bg-blue-600" style={{ width: `${pct(b.ORG)}%` }} />
+                        </div>
+                        <div className="mt-3 grid grid-cols-3 gap-2 text-sm tabular-nums">
+                          <div>
+                            <p className="flex items-center gap-1.5 text-xs text-zinc-500"><span className="h-2 w-2 rounded-sm bg-emerald-600" />EH</p>
+                            <p className="text-lg font-semibold">{b.EH.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="flex items-center gap-1.5 text-xs text-zinc-500"><span className="h-2 w-2 rounded-sm bg-blue-600" />ORG</p>
+                            <p className="text-lg font-semibold">{b.ORG.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="flex items-center gap-1.5 text-xs text-zinc-500"><span className="h-2 w-2 rounded-sm bg-zinc-300" />{t("Not assigned")}</p>
+                            <p className="text-lg font-semibold text-zinc-500">{b.unassigned.toFixed(2)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
             <section className="mb-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between gap-4">
