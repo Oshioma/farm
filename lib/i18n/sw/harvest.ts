@@ -185,4 +185,16 @@ export const harvest: Record<string, string> = {
   "Not assigned · set": "Haijapangwa · weka",
   "Edit destination": "Badilisha ilikopelekwa",
   "Where did this harvest go?": "Mavuno haya yalipelekwa wapi?",
+
+  /* Harvest logs: log and edit in place */
+  "Click a row's Edit to change it in place.": "Bofya Badilisha kwenye mstari ili kuurekebisha hapo hapo.",
+  "+ Log harvest": "+ Rekodi mavuno",
+  "Edit harvest": "Badilisha mavuno",
+  "pcs": "vipande",
+
+  /* Farm dashboard: where harvests went */
+  "Where harvests went": "Mavuno yalikopelekwa",
+  "Kilos to EH and ORG, from the harvest logs.": "Kilo kwa EH na ORG, kutoka kumbukumbu za mavuno.",
+  "Sort {n} harvests →": "Panga mavuno {n} →",
+  "Harvest logs →": "Kumbukumbu za mavuno →",
 };

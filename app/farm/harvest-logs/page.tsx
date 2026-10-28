@@ -4,15 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { getFarms, getHarvestLogs, saveHarvestSplits } from "@/lib/farm";
-import type { Farm, HarvestLog } from "@/lib/farm";
+import { getFarms, getHarvestLogs, getCrops, getZones, saveHarvestSplits } from "@/lib/farm";
+import type { Farm, HarvestLog, Crop, Zone } from "@/lib/farm";
 import { formatDate } from "@/app/farm/utils";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Pencil } from "lucide-react";
 import { useFarmSelection } from "@/hooks/useFarmSelection";
 import { useFormDraft, discardDraft } from "@/hooks/useFormDraft";
 import { useT, useLanguage } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/LanguageToggle";
-import { splitTotals, splitsFromFields } from "@/lib/harvest";
+import { splitTotals, splitsFromFields, isCountedCrop, estimatedKg, presetSplitFields } from "@/lib/harvest";
+import { logHarvest, updateHarvest } from "@/lib/harvestLog";
 import type { HarvestSplit } from "@/lib/harvest";
 import { HarvestSplitFields, blankSplitFields, splitIsOver } from "@/app/farm/components/HarvestSplitFields";
 import type { SplitFields } from "@/app/farm/components/HarvestSplitFields";
@@ -54,6 +55,10 @@ export default function HarvestLogsPage() {
   const [qualityFilter, setQualityFilter] = useState("all");
   const [destinationFilter, setDestinationFilter] = useState<DestinationFilter>("all");
   const [editingLog, setEditingLog] = useState<HarvestLog | null>(null);
+  const [editingRowId, setEditingRowId] = useState<string | null>(null);
+  const [addingNew, setAddingNew] = useState(false);
+  const [crops, setCrops] = useState<Crop[]>([]);
+  const [zones, setZones] = useState<Zone[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const router = useRouter();
@@ -108,10 +113,16 @@ export default function HarvestLogsPage() {
       try {
         setLoading(true);
         setError("");
-        const logs = await getHarvestLogs(activeFarmId);
+        const [logs, cropRows, zoneRows] = await Promise.all([
+          getHarvestLogs(activeFarmId),
+          getCrops(activeFarmId).catch(() => [] as Crop[]),
+          getZones(activeFarmId).catch(() => [] as Zone[]),
+        ]);
         if (cancelled) return;
         /* Logs cached offline before splits existed have none. */
         setHarvestLogs(logs.map((log) => ({ ...log, splits: log.splits ?? [] })));
+        setCrops(cropRows);
+        setZones(zoneRows);
       } catch (err) {
         if (!cancelled) setError(errMsg(err, t("Failed to load harvest logs")));
       } finally {
@@ -123,6 +134,20 @@ export default function HarvestLogsPage() {
       cancelled = true;
     };
   }, [activeFarmId]);
+
+  /* Fresh logs and crops after a harvest is added or corrected, so names,
+     totals and crop yields all match what was saved. */
+  async function reloadLogs() {
+    if (!activeFarmId) return;
+    try {
+      setError("");
+      const [logs, cropRows] = await Promise.all([getHarvestLogs(activeFarmId), getCrops(activeFarmId)]);
+      setHarvestLogs(logs.map((log) => ({ ...log, splits: log.splits ?? [] })));
+      setCrops(cropRows);
+    } catch (err) {
+      setError(errMsg(err, t("Failed to load harvest logs")));
+    }
+  }
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -321,14 +346,32 @@ export default function HarvestLogsPage() {
         )}
 
         {/* Harvest logs table */}
-        {filteredHarvestLogs.length === 0 ? (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-zinc-500">{t("Click a row's Edit to change it in place.")}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setEditingRowId(null);
+              setAddingNew(true);
+            }}
+            disabled={addingNew}
+            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+          >
+            {t("+ Log harvest")}
+          </button>
+        </div>
+        {filteredHarvestLogs.length === 0 && !addingNew ? (
           <div className="rounded-lg border border-zinc-200 bg-white p-8 text-center">
             <p className="text-zinc-500">
               {harvestLogs.length === 0 ? t("No harvest logs yet.") : t("No harvest logs match the current filters.")}
             </p>
-            <Link href="/farm" className="mt-4 inline-block text-zinc-900 hover:text-zinc-700 font-medium">
+            <button
+              type="button"
+              onClick={() => setAddingNew(true)}
+              className="mt-4 inline-block font-medium text-zinc-900 hover:text-zinc-700"
+            >
               {t("Log a harvest →")}
-            </Link>
+            </button>
           </div>
         ) : (
           <div className="rounded-lg border border-zinc-200 bg-white shadow-sm overflow-x-auto">
@@ -342,10 +385,39 @@ export default function HarvestLogsPage() {
                   <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-900">{t("Quality")}</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-900">{t("Destination")}</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-900">{t("Notes")}</th>
+                  <th className="px-4 py-4" aria-label={t("Actions")} />
                 </tr>
               </thead>
               <tbody>
-                {filteredHarvestLogs.map((log) => (
+                {addingNew && activeFarmId && (
+                  <HarvestRowEditor
+                    farmId={activeFarmId}
+                    crops={crops}
+                    zones={zones}
+                    log={null}
+                    onCancel={() => setAddingNew(false)}
+                    onSaved={async (notice) => {
+                      setAddingNew(false);
+                      await reloadLogs();
+                      if (notice) setError(notice);
+                    }}
+                  />
+                )}
+                {filteredHarvestLogs.map((log) =>
+                  editingRowId === log.id && activeFarmId ? (
+                    <HarvestRowEditor
+                      key={log.id}
+                      farmId={activeFarmId}
+                      crops={crops}
+                      zones={zones}
+                      log={log}
+                      onCancel={() => setEditingRowId(null)}
+                      onSaved={async () => {
+                        setEditingRowId(null);
+                        await reloadLogs();
+                      }}
+                    />
+                  ) : (
                   <tr key={log.id} className="border-b border-zinc-200 hover:bg-zinc-50">
                     <td className="px-6 py-4 text-sm text-zinc-900">{formatDate(log.harvest_date)}</td>
                     <td className="px-6 py-4 text-sm text-zinc-900">
@@ -376,8 +448,23 @@ export default function HarvestLogsPage() {
                     <td className="px-6 py-4 text-sm text-zinc-600 max-w-xs truncate">
                       {log.notes || "—"}
                     </td>
+                    <td className="px-4 py-4 text-right">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAddingNew(false);
+                          setEditingRowId(log.id);
+                        }}
+                        className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
+                        aria-label={t("Edit harvest")}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        {t("Edit")}
+                      </button>
+                    </td>
                   </tr>
-                ))}
+                  )
+                )}
               </tbody>
             </table>
           </div>
@@ -538,5 +625,339 @@ function SplitDialog({
         </div>
       </form>
     </div>
+  );
+}
+
+type RowFields = {
+  harvest_date: string;
+  crop_id: string;
+  zone_id: string;
+  quantity_kg: string;
+  quantity_units: string;
+  quality: string;
+  notes: string;
+  split: SplitFields;
+};
+
+const QUALITIES = ["premium", "standard", "lower_grade", "mixed"];
+
+function todayIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function rowFieldsFor(log: HarvestLog | null): RowFields {
+  if (!log) {
+    return {
+      harvest_date: todayIso(),
+      crop_id: "",
+      zone_id: "",
+      quantity_kg: "",
+      quantity_units: "",
+      quality: "standard",
+      notes: "",
+      split: blankSplitFields,
+    };
+  }
+  return {
+    harvest_date: log.harvest_date ?? "",
+    crop_id: log.crop_id ?? "",
+    zone_id: log.zone_id ?? "",
+    quantity_kg: log.quantity_kg !== null ? String(log.quantity_kg) : "",
+    quantity_units: log.quantity_units !== null ? String(log.quantity_units) : "",
+    quality: log.quality || "standard",
+    notes: log.notes ?? "",
+    split: fieldsFromSplits(log.splits ?? []),
+  };
+}
+
+/**
+ * A harvest row turned into inputs: a new harvest at the top of the table, or
+ * an existing one being corrected. What is typed survives a refresh until it
+ * is saved or cancelled.
+ */
+function HarvestRowEditor({
+  farmId,
+  crops,
+  zones,
+  log,
+  onCancel,
+  onSaved,
+}: {
+  farmId: string;
+  crops: Crop[];
+  zones: Zone[];
+  log: HarvestLog | null;
+  onCancel: () => void;
+  onSaved: (notice?: string) => void | Promise<void>;
+}) {
+  const t = useT();
+  const draftKey = log ? `harvest-row:${log.id}` : `harvest-row-new:${farmId}`;
+  const baseline = useMemo(() => rowFieldsFor(log), [log]);
+  const [fields, setFields, clearDraft] = useFormDraft<RowFields>(draftKey, baseline);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const crop = crops.find((c) => c.id === fields.crop_id) ?? null;
+  const showUnits = isCountedCrop(crop?.crop_name ?? log?.crop?.[0]?.crop_name) || !!fields.quantity_units.trim();
+  const perPiece = crop?.kg_per_unit ? String(crop.kg_per_unit) : "";
+  const typedKg = fields.quantity_kg.trim() ? Number(fields.quantity_kg) : null;
+  const estimate = typedKg === null && fields.quantity_units.trim() ? estimatedKg(fields.quantity_units, perPiece) : null;
+  const splitTotalKg = typedKg !== null && Number.isFinite(typedKg) && typedKg > 0 ? typedKg : estimate;
+  const split = fields.split ?? blankSplitFields;
+  const over = splitIsOver(splitTotalKg, split);
+  const set = (patch: Partial<RowFields>) => setFields((prev) => ({ ...prev, ...patch }));
+
+  function cancel() {
+    discardDraft(draftKey);
+    onCancel();
+  }
+
+  async function save() {
+    if (over || saving) return;
+    try {
+      setSaving(true);
+      setError("");
+      let notice = "";
+      if (!log) {
+        const units = fields.quantity_units.trim();
+        const result = await logHarvest(
+          farmId,
+          {
+            crop_id: fields.crop_id,
+            zone_id: fields.zone_id,
+            harvest_date: fields.harvest_date,
+            unit_mode: units ? "units" : "kg",
+            quantity_units: units,
+            quantity_kg: fields.quantity_kg,
+            kg_per_unit: units ? perPiece : "",
+            quality: fields.quality,
+            notes: fields.notes,
+            split,
+          },
+          crops,
+          t
+        );
+        notice = result.splitError;
+      } else {
+        const units = fields.quantity_units.trim() ? Math.floor(Number(fields.quantity_units)) : null;
+        const kgValue = typedKg ?? estimate;
+        /* Still an estimate only if the kilos were left as they were. */
+        const kgUnchanged = typedKg !== null && log.quantity_kg !== null && Math.abs(typedKg - log.quantity_kg) < 0.0005;
+        await updateHarvest(
+          farmId,
+          log,
+          {
+            crop_id: fields.crop_id,
+            zone_id: fields.zone_id || null,
+            harvest_date: fields.harvest_date,
+            quantity_kg: kgValue,
+            quantity_units: units,
+            weight_estimated: typedKg === null ? estimate !== null : kgUnchanged && !!log.weight_estimated,
+            quality: fields.quality,
+            notes: fields.notes.trim() || null,
+            splits: splitsFromFields(split),
+          },
+          t
+        );
+      }
+      clearDraft();
+      await onSaved(notice || undefined);
+    } catch (err) {
+      setError(errMsg(err, log ? t("Failed to save") : t("Failed to log harvest")));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const onEnter = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      save();
+    } else if (e.key === "Escape") {
+      cancel();
+    }
+  };
+  const input = "w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-zinc-900";
+  const cropMissing = log && fields.crop_id && !crops.some((c) => c.id === fields.crop_id);
+
+  return (
+    <>
+      <tr className="border-b border-amber-200 bg-amber-50/60 align-top">
+        <td className="px-3 py-3">
+          <input
+            type="date"
+            value={fields.harvest_date}
+            onChange={(e) => set({ harvest_date: e.target.value })}
+            onKeyDown={onEnter}
+            className={`${input} min-w-[140px]`}
+            aria-label={t("Harvest date")}
+          />
+        </td>
+        <td className="px-3 py-3">
+          <select
+            value={fields.crop_id}
+            onChange={(e) => {
+              const next = crops.find((c) => c.id === e.target.value);
+              set({ crop_id: e.target.value, zone_id: fields.zone_id || next?.zone_id || "" });
+            }}
+            className={`${input} min-w-[140px]`}
+            aria-label={t("Crop")}
+          >
+            <option value="">{t("Select crop")}</option>
+            {cropMissing && <option value={fields.crop_id}>{log?.crop?.[0]?.crop_name ?? t("Crop")}</option>}
+            {crops.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.crop_name}
+                {c.variety ? ` · ${c.variety}` : ""}
+              </option>
+            ))}
+          </select>
+        </td>
+        <td className="px-3 py-3">
+          <select
+            value={fields.zone_id}
+            onChange={(e) => set({ zone_id: e.target.value })}
+            className={`${input} min-w-[100px]`}
+            aria-label={t("Bed")}
+          >
+            <option value="">{t("No bed")}</option>
+            {zones.map((z) => (
+              <option key={z.id} value={z.id}>
+                {z.name}
+              </option>
+            ))}
+          </select>
+        </td>
+        <td className="px-3 py-3">
+          <div className="flex min-w-[110px] flex-col gap-1.5">
+            <label className="flex items-center gap-1.5">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                inputMode="decimal"
+                value={fields.quantity_kg}
+                onChange={(e) => set({ quantity_kg: e.target.value })}
+                onKeyDown={onEnter}
+                className={`${input} text-right`}
+                placeholder={estimate !== null ? `≈ ${estimate}` : "0.00"}
+                aria-label={t("Quantity (kg)")}
+              />
+              <span className="text-xs text-zinc-500">kg</span>
+            </label>
+            {showUnits && (
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  step="1"
+                  min="0"
+                  inputMode="numeric"
+                  value={fields.quantity_units}
+                  onChange={(e) => set({ quantity_units: e.target.value })}
+                  onKeyDown={onEnter}
+                  className={`${input} text-right`}
+                  placeholder="0"
+                  aria-label={t("Count (pieces)")}
+                />
+                <span className="text-xs text-zinc-500">{t("pcs")}</span>
+              </label>
+            )}
+          </div>
+        </td>
+        <td className="px-3 py-3">
+          <select
+            value={fields.quality}
+            onChange={(e) => set({ quality: e.target.value })}
+            className={`${input} min-w-[110px]`}
+            aria-label={t("Quality")}
+          >
+            {QUALITIES.map((q) => (
+              <option key={q} value={q}>
+                {t(q)}
+              </option>
+            ))}
+          </select>
+        </td>
+        <td className="px-3 py-3">
+          <div className="flex min-w-[170px] flex-col gap-1.5">
+            {(["EH", "ORG"] as const).map((dest) => (
+              <label key={dest} className="flex items-center gap-1.5">
+                <span className={`w-9 text-xs font-semibold ${dest === "EH" ? "text-emerald-700" : "text-blue-700"}`}>{dest}</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  inputMode="decimal"
+                  value={split[dest]}
+                  onChange={(e) => set({ split: { ...split, [dest]: e.target.value } })}
+                  onKeyDown={onEnter}
+                  disabled={!splitTotalKg}
+                  className={`${input} text-right disabled:bg-zinc-100`}
+                  placeholder="0"
+                  aria-label={t("Kilos to {dest}", { dest })}
+                />
+                <span className="text-xs text-zinc-500">kg</span>
+              </label>
+            ))}
+            {splitTotalKg ? (
+              <div className="flex gap-1">
+                {[
+                  { label: "All EH", eh: 1 },
+                  { label: "50 / 50", eh: 0.5 },
+                  { label: "All ORG", eh: 0 },
+                ].map((p) => (
+                  <button
+                    key={p.label}
+                    type="button"
+                    onClick={() => set({ split: presetSplitFields(splitTotalKg, p.eh) })}
+                    className="rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[11px] font-medium text-zinc-700 hover:bg-zinc-100"
+                  >
+                    {t(p.label)}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </td>
+        <td className="px-3 py-3">
+          <textarea
+            value={fields.notes}
+            onChange={(e) => set({ notes: e.target.value })}
+            rows={2}
+            className={`${input} min-w-[180px]`}
+            placeholder={t("Notes")}
+            aria-label={t("Notes")}
+          />
+        </td>
+        <td className="px-3 py-3">
+          <div className="flex flex-col gap-1.5">
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving || over || !fields.crop_id}
+              className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {saving ? t("Saving...") : log ? t("Save") : t("Log harvest")}
+            </button>
+            <button
+              type="button"
+              onClick={cancel}
+              className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-white"
+            >
+              {t("Cancel")}
+            </button>
+          </div>
+        </td>
+      </tr>
+      {(error || over) && (
+        <tr className="border-b border-amber-200 bg-amber-50/60">
+          <td colSpan={8} className="px-3 pb-3 text-sm text-red-700">
+            {error ||
+              t("EH and ORG add up to more than the harvest.")}
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
