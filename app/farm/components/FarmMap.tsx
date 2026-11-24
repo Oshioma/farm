@@ -1449,7 +1449,10 @@ export function FarmMap({ zones, crops, plants = [], fertilisations = [], compos
                               {c.variety ? ` · ${c.variety}` : ""}
                             </span>
                           </div>
-                          <div className="mt-1 text-xs text-zinc-400 capitalize">{c.status ? t(c.status) : null}</div>
+                          <div className="mt-1 text-xs text-zinc-400 capitalize">
+                            {c.status ? t(c.status) : null}
+                            {c.planted_on ? `${c.status ? " · " : ""}${fmtDate(c.planted_on)}` : null}
+                          </div>
                         </div>
                       ))}
                     </div>
